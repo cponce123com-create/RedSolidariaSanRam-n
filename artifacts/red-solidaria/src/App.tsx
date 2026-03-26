@@ -21,6 +21,10 @@ import AdminLayout from "./pages/admin/layout";
 import AdminCampaigns from "./pages/admin/campaigns";
 import AdminCampaignDetail from "./pages/admin/campaign-detail";
 import AdminDonations from "./pages/admin/donations";
+import AdminReports from "./pages/admin/reports";
+import AdminReportDetail from "./pages/admin/report-detail";
+import ReportForm from "./pages/report-form";
+import UrgentCases from "./pages/urgent-cases";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +72,16 @@ function App() {
                 <div className="p-8">Módulo Mensajes en Construcción</div>
               </AdminLayout>
             </Route>
+            <Route path="/admin/reportes/:id">
+              <AdminLayout>
+                <AdminReportDetail />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/reportes">
+              <AdminLayout>
+                <AdminReports />
+              </AdminLayout>
+            </Route>
             <Route path="/admin">
               <AdminLayout>
                 <AdminCampaigns />
@@ -88,6 +102,16 @@ function App() {
             <Route path="/campanas">
               <MainLayout>
                 <Campaigns />
+              </MainLayout>
+            </Route>
+            <Route path="/casos-urgentes">
+              <MainLayout>
+                <UrgentCases />
+              </MainLayout>
+            </Route>
+            <Route path="/reportar">
+              <MainLayout>
+                <ReportForm />
               </MainLayout>
             </Route>
             <Route path="/nosotros">

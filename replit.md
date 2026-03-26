@@ -132,6 +132,12 @@ Tables:
 - `stats` - Impact statistics (key-value store)
 - `contact_messages` - Contact form submissions
 - `volunteers` - Volunteer registrations
+- `donations` - Campaign donations (Yape/Plin/BCP/efectivo) with approval workflow
+- `campaign_updates` - Progress updates per campaign
+- `campaign_images` - Gallery images per campaign
+- `campaign_expenses` - Expense records per campaign (Phase 3)
+- `campaign_evidence` - Photo/document evidence per campaign (Phase 3)
+- `community_reports` - Community-submitted urgent case reports (Phase 4)
 
 ## Packages
 

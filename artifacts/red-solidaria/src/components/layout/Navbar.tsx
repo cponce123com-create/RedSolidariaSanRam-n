@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, Heart, X } from "lucide-react";
+import { Menu, Heart, X, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -12,6 +12,7 @@ export function Navbar() {
     { href: "/", label: "Inicio" },
     { href: "/nosotros", label: "Nosotros" },
     { href: "/campanas", label: "Campañas" },
+    { href: "/casos-urgentes", label: "Casos Urgentes", urgent: true },
     { href: "/noticias", label: "Noticias" },
     { href: "/contacto", label: "Contacto" },
   ];
@@ -44,10 +45,17 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all hover:bg-secondary ${
-                  location === link.href ? "text-primary bg-primary/5" : "text-muted-foreground hover:text-foreground"
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  (link as any).urgent
+                    ? location === link.href
+                      ? "text-red-700 bg-red-100 font-semibold"
+                      : "text-red-600 hover:bg-red-50 font-semibold flex items-center gap-1"
+                    : location === link.href
+                    ? "text-primary bg-primary/5"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
               >
+                {(link as any).urgent && <AlertTriangle className="w-3.5 h-3.5 inline" />}
                 {link.label}
               </Link>
             ))}
@@ -94,9 +102,16 @@ export function Navbar() {
                   }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
+                  {(link as any).urgent && <AlertTriangle className="w-4 h-4 inline mr-1 text-red-500" />}
                   {link.label}
                 </Link>
               ))}
+              <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="outline" className="w-full mt-1 rounded-xl gap-2 font-semibold border-red-200 text-red-600 hover:bg-red-50">
+                  <AlertTriangle className="w-4 h-4" />
+                  Reportar Caso
+                </Button>
+              </Link>
               <Link href="/campanas" onClick={() => setIsMobileMenuOpen(false)}>
                 <Button className="w-full mt-2 rounded-xl gap-2 font-semibold">
                   <Heart className="w-4 h-4" />

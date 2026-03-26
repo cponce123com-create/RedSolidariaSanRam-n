@@ -13,6 +13,7 @@ import statsRouter from "./stats";
 import contactRouter from "./contact";
 import volunteersRouter from "./volunteers";
 import adminRouter from "./admin";
+import communityReportsRouter from "./community-reports";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(statsRouter);
 router.use(contactRouter);
 router.use(volunteersRouter);
 router.use(adminRouter);
+router.use(communityReportsRouter);
 
 export default router;

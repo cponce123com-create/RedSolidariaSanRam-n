@@ -1,14 +1,36 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useGetStats, useGetCampaigns, useGetTestimonials } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { CampaignCard } from "@/components/shared/CampaignCard";
-import { Heart, Users, Gift, ShieldCheck, PawPrint } from "lucide-react";
+import { Heart, Users, Gift, ShieldCheck, PawPrint, AlertTriangle, MapPin, ArrowRight, Baby, PersonStanding, Cat, Home as HomeIcon, Zap } from "lucide-react";
+
+interface FeaturedReport {
+  id: number; type: string; title: string; description: string;
+  location: string; urgency: string; photos: string[] | null; campaignId: number | null;
+}
+
+const TYPE_ICONS: Record<string, React.ElementType> = {
+  "familia-vulnerable": Heart, "nino-necesidad": Baby, "adulto-mayor": PersonStanding,
+  "animal-herido": Cat, "albergue": HomeIcon, "emergencia-comunitaria": Zap,
+};
+const URGENCY_COLOR: Record<string, string> = {
+  low: "bg-green-500", medium: "bg-yellow-500", high: "bg-orange-500", critical: "bg-red-500 animate-pulse",
+};
 
 export default function Home() {
   const { data: stats } = useGetStats();
   const { data: campaigns } = useGetCampaigns({ featured: true, status: "active" });
   const { data: testimonials } = useGetTestimonials();
+  const { data: featuredReports = [] } = useQuery<FeaturedReport[]>({
+    queryKey: ["/api/reports/featured"],
+    queryFn: async () => {
+      const res = await fetch("/api/reports/featured");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
   return (
     <div className="min-h-screen pt-20">
@@ -122,6 +144,89 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* URGENT CASES - only shown when there are featured reports */}
+      {featuredReports.length > 0 && (
+        <section className="py-24 bg-background">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-red-600 font-bold text-sm uppercase tracking-wider">Casos que necesitan ayuda ahora</span>
+                </div>
+                <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Casos Urgentes</h2>
+                <p className="text-lg text-muted-foreground">Personas reales de nuestra comunidad que atraviesan situaciones difíciles. Cada pequeña ayuda marca una diferencia enorme.</p>
+              </div>
+              <Link href="/casos-urgentes">
+                <Button variant="outline" className="rounded-xl bg-white border-red-200 text-red-600 hover:bg-red-50">
+                  Ver todos los casos <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {featuredReports.slice(0, 3).map((report) => {
+                const TypeIcon = TYPE_ICONS[report.type] || AlertTriangle;
+                const photo = report.photos?.[0];
+                return (
+                  <motion.div
+                    key={report.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col"
+                  >
+                    <div className="aspect-[4/3] bg-secondary relative overflow-hidden">
+                      {photo ? (
+                        <img src={photo} alt={report.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <TypeIcon className="w-16 h-16 text-muted-foreground opacity-20" />
+                        </div>
+                      )}
+                      <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-white shadow-sm`}>
+                        <span className={`w-2 h-2 rounded-full ${URGENCY_COLOR[report.urgency] || "bg-secondary"}`} />
+                        {report.urgency === "critical" ? "EMERGENCIA" : report.urgency === "high" ? "Urgente" : "Necesita ayuda"}
+                      </div>
+                    </div>
+                    <div className="p-5 flex-1 flex flex-col gap-3">
+                      <h3 className="font-display font-bold text-lg leading-tight line-clamp-2">{report.title}</h3>
+                      <p className="text-muted-foreground text-sm line-clamp-2">{report.description}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-auto">
+                        <MapPin className="w-3.5 h-3.5" /> {report.location}
+                      </div>
+                      <div className="pt-2">
+                        {report.campaignId ? (
+                          <Link href={`/campanas/${report.campaignId}`}>
+                            <Button size="sm" className="w-full rounded-xl h-9">
+                              <Heart className="w-3.5 h-3.5 mr-1.5" /> Apoyar campaña
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link href="/casos-urgentes">
+                            <Button variant="outline" size="sm" className="w-full rounded-xl h-9 border-primary/30 text-primary hover:bg-primary/5">
+                              <ArrowRight className="w-3.5 h-3.5 mr-1.5" /> Ver caso completo
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            <div className="mt-10 text-center">
+              <Link href="/reportar">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground rounded-xl">
+                  ¿Conoces a alguien que necesite ayuda? <span className="text-primary font-semibold ml-1">Repórtalo aquí →</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* HOW TO HELP */}
       <section className="py-24 bg-background">

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useEffect } from "react";
-import { Target, FileText, LogOut, MessageSquare, DollarSign } from "lucide-react";
+import { Target, FileText, LogOut, MessageSquare, DollarSign, AlertTriangle } from "lucide-react";
 import { useAdminLogout, useGetAdminMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 
@@ -31,6 +31,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { href: "/admin/campanas", icon: Target, label: "Campañas" },
     { href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" },
+    { href: "/admin/reportes", icon: AlertTriangle, label: "Reportes", highlight: true },
     { href: "/admin/noticias", icon: FileText, label: "Noticias" },
     { href: "/admin/mensajes", icon: MessageSquare, label: "Mensajes" },
   ];
@@ -49,7 +50,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             return (
               <Link key={item.href} href={item.href}>
                 <span className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
-                  isActive ? "bg-primary text-primary-foreground shadow-md hover-elevate" : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : (item as any).highlight && !isActive
+                    ? "text-red-600 hover:bg-red-50 hover:text-red-700"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}>
                   <item.icon className="w-5 h-5" />
                   {item.label}
