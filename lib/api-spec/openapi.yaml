@@ -1,28 +1,23 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: Red Solidaria San Ramón API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: campaigns
-    description: Campaign management
+  - name: donations
+  - name: campaign-updates
+  - name: campaign-images
   - name: news
-    description: News and blog posts
   - name: testimonials
-    description: Testimonials
   - name: stats
-    description: Impact statistics
   - name: contact
-    description: Contact form
   - name: volunteers
-    description: Volunteer sign-up
   - name: admin
-    description: Admin authentication and management
 paths:
   /healthz:
     get:
@@ -47,7 +42,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [active, completed, all]
+            enum: [active, completed, paused, all]
         - name: featured
           in: query
           schema:
@@ -133,6 +128,252 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /campaigns/{id}/donations:
+    get:
+      operationId: getCampaignDonations
+      tags: [donations]
+      summary: Get donations for a specific campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of donations for campaign
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Donation"
+
+  /campaigns/{id}/updates:
+    get:
+      operationId: getCampaignUpdates
+      tags: [campaign-updates]
+      summary: Get updates for a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of updates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignUpdate"
+    post:
+      operationId: createCampaignUpdate
+      tags: [campaign-updates]
+      summary: Add an update to a campaign (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignUpdateInput"
+      responses:
+        "201":
+          description: Created update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignUpdate"
+
+  /campaigns/{id}/updates/{updateId}:
+    delete:
+      operationId: deleteCampaignUpdate
+      tags: [campaign-updates]
+      summary: Delete a campaign update (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: updateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /campaigns/{id}/images:
+    get:
+      operationId: getCampaignImages
+      tags: [campaign-images]
+      summary: Get gallery images for a campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignImage"
+    post:
+      operationId: addCampaignImage
+      tags: [campaign-images]
+      summary: Add image to campaign gallery (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignImageInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignImage"
+
+  /campaigns/{id}/images/{imageId}:
+    delete:
+      operationId: deleteCampaignImage
+      tags: [campaign-images]
+      summary: Delete campaign gallery image (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: imageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /donations:
+    post:
+      operationId: createDonation
+      tags: [donations]
+      summary: Submit a donation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDonationInput"
+      responses:
+        "201":
+          description: Donation submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+    get:
+      operationId: getDonations
+      tags: [donations]
+      summary: List all donations (admin)
+      parameters:
+        - name: campaignId
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        "200":
+          description: List of donations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Donation"
+
+  /donations/{id}:
+    get:
+      operationId: getDonation
+      tags: [donations]
+      summary: Get donation by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Donation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+    put:
+      operationId: updateDonationStatus
+      tags: [donations]
+      summary: Update donation status (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDonationStatusInput"
+      responses:
+        "200":
+          description: Updated donation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Donation"
+
+  /donations/stats:
+    get:
+      operationId: getDonationStats
+      tags: [donations]
+      summary: Get overall donation statistics
+      responses:
+        "200":
+          description: Donation statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DonationStats"
 
   /news:
     get:
@@ -340,6 +581,21 @@ paths:
               schema:
                 $ref: "#/components/schemas/ContactMessage"
 
+  /contact/messages:
+    get:
+      operationId: getContactMessages
+      tags: [contact]
+      summary: List contact messages (admin)
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContactMessage"
+
   /volunteers:
     post:
       operationId: registerVolunteer
@@ -429,21 +685,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-  /contact/messages:
-    get:
-      operationId: getContactMessages
-      tags: [contact]
-      summary: List contact messages (admin)
-      responses:
-        "200":
-          description: List of messages
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ContactMessage"
-
 components:
   schemas:
     HealthStatus:
@@ -451,8 +692,7 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
     Campaign:
       type: object
@@ -470,9 +710,11 @@ components:
           type: number
         raised:
           type: number
+        donorCount:
+          type: integer
         status:
           type: string
-          enum: [active, completed]
+          enum: [active, completed, paused]
         featured:
           type: boolean
         category:
@@ -490,6 +732,7 @@ components:
         - description
         - goal
         - raised
+        - donorCount
         - status
         - featured
         - category
@@ -512,7 +755,7 @@ components:
           type: number
         status:
           type: string
-          enum: [active, completed]
+          enum: [active, completed, paused]
         featured:
           type: boolean
         category:
@@ -530,6 +773,180 @@ components:
         - featured
         - category
         - startDate
+
+    CampaignUpdate:
+      type: object
+      properties:
+        id:
+          type: integer
+        campaignId:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+      required: [id, campaignId, title, content, createdAt]
+
+    CreateCampaignUpdateInput:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+      required: [title, content]
+
+    CampaignImage:
+      type: object
+      properties:
+        id:
+          type: integer
+        campaignId:
+          type: integer
+        imageUrl:
+          type: string
+        caption:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, campaignId, imageUrl, createdAt]
+
+    CreateCampaignImageInput:
+      type: object
+      properties:
+        imageUrl:
+          type: string
+        caption:
+          type: string
+          nullable: true
+      required: [imageUrl]
+
+    Donation:
+      type: object
+      properties:
+        id:
+          type: integer
+        campaignId:
+          type: integer
+          nullable: true
+        campaignTitle:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        amount:
+          type: number
+        paymentMethod:
+          type: string
+        message:
+          type: string
+          nullable: true
+        anonymous:
+          type: boolean
+        receiptUrl:
+          type: string
+          nullable: true
+        receiptNote:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        adminNote:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - firstName
+        - lastName
+        - email
+        - amount
+        - paymentMethod
+        - anonymous
+        - status
+        - createdAt
+
+    CreateDonationInput:
+      type: object
+      properties:
+        campaignId:
+          type: integer
+          nullable: true
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        amount:
+          type: number
+        paymentMethod:
+          type: string
+          enum: [yape, plin, transfer, card, cash, other]
+        message:
+          type: string
+          nullable: true
+        anonymous:
+          type: boolean
+        receiptUrl:
+          type: string
+          nullable: true
+        receiptNote:
+          type: string
+          nullable: true
+      required:
+        - firstName
+        - lastName
+        - email
+        - amount
+        - paymentMethod
+        - anonymous
+
+    UpdateDonationStatusInput:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        adminNote:
+          type: string
+          nullable: true
+      required: [status]
+
+    DonationStats:
+      type: object
+      properties:
+        totalDonations:
+          type: integer
+        totalAmount:
+          type: number
+        pendingCount:
+          type: integer
+        approvedCount:
+          type: integer
+        totalDonors:
+          type: integer
+      required:
+        - totalDonations
+        - totalAmount
+        - pendingCount
+        - approvedCount
+        - totalDonors
 
     NewsPost:
       type: object
@@ -549,13 +966,7 @@ components:
           type: string
         createdAt:
           type: string
-      required:
-        - id
-        - title
-        - content
-        - summary
-        - publishedAt
-        - createdAt
+      required: [id, title, content, summary, publishedAt, createdAt]
 
     CreateNewsInput:
       type: object
@@ -571,11 +982,7 @@ components:
           nullable: true
         publishedAt:
           type: string
-      required:
-        - title
-        - content
-        - summary
-        - publishedAt
+      required: [title, content, summary, publishedAt]
 
     Testimonial:
       type: object
@@ -593,12 +1000,7 @@ components:
           nullable: true
         createdAt:
           type: string
-      required:
-        - id
-        - name
-        - role
-        - message
-        - createdAt
+      required: [id, name, role, message, createdAt]
 
     CreateTestimonialInput:
       type: object
@@ -612,10 +1014,7 @@ components:
         avatarUrl:
           type: string
           nullable: true
-      required:
-        - name
-        - role
-        - message
+      required: [name, role, message]
 
     ImpactStats:
       type: object
@@ -651,11 +1050,7 @@ components:
           type: string
         subject:
           type: string
-      required:
-        - name
-        - email
-        - message
-        - subject
+      required: [name, email, message, subject]
 
     ContactMessage:
       type: object
@@ -675,13 +1070,7 @@ components:
           type: string
         createdAt:
           type: string
-      required:
-        - id
-        - name
-        - email
-        - message
-        - subject
-        - createdAt
+      required: [id, name, email, message, subject, createdAt]
 
     VolunteerInput:
       type: object
@@ -701,10 +1090,7 @@ components:
         motivation:
           type: string
           nullable: true
-      required:
-        - name
-        - email
-        - availability
+      required: [name, email, availability]
 
     Volunteer:
       type: object
@@ -728,12 +1114,7 @@ components:
           nullable: true
         createdAt:
           type: string
-      required:
-        - id
-        - name
-        - email
-        - availability
-        - createdAt
+      required: [id, name, email, availability, createdAt]
 
     AdminLoginInput:
       type: object
@@ -742,9 +1123,7 @@ components:
           type: string
         password:
           type: string
-      required:
-        - username
-        - password
+      required: [username, password]
 
     AdminLoginResponse:
       type: object
@@ -755,9 +1134,7 @@ components:
           type: string
         user:
           $ref: "#/components/schemas/AdminUser"
-      required:
-        - success
-        - message
+      required: [success, message]
 
     AdminUser:
       type: object
@@ -766,9 +1143,7 @@ components:
           type: integer
         username:
           type: string
-      required:
-        - id
-        - username
+      required: [id, username]
 
     SuccessResponse:
       type: object
@@ -777,9 +1152,7 @@ components:
           type: boolean
         message:
           type: string
-      required:
-        - success
-        - message
+      required: [success, message]
 
     ErrorResponse:
       type: object
@@ -788,6 +1161,4 @@ components:
           type: string
         message:
           type: string
-      required:
-        - error
-        - message
+      required: [error, message]
