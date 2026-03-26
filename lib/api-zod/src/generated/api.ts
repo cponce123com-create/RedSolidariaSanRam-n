@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Red Solidaria San Ramón API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from "zod";
 
@@ -18,7 +18,7 @@ export const HealthCheckResponse = zod.object({
  * @summary List all campaigns
  */
 export const GetCampaignsQueryParams = zod.object({
-  status: zod.enum(["active", "completed", "all"]).optional(),
+  status: zod.enum(["active", "completed", "paused", "all"]).optional(),
   featured: zod.coerce.boolean().optional(),
 });
 
@@ -29,7 +29,8 @@ export const GetCampaignsResponseItem = zod.object({
   imageUrl: zod.string().nullish(),
   goal: zod.number(),
   raised: zod.number(),
-  status: zod.enum(["active", "completed"]),
+  donorCount: zod.number(),
+  status: zod.enum(["active", "completed", "paused"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -47,7 +48,7 @@ export const CreateCampaignBody = zod.object({
   imageUrl: zod.string().nullish(),
   goal: zod.number(),
   raised: zod.number().optional(),
-  status: zod.enum(["active", "completed"]),
+  status: zod.enum(["active", "completed", "paused"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -68,7 +69,8 @@ export const GetCampaignResponse = zod.object({
   imageUrl: zod.string().nullish(),
   goal: zod.number(),
   raised: zod.number(),
-  status: zod.enum(["active", "completed"]),
+  donorCount: zod.number(),
+  status: zod.enum(["active", "completed", "paused"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -89,7 +91,7 @@ export const UpdateCampaignBody = zod.object({
   imageUrl: zod.string().nullish(),
   goal: zod.number(),
   raised: zod.number().optional(),
-  status: zod.enum(["active", "completed"]),
+  status: zod.enum(["active", "completed", "paused"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -103,7 +105,8 @@ export const UpdateCampaignResponse = zod.object({
   imageUrl: zod.string().nullish(),
   goal: zod.number(),
   raised: zod.number(),
-  status: zod.enum(["active", "completed"]),
+  donorCount: zod.number(),
+  status: zod.enum(["active", "completed", "paused"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -116,6 +119,231 @@ export const UpdateCampaignResponse = zod.object({
  */
 export const DeleteCampaignParams = zod.object({
   id: zod.coerce.number(),
+});
+
+/**
+ * @summary Get donations for a specific campaign
+ */
+export const GetCampaignDonationsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCampaignDonationsResponseItem = zod.object({
+  id: zod.number(),
+  campaignId: zod.number().nullish(),
+  campaignTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  amount: zod.number(),
+  paymentMethod: zod.string(),
+  message: zod.string().nullish(),
+  anonymous: zod.boolean(),
+  receiptUrl: zod.string().nullish(),
+  receiptNote: zod.string().nullish(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const GetCampaignDonationsResponse = zod.array(
+  GetCampaignDonationsResponseItem,
+);
+
+/**
+ * @summary Get updates for a campaign
+ */
+export const GetCampaignUpdatesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCampaignUpdatesResponseItem = zod.object({
+  id: zod.number(),
+  campaignId: zod.number(),
+  title: zod.string(),
+  content: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetCampaignUpdatesResponse = zod.array(
+  GetCampaignUpdatesResponseItem,
+);
+
+/**
+ * @summary Add an update to a campaign (admin)
+ */
+export const CreateCampaignUpdateParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CreateCampaignUpdateBody = zod.object({
+  title: zod.string(),
+  content: zod.string(),
+});
+
+/**
+ * @summary Delete a campaign update (admin)
+ */
+export const DeleteCampaignUpdateParams = zod.object({
+  id: zod.coerce.number(),
+  updateId: zod.coerce.number(),
+});
+
+/**
+ * @summary Get gallery images for a campaign
+ */
+export const GetCampaignImagesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCampaignImagesResponseItem = zod.object({
+  id: zod.number(),
+  campaignId: zod.number(),
+  imageUrl: zod.string(),
+  caption: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const GetCampaignImagesResponse = zod.array(
+  GetCampaignImagesResponseItem,
+);
+
+/**
+ * @summary Add image to campaign gallery (admin)
+ */
+export const AddCampaignImageParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddCampaignImageBody = zod.object({
+  imageUrl: zod.string(),
+  caption: zod.string().nullish(),
+});
+
+/**
+ * @summary Delete campaign gallery image (admin)
+ */
+export const DeleteCampaignImageParams = zod.object({
+  id: zod.coerce.number(),
+  imageId: zod.coerce.number(),
+});
+
+/**
+ * @summary Submit a donation
+ */
+export const CreateDonationBody = zod.object({
+  campaignId: zod.number().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  amount: zod.number(),
+  paymentMethod: zod.enum([
+    "yape",
+    "plin",
+    "transfer",
+    "card",
+    "cash",
+    "other",
+  ]),
+  message: zod.string().nullish(),
+  anonymous: zod.boolean(),
+  receiptUrl: zod.string().nullish(),
+  receiptNote: zod.string().nullish(),
+});
+
+/**
+ * @summary List all donations (admin)
+ */
+export const GetDonationsQueryParams = zod.object({
+  campaignId: zod.coerce.number().optional(),
+  status: zod.enum(["pending", "approved", "rejected"]).optional(),
+});
+
+export const GetDonationsResponseItem = zod.object({
+  id: zod.number(),
+  campaignId: zod.number().nullish(),
+  campaignTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  amount: zod.number(),
+  paymentMethod: zod.string(),
+  message: zod.string().nullish(),
+  anonymous: zod.boolean(),
+  receiptUrl: zod.string().nullish(),
+  receiptNote: zod.string().nullish(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const GetDonationsResponse = zod.array(GetDonationsResponseItem);
+
+/**
+ * @summary Get donation by ID
+ */
+export const GetDonationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetDonationResponse = zod.object({
+  id: zod.number(),
+  campaignId: zod.number().nullish(),
+  campaignTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  amount: zod.number(),
+  paymentMethod: zod.string(),
+  message: zod.string().nullish(),
+  anonymous: zod.boolean(),
+  receiptUrl: zod.string().nullish(),
+  receiptNote: zod.string().nullish(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Update donation status (admin)
+ */
+export const UpdateDonationStatusParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateDonationStatusBody = zod.object({
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string().nullish(),
+});
+
+export const UpdateDonationStatusResponse = zod.object({
+  id: zod.number(),
+  campaignId: zod.number().nullish(),
+  campaignTitle: zod.string().nullish(),
+  firstName: zod.string(),
+  lastName: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  amount: zod.number(),
+  paymentMethod: zod.string(),
+  message: zod.string().nullish(),
+  anonymous: zod.boolean(),
+  receiptUrl: zod.string().nullish(),
+  receiptNote: zod.string().nullish(),
+  status: zod.enum(["pending", "approved", "rejected"]),
+  adminNote: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+
+/**
+ * @summary Get overall donation statistics
+ */
+export const GetDonationStatsResponse = zod.object({
+  totalDonations: zod.number(),
+  totalAmount: zod.number(),
+  pendingCount: zod.number(),
+  approvedCount: zod.number(),
+  totalDonors: zod.number(),
 });
 
 /**
@@ -287,6 +515,22 @@ export const SendContactMessageBody = zod.object({
 });
 
 /**
+ * @summary List contact messages (admin)
+ */
+export const GetContactMessagesResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  email: zod.string(),
+  phone: zod.string().nullish(),
+  message: zod.string(),
+  subject: zod.string(),
+  createdAt: zod.string(),
+});
+export const GetContactMessagesResponse = zod.array(
+  GetContactMessagesResponseItem,
+);
+
+/**
  * @summary Register as volunteer
  */
 export const RegisterVolunteerBody = zod.object({
@@ -347,19 +591,3 @@ export const GetAdminMeResponse = zod.object({
   id: zod.number(),
   username: zod.string(),
 });
-
-/**
- * @summary List contact messages (admin)
- */
-export const GetContactMessagesResponseItem = zod.object({
-  id: zod.number(),
-  name: zod.string(),
-  email: zod.string(),
-  phone: zod.string().nullish(),
-  message: zod.string(),
-  subject: zod.string(),
-  createdAt: zod.string(),
-});
-export const GetContactMessagesResponse = zod.array(
-  GetContactMessagesResponseItem,
-);

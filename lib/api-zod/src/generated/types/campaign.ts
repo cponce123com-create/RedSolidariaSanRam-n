@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Red Solidaria San Ramón API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { CampaignStatus } from "./campaignStatus";
 
@@ -14,6 +14,7 @@ export interface Campaign {
   imageUrl?: string | null;
   goal: number;
   raised: number;
+  donorCount: number;
   status: CampaignStatus;
   featured: boolean;
   category: string;

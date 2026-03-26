@@ -6,12 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface NewsPost {
+export interface CampaignUpdate {
   id: number;
+  campaignId: number;
   title: string;
   content: string;
-  summary: string;
-  imageUrl?: string | null;
-  publishedAt: string;
   createdAt: string;
 }

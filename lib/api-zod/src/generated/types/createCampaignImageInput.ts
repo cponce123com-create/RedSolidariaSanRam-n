@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface ErrorResponse {
-  error: string;
-  message: string;
+export interface CreateCampaignImageInput {
+  imageUrl: string;
+  caption?: string | null;
 }

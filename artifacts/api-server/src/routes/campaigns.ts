@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, campaignsTable, insertCampaignSchema } from "@workspace/db";
+import { db, campaignsTable, donationsTable, insertCampaignSchema } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -7,8 +7,7 @@ const router: IRouter = Router();
 router.get("/campaigns", async (req, res) => {
   try {
     const { status, featured } = req.query;
-    let query = db.select().from(campaignsTable);
-    const campaigns = await query;
+    const campaigns = await db.select().from(campaignsTable);
     let filtered = campaigns;
     if (status && status !== "all") {
       filtered = filtered.filter((c) => c.status === status);
@@ -17,7 +16,8 @@ router.get("/campaigns", async (req, res) => {
       const featuredBool = featured === "true";
       filtered = filtered.filter((c) => c.featured === featuredBool);
     }
-    res.json(filtered.map(formatCampaign));
+    const result = await Promise.all(filtered.map(formatCampaignWithDonors));
+    res.json(result);
   } catch (err) {
     req.log.error({ err }, "Failed to get campaigns");
     res.status(500).json({ error: "server_error", message: "Failed to get campaigns" });
@@ -31,7 +31,7 @@ router.get("/campaigns/:id", async (req, res) => {
     if (!campaign) {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
-    res.json(formatCampaign(campaign));
+    res.json(await formatCampaignWithDonors(campaign));
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign");
     res.status(500).json({ error: "server_error", message: "Failed to get campaign" });
@@ -42,7 +42,7 @@ router.post("/campaigns", async (req, res) => {
   try {
     const data = insertCampaignSchema.parse(req.body);
     const [campaign] = await db.insert(campaignsTable).values(data).returning();
-    res.status(201).json(formatCampaign(campaign));
+    res.status(201).json(await formatCampaignWithDonors(campaign));
   } catch (err) {
     req.log.error({ err }, "Failed to create campaign");
     res.status(400).json({ error: "validation_error", message: "Invalid campaign data" });
@@ -57,7 +57,7 @@ router.put("/campaigns/:id", async (req, res) => {
     if (!campaign) {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
-    res.json(formatCampaign(campaign));
+    res.json(await formatCampaignWithDonors(campaign));
   } catch (err) {
     req.log.error({ err }, "Failed to update campaign");
     res.status(400).json({ error: "validation_error", message: "Invalid campaign data" });
@@ -75,14 +75,24 @@ router.delete("/campaigns/:id", async (req, res) => {
   }
 });
 
-function formatCampaign(c: typeof campaignsTable.$inferSelect) {
+async function formatCampaignWithDonors(c: typeof campaignsTable.$inferSelect) {
+  const donations = await db
+    .select()
+    .from(donationsTable)
+    .where(eq(donationsTable.campaignId, c.id));
+  const approvedDonations = donations.filter((d) => d.status === "approved");
+  const donorCount = approvedDonations.length;
+  const raisedFromDonations = approvedDonations.reduce((sum, d) => sum + d.amount, 0);
+  const raised = Math.max(c.raised, raisedFromDonations);
+
   return {
     id: c.id,
     title: c.title,
     description: c.description,
     imageUrl: c.imageUrl,
     goal: c.goal,
-    raised: c.raised,
+    raised,
+    donorCount,
     status: c.status,
     featured: c.featured,
     category: c.category,

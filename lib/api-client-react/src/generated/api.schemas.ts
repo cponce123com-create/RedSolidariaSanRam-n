@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Red Solidaria San Ramón API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -15,6 +15,7 @@ export type CampaignStatus =
 export const CampaignStatus = {
   active: "active",
   completed: "completed",
+  paused: "paused",
 } as const;
 
 export interface Campaign {
@@ -24,6 +25,7 @@ export interface Campaign {
   imageUrl?: string | null;
   goal: number;
   raised: number;
+  donorCount: number;
   status: CampaignStatus;
   featured: boolean;
   category: string;
@@ -38,6 +40,7 @@ export type CreateCampaignInputStatus =
 export const CreateCampaignInputStatus = {
   active: "active",
   completed: "completed",
+  paused: "paused",
 } as const;
 
 export interface CreateCampaignInput {
@@ -51,6 +54,108 @@ export interface CreateCampaignInput {
   category: string;
   startDate: string;
   endDate?: string | null;
+}
+
+export interface CampaignUpdate {
+  id: number;
+  campaignId: number;
+  title: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface CreateCampaignUpdateInput {
+  title: string;
+  content: string;
+}
+
+export interface CampaignImage {
+  id: number;
+  campaignId: number;
+  imageUrl: string;
+  caption?: string | null;
+  createdAt: string;
+}
+
+export interface CreateCampaignImageInput {
+  imageUrl: string;
+  caption?: string | null;
+}
+
+export type DonationStatus =
+  (typeof DonationStatus)[keyof typeof DonationStatus];
+
+export const DonationStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface Donation {
+  id: number;
+  campaignId?: number | null;
+  campaignTitle?: string | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  amount: number;
+  paymentMethod: string;
+  message?: string | null;
+  anonymous: boolean;
+  receiptUrl?: string | null;
+  receiptNote?: string | null;
+  status: DonationStatus;
+  adminNote?: string | null;
+  createdAt: string;
+}
+
+export type CreateDonationInputPaymentMethod =
+  (typeof CreateDonationInputPaymentMethod)[keyof typeof CreateDonationInputPaymentMethod];
+
+export const CreateDonationInputPaymentMethod = {
+  yape: "yape",
+  plin: "plin",
+  transfer: "transfer",
+  card: "card",
+  cash: "cash",
+  other: "other",
+} as const;
+
+export interface CreateDonationInput {
+  campaignId?: number | null;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  amount: number;
+  paymentMethod: CreateDonationInputPaymentMethod;
+  message?: string | null;
+  anonymous: boolean;
+  receiptUrl?: string | null;
+  receiptNote?: string | null;
+}
+
+export type UpdateDonationStatusInputStatus =
+  (typeof UpdateDonationStatusInputStatus)[keyof typeof UpdateDonationStatusInputStatus];
+
+export const UpdateDonationStatusInputStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
+} as const;
+
+export interface UpdateDonationStatusInput {
+  status: UpdateDonationStatusInputStatus;
+  adminNote?: string | null;
+}
+
+export interface DonationStats {
+  totalDonations: number;
+  totalAmount: number;
+  pendingCount: number;
+  approvedCount: number;
+  totalDonors: number;
 }
 
 export interface NewsPost {
@@ -170,5 +275,20 @@ export type GetCampaignsStatus =
 export const GetCampaignsStatus = {
   active: "active",
   completed: "completed",
+  paused: "paused",
   all: "all",
+} as const;
+
+export type GetDonationsParams = {
+  campaignId?: number;
+  status?: GetDonationsStatus;
+};
+
+export type GetDonationsStatus =
+  (typeof GetDonationsStatus)[keyof typeof GetDonationsStatus];
+
+export const GetDonationsStatus = {
+  pending: "pending",
+  approved: "approved",
+  rejected: "rejected",
 } as const;

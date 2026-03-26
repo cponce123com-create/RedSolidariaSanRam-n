@@ -3,27 +3,40 @@
  * Do not edit manually.
  * Api
  * Red Solidaria San Ramón API
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from "./adminLoginInput";
 export * from "./adminLoginResponse";
 export * from "./adminUser";
 export * from "./campaign";
+export * from "./campaignImage";
 export * from "./campaignStatus";
+export * from "./campaignUpdate";
 export * from "./contactMessage";
 export * from "./contactMessageInput";
+export * from "./createCampaignImageInput";
 export * from "./createCampaignInput";
 export * from "./createCampaignInputStatus";
+export * from "./createCampaignUpdateInput";
+export * from "./createDonationInput";
+export * from "./createDonationInputPaymentMethod";
 export * from "./createNewsInput";
 export * from "./createTestimonialInput";
+export * from "./donation";
+export * from "./donationStats";
+export * from "./donationStatus";
 export * from "./errorResponse";
 export * from "./getCampaignsParams";
 export * from "./getCampaignsStatus";
+export * from "./getDonationsParams";
+export * from "./getDonationsStatus";
 export * from "./healthStatus";
 export * from "./impactStats";
 export * from "./newsPost";
 export * from "./successResponse";
 export * from "./testimonial";
+export * from "./updateDonationStatusInput";
+export * from "./updateDonationStatusInputStatus";
 export * from "./volunteer";
 export * from "./volunteerInput";

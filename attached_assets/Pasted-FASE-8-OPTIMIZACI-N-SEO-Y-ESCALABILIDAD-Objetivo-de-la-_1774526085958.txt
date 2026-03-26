@@ -1,0 +1,144 @@
+FASE 8 — OPTIMIZACIÓN, SEO Y ESCALABILIDAD
+Objetivo de la Fase 8
+
+Dejar el proyecto listo para crecer y posicionarse.
+
+Módulos a mejorar
+1. SEO básico
+títulos optimizados
+meta descriptions
+URLs amigables
+Open Graph
+sitemap
+textos estructurados
+2. Optimización móvil
+
+Mejorar:
+
+velocidad
+tamaños de imagen
+navegación móvil
+formularios
+accesibilidad
+3. Compartir campañas
+
+Botones para:
+
+WhatsApp
+Facebook
+copiar enlace
+4. Seguridad y validaciones
+protección contra spam
+validación de formularios
+manejo de archivos
+control de acceso admin
+5. Escalabilidad
+
+Preparar estructura para futuro:
+
+múltiples sedes
+categorías ampliadas
+más paneles
+más campañas simultáneas
+mayor tráfico
+Resultado esperado de la Fase 8
+
+Web optimizada, seria y lista para crecer con más campañas, más usuarios y más impacto.
+
+BASE DE DATOS SUGERIDA
+
+Crear tablas como:
+
+users
+admin_users
+campaigns
+campaign_updates
+donations
+donation_proofs
+expenses
+expense_receipts
+reports
+adoptions
+adoption_requests
+volunteers
+testimonials
+blog_posts
+partners
+gallery
+faqs
+settings
+FUNCIONALIDADES MÍNIMAS POR PRIORIDAD
+Prioridad alta
+home profesional
+campañas
+donaciones
+transparencia
+admin básico
+Prioridad media
+reportes ciudadanos
+adopciones
+ayuda animal
+voluntariado
+Prioridad avanzada
+analítica
+roles internos
+SEO
+automatizaciones
+aliados
+ORDEN DE CONSTRUCCIÓN RECOMENDADO EN REPLIT
+Sprint 1
+estructura del proyecto
+diseño general
+home
+nosotros
+contacto
+footer
+header
+responsive base
+Sprint 2
+campañas
+detalle de campaña
+panel admin básico
+CRUD campañas
+Sprint 3
+donaciones
+contadores
+historial de donaciones
+dashboard de campañas
+Sprint 4
+gastos
+comprobantes
+transparencia pública
+panel admin de rendición
+Sprint 5
+reportes ciudadanos
+revisión admin
+casos urgentes
+Sprint 6
+adopciones
+solicitudes de adopción
+ayuda animal
+Sprint 7
+voluntariado
+aliados
+testimonios
+blog mejorado
+Sprint 8
+métricas
+SEO
+optimización
+seguridad
+despliegue final
+REQUISITOS DE UX IMPORTANTES
+
+Quiero que toda la plataforma cumpla con esto:
+
+navegación simple
+visual moderna
+carga rápida
+diseño mobile-first
+formularios claros
+botones visibles
+mucha confianza visual
+transparencia destacada
+arquitectura limpia y profesional

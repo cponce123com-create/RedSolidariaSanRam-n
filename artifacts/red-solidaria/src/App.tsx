@@ -18,6 +18,8 @@ import NotFound from "./pages/not-found";
 import AdminLogin from "./pages/admin/login";
 import AdminLayout from "./pages/admin/layout";
 import AdminCampaigns from "./pages/admin/campaigns";
+import AdminCampaignDetail from "./pages/admin/campaign-detail";
+import AdminDonations from "./pages/admin/donations";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,8 @@ function Router() {
               {/* If we hit /admin, redirect to campaigns or show dashboard */}
               <Route path="/admin" component={AdminCampaigns} />
               <Route path="/admin/campanas" component={AdminCampaigns} />
+              <Route path="/admin/campanas/:id" component={AdminCampaignDetail} />
+              <Route path="/admin/donaciones" component={AdminDonations} />
               <Route path="/admin/noticias" component={() => <div className="p-8">Módulo Noticias en Construcción</div>} />
               <Route path="/admin/mensajes" component={() => <div className="p-8">Módulo Mensajes en Construcción</div>} />
               <Route component={NotFound} />
