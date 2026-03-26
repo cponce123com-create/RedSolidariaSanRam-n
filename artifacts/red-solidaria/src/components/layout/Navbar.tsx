@@ -13,9 +13,9 @@ export function Navbar() {
     { href: "/nosotros", label: "Nosotros" },
     { href: "/campanas", label: "Campañas" },
     { href: "/casos-urgentes", label: "Casos Urgentes", urgent: true },
+    { href: "/como-ayudar", label: "Cómo Ayudar" },
     { href: "/adopciones", label: "Adopciones", animal: true },
     { href: "/ayuda-animal", label: "Ayuda Animal", animal: true },
-    { href: "/noticias", label: "Noticias" },
     { href: "/contacto", label: "Contacto" },
   ];
 

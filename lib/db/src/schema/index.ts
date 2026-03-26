@@ -12,3 +12,4 @@ export * from "./campaign-evidence";
 export * from "./community-reports";
 export * from "./pets";
 export * from "./adoption-requests";
+export * from "./allies";

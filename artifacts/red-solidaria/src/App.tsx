@@ -31,6 +31,11 @@ import Adoptions from "./pages/adoptions";
 import PetDetail from "./pages/pet-detail";
 import SubmitPet from "./pages/submit-pet";
 import AnimalWelfare from "./pages/animal-welfare";
+import Volunteer from "./pages/volunteer";
+import HowToHelp from "./pages/how-to-help";
+import Allies from "./pages/allies";
+import AdminVolunteers from "./pages/admin/volunteers";
+import AdminAllies from "./pages/admin/allies";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +58,16 @@ function App() {
           <Switch>
             {/* Admin routes */}
             <Route path="/admin/login" component={AdminLogin} />
+            <Route path="/admin/voluntarios">
+              <AdminLayout>
+                <AdminVolunteers />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/aliados">
+              <AdminLayout>
+                <AdminAllies />
+              </AdminLayout>
+            </Route>
             <Route path="/admin/adopciones/nueva">
               <AdminLayout>
                 <AdminPetForm />
@@ -153,6 +168,21 @@ function App() {
             <Route path="/ayuda-animal">
               <MainLayout>
                 <AnimalWelfare />
+              </MainLayout>
+            </Route>
+            <Route path="/voluntariado">
+              <MainLayout>
+                <Volunteer />
+              </MainLayout>
+            </Route>
+            <Route path="/como-ayudar">
+              <MainLayout>
+                <HowToHelp />
+              </MainLayout>
+            </Route>
+            <Route path="/aliados">
+              <MainLayout>
+                <Allies />
               </MainLayout>
             </Route>
             <Route path="/nosotros">

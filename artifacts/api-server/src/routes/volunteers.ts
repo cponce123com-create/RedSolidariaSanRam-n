@@ -1,27 +1,40 @@
 import { Router, type IRouter } from "express";
-import { db, volunteersTable, insertVolunteerSchema } from "@workspace/db";
+import { db } from "@workspace/db";
+import { volunteersTable, insertVolunteerSchema } from "@workspace/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+// ─── PUBLIC: Submit volunteer application ─────────────────────────────────────
 router.post("/volunteers", async (req, res) => {
   try {
     const data = insertVolunteerSchema.parse(req.body);
-    const [volunteer] = await db.insert(volunteersTable).values(data).returning();
+    const [volunteer] = await db.insert(volunteersTable).values({ ...data, status: "pending" }).returning();
     res.status(201).json(formatVolunteer(volunteer));
   } catch (err) {
     req.log.error({ err }, "Failed to register volunteer");
-    res.status(400).json({ error: "validation_error", message: "Invalid volunteer data" });
+    res.status(400).json({ error: "validation_error", message: "Datos de voluntario inválidos" });
   }
 });
 
-router.get("/volunteers", async (req, res) => {
-  try {
-    const volunteers = await db.select().from(volunteersTable);
-    res.json(volunteers.map(formatVolunteer).reverse());
-  } catch (err) {
-    req.log.error({ err }, "Failed to get volunteers");
-    res.status(500).json({ error: "server_error", message: "Failed to get volunteers" });
-  }
+// ─── ADMIN: List all volunteers ───────────────────────────────────────────────
+router.get("/admin/volunteers", async (req, res) => {
+  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
+  const { status } = req.query;
+  let query = db.select().from(volunteersTable).$dynamic();
+  if (status && status !== "all") query = query.where(eq(volunteersTable.status, status as string));
+  const volunteers = await query.orderBy(desc(volunteersTable.createdAt));
+  res.json(volunteers.map(formatVolunteer));
+});
+
+// ─── ADMIN: Update volunteer status ──────────────────────────────────────────
+router.patch("/admin/volunteers/:id", async (req, res) => {
+  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
+  const id = Number(req.params.id);
+  const { status, adminNotes } = req.body;
+  const [updated] = await db.update(volunteersTable).set({ status, adminNotes }).where(eq(volunteersTable.id, id)).returning();
+  if (!updated) return res.status(404).json({ error: "Voluntario no encontrado" });
+  res.json(formatVolunteer(updated));
 });
 
 function formatVolunteer(v: typeof volunteersTable.$inferSelect) {
@@ -30,9 +43,15 @@ function formatVolunteer(v: typeof volunteersTable.$inferSelect) {
     name: v.name,
     email: v.email,
     phone: v.phone,
+    age: v.age,
+    district: v.district,
     availability: v.availability,
     skills: v.skills,
+    interests: v.interests,
     motivation: v.motivation,
+    priorExperience: v.priorExperience,
+    status: v.status,
+    adminNotes: v.adminNotes,
     createdAt: v.createdAt.toISOString(),
   };
 }
