@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, Heart, X, AlertTriangle } from "lucide-react";
+import { Menu, Heart, X, AlertTriangle, Dog } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -13,6 +13,8 @@ export function Navbar() {
     { href: "/nosotros", label: "Nosotros" },
     { href: "/campanas", label: "Campañas" },
     { href: "/casos-urgentes", label: "Casos Urgentes", urgent: true },
+    { href: "/adopciones", label: "Adopciones", animal: true },
+    { href: "/ayuda-animal", label: "Ayuda Animal", animal: true },
     { href: "/noticias", label: "Noticias" },
     { href: "/contacto", label: "Contacto" },
   ];
@@ -24,9 +26,9 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-              <img 
-                src={`${import.meta.env.BASE_URL}images/logo.png`} 
-                alt="Logo" 
+              <img
+                src={`${import.meta.env.BASE_URL}images/logo.png`}
+                alt="Logo"
                 className="w-8 h-8 object-contain"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -40,41 +42,46 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1 lg:gap-2">
+          <nav className="hidden lg:flex items-center gap-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
                   (link as any).urgent
-                    ? location === link.href
+                    ? location === link.href || location.startsWith(link.href + "/")
                       ? "text-red-700 bg-red-100 font-semibold"
                       : "text-red-600 hover:bg-red-50 font-semibold flex items-center gap-1"
-                    : location === link.href
+                    : (link as any).animal
+                    ? location === link.href || location.startsWith(link.href + "/")
+                      ? "text-amber-700 bg-amber-100 font-semibold"
+                      : "text-amber-700 hover:bg-amber-50 font-medium flex items-center gap-1"
+                    : location === link.href || (link.href !== "/" && location.startsWith(link.href + "/"))
                     ? "text-primary bg-primary/5"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}
               >
-                {(link as any).urgent && <AlertTriangle className="w-3.5 h-3.5 inline" />}
+                {(link as any).urgent && <AlertTriangle className="w-3.5 h-3.5 inline mr-0.5" />}
+                {(link as any).animal && <Dog className="w-3.5 h-3.5 inline mr-0.5" />}
                 {link.label}
               </Link>
             ))}
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link href="/campanas">
-              <Button className="hidden sm:flex rounded-full gap-2 font-semibold shadow-lg shadow-primary/25 hover-elevate">
+              <Button className="hidden sm:flex rounded-full gap-2 font-semibold shadow-lg shadow-primary/25 hover-elevate text-sm px-4 h-9">
                 <Heart className="w-4 h-4" />
-                Donar Ahora
+                Donar
               </Button>
             </Link>
-            
+
             {/* Mobile Menu Toggle */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="md:hidden"
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -90,34 +97,40 @@ export function Navbar() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-background border-b border-border"
+            className="lg:hidden bg-background border-b border-border"
           >
-            <nav className="flex flex-col p-4 gap-2">
+            <nav className="flex flex-col p-4 gap-1">
               {navLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`p-3 rounded-xl text-base font-medium ${
-                    location === link.href ? "bg-primary/10 text-primary" : "text-foreground hover:bg-secondary"
+                  className={`p-3 rounded-xl text-base font-medium flex items-center gap-2 ${
+                    location === link.href ? "bg-primary/10 text-primary" :
+                    (link as any).urgent ? "text-red-600 hover:bg-red-50" :
+                    (link as any).animal ? "text-amber-700 hover:bg-amber-50" :
+                    "text-foreground hover:bg-secondary"
                   }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  {(link as any).urgent && <AlertTriangle className="w-4 h-4 inline mr-1 text-red-500" />}
+                  {(link as any).urgent && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                  {(link as any).animal && <Dog className="w-4 h-4 text-amber-500" />}
                   {link.label}
                 </Link>
               ))}
-              <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full mt-1 rounded-xl gap-2 font-semibold border-red-200 text-red-600 hover:bg-red-50">
-                  <AlertTriangle className="w-4 h-4" />
-                  Reportar Caso
-                </Button>
-              </Link>
-              <Link href="/campanas" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button className="w-full mt-2 rounded-xl gap-2 font-semibold">
-                  <Heart className="w-4 h-4" />
-                  Donar Ahora
-                </Button>
-              </Link>
+              <div className="border-t border-border mt-2 pt-2 space-y-2">
+                <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-red-200 text-red-600 hover:bg-red-50">
+                    <AlertTriangle className="w-4 h-4" />
+                    Reportar Caso
+                  </Button>
+                </Link>
+                <Link href="/campanas" onClick={() => setIsMobileMenuOpen(false)}>
+                  <Button className="w-full rounded-xl gap-2 font-semibold">
+                    <Heart className="w-4 h-4" />
+                    Donar Ahora
+                  </Button>
+                </Link>
+              </div>
             </nav>
           </motion.div>
         )}

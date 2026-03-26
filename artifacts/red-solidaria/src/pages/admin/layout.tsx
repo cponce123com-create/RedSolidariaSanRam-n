@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useEffect } from "react";
-import { Target, FileText, LogOut, MessageSquare, DollarSign, AlertTriangle } from "lucide-react";
+import { Target, FileText, LogOut, MessageSquare, DollarSign, AlertTriangle, Dog } from "lucide-react";
 import { useAdminLogout, useGetAdminMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 
@@ -32,6 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/campanas", icon: Target, label: "Campañas" },
     { href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" },
     { href: "/admin/reportes", icon: AlertTriangle, label: "Reportes", highlight: true },
+    { href: "/admin/adopciones", icon: Dog, label: "Adopciones", animal: true },
     { href: "/admin/noticias", icon: FileText, label: "Noticias" },
     { href: "/admin/mensajes", icon: MessageSquare, label: "Mensajes" },
   ];
@@ -54,6 +55,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     ? "bg-primary text-primary-foreground shadow-md"
                     : (item as any).highlight && !isActive
                     ? "text-red-600 hover:bg-red-50 hover:text-red-700"
+                    : (item as any).animal && !isActive
+                    ? "text-amber-700 hover:bg-amber-50 hover:text-amber-800"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 }`}>
                   <item.icon className="w-5 h-5" />

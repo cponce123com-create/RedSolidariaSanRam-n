@@ -138,6 +138,8 @@ Tables:
 - `campaign_expenses` - Expense records per campaign (Phase 3)
 - `campaign_evidence` - Photo/document evidence per campaign (Phase 3)
 - `community_reports` - Community-submitted urgent case reports (Phase 4)
+- `pets` - Animal adoption listings with health/status info (Phase 5)
+- `adoption_requests` - Adoption applications submitted by the public (Phase 5)
 
 ## Packages
 

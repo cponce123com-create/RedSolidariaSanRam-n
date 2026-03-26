@@ -23,8 +23,14 @@ import AdminCampaignDetail from "./pages/admin/campaign-detail";
 import AdminDonations from "./pages/admin/donations";
 import AdminReports from "./pages/admin/reports";
 import AdminReportDetail from "./pages/admin/report-detail";
+import AdminAdoptions from "./pages/admin/adoptions";
+import AdminPetForm from "./pages/admin/pet-form";
 import ReportForm from "./pages/report-form";
 import UrgentCases from "./pages/urgent-cases";
+import Adoptions from "./pages/adoptions";
+import PetDetail from "./pages/pet-detail";
+import SubmitPet from "./pages/submit-pet";
+import AnimalWelfare from "./pages/animal-welfare";
 
 const queryClient = new QueryClient();
 
@@ -45,8 +51,23 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Switch>
-            {/* Admin routes - no layout wrapper, handled individually */}
+            {/* Admin routes */}
             <Route path="/admin/login" component={AdminLogin} />
+            <Route path="/admin/adopciones/nueva">
+              <AdminLayout>
+                <AdminPetForm />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/adopciones/:id">
+              <AdminLayout>
+                <AdminPetForm />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/adopciones">
+              <AdminLayout>
+                <AdminAdoptions />
+              </AdminLayout>
+            </Route>
             <Route path="/admin/campanas/:id">
               <AdminLayout>
                 <AdminCampaignDetail />
@@ -112,6 +133,26 @@ function App() {
             <Route path="/reportar">
               <MainLayout>
                 <ReportForm />
+              </MainLayout>
+            </Route>
+            <Route path="/adopciones/:id">
+              <MainLayout>
+                <PetDetail />
+              </MainLayout>
+            </Route>
+            <Route path="/adopciones">
+              <MainLayout>
+                <Adoptions />
+              </MainLayout>
+            </Route>
+            <Route path="/publicar-mascota">
+              <MainLayout>
+                <SubmitPet />
+              </MainLayout>
+            </Route>
+            <Route path="/ayuda-animal">
+              <MainLayout>
+                <AnimalWelfare />
               </MainLayout>
             </Route>
             <Route path="/nosotros">
