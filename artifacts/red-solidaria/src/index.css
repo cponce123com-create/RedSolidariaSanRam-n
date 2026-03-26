@@ -50,34 +50,34 @@
 }
 
 :root {
-  --background: 30 20% 99%;
-  --foreground: 20 14% 15%;
-  --border: 20 10% 90%;
-  --input: 20 10% 90%;
-  --ring: 0 77% 58%;
+  --background: 120 10% 99%;
+  --foreground: 122 20% 12%;
+  --border: 120 10% 88%;
+  --input: 120 10% 88%;
+  --ring: 122 47% 35%;
 
   --card: 0 0% 100%;
-  --card-foreground: 20 14% 15%;
-  --card-border: 20 10% 92%;
+  --card-foreground: 122 20% 12%;
+  --card-border: 120 10% 91%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 20 14% 15%;
-  --popover-border: 20 10% 90%;
+  --popover-foreground: 122 20% 12%;
+  --popover-border: 120 10% 88%;
 
-  /* Coral Red Primary */
-  --primary: 0 77% 58%;
+  /* Verde Selva — color principal del logo */
+  --primary: 122 47% 35%;
   --primary-foreground: 0 0% 100%;
 
-  /* Soft Peach/Cream Secondary */
-  --secondary: 15 50% 95%;
-  --secondary-foreground: 20 14% 15%;
+  /* Verde claro suave — secundario */
+  --secondary: 120 30% 94%;
+  --secondary-foreground: 122 30% 18%;
 
-  /* Green Accent */
-  --accent: 142 71% 45%;
+  /* Teal/Cyan — acento del logo */
+  --accent: 189 66% 46%;
   --accent-foreground: 0 0% 100%;
 
-  --muted: 20 10% 95%;
-  --muted-foreground: 20 5% 45%;
+  --muted: 120 10% 95%;
+  --muted-foreground: 120 8% 44%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;

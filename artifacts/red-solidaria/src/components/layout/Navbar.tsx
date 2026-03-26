@@ -50,8 +50,8 @@ export function Navbar() {
                 className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
                   (link as any).urgent
                     ? location === link.href || location.startsWith(link.href + "/")
-                      ? "text-red-700 bg-red-100 font-semibold"
-                      : "text-red-600 hover:bg-red-50 font-semibold flex items-center gap-1"
+                      ? "text-orange-700 bg-orange-100 font-semibold"
+                      : "text-orange-600 hover:bg-orange-50 font-semibold flex items-center gap-1"
                     : (link as any).animal
                     ? location === link.href || location.startsWith(link.href + "/")
                       ? "text-amber-700 bg-amber-100 font-semibold"
@@ -106,20 +106,20 @@ export function Navbar() {
                   href={link.href}
                   className={`p-3 rounded-xl text-base font-medium flex items-center gap-2 ${
                     location === link.href ? "bg-primary/10 text-primary" :
-                    (link as any).urgent ? "text-red-600 hover:bg-red-50" :
+                    (link as any).urgent ? "text-orange-600 hover:bg-orange-50" :
                     (link as any).animal ? "text-amber-700 hover:bg-amber-50" :
                     "text-foreground hover:bg-secondary"
                   }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  {(link as any).urgent && <AlertTriangle className="w-4 h-4 text-red-500" />}
+                  {(link as any).urgent && <AlertTriangle className="w-4 h-4 text-orange-500" />}
                   {(link as any).animal && <Dog className="w-4 h-4 text-amber-500" />}
                   {link.label}
                 </Link>
               ))}
               <div className="border-t border-border mt-2 pt-2 space-y-2">
                 <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-red-200 text-red-600 hover:bg-red-50">
+                  <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-orange-200 text-orange-600 hover:bg-orange-50">
                     <AlertTriangle className="w-4 h-4" />
                     Reportar Caso
                   </Button>

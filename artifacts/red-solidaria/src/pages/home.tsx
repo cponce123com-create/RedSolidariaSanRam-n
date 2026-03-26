@@ -39,12 +39,10 @@ export default function Home() {
       {/* HERO SECTION */}
       <section className="relative overflow-hidden bg-background">
         <div className="absolute inset-0 z-0">
-          <img 
-            src={`${import.meta.env.BASE_URL}images/abstract-bg.png`} 
-            alt="Hero Background" 
-            className="w-full h-full object-cover opacity-60"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-emerald-50/60 to-teal-50/40"></div>
+          <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-yellow-100/40 blur-3xl -translate-y-1/3 translate-x-1/4"></div>
+          <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full bg-teal-100/50 blur-3xl translate-y-1/3 -translate-x-1/4"></div>
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background"></div>
         </div>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-20 pb-32 lg:pt-32 lg:pb-48 flex flex-col items-center text-center">
@@ -154,14 +152,14 @@ export default function Home() {
             <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
               <div className="max-w-2xl">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-                  <span className="text-red-600 font-bold text-sm uppercase tracking-wider">Casos que necesitan ayuda ahora</span>
+                  <span className="w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
+                  <span className="text-orange-600 font-bold text-sm uppercase tracking-wider">Casos que necesitan ayuda ahora</span>
                 </div>
                 <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Casos Urgentes</h2>
                 <p className="text-lg text-muted-foreground">Personas reales de nuestra comunidad que atraviesan situaciones difíciles. Cada pequeña ayuda marca una diferencia enorme.</p>
               </div>
               <Link href="/casos-urgentes">
-                <Button variant="outline" className="rounded-xl bg-white border-red-200 text-red-600 hover:bg-red-50">
+                <Button variant="outline" className="rounded-xl bg-white border-orange-200 text-orange-600 hover:bg-orange-50">
                   Ver todos los casos <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
