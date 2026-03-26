@@ -1,0 +1,19 @@
+packages:
+  "framer-motion": "Animations for page transitions and scroll effects"
+  "date-fns": "Date formatting for news and campaigns"
+  "react-hook-form": "Form state management"
+  "@hookform/resolvers": "Zod resolver for robust form validation"
+  "zod": "Schema definition for forms"
+  "embla-carousel-react": "Required by shadcn carousel component"
+
+images:
+  - path: "artifacts/red-solidaria/public/images/logo.png"
+    description: "Minimalist warm logo for NGO 'Red Solidaria San Ramón', featuring abstract hands holding a heart, in coral red and green on a transparent background"
+    aspect_ratio: "1:1"
+  - path: "artifacts/red-solidaria/public/images/abstract-bg.png"
+    description: "Abstract soft gradient background with warm coral red, peach, and light cream tones, suitable for a humanitarian NGO website hero section"
+    aspect_ratio: "16:9"
+
+notes:
+  - Using generated Orval hooks from @workspace/api-client-react
+  - Admin protected routes rely on /api/admin/me

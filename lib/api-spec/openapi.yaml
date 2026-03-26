@@ -1,22 +1,34 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Red Solidaria San Ramón API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: campaigns
+    description: Campaign management
+  - name: news
+    description: News and blog posts
+  - name: testimonials
+    description: Testimonials
+  - name: stats
+    description: Impact statistics
+  - name: contact
+    description: Contact form
+  - name: volunteers
+    description: Volunteer sign-up
+  - name: admin
+    description: Admin authentication and management
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +36,414 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /campaigns:
+    get:
+      operationId: getCampaigns
+      tags: [campaigns]
+      summary: List all campaigns
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, completed, all]
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of campaigns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+    post:
+      operationId: createCampaign
+      tags: [campaigns]
+      summary: Create a campaign (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignInput"
+      responses:
+        "201":
+          description: Created campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+
+  /campaigns/{id}:
+    get:
+      operationId: getCampaign
+      tags: [campaigns]
+      summary: Get campaign by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+    put:
+      operationId: updateCampaign
+      tags: [campaigns]
+      summary: Update campaign (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCampaignInput"
+      responses:
+        "200":
+          description: Updated campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+    delete:
+      operationId: deleteCampaign
+      tags: [campaigns]
+      summary: Delete campaign (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /news:
+    get:
+      operationId: getNews
+      tags: [news]
+      summary: List news posts
+      responses:
+        "200":
+          description: List of news
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NewsPost"
+    post:
+      operationId: createNews
+      tags: [news]
+      summary: Create news post (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNewsInput"
+      responses:
+        "201":
+          description: Created news post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsPost"
+
+  /news/{id}:
+    get:
+      operationId: getNewsPost
+      tags: [news]
+      summary: Get news post by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: News post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsPost"
+    put:
+      operationId: updateNews
+      tags: [news]
+      summary: Update news post (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNewsInput"
+      responses:
+        "200":
+          description: Updated news post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsPost"
+    delete:
+      operationId: deleteNews
+      tags: [news]
+      summary: Delete news post (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /testimonials:
+    get:
+      operationId: getTestimonials
+      tags: [testimonials]
+      summary: List testimonials
+      responses:
+        "200":
+          description: List of testimonials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Testimonial"
+    post:
+      operationId: createTestimonial
+      tags: [testimonials]
+      summary: Create testimonial (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTestimonialInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Testimonial"
+
+  /testimonials/{id}:
+    put:
+      operationId: updateTestimonial
+      tags: [testimonials]
+      summary: Update testimonial (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTestimonialInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Testimonial"
+    delete:
+      operationId: deleteTestimonial
+      tags: [testimonials]
+      summary: Delete testimonial (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get impact statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImpactStats"
+    put:
+      operationId: updateStats
+      tags: [stats]
+      summary: Update stats (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImpactStats"
+      responses:
+        "200":
+          description: Updated stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImpactStats"
+
+  /contact:
+    post:
+      operationId: sendContactMessage
+      tags: [contact]
+      summary: Send contact message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactMessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactMessage"
+
+  /volunteers:
+    post:
+      operationId: registerVolunteer
+      tags: [volunteers]
+      summary: Register as volunteer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VolunteerInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Volunteer"
+    get:
+      operationId: getVolunteers
+      tags: [volunteers]
+      summary: List volunteers (admin)
+      responses:
+        "200":
+          description: List of volunteers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Volunteer"
+
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Admin login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginInput"
+      responses:
+        "200":
+          description: Login success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /admin/logout:
+    post:
+      operationId: adminLogout
+      tags: [admin]
+      summary: Admin logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/me:
+    get:
+      operationId: getAdminMe
+      tags: [admin]
+      summary: Get current admin session
+      responses:
+        "200":
+          description: Admin info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /contact/messages:
+    get:
+      operationId: getContactMessages
+      tags: [contact]
+      summary: List contact messages (admin)
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContactMessage"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +454,340 @@ components:
       required:
         - status
 
+    Campaign:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        goal:
+          type: number
+        raised:
+          type: number
+        status:
+          type: string
+          enum: [active, completed]
+        featured:
+          type: boolean
+        category:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - title
+        - description
+        - goal
+        - raised
+        - status
+        - featured
+        - category
+        - startDate
+        - createdAt
+
+    CreateCampaignInput:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        goal:
+          type: number
+        raised:
+          type: number
+        status:
+          type: string
+          enum: [active, completed]
+        featured:
+          type: boolean
+        category:
+          type: string
+        startDate:
+          type: string
+        endDate:
+          type: string
+          nullable: true
+      required:
+        - title
+        - description
+        - goal
+        - status
+        - featured
+        - category
+        - startDate
+
+    NewsPost:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        summary:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        publishedAt:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - title
+        - content
+        - summary
+        - publishedAt
+        - createdAt
+
+    CreateNewsInput:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        summary:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        publishedAt:
+          type: string
+      required:
+        - title
+        - content
+        - summary
+        - publishedAt
+
+    Testimonial:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        role:
+          type: string
+        message:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - role
+        - message
+        - createdAt
+
+    CreateTestimonialInput:
+      type: object
+      properties:
+        name:
+          type: string
+        role:
+          type: string
+        message:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+      required:
+        - name
+        - role
+        - message
+
+    ImpactStats:
+      type: object
+      properties:
+        childrenHelped:
+          type: integer
+        campaignsRun:
+          type: integer
+        volunteers:
+          type: integer
+        donationsReceived:
+          type: number
+        animalsHelped:
+          type: integer
+      required:
+        - childrenHelped
+        - campaignsRun
+        - volunteers
+        - donationsReceived
+        - animalsHelped
+
+    ContactMessageInput:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        message:
+          type: string
+        subject:
+          type: string
+      required:
+        - name
+        - email
+        - message
+        - subject
+
+    ContactMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        message:
+          type: string
+        subject:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - message
+        - subject
+        - createdAt
+
+    VolunteerInput:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        availability:
+          type: string
+        skills:
+          type: string
+          nullable: true
+        motivation:
+          type: string
+          nullable: true
+      required:
+        - name
+        - email
+        - availability
+
+    Volunteer:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        availability:
+          type: string
+        skills:
+          type: string
+          nullable: true
+        motivation:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - availability
+        - createdAt
+
+    AdminLoginInput:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    AdminLoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        user:
+          $ref: "#/components/schemas/AdminUser"
+      required:
+        - success
+        - message
+
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+      required:
+        - id
+        - username
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required:
+        - success
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message

@@ -15,13 +15,15 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Frontend**: React + Vite (Wouter routing, TanStack Query, Tailwind CSS, shadcn/ui)
 
 ## Structure
 
 ```text
 artifacts-monorepo/
 ├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
+│   ├── api-server/         # Express API server
+│   └── red-solidaria/      # Red Solidaria San Ramón website (React + Vite)
 ├── lib/                    # Shared libraries
 │   ├── api-spec/           # OpenAPI spec + Orval codegen config
 │   ├── api-client-react/   # Generated React Query hooks
@@ -34,6 +36,43 @@ artifacts-monorepo/
 ├── tsconfig.json           # Root TS project references
 └── package.json            # Root package with hoisted devDeps
 ```
+
+## Red Solidaria San Ramón
+
+A full-stack NGO/solidarity organization website for Red Solidaria San Ramón (Chanchamayo, Peru).
+
+### Features (Phase 1)
+- **Home**: Hero, impact stats, featured campaigns, how to help, transparency, testimonials, CTA, footer
+- **Nosotros (About)**: History, mission, vision, values, team
+- **Campañas (Campaigns)**: Active and completed campaigns with progress bars
+- **Noticias (News)**: Blog/news listing and detail pages
+- **Contacto (Contact)**: Contact form, volunteer registration
+- **Admin Panel**: Login-protected dashboard to manage campaigns, news, testimonials, stats, volunteers, messages
+
+### Admin Credentials
+- Username: `admin`
+- Password: `redsolidaria2024`
+
+### Color Palette
+- Primary: Coral red (HSL: 0 77% 58%)
+- Background: Warm white
+- Accent: Green (hope/success)
+
+### API Routes
+All routes served at `/api`:
+- `GET/POST /campaigns` - Campaign management
+- `GET/PUT/DELETE /campaigns/:id` - Single campaign
+- `GET/POST /news` - News management
+- `GET/PUT/DELETE /news/:id` - Single news post
+- `GET/POST /testimonials` - Testimonials
+- `GET/PUT /stats` - Impact statistics
+- `POST /contact` - Contact form submission
+- `GET /contact/messages` - View messages (admin)
+- `POST /volunteers` - Volunteer registration
+- `GET /volunteers` - List volunteers (admin)
+- `POST /admin/login` - Admin login
+- `POST /admin/logout` - Admin logout
+- `GET /admin/me` - Current session check
 
 ## TypeScript & Composite Projects
 
@@ -48,6 +87,16 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 - `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
 - `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
 
+## Database Schema
+
+Tables:
+- `campaigns` - Solidarity campaigns with goals and progress
+- `news` - Blog/news posts
+- `testimonials` - Community testimonials
+- `stats` - Impact statistics (key-value store)
+- `contact_messages` - Contact form submissions
+- `volunteers` - Volunteer registrations
+
 ## Packages
 
 ### `artifacts/api-server` (`@workspace/api-server`)
@@ -55,42 +104,16 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
+- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, session, routes at `/api`
+- Routes: `src/routes/index.ts` mounts all routers
 - Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+
+### `artifacts/red-solidaria` (`@workspace/red-solidaria`)
+
+React + Vite frontend for Red Solidaria San Ramón website. All pages in Spanish.
 
 ### `lib/db` (`@workspace/db`)
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+Database layer using Drizzle ORM with PostgreSQL.
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+- Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`.

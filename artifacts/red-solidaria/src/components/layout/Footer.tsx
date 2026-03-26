@@ -1,0 +1,83 @@
+import { Link } from "wouter";
+import { Heart, Mail, MapPin, Phone, Facebook, Instagram } from "lucide-react";
+
+export function Footer() {
+  return (
+    <footer className="bg-card border-t border-border/50 pt-16 pb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+          
+          <div className="space-y-4">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                <Heart className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-display font-bold text-xl">Red Solidaria</span>
+            </Link>
+            <p className="text-muted-foreground leading-relaxed">
+              Uniendo corazones para transformar vidas en San Ramón, Chanchamayo. Empezamos con sonrisas en Navidad, y hoy somos una familia solidaria.
+            </p>
+            <div className="flex gap-4">
+              <a href="#" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
+                <Facebook className="w-5 h-5" />
+              </a>
+              <a href="#" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
+                <Instagram className="w-5 h-5" />
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-display font-bold text-lg mb-6">Enlaces Rápidos</h3>
+            <ul className="space-y-3">
+              <li><Link href="/nosotros" className="text-muted-foreground hover:text-primary transition-colors">Sobre Nosotros</Link></li>
+              <li><Link href="/campanas" className="text-muted-foreground hover:text-primary transition-colors">Campañas Activas</Link></li>
+              <li><Link href="/noticias" className="text-muted-foreground hover:text-primary transition-colors">Noticias y Blog</Link></li>
+              <li><Link href="/contacto" className="text-muted-foreground hover:text-primary transition-colors">Ser Voluntario</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-display font-bold text-lg mb-6">Contacto</h3>
+            <ul className="space-y-4">
+              <li className="flex items-start gap-3 text-muted-foreground">
+                <MapPin className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                <span>San Ramón, Chanchamayo<br/>Junín, Perú</span>
+              </li>
+              <li className="flex items-center gap-3 text-muted-foreground">
+                <Phone className="w-5 h-5 text-primary shrink-0" />
+                <span>+51 987 654 321</span>
+              </li>
+              <li className="flex items-center gap-3 text-muted-foreground">
+                <Mail className="w-5 h-5 text-primary shrink-0" />
+                <span>hola@redsolidariasanramon.org</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-display font-bold text-lg mb-6">Transparencia</h3>
+            <p className="text-muted-foreground mb-4">
+              Cada donación está documentada. Publicamos reportes de gastos y evidencias de entrega para cada campaña.
+            </p>
+            <Link href="/nosotros">
+              <span className="text-primary font-medium hover:underline flex items-center gap-1">
+                Conoce más sobre nuestro impacto <span aria-hidden="true">&rarr;</span>
+              </span>
+            </Link>
+          </div>
+
+        </div>
+
+        <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            © {new Date().getFullYear()} Red Solidaria San Ramón. Todos los derechos reservados.
+          </p>
+          <div className="flex gap-4 text-sm text-muted-foreground">
+            <Link href="/admin/login" className="hover:text-primary transition-colors">Portal Admin</Link>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}

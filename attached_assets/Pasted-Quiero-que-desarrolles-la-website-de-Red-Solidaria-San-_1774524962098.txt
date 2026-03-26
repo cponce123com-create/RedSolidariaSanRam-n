@@ -1,0 +1,219 @@
+Quiero que desarrolles la website de Red Solidaria San Ramón por fases, con una arquitectura escalable, diseño moderno, panel de administración y buena experiencia de usuario.
+
+La organización nació a partir de campañas navideñas para llevar chocolatada y juguetes a niños de escasos recursos en anexos lejanos de San Ramón, Chanchamayo, y ahora busca crecer hacia una plataforma más amplia de ayuda social, campañas solidarias, adopción responsable, ayuda animal, reportes ciudadanos y transparencia de donaciones.
+
+La web debe verse profesional, humana, moderna, confiable y funcional.
+
+OBJETIVO GENERAL
+
+Crear una plataforma web que permita:
+
+Mostrar la identidad de la organización.
+Publicar campañas solidarias.
+Recibir donaciones económicas y en especie.
+Mostrar rendición de cuentas por campaña.
+Publicar casos urgentes.
+Permitir reportes ciudadanos.
+Publicar mascotas en adopción responsable.
+Gestionar campañas de ayuda animal.
+Captar voluntarios.
+Tener un panel administrativo completo.
+STACK SUGERIDO
+
+Desarrolla con una arquitectura moderna y ordenada:
+
+Frontend: Next.js o React
+UI: Tailwind CSS
+Backend: Node.js / API routes / Express si es necesario
+Base de datos: PostgreSQL o Supabase
+Storage: Supabase Storage o equivalente
+Auth: autenticación para admin
+Deployment: compatible con Replit
+
+Si propones otro stack, debe mantenerse:
+
+escalable
+claro
+profesional
+fácil de mantener
+DISEÑO GENERAL
+
+La web debe usar un estilo:
+
+moderno
+cálido
+limpio
+profesional
+solidario
+muy usable en móvil
+Colores sugeridos
+rojo coral / rojo solidario
+blanco
+gris claro
+verde esperanza como apoyo
+detalles cálidos
+Sensación visual
+
+Debe verse como mezcla entre:
+
+ONG moderna
+plataforma comunitaria
+portal institucional confiable
+sistema de campañas con transparencia
+FASE 1 — BASE INSTITUCIONAL + PRESENCIA PROFESIONAL
+Objetivo de la Fase 1
+
+Lanzar una primera versión pública seria y bien presentada, para que la organización ya tenga presencia digital, pueda mostrar su propósito y empiece a captar confianza.
+
+Módulos a construir
+1. Home principal
+
+Diseñar un home moderno y responsive con estas secciones:
+
+Header
+logo
+menú principal
+botón destacado “Donar”
+acceso a redes sociales
+menú móvil bien resuelto
+Hero principal
+título: Red Solidaria San Ramón
+subtítulo emocional y profesional
+imagen o banner fuerte
+botones:
+Donar ahora
+Ver campañas
+Reportar un caso
+Ser voluntario
+Sección “Quiénes somos”
+
+Explicar:
+
+cómo nació la iniciativa
+campaña navideña inicial
+trabajo en anexos lejanos
+visión de crecimiento
+Estadísticas de impacto
+
+Aunque al inicio sean referenciales/editables:
+
+niños beneficiados
+campañas realizadas
+voluntarios
+donaciones recibidas
+animales ayudados
+Campañas destacadas
+
+Tarjetas visuales con:
+
+imagen
+título
+breve descripción
+meta
+monto recaudado
+barra de progreso
+botón ver más
+Cómo ayudar
+
+Tarjetas para:
+
+donar dinero
+donar productos
+ayudar a animales
+ser voluntario
+reportar casos
+Transparencia
+
+Bloque que explique:
+
+cada campaña tiene registro de ingresos
+registro de gastos
+comprobantes
+evidencias
+Testimonios
+
+Tarjetas o slider con testimonios editables
+
+CTA final
+
+Bloque fuerte con llamado a:
+
+donar
+sumarse
+compartir
+Footer
+contacto
+redes
+correo
+ubicación
+enlaces rápidos
+políticas
+botón de WhatsApp flotante
+2. Página “Nosotros”
+
+Crear una página institucional con:
+
+historia
+misión
+visión
+valores
+cómo inició la red
+fotos de campañas pasadas
+bloque del equipo
+bloque de voluntarios
+CTA para sumarse
+3. Página de contacto
+
+Debe incluir:
+
+formulario de contacto
+WhatsApp
+correo
+redes sociales
+ubicación de referencia
+mensaje institucional
+4. Página básica de campañas
+
+Crear una página pública donde se vean las campañas en tarjetas:
+
+activas
+finalizadas
+destacadas
+
+Cada tarjeta debe mostrar:
+
+imagen
+título
+resumen
+estado
+meta
+recaudado
+progreso
+5. Blog / noticias básico
+
+Crear una sección básica de noticias o actualizaciones para:
+
+publicar actividades
+avances de campañas
+novedades
+comunicados
+6. Panel de administración inicial
+
+Crear un admin panel básico con login para poder editar:
+
+home
+campañas
+testimonios
+estadísticas
+noticias
+datos de contacto
+Resultado esperado de la Fase 1
+
+Al terminar esta fase la organización ya debe tener:
+
+una web profesional
+presencia institucional
+campañas visibles
+imagen seria
+contenido administrable
+base preparada para crecer

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Red Solidaria San Ramón"
+version = "1.0.0"
+id = "artifacts/red-solidaria"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22567
+
+[services.development]
+run = "pnpm --filter @workspace/red-solidaria run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/red-solidaria", "run", "build" ]
+publicDir = "artifacts/red-solidaria/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22567"
+BASE_PATH = "/"
