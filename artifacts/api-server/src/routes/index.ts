@@ -19,6 +19,8 @@ import alliesRouter from "./allies";
 import dashboardRouter from "./dashboard";
 import faqRouter from "./faq";
 import adminUsersRouter from "./admin-users";
+import settingsRouter from "./settings";
+import sitemapRouter from "./sitemap";
 
 const router: IRouter = Router();
 
@@ -42,5 +44,7 @@ router.use(alliesRouter);
 router.use(dashboardRouter);
 router.use(faqRouter);
 router.use(adminUsersRouter);
+router.use(settingsRouter);
+router.use(sitemapRouter);
 
 export default router;

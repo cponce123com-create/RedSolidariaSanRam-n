@@ -1,9 +1,10 @@
 import { Router, type IRouter } from "express";
 import { db, contactMessagesTable, insertContactMessageSchema } from "@workspace/db";
+import { contactLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
-router.post("/contact", async (req, res) => {
+router.post("/contact", contactLimiter, async (req, res) => {
   try {
     const data = insertContactMessageSchema.parse(req.body);
     const [message] = await db.insert(contactMessagesTable).values(data).returning();

@@ -2,11 +2,12 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { volunteersTable, insertVolunteerSchema } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { volunteerLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
 // ─── PUBLIC: Submit volunteer application ─────────────────────────────────────
-router.post("/volunteers", async (req, res) => {
+router.post("/volunteers", volunteerLimiter, async (req, res) => {
   try {
     const data = insertVolunteerSchema.parse(req.body);
     const [volunteer] = await db.insert(volunteersTable).values({ ...data, status: "pending" }).returning();

@@ -41,7 +41,7 @@ artifacts-monorepo/
 
 A full-stack NGO/solidarity organization website for Red Solidaria San Ramón (Chanchamayo, Peru).
 
-### Features — Phases 1–7 Complete
+### Features — Phases 1–8 Complete
 
 **Phase 1 - Informational Website:**
 - **Home**: Hero, impact stats, featured campaigns, how to help, transparency, testimonials, CTA, footer
@@ -143,6 +143,7 @@ Tables:
 - `allies` - Partner organizations and sponsors (Phase 6)
 - `faq` - Frequently asked questions with categories and sort order (Phase 7)
 - `admin_users` - Additional admin users with roles (superadmin/administrador/moderador) (Phase 7)
+- `settings` - Site-wide configuration key-value store (org name, contact, social links, payment info) (Phase 8)
 
 ## Packages
 

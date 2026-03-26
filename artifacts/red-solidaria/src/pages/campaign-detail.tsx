@@ -15,6 +15,8 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DonationModal } from "@/components/shared/DonationModal";
 import { useToast } from "@/hooks/use-toast";
+import SEO from "@/components/shared/SEO";
+import ShareButtons from "@/components/shared/ShareButtons";
 
 export default function CampaignDetail() {
   const { id } = useParams();
@@ -62,6 +64,13 @@ export default function CampaignDetail() {
 
   return (
     <div className="min-h-screen pt-20 bg-background pb-20">
+      <SEO
+        title={campaign.title}
+        description={campaign.description || `Apoya la campaña "${campaign.title}" de Red Solidaria San Ramón. Tu donación hace la diferencia.`}
+        url={`/campanas/${campaign.id}`}
+        type="article"
+        image={campaign.imageUrl || undefined}
+      />
       <DonationModal 
         open={isDonationModalOpen} 
         onClose={() => setIsDonationModalOpen(false)} 
@@ -274,15 +283,14 @@ export default function CampaignDetail() {
                       <Heart className="w-6 h-6 mr-2 fill-current" />
                       {campaign.status === 'active' ? 'Donar Ahora' : 'Campaña Cerrada'}
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full rounded-2xl h-12 font-semibold hover:bg-secondary border-2"
-                      onClick={handleShare}
-                      data-testid="btn-share-campaign"
-                    >
-                      <Share2 className="w-5 h-5 mr-2 text-primary" />
-                      Compartir Campaña
-                    </Button>
+                    <div className="space-y-2" data-testid="share-buttons-campaign">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Compartir campaña</p>
+                      <ShareButtons
+                        title={campaign.title}
+                        description={`Apoya esta campaña solidaria en San Ramón, Chanchamayo.`}
+                        className="flex-wrap"
+                      />
+                    </div>
                   </div>
                 </div>
                 

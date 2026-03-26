@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import SEO from "@/components/shared/SEO";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSendContactMessage } from "@workspace/api-client-react";
@@ -46,6 +47,11 @@ export default function Contact() {
 
   return (
     <div className="min-h-screen pt-20 bg-background">
+      <SEO
+        title="Contacto"
+        description="Escríbenos o llámanos. Resolvemos tus dudas sobre donaciones, voluntariado, adopciones y reportes sociales en San Ramón, Chanchamayo."
+        url="/contacto"
+      />
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           

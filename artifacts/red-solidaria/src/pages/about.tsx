@@ -1,10 +1,15 @@
 import { motion } from "framer-motion";
 import { Shield, Target, Heart, Users } from "lucide-react";
+import SEO from "@/components/shared/SEO";
 
 export default function About() {
   return (
     <div className="min-h-screen pt-20 bg-background">
-      
+      <SEO
+        title="Quiénes Somos"
+        description="Conoce la historia, misión y valores de Red Solidaria San Ramón. Una organización comprometida con el bienestar de la comunidad de Chanchamayo."
+        url="/nosotros"
+      />
       {/* HEADER */}
       <section className="py-20 bg-secondary/30 border-b border-border/50 text-center px-4">
         <div className="max-w-3xl mx-auto">

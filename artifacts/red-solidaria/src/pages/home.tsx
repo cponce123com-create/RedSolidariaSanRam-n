@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "wouter";
+import SEO from "@/components/shared/SEO";
 import { useQuery } from "@tanstack/react-query";
 import { useGetStats, useGetCampaigns, useGetTestimonials } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen pt-20">
+      <SEO />
       {/* HERO SECTION */}
       <section className="relative overflow-hidden bg-background">
         <div className="absolute inset-0 z-0">

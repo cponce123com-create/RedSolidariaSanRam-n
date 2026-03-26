@@ -42,6 +42,8 @@ import AdminMessages from "./pages/admin/messages";
 import AdminTestimonials from "./pages/admin/testimonials";
 import AdminFaq from "./pages/admin/faq";
 import AdminUsers from "./pages/admin/users";
+import AdminSettings from "./pages/admin/settings";
+import MobileBottomNav from "./components/shared/MobileBottomNav";
 
 const queryClient = new QueryClient();
 
@@ -49,9 +51,10 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow">{children}</main>
+      <main className="flex-grow pb-16 md:pb-0">{children}</main>
       <Footer />
       <FloatingWhatsApp />
+      <MobileBottomNav />
     </div>
   );
 }
@@ -137,6 +140,11 @@ function App() {
             <Route path="/admin/usuarios">
               <AdminLayout>
                 <AdminUsers />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/configuracion">
+              <AdminLayout>
+                <AdminSettings />
               </AdminLayout>
             </Route>
             <Route path="/admin">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useGetCampaigns } from "@workspace/api-client-react";
 import { CampaignCard } from "@/components/shared/CampaignCard";
 import { Button } from "@/components/ui/button";
+import SEO from "@/components/shared/SEO";
 
 export default function Campaigns() {
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
@@ -11,6 +12,11 @@ export default function Campaigns() {
 
   return (
     <div className="min-h-screen pt-20 bg-background">
+      <SEO
+        title="Campañas Solidarias"
+        description="Conoce y apoya nuestras campañas activas. Cada donación transforma vidas en San Ramón, Chanchamayo, Perú."
+        url="/campanas"
+      />
       <section className="py-12 bg-secondary/30 border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">Nuestras Campañas</h1>

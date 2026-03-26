@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useEffect } from "react";
 import {
   LayoutDashboard, Target, FileText, LogOut, MessageSquare, DollarSign,
-  AlertTriangle, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck
+  AlertTriangle, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck, Settings
 } from "lucide-react";
 import { useAdminLogout, useGetAdminMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       label: "Sistema",
       items: [
         { href: "/admin/usuarios", icon: ShieldCheck, label: "Usuarios", system: true },
+        { href: "/admin/configuracion", icon: Settings, label: "Configuración", system: true },
       ],
     }] : []),
   ];
