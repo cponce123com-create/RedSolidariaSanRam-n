@@ -41,13 +41,29 @@ artifacts-monorepo/
 
 A full-stack NGO/solidarity organization website for Red Solidaria San Ramón (Chanchamayo, Peru).
 
-### Features (Phase 1)
+### Features - All Three Phases Complete
+
+**Phase 1 - Informational Website:**
 - **Home**: Hero, impact stats, featured campaigns, how to help, transparency, testimonials, CTA, footer
 - **Nosotros (About)**: History, mission, vision, values, team
 - **Campañas (Campaigns)**: Active and completed campaigns with progress bars
-- **Noticias (News)**: Blog/news listing and detail pages
+- **Noticias (News)**: Blog/news listing
 - **Contacto (Contact)**: Contact form, volunteer registration
-- **Admin Panel**: Login-protected dashboard to manage campaigns, news, testimonials, stats, volunteers, messages
+- **Admin Panel**: Login-protected dashboard
+
+**Phase 2 - Fundraising Platform:**
+- **DonationModal**: Multi-step donation form (Yape, Plin, BCP, cash)
+- **CampaignDetail**: Enhanced page with gallery and updates tabs
+- **Admin Donations**: Manage and approve/reject donation records
+- **Admin Campaign Detail**: Manage gallery images and news updates
+- Payment methods: Yape (987 654 321), Plin (987 654 321), BCP (193-12345678-0-55)
+
+**Phase 3 - Transparency & Accountability:**
+- **Public Transparency Dashboard** (`/campanas/:id/transparencia`): Meta, Recaudado, Gastado, Saldo, Ejecución %
+- **Admin Gastos Tab**: Register and manage campaign expenses with receipts and visibility controls
+- **Admin Evidencias Tab**: Upload and manage evidence photos/documents with type labeling
+- Expense categories: alimentación, transporte, materiales, logística, comunicación, salud, educación, general
+- Evidence types: compra, entrega, actividad, resultado, reporte
 
 ### Admin Credentials
 - Username: `admin`
@@ -58,18 +74,38 @@ A full-stack NGO/solidarity organization website for Red Solidaria San Ramón (C
 - Background: Warm white
 - Accent: Green (hope/success)
 
+### Routing (App.tsx)
+Uses flat wouter Switch (NOT nested Switch inside Route) for reliable route matching:
+- `/admin/login` → AdminLogin
+- `/admin/campanas/:id` → AdminLayout + AdminCampaignDetail
+- `/admin/campanas` → AdminLayout + AdminCampaigns
+- `/admin/donaciones` → AdminLayout + AdminDonations
+- `/campanas/:id/transparencia` → MainLayout + CampaignTransparency
+- `/campanas/:id` → MainLayout + CampaignDetail
+- etc.
+
+**IMPORTANT:** Do NOT use nested `<Switch>` inside `<Route>` - use flat Switch structure. Nested Switches in wouter caused blank pages for routes with params.
+
 ### API Routes
 All routes served at `/api`:
 - `GET/POST /campaigns` - Campaign management
 - `GET/PUT/DELETE /campaigns/:id` - Single campaign
-- `GET/POST /news` - News management
-- `GET/PUT/DELETE /news/:id` - Single news post
-- `GET/POST /testimonials` - Testimonials
-- `GET/PUT /stats` - Impact statistics
+- `GET/POST /campaigns/:id/donations` - Donations per campaign
+- `GET/POST /campaigns/:id/images` - Gallery images
+- `DELETE /campaigns/:id/images/:imageId` - Delete image
+- `GET/POST /campaigns/:id/updates` - Campaign updates/news
+- `DELETE /campaigns/:id/updates/:updateId` - Delete update
+- `GET/POST /campaigns/:id/expenses` - Expense records (admin)
+- `PUT/DELETE /campaigns/:id/expenses/:expenseId` - Single expense
+- `GET/POST /campaigns/:id/evidence` - Evidence records
+- `PUT/DELETE /campaigns/:id/evidence/:evidenceId` - Single evidence
+- `GET /campaigns/:id/transparency` - Public transparency data
+- `GET/POST /donations` - All donations (admin)
+- `PUT /donations/:id/status` - Approve/reject donations
+- `GET /donations/stats` - Donation statistics
 - `POST /contact` - Contact form submission
 - `GET /contact/messages` - View messages (admin)
 - `POST /volunteers` - Volunteer registration
-- `GET /volunteers` - List volunteers (admin)
 - `POST /admin/login` - Admin login
 - `POST /admin/logout` - Admin logout
 - `GET /admin/me` - Current session check

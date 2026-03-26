@@ -7,3 +7,5 @@ export * from "./volunteers";
 export * from "./donations";
 export * from "./campaign-updates";
 export * from "./campaign-images";
+export * from "./campaign-expenses";
+export * from "./campaign-evidence";

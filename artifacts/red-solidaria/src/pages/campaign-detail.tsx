@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 import { 
   useGetCampaign, 
   useGetCampaignUpdates, 
   useGetCampaignImages,
-  useGetDonationStats
 } from "@workspace/api-client-react";
+import { useCampaignTransparency } from "@/hooks/use-phase3";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Heart, Share2, Calendar, Target, Users, Landmark, Clock, ImageIcon, Copy } from "lucide-react";
+import { Heart, Share2, Calendar, Target, Users, Landmark, Clock, ImageIcon, Copy, Shield, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DonationModal } from "@/components/shared/DonationModal";
@@ -27,6 +27,9 @@ export default function CampaignDetail() {
   const { data: campaign, isLoading: loadingCampaign, isError } = useGetCampaign(campaignId);
   const { data: updates, isLoading: loadingUpdates } = useGetCampaignUpdates(campaignId);
   const { data: images, isLoading: loadingImages } = useGetCampaignImages(campaignId);
+  
+  // Phase 3 Transparency summary
+  const { data: transparency } = useCampaignTransparency(campaignId);
 
   if (loadingCampaign) {
     return <div className="min-h-screen pt-32 text-center text-muted-foreground flex flex-col items-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mb-4"></div>Cargando campaña...</div>;
@@ -54,6 +57,8 @@ export default function CampaignDetail() {
       toast({ title: "Enlace copiado", description: "El enlace de la campaña ha sido copiado al portapapeles." });
     }
   };
+
+  const hasTransparencyData = transparency && (transparency.publicExpenseCount > 0 || transparency.publicEvidenceCount > 0 || transparency.totalRaised > 0);
 
   return (
     <div className="min-h-screen pt-20 bg-background pb-20">
@@ -182,7 +187,7 @@ export default function CampaignDetail() {
                 )}
               </section>
 
-              {/* Payment Info Box (Fallback if not using modal) */}
+              {/* Payment Info Box */}
               {campaign.status === 'active' && (
                 <section className="bg-primary/5 rounded-3xl p-8 border border-primary/20">
                   <h3 className="font-display font-bold text-2xl mb-4 flex items-center gap-3 text-foreground">
@@ -195,7 +200,7 @@ export default function CampaignDetail() {
                         <div className="font-bold text-foreground mb-1">Cta. BCP (Soles)</div>
                         <div className="font-mono text-lg flex items-center justify-between">
                           193-12345678-0-55
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => navigator.clipboard.writeText("193-12345678-0-55")}><Copy className="w-4 h-4"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => navigator.clipboard.writeText("193-12345678-0-55")}><Copy className="w-4 h-4"/></Button>
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">CCI: 00219312345678055</div>
                       </div>
@@ -203,7 +208,7 @@ export default function CampaignDetail() {
                         <div className="font-bold text-foreground mb-1">Yape / Plin</div>
                         <div className="font-mono text-lg flex items-center justify-between">
                           987 654 321
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => navigator.clipboard.writeText("987654321")}><Copy className="w-4 h-4"/></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => navigator.clipboard.writeText("987654321")}><Copy className="w-4 h-4"/></Button>
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">Titular: Juan Pérez (Red Solidaria)</div>
                       </div>
@@ -220,12 +225,12 @@ export default function CampaignDetail() {
                   <div className="mb-8">
                     <div className="flex justify-between items-end mb-2">
                       <span className="text-4xl font-display font-extrabold text-foreground" data-testid="campaign-raise-amount">
-                        S/ {campaign.raised.toLocaleString()}
+                        S/ {campaign.raised.toLocaleString("es-PE", {minimumFractionDigits: 0})}
                       </span>
                     </div>
                     <div className="text-muted-foreground flex justify-between text-sm mb-4 font-medium">
                       <span>Recaudado</span>
-                      <span>Meta: S/ {campaign.goal.toLocaleString()}</span>
+                      <span>Meta: S/ {campaign.goal.toLocaleString("es-PE", {minimumFractionDigits: 0})}</span>
                     </div>
                     <Progress value={progress} className="h-4 mb-3" data-testid="campaign-progress-bar" />
                     <div className="flex justify-between items-center">
@@ -281,16 +286,73 @@ export default function CampaignDetail() {
                   </div>
                 </div>
                 
-                <div className="bg-card rounded-3xl p-6 border border-border text-center">
-                  <Heart className="w-8 h-8 text-primary mx-auto mb-3 opacity-50" />
-                  <h4 className="font-display font-bold text-lg mb-2">Transparencia Total</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Cada donación cuenta. Publicamos el registro detallado de ingresos y gastos al finalizar cada campaña.
+                {/* Phase 3 Transparency Callout Sidebar */}
+                <div className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/20 dark:to-green-900/10 rounded-3xl p-6 border-2 border-green-200 dark:border-green-800/50 shadow-sm relative overflow-hidden group">
+                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-green-200/50 dark:bg-green-800/30 rounded-full blur-xl group-hover:scale-150 transition-transform duration-500"></div>
+                  
+                  <div className="flex items-center gap-2 mb-3 relative z-10">
+                    <Shield className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    <h4 className="font-display font-bold text-lg text-green-900 dark:text-green-300">100% Transparente</h4>
+                  </div>
+                  
+                  <p className="text-sm text-green-800/80 dark:text-green-300/80 font-medium mb-5 relative z-10 leading-relaxed">
+                    Esta campaña rinde cuentas públicamente. Publicamos los gastos y evidencias de impacto para tu total tranquilidad.
                   </p>
+                  
+                  <Link href={`/campanas/${campaignId}/transparencia`} className="block relative z-10">
+                    <Button variant="default" className="w-full bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-md hover-elevate">
+                      Ver Rendición de Cuentas <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
                 </div>
+
               </div>
             </div>
           </div>
+
+          {/* Phase 3 Full Width Transparency Banner (Bottom) */}
+          {hasTransparencyData && (
+            <div className="mt-16 pt-12 border-t border-border">
+              <div className="bg-white dark:bg-card border-2 border-border shadow-lg rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group hover:border-green-300/50 transition-colors">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-green-50/50 rounded-full blur-3xl -z-10 group-hover:bg-green-100/50 transition-colors"></div>
+                
+                <div className="flex-1 text-center md:text-left z-10">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-green-200">
+                    <Shield className="w-3.5 h-3.5" /> Rendición Pública
+                  </div>
+                  <h3 className="text-2xl md:text-3xl font-display font-bold mb-3 text-foreground">
+                    Tu confianza es nuestra prioridad
+                  </h3>
+                  <p className="text-muted-foreground text-lg mb-6 max-w-2xl">
+                    Revisa en detalle cómo se están utilizando los fondos recaudados en esta campaña. Publicamos todos los gastos, boletas y fotos de las actividades.
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-4 justify-center md:justify-start mb-6 md:mb-0">
+                    <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Recaudado</div>
+                      <div className="font-bold text-foreground">S/ {transparency.totalRaised.toLocaleString("es-PE")}</div>
+                    </div>
+                    <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">Gastado</div>
+                      <div className="font-bold text-foreground">S/ {transparency.publicSpent.toLocaleString("es-PE")}</div>
+                    </div>
+                    <div className="bg-primary/5 px-4 py-2 rounded-xl border border-primary/20">
+                      <div className="text-xs text-primary uppercase tracking-wider font-semibold mb-1">Saldo</div>
+                      <div className="font-bold text-primary">S/ {transparency.balance.toLocaleString("es-PE")}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-shrink-0 z-10">
+                  <Link href={`/campanas/${campaignId}/transparencia`}>
+                    <Button className="h-14 px-8 rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 hover-elevate group-hover:bg-green-600 transition-colors">
+                      Ver Panel de Transparencia
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

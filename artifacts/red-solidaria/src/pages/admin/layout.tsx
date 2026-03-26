@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Target, FileText, Settings, LogOut, MessageSquare, DollarSign } from "lucide-react";
+import { useEffect } from "react";
+import { Target, FileText, LogOut, MessageSquare, DollarSign } from "lucide-react";
 import { useAdminLogout, useGetAdminMe } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 
@@ -7,18 +8,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [location, setLocation] = useLocation();
   const logoutMutation = useAdminLogout();
   
-  // The API returns 401 if not authenticated, which react-query turns into an error state.
   const { data: user, isError, isLoading } = useGetAdminMe({
     query: { retry: false }
   });
 
+  useEffect(() => {
+    if (isError) {
+      setLocation("/admin/login");
+    }
+  }, [isError, setLocation]);
+
   if (isLoading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
   
-  if (isError) {
-    // Redirect to login if unauthenticated
-    setLocation("/admin/login");
-    return null;
-  }
+  if (isError || !user) return null;
 
   const handleLogout = () => {
     logoutMutation.mutate(undefined, {
@@ -35,7 +37,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-secondary/30 flex">
-      {/* Sidebar */}
       <aside className="w-64 bg-card border-r border-border flex flex-col fixed inset-y-0 shadow-lg shadow-black/5 z-20">
         <div className="p-6 border-b border-border flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold">R</div>
@@ -66,7 +67,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 ml-64 min-h-screen">
         {children}
       </main>

@@ -1,9 +1,7 @@
 packages:
-  "canvas-confetti": "For donation success celebration"
-  "@types/canvas-confetti": "Types for canvas-confetti"
-
+  "date-fns": "Date formatting"
+  "clsx": "Class merging"
+  "tailwind-merge": "Tailwind class merging"
 images: []
-
 notes:
-  - Phase 2 implementation including donations, campaign details, and admin panels.
-  - Relying on @workspace/api-client-react for TanStack hooks.
+  - Added custom hooks for Phase 3 API endpoints since they might not be in the generated api-client-react yet.
