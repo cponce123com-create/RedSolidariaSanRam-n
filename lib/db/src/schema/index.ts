@@ -13,3 +13,5 @@ export * from "./community-reports";
 export * from "./pets";
 export * from "./adoption-requests";
 export * from "./allies";
+export * from "./faq";
+export * from "./admin-users";

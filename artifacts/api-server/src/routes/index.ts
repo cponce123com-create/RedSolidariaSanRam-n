@@ -16,6 +16,9 @@ import adminRouter from "./admin";
 import communityReportsRouter from "./community-reports";
 import petsRouter from "./pets";
 import alliesRouter from "./allies";
+import dashboardRouter from "./dashboard";
+import faqRouter from "./faq";
+import adminUsersRouter from "./admin-users";
 
 const router: IRouter = Router();
 
@@ -36,5 +39,8 @@ router.use(adminRouter);
 router.use(communityReportsRouter);
 router.use(petsRouter);
 router.use(alliesRouter);
+router.use(dashboardRouter);
+router.use(faqRouter);
+router.use(adminUsersRouter);
 
 export default router;

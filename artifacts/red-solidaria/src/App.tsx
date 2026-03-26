@@ -36,6 +36,12 @@ import HowToHelp from "./pages/how-to-help";
 import Allies from "./pages/allies";
 import AdminVolunteers from "./pages/admin/volunteers";
 import AdminAllies from "./pages/admin/allies";
+import AdminDashboard from "./pages/admin/dashboard";
+import AdminNews from "./pages/admin/news";
+import AdminMessages from "./pages/admin/messages";
+import AdminTestimonials from "./pages/admin/testimonials";
+import AdminFaq from "./pages/admin/faq";
+import AdminUsers from "./pages/admin/users";
 
 const queryClient = new QueryClient();
 
@@ -98,16 +104,6 @@ function App() {
                 <AdminDonations />
               </AdminLayout>
             </Route>
-            <Route path="/admin/noticias">
-              <AdminLayout>
-                <div className="p-8">Módulo Noticias en Construcción</div>
-              </AdminLayout>
-            </Route>
-            <Route path="/admin/mensajes">
-              <AdminLayout>
-                <div className="p-8">Módulo Mensajes en Construcción</div>
-              </AdminLayout>
-            </Route>
             <Route path="/admin/reportes/:id">
               <AdminLayout>
                 <AdminReportDetail />
@@ -118,9 +114,34 @@ function App() {
                 <AdminReports />
               </AdminLayout>
             </Route>
+            <Route path="/admin/noticias">
+              <AdminLayout>
+                <AdminNews />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/mensajes">
+              <AdminLayout>
+                <AdminMessages />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/testimonios">
+              <AdminLayout>
+                <AdminTestimonials />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/faq">
+              <AdminLayout>
+                <AdminFaq />
+              </AdminLayout>
+            </Route>
+            <Route path="/admin/usuarios">
+              <AdminLayout>
+                <AdminUsers />
+              </AdminLayout>
+            </Route>
             <Route path="/admin">
               <AdminLayout>
-                <AdminCampaigns />
+                <AdminDashboard />
               </AdminLayout>
             </Route>
 

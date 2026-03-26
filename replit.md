@@ -41,7 +41,7 @@ artifacts-monorepo/
 
 A full-stack NGO/solidarity organization website for Red Solidaria San Ramón (Chanchamayo, Peru).
 
-### Features - All Three Phases Complete
+### Features — Phases 1–7 Complete
 
 **Phase 1 - Informational Website:**
 - **Home**: Hero, impact stats, featured campaigns, how to help, transparency, testimonials, CTA, footer
@@ -131,7 +131,7 @@ Tables:
 - `testimonials` - Community testimonials
 - `stats` - Impact statistics (key-value store)
 - `contact_messages` - Contact form submissions
-- `volunteers` - Volunteer registrations
+- `volunteers` - Volunteer registrations (Phase 6: age, district, interests, status, adminNotes)
 - `donations` - Campaign donations (Yape/Plin/BCP/efectivo) with approval workflow
 - `campaign_updates` - Progress updates per campaign
 - `campaign_images` - Gallery images per campaign
@@ -140,6 +140,9 @@ Tables:
 - `community_reports` - Community-submitted urgent case reports (Phase 4)
 - `pets` - Animal adoption listings with health/status info (Phase 5)
 - `adoption_requests` - Adoption applications submitted by the public (Phase 5)
+- `allies` - Partner organizations and sponsors (Phase 6)
+- `faq` - Frequently asked questions with categories and sort order (Phase 7)
+- `admin_users` - Additional admin users with roles (superadmin/administrador/moderador) (Phase 7)
 
 ## Packages
 
