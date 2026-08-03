@@ -1,5 +1,34 @@
 import rateLimit from "express-rate-limit";
 
+// Rate limiter general para la API - más estricto
+export const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // 100 requests por IP en 15 minutos
+  message: { error: "Demasiadas solicitudes. Por favor intenta de nuevo más tarde." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+});
+
+// Rate limiter específico para login - muy estricto para prevenir brute force
+export const loginLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000, // 30 minutos
+  max: 10, // 10 intentos de login
+  message: { error: "Demasiados intentos de inicio de sesión. Por favor espera 30 minutos." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+});
+
+// Rate limiter para acciones administrativas críticas
+export const adminActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 50, // 50 acciones administrativas
+  message: { error: "Demasiadas acciones administrativas. Por favor espera." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 export const contactLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,

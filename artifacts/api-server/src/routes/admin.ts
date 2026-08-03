@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { z } from "zod";
 import { db, adminUsersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { hashPassword, verifyPassword, logAuditAction } from "../middleware/auth-utils";
 
 const router: IRouter = Router();
 
@@ -13,6 +14,9 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+// Inicializar superadmin con contraseña hasheada (solo para desarrollo)
+let superAdminHashedPassword: string | null = null;
+
 router.post("/admin/login", async (req, res) => {
   try {
     const { username, password } = loginSchema.parse(req.body);
@@ -21,30 +25,111 @@ router.post("/admin/login", async (req, res) => {
     const dbUsers = await db.select().from(adminUsersTable).where(eq(adminUsersTable.username, username));
     const dbUser = dbUsers[0];
 
-    if (dbUser && dbUser.active && dbUser.password === password) {
-      (req.session as any).adminUser = {
-        id: dbUser.id,
-        username: dbUser.username,
-        name: dbUser.name,
-        role: dbUser.role,
-      };
-      return res.json({ success: true, message: "Login exitoso", user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, role: dbUser.role } });
+    if (dbUser && dbUser.active) {
+      // Verificar contraseña hasheada
+      const isValid = await verifyPassword(password, dbUser.password);
+      
+      if (isValid) {
+        // Actualizar último login
+        await db.update(adminUsersTable)
+          .set({ lastLoginAt: new Date() })
+          .where(eq(adminUsersTable.id, dbUser.id));
+        
+        (req.session as any).adminUser = {
+          id: dbUser.id,
+          username: dbUser.username,
+          name: dbUser.name,
+          role: dbUser.role,
+        };
+        
+        // Audit log
+        await logAuditAction({
+          userId: dbUser.id,
+          username: dbUser.username,
+          action: "LOGIN",
+          resource: "admin_users",
+          ipAddress: req.ip || req.connection?.remoteAddress || null,
+          userAgent: req.get("user-agent") || null,
+          details: { success: true },
+        });
+        
+        return res.json({ success: true, message: "Login exitoso", user: { id: dbUser.id, username: dbUser.username, name: dbUser.name, role: dbUser.role } });
+      } else {
+        // Audit log para intento fallido
+        await logAuditAction({
+          userId: dbUser.id,
+          username: dbUser.username,
+          action: "LOGIN_FAILED",
+          resource: "admin_users",
+          ipAddress: req.ip || req.connection?.remoteAddress || null,
+          userAgent: req.get("user-agent") || null,
+          details: { reason: "invalid_password" },
+        });
+      }
     }
 
-    // Fall back to env var superadmin
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
-      const user = { id: 0, username, name: "Superadmin", role: "superadmin" };
-      (req.session as any).adminUser = user;
-      return res.json({ success: true, message: "Login exitoso", user });
+    // Fall back to env var superadmin (solo si no existe en DB)
+    if (!dbUser && username === ADMIN_USERNAME) {
+      // Hashear la contraseña del superadmin la primera vez
+      if (!superAdminHashedPassword) {
+        superAdminHashedPassword = await hashPassword(ADMIN_PASSWORD);
+      }
+      
+      const isValid = await verifyPassword(password, superAdminHashedPassword);
+      
+      if (isValid) {
+        const user = { id: 0, username, name: "Superadmin", role: "superadmin" };
+        (req.session as any).adminUser = user;
+        
+        // Audit log
+        await logAuditAction({
+          userId: 0,
+          username,
+          action: "LOGIN",
+          resource: "admin_users",
+          ipAddress: req.ip || req.connection?.remoteAddress || null,
+          userAgent: req.get("user-agent") || null,
+          details: { success: true, source: "env_superadmin" },
+        });
+        
+        return res.json({ success: true, message: "Login exitoso", user });
+      } else {
+        // Audit log para intento fallido
+        await logAuditAction({
+          userId: 0,
+          username,
+          action: "LOGIN_FAILED",
+          resource: "admin_users",
+          ipAddress: req.ip || req.connection?.remoteAddress || null,
+          userAgent: req.get("user-agent") || null,
+          details: { reason: "invalid_password", source: "env_superadmin" },
+        });
+      }
     }
 
     return res.status(401).json({ error: "unauthorized", message: "Usuario o contraseña incorrectos" });
   } catch (err) {
+    console.error("Login error:", err);
     res.status(400).json({ error: "validation_error", message: "Invalid login data" });
   }
 });
 
-router.post("/admin/logout", (req, res) => {
+router.post("/admin/logout", async (req, res) => {
+  const adminUser = (req.session as any).adminUser;
+  
+  // Audit log para logout
+  if (adminUser) {
+    await logAuditAction({
+      userId: adminUser.id,
+      username: adminUser.username,
+      action: "LOGOUT",
+      resource: "admin_users",
+      ipAddress: req.ip || req.connection?.remoteAddress || null,
+      userAgent: req.get("user-agent") || null,
+      details: { success: true },
+    });
+  }
+  
   (req.session as any).adminUser = null;
   req.session.destroy(() => {
     res.json({ success: true, message: "Sesión cerrada" });
