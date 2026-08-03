@@ -1,2 +1,3 @@
 export * from "./generated/api";
-export * from "./generated/types";
+// Tipos ya incluidos en api.ts para evitar duplicados (TS2308)
+// export * from "./generated/types";
