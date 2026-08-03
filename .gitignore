@@ -12,7 +12,8 @@ node_modules/
 # Environment
 .env
 .env.local
-*.env.*
+*.env.local
+!.env.example
 
 # Editors
 .vscode/
