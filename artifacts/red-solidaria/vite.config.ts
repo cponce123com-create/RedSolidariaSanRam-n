@@ -62,26 +62,10 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom", "react-router-dom"],
-          "ui-vendor": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-label",
-            "@radix-ui/react-progress",
-            "@radix-ui/react-select",
-            "@radix-ui/react-slot",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-toast",
-            "@radix-ui/react-tooltip",
-            "class-variance-authority",
-            "clsx",
-            "tailwind-merge",
-          ],
-          "charts": ["recharts"],
-          "icons": ["lucide-react", "react-icons"],
-          "forms": ["@tanstack/react-query", "zod", "react-hook-form"],
-          "maps": ["leaflet", "react-leaflet"],
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
         },
       },
     },
