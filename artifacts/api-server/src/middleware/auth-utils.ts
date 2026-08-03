@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { db, auditLogsTable } from "@workspace/db";
 
 const SALT_ROUNDS = 12;
