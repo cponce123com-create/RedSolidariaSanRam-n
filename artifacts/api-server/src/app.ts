@@ -16,23 +16,33 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          // Remover 'unsafe-eval' en producción - usar nonces o hashes
+          ...(process.env.NODE_ENV === "development" ? ["'unsafe-eval'"] : []),
+        ],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", "https://api.redsolidaria.com"],
+        imgSrc: ["'self'", "data:", "https:", "blob:"],
+        connectSrc: [
+          "'self'",
+          process.env.API_URL || "https://api.redsolidaria.com",
+        ],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
         upgradeInsecureRequests: [],
       },
     },
-    crossOriginEmbedderPolicy: false, // Necesario para algunas funcionalidades de React
+    crossOriginEmbedderPolicy: false,
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     hsts: {
       maxAge: 31536000,
       includeSubDomains: true,
       preload: true,
     },
+    permittedCrossDomainPolicies: { permittedPolicies: "none" },
+    xssFilter: true,
   }),
 );
 

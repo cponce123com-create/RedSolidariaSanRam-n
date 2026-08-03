@@ -85,33 +85,51 @@ pnpm build
 ## 📊 Mejoras Recientes
 
 ### Performance ⚡
-- Code splitting por vendor (React, UI, charts, icons)
-- Bundle reducido ~40% con manualChunks
-- HTTP caching optimizado (1 año para assets)
+- Code splitting avanzado (React, Radix UI, Framer Motion, Charts)
+- Bundle reducido ~40% con manualChunks optimizados
+- HTTP caching optimizado (1 año para assets con hash)
+- Sourcemaps habilitados para debugging
+- Optimización de dependencias con optimizeDeps
+- Lazy loading para componentes grandes
 
 ### Seguridad 🔒
-- Helmet.js para headers HTTP seguros
-- Content Security Policy configurado
+- Helmet.js con configuración mejorada
+  - CSP: 'unsafe-eval' solo en desarrollo
+  - XSS Filter habilitado
+  - HSTS con preload
+  - Permitted Cross-Domain Policies: none
+- Rate limiting inteligente por endpoint
+  - Login: IP + email combinados
+  - API general: Soporte para API keys
+  - Límites específicos por tipo de acción
 - SESSION_SECRET obligatorio en producción
-- Rate limiting mejorado
+- Validación de entrada con Zod
 
 ### Base de Datos 🗄️
 - Connection pooling optimizado
 - 15 índices para consultas frecuentes
 - Mejora estimada: 60-80% en velocidad
 
-### UX 👥
-- Skeleton loaders para carga percibida
-- Error boundaries implementados
+### UX/UI 👥
+- Error Boundaries para manejo graceful de errores
+- Skeleton loaders múltiples (Card, List, Table, Dashboard, Page)
+- Animaciones pulse y shine para carga percibida
 - Mobile-first responsive
+- Botones de recuperación en errores
+
+### Calidad de Código 💻
+- TypeScript strict mode habilitado
+- .env.example documentado
+- Componentes reutilizables
+- Logging estructurado con Pino
 
 ## 🧪 Testing
 
 ```bash
-# Tests unitarios (próximamente)
+# Tests unitarios (próximamente con Vitest)
 pnpm test
 
-# E2E tests (próximamente)
+# E2E tests (próximamente con Playwright/Cypress)
 pnpm test:e2e
 ```
 

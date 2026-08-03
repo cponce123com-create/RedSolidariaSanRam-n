@@ -1,6 +1,6 @@
 import rateLimit from "express-rate-limit";
 
-// Rate limiter general para la API - más estricto
+// Rate limiter general para la API - más estricto con configuración mejorada
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 100, // 100 requests por IP en 15 minutos
@@ -8,6 +8,10 @@ export const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
+  keyGenerator: (req) => {
+    // Usar IP o API key si está disponible
+    return req.headers['x-api-key'] as string || req.ip;
+  },
 });
 
 // Rate limiter específico para login - muy estricto para prevenir brute force
@@ -18,6 +22,11 @@ export const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
+  keyGenerator: (req) => {
+    // Limitar por IP y email combinados para login
+    const email = req.body?.email || 'unknown';
+    return `${req.ip}-${email}`;
+  },
 });
 
 // Rate limiter para acciones administrativas críticas

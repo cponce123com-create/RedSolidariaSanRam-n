@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import runtimeErrorModal from "@replit/vite-plugin-runtime-error-modal";
 
 const rawPort = process.env.PORT;
 
@@ -31,7 +31,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
+    runtimeErrorModal(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -59,17 +59,36 @@ export default defineConfig({
     emptyOutDir: true,
     target: "esnext",
     minify: "esbuild",
-    sourcemap: false,
+    sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
+            if (id.includes("react") || id.includes("react-dom")) {
+              return "react-vendor";
+            }
+            if (id.includes("radix-ui")) {
+              return "radix-vendor";
+            }
+            if (id.includes("framer-motion")) {
+              return "animation-vendor";
+            }
+            if (id.includes("recharts") || id.includes("d3")) {
+              return "charts-vendor";
+            }
             return "vendor";
+          }
+          // Code splitting para componentes grandes
+          if (id.includes("/components/")) {
+            return "components";
+          }
+          if (id.includes("/pages/")) {
+            return "pages";
           }
         },
       },
     },
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 500,
   },
   server: {
     port,
@@ -84,5 +103,8 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom", "wouter", "@tanstack/react-query"],
   },
 });
