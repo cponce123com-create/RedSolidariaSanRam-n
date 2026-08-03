@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import session from "express-session";
+import path from "path";
 import { apiLimiter } from "./middleware/rate-limit";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -49,5 +50,17 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Servir archivos estáticos del frontend en producción
+if (process.env.NODE_ENV === "production") {
+  const staticPath = path.join(__dirname, "../../artifacts/red-solidaria/dist/public");
+  logger.info({ staticPath }, "Serving static files from");
+  app.use(express.static(staticPath));
+  
+  // Para SPA con React Router: todas las rutas no-API deben servir index.html
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(staticPath, "index.html"));
+  });
+}
 
 export default app;
