@@ -57,6 +57,35 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    target: "esnext",
+    minify: "esbuild",
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
+          "ui-vendor": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-label",
+            "@radix-ui/react-progress",
+            "@radix-ui/react-select",
+            "@radix-ui/react-slot",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-toast",
+            "@radix-ui/react-tooltip",
+            "class-variance-authority",
+            "clsx",
+            "tailwind-merge",
+          ],
+          "charts": ["recharts"],
+          "icons": ["lucide-react", "react-icons"],
+          "forms": ["@tanstack/react-query", "zod", "react-hook-form"],
+          "maps": ["leaflet", "react-leaflet"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 800,
   },
   server: {
     port,
