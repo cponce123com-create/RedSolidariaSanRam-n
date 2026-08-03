@@ -53,7 +53,7 @@ app.use("/api", router);
 
 // Servir archivos estáticos del frontend en producción
 if (process.env.NODE_ENV === "production") {
-  const staticPath = path.join(__dirname, "../../artifacts/red-solidaria/dist/public");
+  const staticPath = process.env.STATIC_FILES_PATH || path.join(process.cwd(), "artifacts/red-solidaria/dist/public");
   logger.info({ staticPath }, "Serving static files from");
   app.use(express.static(staticPath));
   
