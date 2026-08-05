@@ -17,7 +17,7 @@ router.get("/settings", async (_req, res) => {
 router.get("/admin/settings", async (req, res) => {
   if (!(req.session as any)?.adminUser) return res.status(401).json({ error: "No autorizado" });
   const rows = await db.select().from(settings).orderBy(settings.group, settings.key);
-  res.json(rows);
+  return res.json(rows);
 });
 
 // PUT /admin/settings/:key — update one setting
@@ -34,7 +34,7 @@ router.put("/admin/settings/:key", async (req, res) => {
     .returning();
 
   if (!updated) return res.status(404).json({ error: "Configuración no encontrada" });
-  res.json(updated);
+  return res.json(updated);
 });
 
 // PUT /admin/settings — batch update
@@ -53,7 +53,7 @@ router.put("/admin/settings", async (req, res) => {
     if (row) results.push(row);
   }
 
-  res.json({ updated: results.length, settings: results });
+  return res.json({ updated: results.length, settings: results });
 });
 
 export default router;

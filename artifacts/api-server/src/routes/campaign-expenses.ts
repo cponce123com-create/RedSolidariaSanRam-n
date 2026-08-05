@@ -45,10 +45,10 @@ router.put("/campaigns/:id/expenses/:expenseId", async (req, res) => {
       .where(and(eq(campaignExpensesTable.id, expenseId), eq(campaignExpensesTable.campaignId, campaignId)))
       .returning();
     if (!expense) return res.status(404).json({ error: "not_found", message: "Expense not found" });
-    res.json(formatExpense(expense));
+    return res.json(formatExpense(expense));
   } catch (err) {
     req.log.error({ err }, "Failed to update campaign expense");
-    res.status(400).json({ error: "validation_error", message: "Invalid expense data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid expense data" });
   }
 });
 

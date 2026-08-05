@@ -62,10 +62,10 @@ router.get("/donations/:id", async (req, res) => {
     if (!donation) {
       return res.status(404).json({ error: "not_found", message: "Donation not found" });
     }
-    res.json(await formatDonation(donation));
+    return res.json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to get donation" );
-    res.status(500).json({ error: "server_error", message: "Failed to get donation" });
+    return res.status(500).json({ error: "server_error", message: "Failed to get donation" });
   }
 });
 
@@ -84,10 +84,10 @@ router.put("/donations/:id", async (req, res) => {
     if (!donation) {
       return res.status(404).json({ error: "not_found", message: "Donation not found" });
     }
-    res.json(await formatDonation(donation));
+    return res.json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to update donation");
-    res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
   }
 });
 

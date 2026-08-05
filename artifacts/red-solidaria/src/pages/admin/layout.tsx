@@ -12,7 +12,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const logoutMutation = useAdminLogout();
   
   const { data: user, isError, isLoading } = useGetAdminMe({
-    query: { retry: false }
+    query: { queryKey: ["/api/admin/me"], retry: false }
   });
 
   useEffect(() => {

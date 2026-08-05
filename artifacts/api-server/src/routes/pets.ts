@@ -29,7 +29,7 @@ router.get("/pets/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [pet] = await db.select().from(petsTable).where(eq(petsTable.id, id));
   if (!pet) return res.status(404).json({ error: "Mascota no encontrada" });
-  res.json(pet);
+  return res.json(pet);
 });
 
 // ─── PUBLIC: Submit pet for adoption (requires review) ───────────────────────
@@ -39,7 +39,7 @@ router.post("/pets/submit", async (req, res) => {
     return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   }
   const [pet] = await db.insert(petsTable).values({ ...parsed.data, status: "reviewing", submittedByPublic: true }).returning();
-  res.status(201).json(pet);
+  return res.status(201).json(pet);
 });
 
 // ─── PUBLIC: Submit adoption request ─────────────────────────────────────────
@@ -54,7 +54,7 @@ router.post("/pets/:id/adopt", async (req, res) => {
     return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   }
   const [request] = await db.insert(adoptionRequestsTable).values({ ...parsed.data, status: "pending" }).returning();
-  res.status(201).json(request);
+  return res.status(201).json(request);
 });
 
 // ─── ADMIN: List all pets ─────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ router.get("/admin/pets", async (req, res) => {
   let query = db.select().from(petsTable).$dynamic();
   if (status && status !== "all") query = query.where(eq(petsTable.status, status as string));
   const pets = await query.orderBy(desc(petsTable.createdAt));
-  res.json(pets);
+  return res.json(pets);
 });
 
 // ─── ADMIN: Get single pet ────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ router.get("/admin/pets/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [pet] = await db.select().from(petsTable).where(eq(petsTable.id, id));
   if (!pet) return res.status(404).json({ error: "Mascota no encontrada" });
-  res.json(pet);
+  return res.json(pet);
 });
 
 // ─── ADMIN: Create pet ────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ router.post("/admin/pets", async (req, res) => {
   const parsed = insertPetSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   const [pet] = await db.insert(petsTable).values({ ...parsed.data, status: "available" }).returning();
-  res.status(201).json(pet);
+  return res.status(201).json(pet);
 });
 
 // ─── ADMIN: Update pet ────────────────────────────────────────────────────────
@@ -91,14 +91,14 @@ router.patch("/admin/pets/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [updated] = await db.update(petsTable).set({ ...req.body, updatedAt: new Date() }).where(eq(petsTable.id, id)).returning();
   if (!updated) return res.status(404).json({ error: "Mascota no encontrada" });
-  res.json(updated);
+  return res.json(updated);
 });
 
 // ─── ADMIN: Delete pet ────────────────────────────────────────────────────────
 router.delete("/admin/pets/:id", async (req, res) => {
   if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   await db.delete(petsTable).where(eq(petsTable.id, Number(req.params.id)));
-  res.status(204).send();
+  return res.status(204).send();
 });
 
 // ─── ADMIN: List adoption requests ───────────────────────────────────────────
@@ -111,7 +111,7 @@ router.get("/admin/adoption-requests", async (req, res) => {
   if (petId) filters.push(eq(adoptionRequestsTable.petId, Number(petId)));
   if (filters.length) query = query.where(and(...filters));
   const requests = await query.orderBy(desc(adoptionRequestsTable.createdAt));
-  res.json(requests);
+  return res.json(requests);
 });
 
 // ─── ADMIN: Update adoption request status ────────────────────────────────────
@@ -130,7 +130,7 @@ router.patch("/admin/adoption-requests/:id", async (req, res) => {
   if (status === "in-process") {
     await db.update(petsTable).set({ status: "in-process", updatedAt: new Date() }).where(eq(petsTable.id, updated.petId));
   }
-  res.json(updated);
+  return res.json(updated);
 });
 
 export default router;

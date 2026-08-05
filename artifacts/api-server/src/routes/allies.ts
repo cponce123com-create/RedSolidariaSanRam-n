@@ -17,7 +17,7 @@ router.get("/allies", async (req, res) => {
 router.get("/admin/allies", async (req, res) => {
   if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const allies = await db.select().from(alliesTable).orderBy(asc(alliesTable.sortOrder), desc(alliesTable.createdAt));
-  res.json(allies);
+  return res.json(allies);
 });
 
 // ─── ADMIN: Create ally ───────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ router.post("/admin/allies", async (req, res) => {
   const parsed = insertAllySchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   const [ally] = await db.insert(alliesTable).values(parsed.data).returning();
-  res.status(201).json(ally);
+  return res.status(201).json(ally);
 });
 
 // ─── ADMIN: Update ally ───────────────────────────────────────────────────────
@@ -35,14 +35,14 @@ router.patch("/admin/allies/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [updated] = await db.update(alliesTable).set(req.body).where(eq(alliesTable.id, id)).returning();
   if (!updated) return res.status(404).json({ error: "Aliado no encontrado" });
-  res.json(updated);
+  return res.json(updated);
 });
 
 // ─── ADMIN: Delete ally ───────────────────────────────────────────────────────
 router.delete("/admin/allies/:id", async (req, res) => {
   if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   await db.delete(alliesTable).where(eq(alliesTable.id, Number(req.params.id)));
-  res.status(204).send();
+  return res.status(204).send();
 });
 
 export default router;

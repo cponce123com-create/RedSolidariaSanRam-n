@@ -21,10 +21,10 @@ router.get("/news/:id", async (req, res) => {
     if (!post) {
       return res.status(404).json({ error: "not_found", message: "News post not found" });
     }
-    res.json(formatNews(post));
+    return res.json(formatNews(post));
   } catch (err) {
     req.log.error({ err }, "Failed to get news post");
-    res.status(500).json({ error: "server_error", message: "Failed to get news post" });
+    return res.status(500).json({ error: "server_error", message: "Failed to get news post" });
   }
 });
 
@@ -47,10 +47,10 @@ router.put("/news/:id", async (req, res) => {
     if (!post) {
       return res.status(404).json({ error: "not_found", message: "News post not found" });
     }
-    res.json(formatNews(post));
+    return res.json(formatNews(post));
   } catch (err) {
     req.log.error({ err }, "Failed to update news post");
-    res.status(400).json({ error: "validation_error", message: "Invalid news data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid news data" });
   }
 });
 

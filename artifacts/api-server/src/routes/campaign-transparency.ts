@@ -47,7 +47,7 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 8);
 
-    res.json({
+    return res.json({
       campaignId,
       title: campaign.title,
       goal,
@@ -89,7 +89,7 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
     });
   } catch (err) {
     req.log.error({ err }, "Failed to get transparency data");
-    res.status(500).json({ error: "server_error", message: "Failed to get transparency data" });
+    return res.status(500).json({ error: "server_error", message: "Failed to get transparency data" });
   }
 });
 

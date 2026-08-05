@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -74,16 +74,18 @@ export default function AdminReportDetail() {
       if (!res.ok) throw new Error("Error cargando reporte");
       return res.json();
     },
-    onSuccess: (r: CommunityReport) => {
-      setAdminNotes(r.adminNotes || "");
-      setConvertData(prev => ({
-        ...prev,
-        title: r.title,
-        description: r.description,
-        imageUrl: r.photos?.[0] || "",
-      }));
-    },
   });
+
+  useEffect(() => {
+    if (!report) return;
+    setAdminNotes(report.adminNotes || "");
+    setConvertData(prev => ({
+      ...prev,
+      title: report.title,
+      description: report.description,
+      imageUrl: report.photos?.[0] || "",
+    }));
+  }, [report]);
 
   const update = useMutation({
     mutationFn: async (data: object) => {

@@ -68,7 +68,7 @@ router.get("/admin/dashboard", async (req, res) => {
   const totalSpent = allExpenses.reduce((acc, e) => acc + e.amount, 0);
   const availablePets = allPets.filter(p => p.status === "available").length;
 
-  res.json({
+  return res.json({
     summary: {
       totalCampaigns: allCampaigns.length,
       activeCampaigns,

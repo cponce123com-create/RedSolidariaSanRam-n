@@ -45,10 +45,10 @@ router.put("/campaigns/:id/evidence/:evidenceId", async (req, res) => {
       .where(and(eq(campaignEvidenceTable.id, evidenceId), eq(campaignEvidenceTable.campaignId, campaignId)))
       .returning();
     if (!ev) return res.status(404).json({ error: "not_found", message: "Evidence not found" });
-    res.json(formatEvidence(ev));
+    return res.json(formatEvidence(ev));
   } catch (err) {
     req.log.error({ err }, "Failed to update campaign evidence");
-    res.status(400).json({ error: "validation_error", message: "Invalid evidence data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid evidence data" });
   }
 });
 

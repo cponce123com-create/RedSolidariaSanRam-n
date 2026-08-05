@@ -33,10 +33,10 @@ router.put("/testimonials/:id", async (req, res) => {
     if (!testimonial) {
       return res.status(404).json({ error: "not_found", message: "Testimonial not found" });
     }
-    res.json(formatTestimonial(testimonial));
+    return res.json(formatTestimonial(testimonial));
   } catch (err) {
     req.log.error({ err }, "Failed to update testimonial");
-    res.status(400).json({ error: "validation_error", message: "Invalid testimonial data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid testimonial data" });
   }
 });
 

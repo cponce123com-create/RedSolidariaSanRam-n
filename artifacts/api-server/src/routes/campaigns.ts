@@ -31,10 +31,10 @@ router.get("/campaigns/:id", async (req, res) => {
     if (!campaign) {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
-    res.json(await formatCampaignWithDonors(campaign));
+    return res.json(await formatCampaignWithDonors(campaign));
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign");
-    res.status(500).json({ error: "server_error", message: "Failed to get campaign" });
+    return res.status(500).json({ error: "server_error", message: "Failed to get campaign" });
   }
 });
 
@@ -57,10 +57,10 @@ router.put("/campaigns/:id", async (req, res) => {
     if (!campaign) {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
-    res.json(await formatCampaignWithDonors(campaign));
+    return res.json(await formatCampaignWithDonors(campaign));
   } catch (err) {
     req.log.error({ err }, "Failed to update campaign");
-    res.status(400).json({ error: "validation_error", message: "Invalid campaign data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid campaign data" });
   }
 });
 

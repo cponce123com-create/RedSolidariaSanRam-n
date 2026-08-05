@@ -1,6 +1,20 @@
 import bcrypt from "bcryptjs";
 import { db, auditLogsTable } from "@workspace/db";
 
+// Augmentación de tipos para la sesión de admin (express-session)
+declare module "express-session" {
+  interface SessionData {
+    adminUser?:
+      | {
+          id: number;
+          username: string;
+          name: string | null;
+          role: string;
+        }
+      | null;
+  }
+}
+
 const SALT_ROUNDS = 12;
 
 /**

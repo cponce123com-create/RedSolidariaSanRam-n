@@ -110,7 +110,7 @@ router.post("/admin/login", async (req, res) => {
     return res.status(401).json({ error: "unauthorized", message: "Usuario o contraseña incorrectos" });
   } catch (err) {
     console.error("Login error:", err);
-    res.status(400).json({ error: "validation_error", message: "Invalid login data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid login data" });
   }
 });
 
@@ -139,7 +139,7 @@ router.post("/admin/logout", async (req, res) => {
 router.get("/admin/me", (req, res) => {
   const adminUser = (req.session as any).adminUser;
   if (!adminUser) return res.status(401).json({ error: "unauthorized", message: "No autenticado" });
-  res.json(adminUser);
+  return res.json(adminUser);
 });
 
 export default router;

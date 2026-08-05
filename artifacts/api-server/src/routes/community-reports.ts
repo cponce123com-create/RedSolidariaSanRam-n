@@ -12,7 +12,7 @@ router.post("/reports", async (req, res) => {
     return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   }
   const [report] = await db.insert(communityReportsTable).values(parsed.data).returning();
-  res.status(201).json(report);
+  return res.status(201).json(report);
 });
 
 // ─── PUBLIC: List approved urgent reports (for public page) ──────────────────
@@ -46,7 +46,7 @@ router.get("/admin/reports", async (req, res) => {
     query = query.where(eq(communityReportsTable.status, status));
   }
   const reports = await query.orderBy(desc(communityReportsTable.createdAt));
-  res.json(reports);
+  return res.json(reports);
 });
 
 // ─── ADMIN: Get single report ─────────────────────────────────────────────────
@@ -57,7 +57,7 @@ router.get("/admin/reports/:id", async (req, res) => {
   const id = Number(req.params.id);
   const [report] = await db.select().from(communityReportsTable).where(eq(communityReportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Reporte no encontrado" });
-  res.json(report);
+  return res.json(report);
 });
 
 // ─── ADMIN: Update report status / notes / featured ──────────────────────────
@@ -76,7 +76,7 @@ router.patch("/admin/reports/:id", async (req, res) => {
     .where(eq(communityReportsTable.id, id))
     .returning();
   if (!updated) return res.status(404).json({ error: "Reporte no encontrado" });
-  res.json(updated);
+  return res.json(updated);
 });
 
 // ─── ADMIN: Convert report to campaign ───────────────────────────────────────
@@ -109,7 +109,7 @@ router.post("/admin/reports/:id/convert", async (req, res) => {
     .where(eq(communityReportsTable.id, id))
     .returning();
 
-  res.status(201).json({ campaign, report: updated });
+  return res.status(201).json({ campaign, report: updated });
 });
 
 // ─── ADMIN: Delete report ─────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ router.delete("/admin/reports/:id", async (req, res) => {
   }
   const id = Number(req.params.id);
   await db.delete(communityReportsTable).where(eq(communityReportsTable.id, id));
-  res.status(204).send();
+  return res.status(204).send();
 });
 
 export default router;

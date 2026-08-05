@@ -36,7 +36,7 @@ router.get("/admin/users", async (req, res) => {
     details: { count: users.length },
   });
   
-  res.json(users);
+  return res.json(users);
 });
 
 // ─── Create admin user ───────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ router.post("/admin/users", async (req, res) => {
       details: { createdUserId: user.id, createdUsername: user.username },
     });
     
-    res.status(201).json(user);
+    return res.status(201).json(user);
   } catch (e: any) {
     if (e.code === "23505") return res.status(400).json({ error: "El nombre de usuario ya existe" });
     throw e;
@@ -127,7 +127,7 @@ router.patch("/admin/users/:id", async (req, res) => {
     },
   });
   
-  res.json(updated);
+  return res.json(updated);
 });
 
 // ─── Delete admin user ───────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ router.delete("/admin/users/:id", async (req, res) => {
     details: { deletedUserId: userId, deletedUsername: existingUser.username },
   });
   
-  res.status(204).send();
+  return res.status(204).send();
 });
 
 export default router;

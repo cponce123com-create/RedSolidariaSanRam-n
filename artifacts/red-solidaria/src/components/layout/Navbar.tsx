@@ -1,14 +1,23 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Menu, Heart, X, AlertTriangle, Dog, Package } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+
+type NavLinkItem = {
+  href: string;
+  label: string;
+  icon?: LucideIcon;
+  urgent?: boolean;
+  animal?: boolean;
+};
 
 export function Navbar() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const navLinks = [
+  const navLinks: NavLinkItem[] = [
     { href: "/", label: "Inicio" },
     { href: "/nosotros", label: "Nosotros" },
     { href: "/campanas", label: "Campañas" },
@@ -44,30 +53,33 @@ export function Navbar() {
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
-                  (link as any).urgent
-                    ? location === link.href || location.startsWith(link.href + "/")
-                      ? "text-orange-700 bg-orange-100 font-semibold"
-                      : "text-orange-600 hover:bg-orange-50 font-semibold flex items-center gap-1"
-                    : (link as any).animal
-                    ? location === link.href || location.startsWith(link.href + "/")
-                      ? "text-amber-700 bg-amber-100 font-semibold"
-                      : "text-amber-700 hover:bg-amber-50 font-medium flex items-center gap-1"
-                    : location === link.href || (link.href !== "/" && location.startsWith(link.href + "/"))
-                    ? "text-primary bg-primary/5"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                }`}
-              >
-                {(link as any).urgent && <AlertTriangle className="w-3.5 h-3.5 inline mr-0.5" />}
-                {(link as any).animal && <Dog className="w-3.5 h-3.5 inline mr-0.5" />}
-                {(link as any).icon && <link.icon className="w-3.5 h-3.5 inline mr-0.5" />}
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
+                    link.urgent
+                      ? location === link.href || location.startsWith(link.href + "/")
+                        ? "text-orange-700 bg-orange-100 font-semibold"
+                        : "text-orange-600 hover:bg-orange-50 font-semibold flex items-center gap-1"
+                      : link.animal
+                      ? location === link.href || location.startsWith(link.href + "/")
+                        ? "text-amber-700 bg-amber-100 font-semibold"
+                        : "text-amber-700 hover:bg-amber-50 font-medium flex items-center gap-1"
+                      : location === link.href || (link.href !== "/" && location.startsWith(link.href + "/"))
+                      ? "text-primary bg-primary/5"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }`}
+                >
+                  {link.urgent && <AlertTriangle className="w-3.5 h-3.5 inline mr-0.5" />}
+                  {link.animal && <Dog className="w-3.5 h-3.5 inline mr-0.5" />}
+                  {Icon && <Icon className="w-3.5 h-3.5 inline mr-0.5" />}
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Actions */}
@@ -102,25 +114,28 @@ export function Navbar() {
             className="lg:hidden bg-background border-b border-border"
           >
             <nav className="flex flex-col p-4 gap-1">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`p-3 rounded-xl text-base font-medium flex items-center gap-2 ${
-                    location === link.href ? "bg-primary/10 text-primary" :
-                    (link as any).urgent ? "text-orange-600 hover:bg-orange-50" :
-                    (link as any).animal ? "text-amber-700 hover:bg-amber-50" :
-                    "text-foreground hover:bg-secondary"
-                  }`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  {(link as any).urgent && <AlertTriangle className="w-4 h-4 text-orange-500" />}
-                  {(link as any).animal && <Dog className="w-4 h-4 text-amber-500" />}
-                  {(link as any).icon && <link.icon className="w-4 h-4" />}
-                  {link.label}
-                </Link>
-              ))}
-              <div className="border-t border-border mt-2 pt-2 space-y-2">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`p-3 rounded-xl text-base font-medium flex items-center gap-2 ${
+                      location === link.href ? "bg-primary/10 text-primary" :
+                      link.urgent ? "text-orange-600 hover:bg-orange-50" :
+                      link.animal ? "text-amber-700 hover:bg-amber-50" :
+                      "text-foreground hover:bg-secondary"
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    {link.urgent && <AlertTriangle className="w-4 h-4 text-orange-500" />}
+                    {link.animal && <Dog className="w-4 h-4 text-amber-500" />}
+                    {Icon && <Icon className="w-4 h-4" />}
+                    {link.label}
+                  </Link>
+                );
+                })}
+                <div className="border-t border-border mt-2 pt-2 space-y-2">
                 <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-orange-200 text-orange-600 hover:bg-orange-50">
                     <AlertTriangle className="w-4 h-4" />

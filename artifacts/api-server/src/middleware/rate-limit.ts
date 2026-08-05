@@ -10,7 +10,7 @@ export const apiLimiter = rateLimit({
   skipSuccessfulRequests: false,
   keyGenerator: (req) => {
     // Usar IP o API key si está disponible
-    return req.headers['x-api-key'] as string || req.ip;
+    return (req.headers['x-api-key'] as string | undefined) ?? req.ip ?? "unknown";
   },
 });
 

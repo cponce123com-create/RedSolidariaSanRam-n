@@ -25,7 +25,7 @@ router.get("/admin/volunteers", async (req, res) => {
   let query = db.select().from(volunteersTable).$dynamic();
   if (status && status !== "all") query = query.where(eq(volunteersTable.status, status as string));
   const volunteers = await query.orderBy(desc(volunteersTable.createdAt));
-  res.json(volunteers.map(formatVolunteer));
+  return res.json(volunteers.map(formatVolunteer));
 });
 
 // ─── ADMIN: Update volunteer status ──────────────────────────────────────────
@@ -35,7 +35,7 @@ router.patch("/admin/volunteers/:id", async (req, res) => {
   const { status, adminNotes } = req.body;
   const [updated] = await db.update(volunteersTable).set({ status, adminNotes }).where(eq(volunteersTable.id, id)).returning();
   if (!updated) return res.status(404).json({ error: "Voluntario no encontrado" });
-  res.json(formatVolunteer(updated));
+  return res.json(formatVolunteer(updated));
 });
 
 function formatVolunteer(v: typeof volunteersTable.$inferSelect) {
