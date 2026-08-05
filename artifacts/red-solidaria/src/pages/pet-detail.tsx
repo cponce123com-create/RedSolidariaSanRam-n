@@ -358,7 +358,7 @@ export default function PetDetail() {
                       <FormField control={form.control} name="requesterPhone" render={({ field }) => (
                         <FormItem>
                           <FormLabel>Celular</FormLabel>
-                          <FormControl><Input placeholder="987 654 321" className="rounded-xl bg-secondary/30" {...field} /></FormControl>
+                          <FormControl><Input placeholder="921 615 737" className="rounded-xl bg-secondary/30" {...field} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />

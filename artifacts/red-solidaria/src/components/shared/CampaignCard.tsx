@@ -12,7 +12,7 @@ interface CampaignCardProps {
 }
 
 export function CampaignCard({ campaign }: CampaignCardProps) {
-  const progress = Math.min(100, Math.round((campaign.raised / campaign.goal) * 100)) || 0;
+  const progress = campaign.goal > 0 ? Math.min(100, Math.round((campaign.raised / campaign.goal) * 100)) : 0;
   
   return (
     <Card className="overflow-hidden flex flex-col hover-elevate border-border/50 group bg-card">

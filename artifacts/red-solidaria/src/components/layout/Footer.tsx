@@ -18,10 +18,10 @@ export function Footer() {
               Uniendo corazones para transformar vidas en San Ramón, Chanchamayo. Empezamos con sonrisas en Navidad, y hoy somos una familia solidaria.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
+              <a href="https://facebook.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label="Facebook de Red Solidaria San Ramón" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
                 <Facebook className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
+              <a href="https://instagram.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label="Instagram de Red Solidaria San Ramón" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
                 <Instagram className="w-5 h-5" />
               </a>
             </div>
@@ -46,11 +46,11 @@ export function Footer() {
               </li>
               <li className="flex items-center gap-3 text-muted-foreground">
                 <Phone className="w-5 h-5 text-primary shrink-0" />
-                <span>+51 987 654 321</span>
+                <span>+51 921 615 737</span>
               </li>
               <li className="flex items-center gap-3 text-muted-foreground">
                 <Mail className="w-5 h-5 text-primary shrink-0" />
-                <span>hola@redsolidariasanramon.org</span>
+                <span>contacto@redsolidariasanramon.org</span>
               </li>
             </ul>
           </div>

@@ -20,7 +20,7 @@ const HELP_WAYS = [
     description: "Tu donación llega directamente a las campañas más urgentes. Desde S/ 5 ya puedes marcar una diferencia real. Usamos Yape, Plin, BCP o efectivo.",
     steps: [
       "Elige la campaña que más te mueve",
-      "Dona por Yape (987 654 321) o Plin (987 654 321)",
+      "Dona por Yape (921 615 737) o Plin (921 615 737)",
       "Envíanos el comprobante por WhatsApp",
     ],
     cta: "Ver campañas",
@@ -125,8 +125,8 @@ const HELP_WAYS = [
 ];
 
 const PAYMENT_METHODS = [
-  { icon: QrCode, label: "Yape", value: "987 654 321", color: "text-purple-600" },
-  { icon: QrCode, label: "Plin", value: "987 654 321", color: "text-blue-600" },
+  { icon: QrCode, label: "Yape", value: "921 615 737", color: "text-purple-600" },
+  { icon: QrCode, label: "Plin", value: "921 615 737", color: "text-blue-600" },
   { icon: Banknote, label: "BCP", value: "193-12345678-0-55", color: "text-orange-600" },
   { icon: CreditCard, label: "Efectivo", value: "Coordinamos en San Ramón", color: "text-green-600" },
 ];
@@ -199,7 +199,7 @@ export default function HowToHelp() {
         </div>
         <p className="text-center text-sm text-muted-foreground mt-6">
           Después de tu donación, envía el comprobante al{" "}
-          <a href="https://wa.me/51987654321" className="text-green-600 font-semibold hover:underline">WhatsApp 987 654 321</a>
+          <a href="https://wa.me/51921615737" className="text-green-600 font-semibold hover:underline">WhatsApp 921 615 737</a>
         </p>
       </div>
 

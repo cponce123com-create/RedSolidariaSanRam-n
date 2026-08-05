@@ -303,7 +303,7 @@ export default function ReportForm() {
                 <FormItem>
                   <FormLabel className="flex items-center gap-2"><Phone className="w-4 h-4 text-primary" /> Celular (opcional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="987 654 321" className="rounded-xl bg-secondary/30" {...field} />
+                    <Input placeholder="921 615 737" className="rounded-xl bg-secondary/30" {...field} />
                   </FormControl>
                 </FormItem>
               )} />

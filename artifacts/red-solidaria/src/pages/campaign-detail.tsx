@@ -216,7 +216,7 @@ export default function CampaignDetail() {
                       <div className="bg-white dark:bg-black rounded-xl p-4 border border-border shadow-sm">
                         <div className="font-bold text-foreground mb-1">Yape / Plin</div>
                         <div className="font-mono text-lg flex items-center justify-between">
-                          987 654 321
+                          921 615 737
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => navigator.clipboard.writeText("987654321")}><Copy className="w-4 h-4"/></Button>
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">Titular: Juan Pérez (Red Solidaria)</div>

@@ -110,3 +110,7 @@
 .hover-elevate {
   @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
 }
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}

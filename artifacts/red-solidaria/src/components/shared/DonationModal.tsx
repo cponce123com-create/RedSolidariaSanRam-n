@@ -215,7 +215,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                         </div>
                         <span className="font-bold text-foreground">Yape</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Envía al 987 654 321</p>
+                      <p className="text-xs text-muted-foreground">Envía al 921 615 737</p>
                     </div>
 
                     <div 
@@ -228,7 +228,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                         </div>
                         <span className="font-bold text-foreground">Plin</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Envía al 987 654 321</p>
+                      <p className="text-xs text-muted-foreground">Envía al 921 615 737</p>
                     </div>
 
                     <div 

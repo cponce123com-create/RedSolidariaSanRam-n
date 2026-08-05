@@ -76,7 +76,7 @@ export default function Contact() {
                 <Phone className="w-6 h-6" />
               </div>
               <h3 className="font-bold text-lg mb-2">Teléfono</h3>
-              <p className="text-muted-foreground">+51 987 654 321</p>
+              <p className="text-muted-foreground">+51 921 615 737</p>
             </Card>
 
             <Card className="p-8 text-center flex flex-col items-center border-border/50 shadow-sm hover:shadow-md transition-shadow">
@@ -84,7 +84,7 @@ export default function Contact() {
                 <Mail className="w-6 h-6" />
               </div>
               <h3 className="font-bold text-lg mb-2">Email</h3>
-              <p className="text-muted-foreground">hola@redsolidariasanramon.org</p>
+              <p className="text-muted-foreground">contacto@redsolidariasanramon.org</p>
             </Card>
           </div>
 

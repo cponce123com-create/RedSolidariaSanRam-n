@@ -156,7 +156,7 @@ MIT License - ver archivo LICENSE para detalles
 ## 📞 Contacto
 
 - Website: https://redsolidariasanram-n.onrender.com
-- Email: contacto@redsolidaria.com
+- Email: contacto@redsolidariasanramon.org
 
 ---
 

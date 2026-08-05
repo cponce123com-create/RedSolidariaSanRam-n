@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import SEO from "@/components/shared/SEO";
 import { useQuery } from "@tanstack/react-query";
-import { useGetStats, useGetCampaigns, useGetTestimonials } from "@workspace/api-client-react";
+import { useGetStats, useGetCampaigns } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { CampaignCard } from "@/components/shared/CampaignCard";
 import { Heart, Users, Gift, ShieldCheck, PawPrint, AlertTriangle, MapPin, ArrowRight, Baby, PersonStanding, Cat, Home as HomeIcon, Zap } from "lucide-react";
@@ -23,7 +23,6 @@ const URGENCY_COLOR: Record<string, string> = {
 export default function Home() {
   const { data: stats } = useGetStats();
   const { data: campaigns } = useGetCampaigns({ featured: true, status: "active" });
-  const { data: testimonials } = useGetTestimonials();
   const { data: featuredReports = [] } = useQuery<FeaturedReport[]>({
     queryKey: ["/api/reports/featured"],
     queryFn: async () => {
@@ -98,10 +97,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 text-center divide-x-0 md:divide-x divide-primary-foreground/20">
             {[
-              { value: stats?.childrenHelped || "2,000+", label: "Niños Beneficiados" },
-              { value: stats?.campaignsRun || "45+", label: "Campañas Exitosas" },
-              { value: stats?.volunteers || "120+", label: "Voluntarios Activos" },
-              { value: stats?.animalsHelped || "300+", label: "Animales Rescatados" },
+              { value: stats?.childrenHelped ?? "—", label: "Niños Beneficiados" },
+              { value: stats?.campaignsRun ?? "—", label: "Campañas Exitosas" },
+              { value: stats?.volunteers ?? "—", label: "Voluntarios Activos" },
+              { value: stats?.animalsHelped ?? "—", label: "Animales Rescatados" },
             ].map((stat, i) => (
               <motion.div 
                 key={i}

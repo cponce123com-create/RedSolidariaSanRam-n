@@ -2,7 +2,7 @@ import { Helmet } from "react-helmet-async";
 
 const SITE_NAME = "Red Solidaria San Ramón";
 const BASE_URL = "https://redsolidariasanramon.org";
-const DEFAULT_IMAGE = "/og-image.jpg";
+const DEFAULT_IMAGE = "/opengraph.jpg";
 const DEFAULT_DESCRIPTION =
   "Organización solidaria en San Ramón, Chanchamayo, Perú. Apoyamos campañas sociales, protección animal y bienestar comunitario.";
 
