@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
-  Wheelchair, 
+  Armchair, 
   Crutch, 
   Bed, 
   Utensils, 
@@ -34,7 +34,7 @@ const STOCK_ITEMS: StockItem[] = [
     name: "Sillas de Ruedas",
     category: "Movilidad",
     description: "Sillas de ruedas manuales plegables para adultos y niños. Incluye modelos estándar y livianos.",
-    icon: Wheelchair,
+    icon: Armchair,
     inStock: true,
     stockLevel: "medium",
     canSponsor: true,
