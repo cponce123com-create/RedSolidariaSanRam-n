@@ -148,9 +148,12 @@ app.use("/api", router);
 
 // Servir archivos estáticos del frontend en producción con caching optimizado
 if (process.env.NODE_ENV === "production") {
-  const staticPath =
+  // STATIC_FILES_PATH puede venir relativo (config de Replit/Render): sendFile
+  // requiere ruta absoluta, así que la normalizamos contra el cwd.
+  const staticPath = path.resolve(
     process.env.STATIC_FILES_PATH ||
-    path.join(process.cwd(), "artifacts/red-solidaria/dist/public");
+      path.join(process.cwd(), "artifacts/red-solidaria/dist/public"),
+  );
   logger.info({ staticPath }, "Serving static files from");
 
   // Assets estáticos con cache de 1 año (hash en nombres de archivo).
