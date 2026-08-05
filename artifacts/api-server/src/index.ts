@@ -16,22 +16,17 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-seedIfEmpty().then(() => {
-  app.listen(port, (err) => {
-    if (err) {
-      logger.error({ err }, "Error listening on port");
-      process.exit(1);
-    }
+// Arrancar el servidor primero y seedear en paralelo: el servicio responde
+// aunque la DB esté lenta o el seed falle (evita downtime durante deploys).
+app.listen(port, (err) => {
+  if (err) {
+    logger.error({ err }, "Error listening on port");
+    process.exit(1);
+  }
 
-    logger.info({ port }, "Server listening");
-  });
-}).catch((err) => {
+  logger.info({ port }, "Server listening");
+});
+
+seedIfEmpty().catch((err) => {
   logger.error({ err }, "Failed to seed database, starting server anyway");
-  app.listen(port, (err2) => {
-    if (err2) {
-      logger.error({ err: err2 }, "Error listening on port");
-      process.exit(1);
-    }
-    logger.info({ port }, "Server listening");
-  });
 });

@@ -9,10 +9,11 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: false,
   keyGenerator: (req) => {
-    // Usar API key si está disponible, o IP normalizada (IPv4/IPv6)
+    // Combinar API key con IP normalizada para que rotar el header
+    // no permita bypassear el límite por IP
     const apiKey = req.headers['x-api-key'] as string | undefined;
-    if (apiKey) return `api-key:${apiKey}`;
-    return ipKeyGenerator(req.ip ?? "unknown");
+    const ip = ipKeyGenerator(req.ip ?? "unknown");
+    return apiKey ? `api-key:${apiKey}:${ip}` : ip;
   },
 });
 
@@ -76,6 +77,14 @@ export const adoptionLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   message: { error: "Demasiadas solicitudes de adopción. Por favor espera 1 hora." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const testimonialLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { error: "Demasiados testimonios. Por favor espera 1 hora antes de intentar de nuevo." },
   standardHeaders: true,
   legacyHeaders: false,
 });

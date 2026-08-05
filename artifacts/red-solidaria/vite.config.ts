@@ -64,7 +64,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes("node_modules")) {
-            if (id.includes("react") || id.includes("react-dom")) {
+            if (id.includes("/react/") || id.includes("/react-dom/")) {
               return "react-vendor";
             }
             if (id.includes("radix-ui")) {
@@ -73,17 +73,10 @@ export default defineConfig({
             if (id.includes("framer-motion")) {
               return "animation-vendor";
             }
-            if (id.includes("recharts") || id.includes("d3")) {
+            if (id.includes("recharts") || id.includes("/d3-")) {
               return "charts-vendor";
             }
             return "vendor";
-          }
-          // Code splitting para componentes grandes
-          if (id.includes("/components/")) {
-            return "components";
-          }
-          if (id.includes("/pages/")) {
-            return "pages";
           }
         },
       },

@@ -1,10 +1,18 @@
 import { Router, type IRouter } from "express";
-import { db, donationsTable, campaignsTable, insertDonationSchema } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import {
+  db,
+  donationsTable,
+  campaignsTable,
+  insertDonationSchema,
+} from "@workspace/db";
+import { eq, and, sql, desc } from "drizzle-orm";
+import { requireAdmin } from "../middleware/require-admin";
+import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
-router.post("/donations", async (req, res) => {
+// POST /donations — público, con rate limit anti-spam
+router.post("/donations", donationLimiter, async (req, res) => {
   try {
     const data = insertDonationSchema.parse({
       ...req.body,
@@ -18,60 +26,78 @@ router.post("/donations", async (req, res) => {
   }
 });
 
+// GET /donations/stats — público (solo agregados, sin datos personales)
 router.get("/donations/stats", async (req, res) => {
   try {
-    const all = await db.select().from(donationsTable);
-    const approved = all.filter((d) => d.status === "approved");
-    const pending = all.filter((d) => d.status === "pending");
-    const donors = new Set(all.map((d) => d.email)).size;
-    res.json({
-      totalDonations: all.length,
-      totalAmount: approved.reduce((sum, d) => sum + d.amount, 0),
-      pendingCount: pending.length,
-      approvedCount: approved.length,
-      totalDonors: donors,
-    });
+    const [stats] = await db
+      .select({
+        totalDonations: sql<number>`count(*)`,
+        totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)`,
+        pendingCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')`,
+        approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'approved')`,
+        totalDonors: sql<number>`count(distinct ${donationsTable.email})`,
+      })
+      .from(donationsTable);
+    res.json(stats);
   } catch (err) {
     req.log.error({ err }, "Failed to get donation stats");
     res.status(500).json({ error: "server_error", message: "Failed to get donation stats" });
   }
 });
 
-router.get("/donations", async (req, res) => {
+// GET /donations — solo admin (contiene datos personales de donantes)
+router.get("/donations", requireAdmin, async (req, res) => {
   try {
-    const { campaignId, status } = req.query;
-    let donations = await db.select().from(donationsTable);
-    if (campaignId) {
-      donations = donations.filter((d) => d.campaignId === Number(campaignId));
-    }
-    if (status && status !== "all") {
-      donations = donations.filter((d) => d.status === status);
-    }
-    const result = await Promise.all(donations.map(formatDonation));
-    res.json(result.reverse());
+    const { campaignId, status, limit: rawLimit, offset: rawOffset } = req.query;
+    const limit = Math.min(Math.max(parseInt(rawLimit as string) || 100, 1), 500);
+    const offset = Math.max(parseInt(rawOffset as string) || 0, 0);
+
+    const conditions = [];
+    if (campaignId) conditions.push(eq(donationsTable.campaignId, Number(campaignId)));
+    if (status && status !== "all") conditions.push(eq(donationsTable.status, status as string));
+
+    const rows = await db
+      .select({
+        donation: donationsTable,
+        campaignTitle: campaignsTable.title,
+      })
+      .from(donationsTable)
+      .leftJoin(campaignsTable, eq(donationsTable.campaignId, campaignsTable.id))
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(desc(donationsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    res.json(
+      rows.map(({ donation, campaignTitle }) =>
+        formatDonation(donation, campaignTitle),
+      ),
+    );
   } catch (err) {
     req.log.error({ err }, "Failed to get donations");
     res.status(500).json({ error: "server_error", message: "Failed to get donations" });
   }
 });
 
-router.get("/donations/:id", async (req, res) => {
+// GET /donations/:id — solo admin (datos personales)
+router.get("/donations/:id", requireAdmin, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, id));
     if (!donation) {
       return res.status(404).json({ error: "not_found", message: "Donation not found" });
     }
     return res.json(await formatDonation(donation));
   } catch (err) {
-    req.log.error({ err }, "Failed to get donation" );
+    req.log.error({ err }, "Failed to get donation");
     return res.status(500).json({ error: "server_error", message: "Failed to get donation" });
   }
 });
 
-router.put("/donations/:id", async (req, res) => {
+// PUT /donations/:id — solo admin (aprobar/rechazar)
+router.put("/donations/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     const { status, adminNote } = req.body;
     if (!["pending", "approved", "rejected"].includes(status)) {
       return res.status(400).json({ error: "validation_error", message: "Invalid status" });
@@ -91,24 +117,36 @@ router.put("/donations/:id", async (req, res) => {
   }
 });
 
-router.get("/campaigns/:id/donations", async (req, res) => {
+// GET /campaigns/:id/donations — solo admin (datos personales)
+router.get("/campaigns/:id/donations", requireAdmin, async (req, res) => {
   try {
-    const campaignId = parseInt(req.params.id);
-    const donations = await db
-      .select()
+    const campaignId = Number(req.params.id);
+    const rows = await db
+      .select({
+        donation: donationsTable,
+        campaignTitle: campaignsTable.title,
+      })
       .from(donationsTable)
-      .where(eq(donationsTable.campaignId, campaignId));
-    const result = await Promise.all(donations.map(formatDonation));
-    res.json(result);
+      .leftJoin(campaignsTable, eq(donationsTable.campaignId, campaignsTable.id))
+      .where(eq(donationsTable.campaignId, campaignId))
+      .orderBy(desc(donationsTable.createdAt));
+
+    res.json(
+      rows.map(({ donation, campaignTitle }) =>
+        formatDonation(donation, campaignTitle),
+      ),
+    );
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign donations");
     res.status(500).json({ error: "server_error", message: "Failed to get campaign donations" });
   }
 });
 
-async function formatDonation(d: typeof donationsTable.$inferSelect) {
-  let campaignTitle: string | null = null;
-  if (d.campaignId) {
+async function formatDonation(
+  d: typeof donationsTable.$inferSelect,
+  campaignTitle: string | null = null,
+) {
+  if (campaignTitle === null && d.campaignId) {
     const [campaign] = await db
       .select({ title: campaignsTable.title })
       .from(campaignsTable)

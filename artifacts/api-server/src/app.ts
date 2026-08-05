@@ -1,4 +1,9 @@
-import express, { type Express } from "express";
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
@@ -11,6 +16,10 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
+
+// Render/Heroku terminan TLS en un proxy: confiar en X-Forwarded-For para
+// obtener la IP real del cliente (rate limiting y audit logs correctos).
+app.set("trust proxy", 1);
 
 // Helmet.js para seguridad de headers HTTP
 app.use(
@@ -67,19 +76,38 @@ app.use(
     },
   }),
 );
-app.use(cors({ origin: process.env.CORS_ORIGIN || true, credentials: true }));
+
+// CORS: en producción restringido al frontend (mismo origin o CORS_ORIGIN explícito)
+app.use(
+  cors({
+    origin:
+      process.env.CORS_ORIGIN ||
+      (process.env.NODE_ENV === "production"
+        ? "https://redsolidariasanramon.org"
+        : true),
+    credentials: true,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiter global para toda la API
 app.use("/api", apiLimiter);
 
-// Session middleware con validación de SECRET en producción
-const sessionSecret = process.env.SESSION_SECRET;
-if (process.env.NODE_ENV === "production" && !sessionSecret) {
-  throw new Error(
-    "SESSION_SECRET environment variable is required in production",
-  );
+// Validación de variables obligatorias en producción
+if (process.env.NODE_ENV === "production") {
+  const missing = [
+    !process.env.SESSION_SECRET && "SESSION_SECRET",
+    !process.env.ADMIN_USERNAME && "ADMIN_USERNAME",
+    !process.env.ADMIN_PASSWORD && "ADMIN_PASSWORD",
+  ].filter(Boolean);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Required environment variables in production: ${missing.join(", ")}. ` +
+        `Defínelas en Render para evitar credenciales por defecto.`,
+    );
+  }
 }
 
 // Store de sesiones en PostgreSQL: escalable y persistente entre deploys
@@ -89,7 +117,7 @@ const PostgresSessionStore = pgSession(session);
 app.use(
   session({
     store: new PostgresSessionStore({ pool, tableName: "session" }),
-    secret: sessionSecret || "redsolidaria-secret-key-2024",
+    secret: process.env.SESSION_SECRET || "redsolidaria-secret-key-2024",
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -105,9 +133,11 @@ app.use("/api", router);
 
 // Servir archivos estáticos del frontend en producción con caching optimizado
 if (process.env.NODE_ENV === "production") {
-  const staticPath = process.env.STATIC_FILES_PATH || path.join(process.cwd(), "artifacts/red-solidaria/dist/public");
+  const staticPath =
+    process.env.STATIC_FILES_PATH ||
+    path.join(process.cwd(), "artifacts/red-solidaria/dist/public");
   logger.info({ staticPath }, "Serving static files from");
-  
+
   // Assets estáticos con cache de 1 año (hash en nombres de archivo)
   app.use(
     express.static(staticPath, {
@@ -122,5 +152,13 @@ if (process.env.NODE_ENV === "production") {
     res.sendFile(path.join(staticPath, "index.html"));
   });
 }
+
+// Middleware de error central: loguea y responde JSON sin filtrar detalles
+app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
+  req.log.error({ err }, "Unhandled error");
+  res
+    .status(500)
+    .json({ error: "server_error", message: "Internal server error" });
+});
 
 export default app;

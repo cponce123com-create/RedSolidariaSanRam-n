@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, contactMessagesTable, insertContactMessageSchema } from "@workspace/db";
+import { desc } from "drizzle-orm";
 import { contactLimiter } from "../middleware/rate-limit";
+import { requireAdmin } from "../middleware/require-admin";
 
 const router: IRouter = Router();
 
@@ -15,10 +17,14 @@ router.post("/contact", contactLimiter, async (req, res) => {
   }
 });
 
-router.get("/contact/messages", async (req, res) => {
+// GET /contact/messages — solo admin (contiene datos personales)
+router.get("/contact/messages", requireAdmin, async (req, res) => {
   try {
-    const messages = await db.select().from(contactMessagesTable);
-    res.json(messages.map(formatMessage).reverse());
+    const messages = await db
+      .select()
+      .from(contactMessagesTable)
+      .orderBy(desc(contactMessagesTable.createdAt));
+    res.json(messages.map(formatMessage));
   } catch (err) {
     req.log.error({ err }, "Failed to get contact messages");
     res.status(500).json({ error: "server_error", message: "Failed to get messages" });

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, adminUsersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword, logAuditAction } from "../middleware/auth-utils";
+import { loginLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
@@ -17,7 +18,7 @@ const loginSchema = z.object({
 // Inicializar superadmin con contraseña hasheada (solo para desarrollo)
 let superAdminHashedPassword: string | null = null;
 
-router.post("/admin/login", async (req, res) => {
+router.post("/admin/login", loginLimiter, async (req, res) => {
   try {
     const { username, password } = loginSchema.parse(req.body);
 

@@ -1,12 +1,14 @@
 import { Router, type IRouter } from "express";
 import { db, campaignUpdatesTable, insertCampaignUpdateSchema } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { requireAdmin } from "../middleware/require-admin";
+import { adminActionLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
 router.get("/campaigns/:id/updates", async (req, res) => {
   try {
-    const campaignId = parseInt(req.params.id);
+    const campaignId = Number(req.params.id);
     const updates = await db
       .select()
       .from(campaignUpdatesTable)
@@ -18,31 +20,41 @@ router.get("/campaigns/:id/updates", async (req, res) => {
   }
 });
 
-router.post("/campaigns/:id/updates", async (req, res) => {
-  try {
-    const campaignId = parseInt(req.params.id);
-    const data = insertCampaignUpdateSchema.parse({ ...req.body, campaignId });
-    const [update] = await db.insert(campaignUpdatesTable).values(data).returning();
-    res.status(201).json(formatUpdate(update));
-  } catch (err) {
-    req.log.error({ err }, "Failed to create campaign update");
-    res.status(400).json({ error: "validation_error", message: "Invalid update data" });
-  }
-});
+router.post(
+  "/campaigns/:id/updates",
+  requireAdmin,
+  adminActionLimiter,
+  async (req, res) => {
+    try {
+      const campaignId = Number(req.params.id);
+      const data = insertCampaignUpdateSchema.parse({ ...req.body, campaignId });
+      const [update] = await db.insert(campaignUpdatesTable).values(data).returning();
+      res.status(201).json(formatUpdate(update));
+    } catch (err) {
+      req.log.error({ err }, "Failed to create campaign update");
+      res.status(400).json({ error: "validation_error", message: "Invalid update data" });
+    }
+  },
+);
 
-router.delete("/campaigns/:id/updates/:updateId", async (req, res) => {
-  try {
-    const campaignId = parseInt(req.params.id);
-    const updateId = parseInt(req.params.updateId);
-    await db
-      .delete(campaignUpdatesTable)
-      .where(and(eq(campaignUpdatesTable.id, updateId), eq(campaignUpdatesTable.campaignId, campaignId)));
-    res.status(204).send();
-  } catch (err) {
-    req.log.error({ err }, "Failed to delete campaign update");
-    res.status(500).json({ error: "server_error", message: "Failed to delete update" });
-  }
-});
+router.delete(
+  "/campaigns/:id/updates/:updateId",
+  requireAdmin,
+  adminActionLimiter,
+  async (req, res) => {
+    try {
+      const campaignId = Number(req.params.id);
+      const updateId = Number(req.params.updateId);
+      await db
+        .delete(campaignUpdatesTable)
+        .where(and(eq(campaignUpdatesTable.id, updateId), eq(campaignUpdatesTable.campaignId, campaignId)));
+      res.status(204).send();
+    } catch (err) {
+      req.log.error({ err }, "Failed to delete campaign update");
+      res.status(500).json({ error: "server_error", message: "Failed to delete update" });
+    }
+  },
+);
 
 function formatUpdate(u: typeof campaignUpdatesTable.$inferSelect) {
   return {

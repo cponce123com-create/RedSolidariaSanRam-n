@@ -1,12 +1,17 @@
 import { Router, type IRouter } from "express";
 import { db, testimonialsTable, insertTestimonialSchema } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
+import { requireAdmin } from "../middleware/require-admin";
+import { adminActionLimiter, testimonialLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
 router.get("/testimonials", async (req, res) => {
   try {
-    const testimonials = await db.select().from(testimonialsTable);
+    const testimonials = await db
+      .select()
+      .from(testimonialsTable)
+      .orderBy(desc(testimonialsTable.createdAt));
     res.json(testimonials.map(formatTestimonial));
   } catch (err) {
     req.log.error({ err }, "Failed to get testimonials");
@@ -14,7 +19,8 @@ router.get("/testimonials", async (req, res) => {
   }
 });
 
-router.post("/testimonials", async (req, res) => {
+// POST /testimonials — público con rate limit anti-spam
+router.post("/testimonials", testimonialLimiter, async (req, res) => {
   try {
     const data = insertTestimonialSchema.parse(req.body);
     const [testimonial] = await db.insert(testimonialsTable).values(data).returning();
@@ -25,9 +31,9 @@ router.post("/testimonials", async (req, res) => {
   }
 });
 
-router.put("/testimonials/:id", async (req, res) => {
+router.put("/testimonials/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     const data = insertTestimonialSchema.parse(req.body);
     const [testimonial] = await db.update(testimonialsTable).set(data).where(eq(testimonialsTable.id, id)).returning();
     if (!testimonial) {
@@ -40,9 +46,9 @@ router.put("/testimonials/:id", async (req, res) => {
   }
 });
 
-router.delete("/testimonials/:id", async (req, res) => {
+router.delete("/testimonials/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     await db.delete(testimonialsTable).where(eq(testimonialsTable.id, id));
     res.status(204).send();
   } catch (err) {

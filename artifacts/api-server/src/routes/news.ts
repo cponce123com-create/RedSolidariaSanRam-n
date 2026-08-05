@@ -1,13 +1,24 @@
 import { Router, type IRouter } from "express";
 import { db, newsTable, insertNewsSchema } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
+import { requireAdmin } from "../middleware/require-admin";
+import { adminActionLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
 router.get("/news", async (req, res) => {
   try {
-    const posts = await db.select().from(newsTable).orderBy(newsTable.createdAt);
-    res.json(posts.map(formatNews).reverse());
+    const { limit: rawLimit, offset: rawOffset } = req.query;
+    const limit = Math.min(Math.max(parseInt(rawLimit as string) || 50, 1), 100);
+    const offset = Math.max(parseInt(rawOffset as string) || 0, 0);
+
+    const posts = await db
+      .select()
+      .from(newsTable)
+      .orderBy(desc(newsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+    res.json(posts.map(formatNews));
   } catch (err) {
     req.log.error({ err }, "Failed to get news");
     res.status(500).json({ error: "server_error", message: "Failed to get news" });
@@ -16,7 +27,7 @@ router.get("/news", async (req, res) => {
 
 router.get("/news/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     const [post] = await db.select().from(newsTable).where(eq(newsTable.id, id));
     if (!post) {
       return res.status(404).json({ error: "not_found", message: "News post not found" });
@@ -28,7 +39,7 @@ router.get("/news/:id", async (req, res) => {
   }
 });
 
-router.post("/news", async (req, res) => {
+router.post("/news", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
     const data = insertNewsSchema.parse(req.body);
     const [post] = await db.insert(newsTable).values(data).returning();
@@ -39,9 +50,9 @@ router.post("/news", async (req, res) => {
   }
 });
 
-router.put("/news/:id", async (req, res) => {
+router.put("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     const data = insertNewsSchema.parse(req.body);
     const [post] = await db.update(newsTable).set(data).where(eq(newsTable.id, id)).returning();
     if (!post) {
@@ -54,9 +65,9 @@ router.put("/news/:id", async (req, res) => {
   }
 });
 
-router.delete("/news/:id", async (req, res) => {
+router.delete("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = Number(req.params.id);
     await db.delete(newsTable).where(eq(newsTable.id, id));
     res.status(204).send();
   } catch (err) {

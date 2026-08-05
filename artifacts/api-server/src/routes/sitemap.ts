@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 
 const router = Router();
 
-const BASE_URL = "https://redsolidariasanramon.org";
+const BASE_URL = process.env.SITE_URL || "https://redsolidariasanramon.org";
 
 function loc(path: string) {
   return `<url><loc>${BASE_URL}${path}</loc></url>`;

@@ -1,0 +1,26 @@
+# Render Blueprint — infraestructura como código
+# (Los secretos se definen en el dashboard de Render: sync: false)
+services:
+  - type: web
+    name: red-solidaria
+    runtime: node
+    plan: free
+    buildCommand: pnpm install && pnpm run build
+    startCommand: node artifacts/api-server/dist/index.mjs
+    healthCheckPath: /api/healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SITE_URL
+        sync: false

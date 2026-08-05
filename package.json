@@ -2,6 +2,10 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "dev": "PORT=${PORT:-5173} BASE_PATH=/ node artifacts/red-solidaria/node_modules/vite/bin/vite.js --config artifacts/red-solidaria/vite.config.ts",
