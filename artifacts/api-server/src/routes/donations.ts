@@ -3,15 +3,19 @@ import {
   db,
   donationsTable,
   campaignsTable,
+  donationProofsTable,
   insertDonationSchema,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
+import { logAuditAction } from "../middleware/auth-utils";
 
 const router: IRouter = Router();
 
-// POST /donations — público, con rate limit anti-spam
+// POST /donations — público, con rate limit anti-spam.
+// El donante puede adjuntar el comprobante (captura de Yape/transferencia)
+// subido previamente a Cloudinary.
 router.post("/donations", donationLimiter, async (req, res) => {
   try {
     const data = insertDonationSchema.parse({
@@ -19,6 +23,29 @@ router.post("/donations", donationLimiter, async (req, res) => {
       status: "pending",
     });
     const [donation] = await db.insert(donationsTable).values(data).returning();
+
+    const proofUrl =
+      typeof req.body?.proofImageUrl === "string" ? req.body.proofImageUrl : null;
+    if (proofUrl) {
+      await db.insert(donationProofsTable).values({
+        donationId: donation.id,
+        imageUrl: proofUrl,
+        publicId:
+          typeof req.body?.proofPublicId === "string"
+            ? req.body.proofPublicId
+            : null,
+        mimeType:
+          typeof req.body?.proofMimeType === "string"
+            ? req.body.proofMimeType
+            : null,
+      });
+      // Mantener compatibilidad con el campo legacy de la donación
+      await db
+        .update(donationsTable)
+        .set({ receiptUrl: proofUrl })
+        .where(eq(donationsTable.id, donation.id));
+    }
+
     res.status(201).json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to create donation");
@@ -94,7 +121,7 @@ router.get("/donations/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// PUT /donations/:id — solo admin (aprobar/rechazar)
+// PUT /donations/:id — solo admin (aprobar/rechazar) con audit log
 router.put("/donations/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -110,6 +137,25 @@ router.put("/donations/:id", requireAdmin, adminActionLimiter, async (req, res) 
     if (!donation) {
       return res.status(404).json({ error: "not_found", message: "Donation not found" });
     }
+
+    // Auditoría: quién aprobó/rechazó y con qué nota
+    const admin = (req.session as any).adminUser;
+    await logAuditAction({
+      userId: admin?.id ?? null,
+      username: admin?.username ?? null,
+      action:
+        status === "approved"
+          ? "DONATION_APPROVED"
+          : status === "rejected"
+            ? "DONATION_REJECTED"
+            : "DONATION_STATUS_CHANGED",
+      resource: "donations",
+      resourceId: String(id),
+      ipAddress: req.ip || req.connection?.remoteAddress || null,
+      userAgent: req.get("user-agent") || null,
+      details: { status, adminNote: adminNote || null, amount: donation.amount },
+    });
+
     return res.json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to update donation");
@@ -142,6 +188,89 @@ router.get("/campaigns/:id/donations", requireAdmin, async (req, res) => {
   }
 });
 
+// GET /donations/:id/proofs — solo admin (comprobantes de una donación)
+router.get("/donations/:id/proofs", requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const proofs = await db
+      .select()
+      .from(donationProofsTable)
+      .where(eq(donationProofsTable.donationId, id))
+      .orderBy(desc(donationProofsTable.createdAt));
+    res.json(proofs);
+  } catch (err) {
+    req.log.error({ err }, "Failed to get donation proofs");
+    res.status(500).json({ error: "server_error", message: "Failed to get donation proofs" });
+  }
+});
+
+// POST /donations/:id/proofs — solo admin (comprobante manual, p. ej. por WhatsApp)
+router.post(
+  "/donations/:id/proofs",
+  requireAdmin,
+  adminActionLimiter,
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { imageUrl, publicId, mimeType } = req.body ?? {};
+      if (typeof imageUrl !== "string" || !imageUrl.trim()) {
+        return res.status(400).json({ error: "validation_error", message: "imageUrl es requerido" });
+      }
+      const [donation] = await db
+        .select()
+        .from(donationsTable)
+        .where(eq(donationsTable.id, id));
+      if (!donation) {
+        return res.status(404).json({ error: "not_found", message: "Donation not found" });
+      }
+      const [proof] = await db
+        .insert(donationProofsTable)
+        .values({
+          donationId: id,
+          imageUrl: imageUrl.trim(),
+          publicId: typeof publicId === "string" ? publicId : null,
+          mimeType: typeof mimeType === "string" ? mimeType : null,
+        })
+        .returning();
+      if (!donation.receiptUrl) {
+        await db
+          .update(donationsTable)
+          .set({ receiptUrl: imageUrl.trim() })
+          .where(eq(donationsTable.id, id));
+      }
+      return res.status(201).json(proof);
+    } catch (err) {
+      req.log.error({ err }, "Failed to add donation proof");
+      return res.status(400).json({ error: "validation_error", message: "Invalid proof data" });
+    }
+  },
+);
+
+// DELETE /donations/:id/proofs/:proofId — solo admin
+router.delete(
+  "/donations/:id/proofs/:proofId",
+  requireAdmin,
+  adminActionLimiter,
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const proofId = Number(req.params.proofId);
+      await db
+        .delete(donationProofsTable)
+        .where(
+          and(
+            eq(donationProofsTable.id, proofId),
+            eq(donationProofsTable.donationId, id),
+          ),
+        );
+      return res.status(204).send();
+    } catch (err) {
+      req.log.error({ err }, "Failed to delete donation proof");
+      return res.status(500).json({ error: "server_error", message: "Failed to delete proof" });
+    }
+  },
+);
+
 async function formatDonation(
   d: typeof donationsTable.$inferSelect,
   campaignTitle: string | null = null,
@@ -165,6 +294,7 @@ async function formatDonation(
     paymentMethod: d.paymentMethod,
     message: d.message,
     anonymous: d.anonymous,
+    publicProof: d.publicProof,
     receiptUrl: d.receiptUrl,
     receiptNote: d.receiptNote,
     status: d.status,
@@ -174,3 +304,4 @@ async function formatDonation(
 }
 
 export default router;
+

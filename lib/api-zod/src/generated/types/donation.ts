@@ -19,6 +19,7 @@ export interface Donation {
   paymentMethod: string;
   message?: string | null;
   anonymous: boolean;
+  publicProof?: boolean;
   receiptUrl?: string | null;
   receiptNote?: string | null;
   status: DonationStatus;

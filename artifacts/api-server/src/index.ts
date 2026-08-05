@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
+import { runMigrations } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -29,4 +30,8 @@ app.listen(port, (err) => {
 
 seedIfEmpty().catch((err) => {
   logger.error({ err }, "Failed to seed database, starting server anyway");
+});
+
+runMigrations().catch((err: unknown) => {
+  logger.error({ err }, "Failed to run database migrations");
 });

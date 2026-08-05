@@ -140,6 +140,7 @@ export const GetCampaignDonationsResponseItem = zod.object({
   paymentMethod: zod.string(),
   message: zod.string().nullish(),
   anonymous: zod.boolean(),
+  publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "rejected"]),
@@ -148,6 +149,26 @@ export const GetCampaignDonationsResponseItem = zod.object({
 });
 export const GetCampaignDonationsResponse = zod.array(
   GetCampaignDonationsResponseItem,
+);
+
+/**
+ * @summary Public list of approved donors for a campaign (no PII)
+ */
+export const GetCampaignDonorsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetCampaignDonorsResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string().nullish(),
+  amount: zod.number(),
+  message: zod.string().nullish(),
+  date: zod.string(),
+  publicProof: zod.boolean(),
+  proofUrl: zod.string().nullish(),
+});
+export const GetCampaignDonorsResponse = zod.array(
+  GetCampaignDonorsResponseItem,
 );
 
 /**
@@ -246,8 +267,12 @@ export const CreateDonationBody = zod.object({
   ]),
   message: zod.string().nullish(),
   anonymous: zod.boolean(),
+  publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
+  proofImageUrl: zod.string().nullish(),
+  proofPublicId: zod.string().nullish(),
+  proofMimeType: zod.string().nullish(),
 });
 
 /**
@@ -270,6 +295,7 @@ export const GetDonationsResponseItem = zod.object({
   paymentMethod: zod.string(),
   message: zod.string().nullish(),
   anonymous: zod.boolean(),
+  publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "rejected"]),
@@ -297,6 +323,7 @@ export const GetDonationResponse = zod.object({
   paymentMethod: zod.string(),
   message: zod.string().nullish(),
   anonymous: zod.boolean(),
+  publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "rejected"]),
@@ -328,11 +355,52 @@ export const UpdateDonationStatusResponse = zod.object({
   paymentMethod: zod.string(),
   message: zod.string().nullish(),
   anonymous: zod.boolean(),
+  publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "rejected"]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
+});
+
+/**
+ * @summary List proof images for a donation (admin)
+ */
+export const GetDonationProofsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetDonationProofsResponseItem = zod.object({
+  id: zod.number(),
+  donationId: zod.number(),
+  imageUrl: zod.string(),
+  publicId: zod.string().nullish(),
+  mimeType: zod.string().nullish(),
+  createdAt: zod.string(),
+});
+export const GetDonationProofsResponse = zod.array(
+  GetDonationProofsResponseItem,
+);
+
+/**
+ * @summary Add a manual proof image to a donation (admin)
+ */
+export const AddDonationProofParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddDonationProofBody = zod.object({
+  imageUrl: zod.string(),
+  publicId: zod.string().nullish(),
+  mimeType: zod.string().nullish(),
+});
+
+/**
+ * @summary Delete a proof image (admin)
+ */
+export const DeleteDonationProofParams = zod.object({
+  id: zod.coerce.number(),
+  proofId: zod.coerce.number(),
 });
 
 /**
@@ -344,6 +412,30 @@ export const GetDonationStatsResponse = zod.object({
   pendingCount: zod.number(),
   approvedCount: zod.number(),
   totalDonors: zod.number(),
+});
+
+/**
+ * @summary Get a signed upload URL for donation proofs (public, rate limited)
+ */
+export const GetUploadSignatureResponse = zod.object({
+  cloudName: zod.string(),
+  apiKey: zod.string(),
+  timestamp: zod.string(),
+  publicId: zod.string(),
+  folder: zod.string(),
+  signature: zod.string(),
+});
+
+/**
+ * @summary Get a signed upload URL for campaign evidence (admin)
+ */
+export const GetAdminUploadSignatureResponse = zod.object({
+  cloudName: zod.string(),
+  apiKey: zod.string(),
+  timestamp: zod.string(),
+  publicId: zod.string(),
+  folder: zod.string(),
+  signature: zod.string(),
 });
 
 /**

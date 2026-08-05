@@ -21,6 +21,7 @@ import faqRouter from "./faq";
 import adminUsersRouter from "./admin-users";
 import settingsRouter from "./settings";
 import sitemapRouter from "./sitemap";
+import uploadsRouter from "./uploads";
 
 const router: IRouter = Router();
 
@@ -46,5 +47,6 @@ router.use(faqRouter);
 router.use(adminUsersRouter);
 router.use(settingsRouter);
 router.use(sitemapRouter);
+router.use(uploadsRouter);
 
 export default router;

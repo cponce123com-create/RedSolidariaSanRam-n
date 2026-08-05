@@ -150,6 +150,27 @@ paths:
                 items:
                   $ref: "#/components/schemas/Donation"
 
+  /campaigns/{id}/donors:
+    get:
+      operationId: getCampaignDonors
+      tags: [donations]
+      summary: Public list of approved donors for a campaign (no PII)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of approved donors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CampaignDonor"
+
   /campaigns/{id}/updates:
     get:
       operationId: getCampaignUpdates
@@ -362,6 +383,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/Donation"
 
+  /donations/{id}/proofs:
+    get:
+      operationId: getDonationProofs
+      tags: [donations]
+      summary: List proof images for a donation (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of proofs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DonationProof"
+    post:
+      operationId: addDonationProof
+      tags: [donations]
+      summary: Add a manual proof image to a donation (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                imageUrl:
+                  type: string
+                publicId:
+                  type: string
+                  nullable: true
+                mimeType:
+                  type: string
+                  nullable: true
+              required: [imageUrl]
+      responses:
+        "201":
+          description: Proof added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DonationProof"
+
+  /donations/{id}/proofs/{proofId}:
+    delete:
+      operationId: deleteDonationProof
+      tags: [donations]
+      summary: Delete a proof image (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: proofId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /donations/stats:
     get:
       operationId: getDonationStats
@@ -374,6 +469,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DonationStats"
+
+  /uploads/signature:
+    post:
+      operationId: getUploadSignature
+      tags: [uploads]
+      summary: Get a signed upload URL for donation proofs (public, rate limited)
+      responses:
+        "200":
+          description: Upload signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSignature"
+
+  /uploads/admin-signature:
+    post:
+      operationId: getAdminUploadSignature
+      tags: [uploads]
+      summary: Get a signed upload URL for campaign evidence (admin)
+      responses:
+        "200":
+          description: Upload signature
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSignature"
 
   /news:
     get:
@@ -853,6 +974,8 @@ components:
           nullable: true
         anonymous:
           type: boolean
+        publicProof:
+          type: boolean
         receiptUrl:
           type: string
           nullable: true
@@ -903,10 +1026,21 @@ components:
           nullable: true
         anonymous:
           type: boolean
+        publicProof:
+          type: boolean
         receiptUrl:
           type: string
           nullable: true
         receiptNote:
+          type: string
+          nullable: true
+        proofImageUrl:
+          type: string
+          nullable: true
+        proofPublicId:
+          type: string
+          nullable: true
+        proofMimeType:
           type: string
           nullable: true
       required:
@@ -916,6 +1050,78 @@ components:
         - amount
         - paymentMethod
         - anonymous
+
+    CampaignDonor:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          nullable: true
+        amount:
+          type: number
+        message:
+          type: string
+          nullable: true
+        date:
+          type: string
+        publicProof:
+          type: boolean
+        proofUrl:
+          type: string
+          nullable: true
+      required:
+        - id
+        - amount
+        - date
+        - publicProof
+
+    DonationProof:
+      type: object
+      properties:
+        id:
+          type: integer
+        donationId:
+          type: integer
+        imageUrl:
+          type: string
+        publicId:
+          type: string
+          nullable: true
+        mimeType:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required:
+        - id
+        - donationId
+        - imageUrl
+        - createdAt
+
+    UploadSignature:
+      type: object
+      properties:
+        cloudName:
+          type: string
+        apiKey:
+          type: string
+        timestamp:
+          type: string
+        publicId:
+          type: string
+        folder:
+          type: string
+        signature:
+          type: string
+      required:
+        - cloudName
+        - apiKey
+        - timestamp
+        - publicId
+        - folder
+        - signature
 
     UpdateDonationStatusInput:
       type: object

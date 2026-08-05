@@ -17,6 +17,10 @@ export interface CreateDonationInput {
   paymentMethod: CreateDonationInputPaymentMethod;
   message?: string | null;
   anonymous: boolean;
+  publicProof?: boolean;
   receiptUrl?: string | null;
   receiptNote?: string | null;
+  proofImageUrl?: string | null;
+  proofPublicId?: string | null;
+  proofMimeType?: string | null;
 }

@@ -197,9 +197,20 @@ export default function AdminDonations() {
                   <TableCell>
                     <div className="flex flex-col gap-1 items-start">
                       {d.receiptUrl ? (
-                        <Button variant="secondary" size="sm" className="h-7 text-xs rounded-lg" onClick={() => setReceiptImage(d.receiptUrl!)}>
-                          <ImageIcon className="w-3 h-3 mr-1" /> Ver Imagen
-                        </Button>
+                        <>
+                          <Button variant="secondary" size="sm" className="h-7 text-xs rounded-lg" onClick={() => setReceiptImage(d.receiptUrl!)}>
+                            <ImageIcon className="w-3 h-3 mr-1" /> Ver Imagen
+                          </Button>
+                          {d.publicProof ? (
+                            <Badge variant="outline" className="text-[10px] text-green-700 border-green-200 bg-green-50 px-1.5">
+                              Recibo público
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground px-1.5">
+                              Recibo privado
+                            </Badge>
+                          )}
+                        </>
                       ) : d.receiptNote ? (
                         <div className="text-xs bg-secondary/50 p-1.5 rounded text-muted-foreground max-w-[150px] truncate" title={d.receiptNote}>
                           📝 {d.receiptNote}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,9 @@ import * as z from "zod";
 import { useCreateDonation } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { CreditCard, Landmark, Phone, Banknote, Heart, CheckCircle2, ChevronRight, ChevronLeft } from "lucide-react";
+import { CreditCard, Landmark, Phone, Heart, CheckCircle2, ChevronRight, ChevronLeft, UploadCloud, Trash2, Loader2 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { uploadImageToCloudinary, validateProofImage } from "@/lib/cloudinary-upload";
 
 const donationSchema = z.object({
   amount: z.coerce.number().min(5, "El monto mínimo es S/ 5"),
@@ -21,12 +22,12 @@ const donationSchema = z.object({
   }),
   message: z.string().optional(),
   anonymous: z.boolean().default(false),
+  publicProof: z.boolean().default(false),
   firstName: z.string().min(2, "Ingresa tu nombre"),
   lastName: z.string().min(2, "Ingresa tu apellido"),
   email: z.string().email("Correo inválido"),
   phone: z.string().optional(),
   receiptNote: z.string().optional(),
-  receiptUrl: z.string().optional(),
 });
 
 type DonationFormValues = z.infer<typeof donationSchema>;
@@ -42,7 +43,13 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
   const [step, setStep] = useState<1 | 2>(1);
   const [isSuccess, setIsSuccess] = useState(false);
   const [donationId, setDonationId] = useState<number | null>(null);
-  
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [proofPublicId, setProofPublicId] = useState<string | null>(null);
+  const [proofMimeType, setProofMimeType] = useState<string | null>(null);
+  const [proofFileName, setProofFileName] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createDonation = useCreateDonation();
@@ -54,12 +61,12 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
       paymentMethod: "yape",
       message: "",
       anonymous: false,
+      publicProof: false,
       firstName: "",
       lastName: "",
       email: "",
       phone: "",
       receiptNote: "",
-      receiptUrl: "",
     },
   });
 
@@ -87,12 +94,48 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
     }, 250);
   };
 
+  const handleProofFile = async (file: File) => {
+    const error = validateProofImage(file);
+    if (error) {
+      toast({ title: "Archivo inválido", description: error, variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const result = await uploadImageToCloudinary(file, "/api/uploads/signature");
+      setProofUrl(result.imageUrl);
+      setProofPublicId(result.publicId);
+      setProofMimeType(file.type);
+      setProofFileName(file.name);
+      toast({ title: "Comprobante subido", description: "Gracias. Un administrador lo revisará para validar tu donación." });
+    } catch (err) {
+      toast({
+        title: "Error al subir",
+        description: err instanceof Error ? err.message : "Intenta de nuevo más tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const removeProof = () => {
+    setProofUrl(null);
+    setProofPublicId(null);
+    setProofMimeType(null);
+    setProofFileName(null);
+  };
+
   const onSubmit = (data: DonationFormValues) => {
     createDonation.mutate(
       {
         data: {
           ...data,
           campaignId: campaignId || null,
+          proofImageUrl: proofUrl,
+          proofPublicId,
+          proofMimeType,
         }
       },
       {
@@ -103,6 +146,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
           queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
           if (campaignId) {
             queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/donations`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/donors`] });
           }
         },
         onError: () => {
@@ -123,6 +167,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
       setStep(1);
       setIsSuccess(false);
       setDonationId(null);
+      removeProof();
       form.reset();
     }, 300);
   };
@@ -157,7 +202,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
               {campaignTitle ? `Donar a: ${campaignTitle}` : "Hacer una Donación General"}
             </DialogTitle>
             <DialogDescription>
-              {step === 1 ? "Paso 1: Monto y Método" : "Paso 2: Tus Datos"}
+              {step === 1 ? "Paso 1: Monto y Método" : "Paso 2: Tus Datos y Comprobante"}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -324,23 +369,89 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
 
                 {requiresReceipt && (
                   <div className="mt-6 p-5 border border-primary/20 bg-primary/5 rounded-2xl space-y-4">
-                    <div className="flex items-center gap-2 text-primary font-medium mb-2">
-                      <Landmark className="w-5 h-5" /> Datos del Comprobante
+                    <div className="flex items-center gap-2 text-primary font-medium">
+                      <Landmark className="w-5 h-5" /> Comprobante de pago
                     </div>
+                    <p className="text-sm text-muted-foreground -mt-2">
+                      Sube la captura de tu {paymentMethod === "transfer" ? "transferencia" : paymentMethod.toUpperCase()}. Esto nos permite validar tu donación y sumarla al recaudado.
+                    </p>
+
                     <FormField control={form.control} name="receiptNote" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Número de operación o descripción</FormLabel>
+                        <FormLabel>Número de operación (opcional)</FormLabel>
                         <FormControl><Input placeholder="Ej. Op: 12345678" className="bg-background rounded-xl" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={form.control} name="receiptUrl" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>URL del comprobante (Opcional)</FormLabel>
-                        <FormControl><Input placeholder="https://..." className="bg-background rounded-xl" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+
+                    {/* Uploader */}
+                    {proofUrl ? (
+                      <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
+                        <div className="flex items-start gap-4">
+                          <img src={proofUrl} alt="Comprobante" className="w-24 h-24 object-cover rounded-xl border border-green-200 bg-white" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-green-800 truncate">{proofFileName || "Comprobante subido"}</p>
+                            <p className="text-xs text-green-700 mt-0.5">Listo para validación por el equipo.</p>
+                            <Button type="button" variant="ghost" size="sm" className="mt-2 text-red-600 hover:text-red-700 hover:bg-red-50 px-2 h-8" onClick={removeProof}>
+                              <Trash2 className="w-4 h-4 mr-1" /> Quitar
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="border-2 border-dashed border-primary/30 rounded-2xl p-6 text-center cursor-pointer hover:border-primary/60 hover:bg-primary/5 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                        data-testid="proof-uploader"
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleProofFile(file);
+                          }}
+                        />
+                        {uploading ? (
+                          <div className="flex flex-col items-center gap-2 py-2">
+                            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                            <span className="text-sm font-medium text-muted-foreground">Subiendo comprobante...</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 py-2">
+                            <UploadCloud className="w-8 h-8 text-primary" />
+                            <span className="text-sm font-semibold">Sube la captura de tu pago</span>
+                            <span className="text-xs text-muted-foreground">JPG, PNG o WebP · máx 8 MB</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {proofUrl && (
+                      <FormField
+                        control={form.control}
+                        name="publicProof"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border p-4 bg-background">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="mt-1"
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="cursor-pointer">Mostrar mi recibo al público</FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                Si lo marcas, tu comprobante aparecerá en la lista de donantes de la campaña. Si no, solo el equipo lo verá al validar.
+                              </p>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -366,7 +477,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                   <Button type="button" variant="outline" onClick={() => setStep(1)} className="h-14 px-6 rounded-xl">
                     <ChevronLeft className="w-5 h-5 mr-1" /> Atrás
                   </Button>
-                  <Button type="submit" className="flex-1 h-14 text-lg rounded-xl shadow-md hover-elevate" disabled={createDonation.isPending} data-testid="btn-submit-donation">
+                  <Button type="submit" className="flex-1 h-14 text-lg rounded-xl shadow-md hover-elevate" disabled={createDonation.isPending || uploading} data-testid="btn-submit-donation">
                     {createDonation.isPending ? "Procesando..." : "Confirmar Donación"}
                   </Button>
                 </div>

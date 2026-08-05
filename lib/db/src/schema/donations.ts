@@ -13,6 +13,8 @@ export const donationsTable = pgTable("donations", {
   paymentMethod: text("payment_method").notNull(),
   message: text("message"),
   anonymous: boolean("anonymous").notNull().default(false),
+  // El donante decide si su comprobante se muestra al público
+  publicProof: boolean("public_proof").notNull().default(false),
   receiptUrl: text("receipt_url"),
   receiptNote: text("receipt_note"),
   status: text("status").notNull().default("pending"),

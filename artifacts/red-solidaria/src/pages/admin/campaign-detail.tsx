@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUploadField } from "@/components/shared/ImageUploadField";
 import { Badge } from "@/components/ui/badge";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -342,7 +343,13 @@ export default function AdminCampaignDetail() {
             <Form {...imageForm}>
               <form onSubmit={imageForm.handleSubmit(onImageSubmit)} className="flex flex-col md:flex-row gap-4 md:items-end">
                 <FormField control={imageForm.control} name="imageUrl" render={({ field }) => (
-                  <FormItem className="flex-1"><FormLabel>URL de la imagen</FormLabel><FormControl><Input placeholder="https://..." className="rounded-xl bg-background" {...field} /></FormControl><FormMessage/></FormItem>
+                  <FormItem className="flex-1">
+                    <FormLabel>Imagen</FormLabel>
+                    <FormControl>
+                      <ImageUploadField value={field.value} onChange={field.onChange} label="Imagen de galería" />
+                    </FormControl>
+                    <FormMessage/>
+                  </FormItem>
                 )} />
                 <FormField control={imageForm.control} name="caption" render={({ field }) => (
                   <FormItem className="flex-1"><FormLabel>Descripción (Opcional)</FormLabel><FormControl><Input placeholder="Pie de foto" className="rounded-xl bg-background" {...field} /></FormControl></FormItem>
@@ -479,7 +486,12 @@ export default function AdminCampaignDetail() {
                     <FormItem><FormLabel>Descripción Breve</FormLabel><FormControl><Input placeholder="Ej. Compra de panetones" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
                   )} />
                   <FormField control={expenseForm.control} name="receiptUrl" render={({ field }) => (
-                    <FormItem><FormLabel>URL del Comprobante (Opcional)</FormLabel><FormControl><Input placeholder="https://..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl></FormItem>
+                    <FormItem>
+                      <FormLabel>Comprobante (Opcional)</FormLabel>
+                      <FormControl>
+                        <ImageUploadField value={field.value} onChange={field.onChange} label="Comprobante" />
+                      </FormControl>
+                    </FormItem>
                   )} />
                 </div>
 
@@ -583,7 +595,13 @@ export default function AdminCampaignDetail() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField control={evidenceForm.control} name="mediaUrl" render={({ field }) => (
-                    <FormItem><FormLabel>URL de Archivo/Foto</FormLabel><FormControl><Input placeholder="https://..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    <FormItem>
+                      <FormLabel>Foto / Archivo</FormLabel>
+                      <FormControl>
+                        <ImageUploadField value={field.value} onChange={field.onChange} label="Evidencia" />
+                      </FormControl>
+                      <FormMessage/>
+                    </FormItem>
                   )} />
                   <FormField control={evidenceForm.control} name="mediaType" render={({ field }) => (
                     <FormItem>

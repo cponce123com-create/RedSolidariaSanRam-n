@@ -88,3 +88,11 @@ export const testimonialLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+export const uploadSignatureLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Demasiadas subidas de archivos. Por favor espera 1 hora." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

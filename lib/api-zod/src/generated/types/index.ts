@@ -6,10 +6,12 @@
  * OpenAPI spec version: 0.2.0
  */
 
+export * from "./addDonationProofBody";
 export * from "./adminLoginInput";
 export * from "./adminLoginResponse";
 export * from "./adminUser";
 export * from "./campaign";
+export * from "./campaignDonor";
 export * from "./campaignImage";
 export * from "./campaignStatus";
 export * from "./campaignUpdate";
@@ -24,6 +26,7 @@ export * from "./createDonationInputPaymentMethod";
 export * from "./createNewsInput";
 export * from "./createTestimonialInput";
 export * from "./donation";
+export * from "./donationProof";
 export * from "./donationStats";
 export * from "./donationStatus";
 export * from "./errorResponse";
@@ -38,5 +41,6 @@ export * from "./successResponse";
 export * from "./testimonial";
 export * from "./updateDonationStatusInput";
 export * from "./updateDonationStatusInputStatus";
+export * from "./uploadSignature";
 export * from "./volunteer";
 export * from "./volunteerInput";

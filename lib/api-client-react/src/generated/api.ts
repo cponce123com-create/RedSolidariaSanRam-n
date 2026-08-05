@@ -17,10 +17,12 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AddDonationProofBody,
   AdminLoginInput,
   AdminLoginResponse,
   AdminUser,
   Campaign,
+  CampaignDonor,
   CampaignImage,
   CampaignUpdate,
   ContactMessage,
@@ -32,6 +34,7 @@ import type {
   CreateNewsInput,
   CreateTestimonialInput,
   Donation,
+  DonationProof,
   DonationStats,
   ErrorResponse,
   GetCampaignsParams,
@@ -42,6 +45,7 @@ import type {
   SuccessResponse,
   Testimonial,
   UpdateDonationStatusInput,
+  UploadSignature,
   Volunteer,
   VolunteerInput,
 } from "./api.schemas";
@@ -648,6 +652,93 @@ export function useGetCampaignDonations<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetCampaignDonationsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Public list of approved donors for a campaign (no PII)
+ */
+export const getGetCampaignDonorsUrl = (id: number) => {
+  return `/api/campaigns/${id}/donors`;
+};
+
+export const getCampaignDonors = async (
+  id: number,
+  options?: RequestInit,
+): Promise<CampaignDonor[]> => {
+  return customFetch<CampaignDonor[]>(getGetCampaignDonorsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetCampaignDonorsQueryKey = (id: number) => {
+  return [`/api/campaigns/${id}/donors`] as const;
+};
+
+export const getGetCampaignDonorsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getCampaignDonors>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCampaignDonors>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetCampaignDonorsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getCampaignDonors>>
+  > = ({ signal }) => getCampaignDonors(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getCampaignDonors>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetCampaignDonorsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getCampaignDonors>>
+>;
+export type GetCampaignDonorsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Public list of approved donors for a campaign (no PII)
+ */
+
+export function useGetCampaignDonors<
+  TData = Awaited<ReturnType<typeof getCampaignDonors>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getCampaignDonors>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetCampaignDonorsQueryOptions(id, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -1531,6 +1622,265 @@ export const useUpdateDonationStatus = <
 };
 
 /**
+ * @summary List proof images for a donation (admin)
+ */
+export const getGetDonationProofsUrl = (id: number) => {
+  return `/api/donations/${id}/proofs`;
+};
+
+export const getDonationProofs = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DonationProof[]> => {
+  return customFetch<DonationProof[]>(getGetDonationProofsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDonationProofsQueryKey = (id: number) => {
+  return [`/api/donations/${id}/proofs`] as const;
+};
+
+export const getGetDonationProofsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDonationProofs>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDonationProofs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetDonationProofsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDonationProofs>>
+  > = ({ signal }) => getDonationProofs(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDonationProofs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDonationProofsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDonationProofs>>
+>;
+export type GetDonationProofsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List proof images for a donation (admin)
+ */
+
+export function useGetDonationProofs<
+  TData = Awaited<ReturnType<typeof getDonationProofs>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDonationProofs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDonationProofsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add a manual proof image to a donation (admin)
+ */
+export const getAddDonationProofUrl = (id: number) => {
+  return `/api/donations/${id}/proofs`;
+};
+
+export const addDonationProof = async (
+  id: number,
+  addDonationProofBody: AddDonationProofBody,
+  options?: RequestInit,
+): Promise<DonationProof> => {
+  return customFetch<DonationProof>(getAddDonationProofUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addDonationProofBody),
+  });
+};
+
+export const getAddDonationProofMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addDonationProof>>,
+    TError,
+    { id: number; data: BodyType<AddDonationProofBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addDonationProof>>,
+  TError,
+  { id: number; data: BodyType<AddDonationProofBody> },
+  TContext
+> => {
+  const mutationKey = ["addDonationProof"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addDonationProof>>,
+    { id: number; data: BodyType<AddDonationProofBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addDonationProof(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddDonationProofMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addDonationProof>>
+>;
+export type AddDonationProofMutationBody = BodyType<AddDonationProofBody>;
+export type AddDonationProofMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add a manual proof image to a donation (admin)
+ */
+export const useAddDonationProof = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addDonationProof>>,
+    TError,
+    { id: number; data: BodyType<AddDonationProofBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addDonationProof>>,
+  TError,
+  { id: number; data: BodyType<AddDonationProofBody> },
+  TContext
+> => {
+  return useMutation(getAddDonationProofMutationOptions(options));
+};
+
+/**
+ * @summary Delete a proof image (admin)
+ */
+export const getDeleteDonationProofUrl = (id: number, proofId: number) => {
+  return `/api/donations/${id}/proofs/${proofId}`;
+};
+
+export const deleteDonationProof = async (
+  id: number,
+  proofId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteDonationProofUrl(id, proofId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteDonationProofMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDonationProof>>,
+    TError,
+    { id: number; proofId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteDonationProof>>,
+  TError,
+  { id: number; proofId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteDonationProof"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteDonationProof>>,
+    { id: number; proofId: number }
+  > = (props) => {
+    const { id, proofId } = props ?? {};
+
+    return deleteDonationProof(id, proofId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteDonationProofMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteDonationProof>>
+>;
+
+export type DeleteDonationProofMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a proof image (admin)
+ */
+export const useDeleteDonationProof = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteDonationProof>>,
+    TError,
+    { id: number; proofId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteDonationProof>>,
+  TError,
+  { id: number; proofId: number },
+  TContext
+> => {
+  return useMutation(getDeleteDonationProofMutationOptions(options));
+};
+
+/**
  * @summary Get overall donation statistics
  */
 export const getGetDonationStatsUrl = () => {
@@ -1604,6 +1954,168 @@ export function useGetDonationStats<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get a signed upload URL for donation proofs (public, rate limited)
+ */
+export const getGetUploadSignatureUrl = () => {
+  return `/api/uploads/signature`;
+};
+
+export const getUploadSignature = async (
+  options?: RequestInit,
+): Promise<UploadSignature> => {
+  return customFetch<UploadSignature>(getGetUploadSignatureUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getGetUploadSignatureMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getUploadSignature>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof getUploadSignature>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["getUploadSignature"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof getUploadSignature>>,
+    void
+  > = () => {
+    return getUploadSignature(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GetUploadSignatureMutationResult = NonNullable<
+  Awaited<ReturnType<typeof getUploadSignature>>
+>;
+
+export type GetUploadSignatureMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Get a signed upload URL for donation proofs (public, rate limited)
+ */
+export const useGetUploadSignature = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getUploadSignature>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof getUploadSignature>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getGetUploadSignatureMutationOptions(options));
+};
+
+/**
+ * @summary Get a signed upload URL for campaign evidence (admin)
+ */
+export const getGetAdminUploadSignatureUrl = () => {
+  return `/api/uploads/admin-signature`;
+};
+
+export const getAdminUploadSignature = async (
+  options?: RequestInit,
+): Promise<UploadSignature> => {
+  return customFetch<UploadSignature>(getGetAdminUploadSignatureUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getGetAdminUploadSignatureMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getAdminUploadSignature>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof getAdminUploadSignature>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["getAdminUploadSignature"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof getAdminUploadSignature>>,
+    void
+  > = () => {
+    return getAdminUploadSignature(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GetAdminUploadSignatureMutationResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminUploadSignature>>
+>;
+
+export type GetAdminUploadSignatureMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Get a signed upload URL for campaign evidence (admin)
+ */
+export const useGetAdminUploadSignature = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getAdminUploadSignature>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof getAdminUploadSignature>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getGetAdminUploadSignatureMutationOptions(options));
+};
 
 /**
  * @summary List news posts

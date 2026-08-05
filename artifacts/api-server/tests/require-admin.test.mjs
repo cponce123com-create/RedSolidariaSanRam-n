@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { requireAdmin } from "./dist/require-admin.mjs";
+import { requireAdmin } from "./dist/middleware/require-admin.mjs";
 
 function mockRes() {
   const res = { statusCode: 200, body: null };

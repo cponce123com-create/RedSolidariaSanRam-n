@@ -103,6 +103,7 @@ export interface Donation {
   paymentMethod: string;
   message?: string | null;
   anonymous: boolean;
+  publicProof?: boolean;
   receiptUrl?: string | null;
   receiptNote?: string | null;
   status: DonationStatus;
@@ -132,8 +133,40 @@ export interface CreateDonationInput {
   paymentMethod: CreateDonationInputPaymentMethod;
   message?: string | null;
   anonymous: boolean;
+  publicProof?: boolean;
   receiptUrl?: string | null;
   receiptNote?: string | null;
+  proofImageUrl?: string | null;
+  proofPublicId?: string | null;
+  proofMimeType?: string | null;
+}
+
+export interface CampaignDonor {
+  id: number;
+  name?: string | null;
+  amount: number;
+  message?: string | null;
+  date: string;
+  publicProof: boolean;
+  proofUrl?: string | null;
+}
+
+export interface DonationProof {
+  id: number;
+  donationId: number;
+  imageUrl: string;
+  publicId?: string | null;
+  mimeType?: string | null;
+  createdAt: string;
+}
+
+export interface UploadSignature {
+  cloudName: string;
+  apiKey: string;
+  timestamp: string;
+  publicId: string;
+  folder: string;
+  signature: string;
 }
 
 export type UpdateDonationStatusInputStatus =
@@ -292,3 +325,9 @@ export const GetDonationsStatus = {
   approved: "approved",
   rejected: "rejected",
 } as const;
+
+export type AddDonationProofBody = {
+  imageUrl: string;
+  publicId?: string | null;
+  mimeType?: string | null;
+};

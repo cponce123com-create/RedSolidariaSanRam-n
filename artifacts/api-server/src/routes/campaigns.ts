@@ -8,6 +8,7 @@ import {
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
+import { formatPublicDonor } from "../lib/donor-format";
 
 const router: IRouter = Router();
 
@@ -75,6 +76,50 @@ router.get("/campaigns/:id", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign");
     return res.status(500).json({ error: "server_error", message: "Failed to get campaign" });
+  }
+});
+
+// GET /campaigns/:id/donors — público: donantes aprobados de la campaña.
+// Nunca expone email/phone; el nombre se omite si la donación es anónima y
+// el comprobante solo se muestra si el donante autorizó (publicProof).
+router.get("/campaigns/:id/donors", async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const donors = await db
+      .select({
+        id: donationsTable.id,
+        firstName: donationsTable.firstName,
+        lastName: donationsTable.lastName,
+        amount: donationsTable.amount,
+        message: donationsTable.message,
+        anonymous: donationsTable.anonymous,
+        publicProof: donationsTable.publicProof,
+        receiptUrl: donationsTable.receiptUrl,
+        createdAt: donationsTable.createdAt,
+      })
+      .from(donationsTable)
+      .where(
+        and(
+          eq(donationsTable.campaignId, campaignId),
+          eq(donationsTable.status, "approved"),
+        ),
+      )
+      .orderBy(desc(donationsTable.createdAt));
+
+    res.json(
+      donors.map((d) => ({
+        id: d.id,
+        name: d.anonymous ? null : `${d.firstName} ${d.lastName}`.trim(),
+        amount: d.amount,
+        message: d.message,
+        date: d.createdAt.toISOString(),
+        publicProof: d.publicProof,
+        proofUrl: d.publicProof ? d.receiptUrl : null,
+      })),
+    );
+  } catch (err) {
+    req.log.error({ err }, "Failed to get campaign donors");
+    res.status(500).json({ error: "server_error", message: "Failed to get campaign donors" });
   }
 });
 

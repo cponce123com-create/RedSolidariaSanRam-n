@@ -5,6 +5,7 @@ export * from "./stats";
 export * from "./contact";
 export * from "./volunteers";
 export * from "./donations";
+export * from "./donation-proofs";
 export * from "./campaign-updates";
 export * from "./campaign-images";
 export * from "./campaign-expenses";

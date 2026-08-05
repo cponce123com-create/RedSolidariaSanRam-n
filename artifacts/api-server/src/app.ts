@@ -108,6 +108,21 @@ if (process.env.NODE_ENV === "production") {
         `Defínelas en Render para evitar credenciales por defecto.`,
     );
   }
+
+  // Cloudinary: config incompleta = error; config ausente = upload deshabilitado (503)
+  const cloudinaryVars = [
+    "CLOUDINARY_CLOUD_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+  ];
+  const defined = cloudinaryVars.filter((v) => process.env[v]);
+  if (defined.length > 0 && defined.length < cloudinaryVars.length) {
+    throw new Error(
+      `Cloudinary configuration incomplete. Missing: ${cloudinaryVars
+        .filter((v) => !process.env[v])
+        .join(", ")}. Define all 3 or none.`,
+    );
+  }
 }
 
 // Store de sesiones en PostgreSQL: escalable y persistente entre deploys

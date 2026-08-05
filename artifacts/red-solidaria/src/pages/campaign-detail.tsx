@@ -4,13 +4,14 @@ import {
   useGetCampaign, 
   useGetCampaignUpdates, 
   useGetCampaignImages,
+  useGetCampaignDonors,
 } from "@workspace/api-client-react";
 import { useCampaignTransparency } from "@/hooks/use-phase3";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Heart, Share2, Calendar, Target, Users, Landmark, Clock, ImageIcon, Copy, Shield, ArrowRight } from "lucide-react";
+import { Heart, Share2, Calendar, Target, Users, Landmark, Clock, ImageIcon, Copy, Shield, ArrowRight, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DonationModal } from "@/components/shared/DonationModal";
@@ -25,10 +26,12 @@ export default function CampaignDetail() {
   
   const [isDonationModalOpen, setIsDonationModalOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<{url: string, caption?: string} | null>(null);
+  const [selectedProof, setSelectedProof] = useState<string | null>(null);
 
   const { data: campaign, isLoading: loadingCampaign, isError } = useGetCampaign(campaignId);
   const { data: updates, isLoading: loadingUpdates } = useGetCampaignUpdates(campaignId);
   const { data: images, isLoading: loadingImages } = useGetCampaignImages(campaignId);
+  const { data: donors } = useGetCampaignDonors(campaignId);
   
   // Phase 3 Transparency summary
   const { data: transparency } = useCampaignTransparency(campaignId);
@@ -361,6 +364,63 @@ export default function CampaignDetail() {
               </div>
             </div>
           )}
+
+          {/* Donantes de la campaña */}
+          <div className="mt-16 pt-12 border-t border-border">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-display font-bold flex items-center gap-3 text-foreground mb-2">
+                  <Users className="w-8 h-8 text-primary" /> Donantes
+                </h2>
+                <p className="text-muted-foreground font-medium">Personas que ya confiaron en esta campaña. ¡Gracias por su solidaridad!</p>
+              </div>
+              {donors && donors.length > 0 && (
+                <Badge variant="secondary" className="px-4 py-1.5 text-sm">{donors.length} donantes</Badge>
+              )}
+            </div>
+
+            {donors && donors.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {donors.map((donor) => (
+                  <div key={donor.id} className="bg-white dark:bg-card rounded-3xl border border-border shadow-sm p-5 flex flex-col gap-3 hover-elevate transition-all">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                          <Heart className="w-5 h-5 fill-current" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-foreground truncate">{donor.name || "Anónimo"}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(donor.date), "dd MMM yyyy", { locale: es })}</p>
+                        </div>
+                      </div>
+                      <span className="font-bold text-primary whitespace-nowrap">S/ {donor.amount.toLocaleString("es-PE")}</span>
+                    </div>
+                    {donor.message && <p className="text-sm text-muted-foreground line-clamp-2">"{donor.message}"</p>}
+                    {donor.publicProof && donor.proofUrl && (
+                      <Button type="button" variant="outline" size="sm" className="w-full rounded-xl text-xs" onClick={() => setSelectedProof(donor.proofUrl ?? null)}>
+                        <Eye className="w-4 h-4 mr-1" /> Ver comprobante
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-card rounded-3xl border border-dashed border-border p-12 text-center shadow-sm">
+                <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-foreground mb-2">Sé el primero en donar</h3>
+                <p className="text-muted-foreground">Tu apoyo se reflejará aquí una vez validemos tu donación.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Lightbox del comprobante público */}
+          <Dialog open={!!selectedProof} onOpenChange={() => setSelectedProof(null)}>
+            <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black/95 border-none shadow-2xl rounded-3xl">
+              {selectedProof && (
+                <img src={selectedProof} alt="Comprobante de donación" className="w-full max-h-[80vh] object-contain" />
+              )}
+            </DialogContent>
+          </Dialog>
 
         </div>
       </div>
