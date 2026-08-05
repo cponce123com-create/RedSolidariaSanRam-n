@@ -18,7 +18,7 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_donations_campaign ON donations(campaign_id);
       CREATE INDEX IF NOT EXISTS idx_donations_created ON donations(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_donations_status ON donations(status);
-      CREATE INDEX IF NOT EXISTS idx_pets_adoption_status ON pets(adoption_status);
+      CREATE INDEX IF NOT EXISTS idx_pets_adoption_status ON pets(status);
       CREATE INDEX IF NOT EXISTS idx_pets_created ON pets(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_volunteers_status ON volunteers(status);
       CREATE INDEX IF NOT EXISTS idx_reports_status ON community_reports(status);
