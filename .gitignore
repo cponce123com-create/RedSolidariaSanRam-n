@@ -1,44 +1,55 @@
 ```
-# Build artifacts
-dist/
-build/
-*.js.map
-*.css.map
-*.tsbuildinfo
-
 # Dependencies
 node_modules/
+
+# Build artifacts
+build/
+dist/
+*.js
+*.ts
+*.tsx
 
 # Environment
 .env
 .env.local
-*.env.local
-!.env.example
+.env.*
 
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Logs
+# Logs and temp files
 *.log
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
+*.tmp
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
+
+# Compiled files
+*.o
+*.obj
 *.so
-*.egg-info/
-.eggs/
-.venv/
-venv/
-.env/
-.pytest_cache/
+*.dll
+*.exe
+*.class
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Caching
 .mypy_cache/
+.pytest_cache/
+target/
+.gradle/
 ```

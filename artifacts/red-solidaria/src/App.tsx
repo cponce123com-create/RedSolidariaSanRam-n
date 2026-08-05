@@ -44,6 +44,7 @@ import AdminFaq from "./pages/admin/faq";
 import AdminUsers from "./pages/admin/users";
 import AdminSettings from "./pages/admin/settings";
 import MobileBottomNav from "./components/shared/MobileBottomNav";
+import StockCatalog from "./pages/stock-catalog";
 
 const queryClient = new QueryClient();
 
@@ -227,6 +228,11 @@ function App() {
             <Route path="/contacto">
               <MainLayout>
                 <Contact />
+              </MainLayout>
+            </Route>
+            <Route path="/catalogo">
+              <MainLayout>
+                <StockCatalog />
               </MainLayout>
             </Route>
             <Route path="/">

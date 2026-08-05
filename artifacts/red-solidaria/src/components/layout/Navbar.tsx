@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, Heart, X, AlertTriangle, Dog } from "lucide-react";
+import { Menu, Heart, X, AlertTriangle, Dog, Package } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -14,6 +14,7 @@ export function Navbar() {
     { href: "/campanas", label: "Campañas" },
     { href: "/casos-urgentes", label: "Casos Urgentes", urgent: true },
     { href: "/como-ayudar", label: "Cómo Ayudar" },
+    { href: "/catalogo", label: "Catálogo", icon: Package },
     { href: "/adopciones", label: "Adopciones", animal: true },
     { href: "/ayuda-animal", label: "Ayuda Animal", animal: true },
     { href: "/contacto", label: "Contacto" },
@@ -63,6 +64,7 @@ export function Navbar() {
               >
                 {(link as any).urgent && <AlertTriangle className="w-3.5 h-3.5 inline mr-0.5" />}
                 {(link as any).animal && <Dog className="w-3.5 h-3.5 inline mr-0.5" />}
+                {(link as any).icon && <link.icon className="w-3.5 h-3.5 inline mr-0.5" />}
                 {link.label}
               </Link>
             ))}
@@ -114,6 +116,7 @@ export function Navbar() {
                 >
                   {(link as any).urgent && <AlertTriangle className="w-4 h-4 text-orange-500" />}
                   {(link as any).animal && <Dog className="w-4 h-4 text-amber-500" />}
+                  {(link as any).icon && <link.icon className="w-4 h-4" />}
                   {link.label}
                 </Link>
               ))}
