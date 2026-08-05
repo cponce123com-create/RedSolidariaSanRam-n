@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
   Armchair, 
-  Crutch, 
+  Walk, 
   Bed, 
   Utensils, 
   Flame, 
@@ -45,7 +45,7 @@ const STOCK_ITEMS: StockItem[] = [
     name: "Andadores",
     category: "Movilidad",
     description: "Andadores ortopédicos regulables con ruedas y frenos. Disponibles en diferentes alturas.",
-    icon: Crutch,
+    icon: Walk,
     inStock: true,
     stockLevel: "high",
     canSponsor: true,
@@ -67,7 +67,7 @@ const STOCK_ITEMS: StockItem[] = [
     name: "Muletas",
     category: "Movilidad",
     description: "Muletas axilares y antebrales ajustables. Material resistente y ergonómico.",
-    icon: Crutch,
+    icon: Walk,
     inStock: true,
     stockLevel: "high",
     canSponsor: true,
