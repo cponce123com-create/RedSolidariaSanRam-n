@@ -153,17 +153,29 @@ if (process.env.NODE_ENV === "production") {
     path.join(process.cwd(), "artifacts/red-solidaria/dist/public");
   logger.info({ staticPath }, "Serving static files from");
 
-  // Assets estáticos con cache de 1 año (hash en nombres de archivo)
+  // Assets estáticos con cache de 1 año (hash en nombres de archivo).
+  // fallthrough por defecto (true): las rutas que no son archivos pasan al SPA fallback.
+  // index.html se sirve SIEMPRE sin caché (no-cache) para que tras cada deploy
+  // el navegador descargue los nuevos hashes de assets (evita página en blanco).
   app.use(
     express.static(staticPath, {
       maxAge: "1y",
       immutable: true,
-      fallthrough: false,
+      index: false,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
     }),
   );
 
-  // Para SPA con React Router: todas las rutas no-API deben servir index.html
-  app.get("*path", (req, res) => {
+  // Para SPA con React Router: todas las rutas no-API deben servir index.html.
+  // Los /assets/ inexistentes no deben caer aquí (devuelven 404 real).
+  app.get("*path", (req, res, next) => {
+    if (req.path.startsWith("/assets/")) {
+      return next();
+    }
     res.sendFile(path.join(staticPath, "index.html"));
   });
 }
