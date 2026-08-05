@@ -3,7 +3,9 @@ import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import session from "express-session";
+import pgSession from "connect-pg-simple";
 import path from "path";
+import { pool } from "@workspace/db";
 import { apiLimiter } from "./middleware/rate-limit";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -80,8 +82,13 @@ if (process.env.NODE_ENV === "production" && !sessionSecret) {
   );
 }
 
+// Store de sesiones en PostgreSQL: escalable y persistente entre deploys
+// (MemoryStore pierde sesiones en cada reinicio y no escala multi-instancia)
+const PostgresSessionStore = pgSession(session);
+
 app.use(
   session({
+    store: new PostgresSessionStore({ pool, tableName: "session" }),
     secret: sessionSecret || "redsolidaria-secret-key-2024",
     resave: false,
     saveUninitialized: false,

@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 // Rate limiter general para la API - más estricto con configuración mejorada
 export const apiLimiter = rateLimit({
@@ -9,8 +9,10 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: false,
   keyGenerator: (req) => {
-    // Usar IP o API key si está disponible
-    return (req.headers['x-api-key'] as string | undefined) ?? req.ip ?? "unknown";
+    // Usar API key si está disponible, o IP normalizada (IPv4/IPv6)
+    const apiKey = req.headers['x-api-key'] as string | undefined;
+    if (apiKey) return `api-key:${apiKey}`;
+    return ipKeyGenerator(req.ip ?? "unknown");
   },
 });
 
@@ -23,9 +25,9 @@ export const loginLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: false,
   keyGenerator: (req) => {
-    // Limitar por IP y email combinados para login
+    // Limitar por IP normalizada y email combinados para login
     const email = req.body?.email || 'unknown';
-    return `${req.ip}-${email}`;
+    return `${ipKeyGenerator(req.ip ?? "unknown")}-${email}`;
   },
 });
 
