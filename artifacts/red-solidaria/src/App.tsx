@@ -50,7 +50,16 @@ const AdminFaq = lazy(() => import("./pages/admin/faq"));
 const AdminUsers = lazy(() => import("./pages/admin/users"));
 const AdminSettings = lazy(() => import("./pages/admin/settings"));
 
-const queryClient = new QueryClient();
+// Caché de 60s + sin refetch al enfocar la pestaña: al volver al home (o navegar
+// de vuelta) los datos ya cacheados se muestran al instante, sin recargar.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function MainLayout({ children }: { children: ReactNode }) {
   return (

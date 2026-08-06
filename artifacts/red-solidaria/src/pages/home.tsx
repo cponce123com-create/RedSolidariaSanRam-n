@@ -99,21 +99,24 @@ export default function Home() {
       {/* HERO SECTION */}
       <MotionConfig reducedMotion="user">
       <section className="relative overflow-hidden bg-background">
-        {/* Fondo: gradiente + blobs animados + patrón de puntos */}
+        {/* Fondo: gradiente + blobs animados (sin filter: transform-only, baratos en GPU) + patrón de puntos */}
         <motion.div className="absolute inset-0 z-0" style={{ y: bgY }}>
           <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-emerald-50/60 to-teal-50/40"></div>
           <motion.div
-            className="absolute top-0 right-0 w-[34rem] h-[34rem] rounded-full bg-yellow-200/40 blur-3xl"
-            animate={{ x: [0, -50, 0], y: [0, 40, 0], scale: [1, 1.1, 1] }}
+            className="absolute -top-32 -right-32 w-[38rem] h-[38rem] transform-gpu"
+            style={{ background: "radial-gradient(circle at 50% 50%, rgba(253, 230, 138, 0.45), transparent 65%)" }}
+            animate={{ x: [0, -50, 0], y: [0, 40, 0], scale: [1, 1.12, 1] }}
             transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div
-            className="absolute bottom-0 left-0 w-[30rem] h-[30rem] rounded-full bg-teal-200/50 blur-3xl"
+            className="absolute -bottom-40 -left-32 w-[34rem] h-[34rem] transform-gpu"
+            style={{ background: "radial-gradient(circle at 50% 50%, rgba(45, 212, 191, 0.4), transparent 65%)" }}
             animate={{ x: [0, 50, 0], y: [0, -35, 0], scale: [1.05, 1, 1.05] }}
             transition={{ duration: 14, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
           />
           <motion.div
-            className="absolute top-[32%] left-[22%] w-[26rem] h-[26rem] rounded-full bg-emerald-200/40 blur-3xl"
+            className="absolute top-[32%] left-[22%] w-[28rem] h-[28rem] transform-gpu"
+            style={{ background: "radial-gradient(circle at 50% 50%, rgba(52, 211, 153, 0.35), transparent 65%)" }}
             animate={{ x: [0, 30, -20, 0], y: [0, -30, 20, 0], scale: [1, 1.12, 1] }}
             transition={{ duration: 16, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
           />
@@ -132,7 +135,7 @@ export default function Home() {
           <motion.span
             key={i}
             aria-hidden="true"
-            className={`absolute z-[1] pointer-events-none ${className}`}
+            className={`absolute z-[1] pointer-events-none transform-gpu ${className}`}
             animate={{ y: [0, -18, 0], rotate: [0, 8, -4, 0] }}
             transition={{ duration, delay, repeat: Infinity, ease: "easeInOut" }}
           >
@@ -142,7 +145,7 @@ export default function Home() {
 
         {/* Tarjetas flotantes decorativas (solo escritorio) */}
         <motion.div
-          className="absolute right-[6%] top-[22%] z-10 hidden xl:flex flex-col gap-4 pointer-events-none"
+          className="absolute right-[6%] top-[22%] z-10 hidden xl:flex flex-col gap-4 pointer-events-none transform-gpu"
           animate={{ y: [0, -14, 0] }}
           transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
         >
@@ -159,7 +162,7 @@ export default function Home() {
           />
         </motion.div>
         <motion.div
-          className="absolute left-[5%] bottom-[24%] z-10 hidden xl:flex flex-col gap-4 pointer-events-none"
+          className="absolute left-[5%] bottom-[24%] z-10 hidden xl:flex flex-col gap-4 pointer-events-none transform-gpu"
           animate={{ y: [0, 12, 0] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
         >

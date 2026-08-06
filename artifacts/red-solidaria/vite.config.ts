@@ -1,7 +1,8 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import path from "path";
+import path from "node:path";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import runtimeErrorModal from "@replit/vite-plugin-runtime-error-modal";
 
 // PORT y BASE_PATH los inyectan Replit y el script dev del root; fuera de esos
@@ -17,12 +18,42 @@ if (Number.isNaN(port) || port <= 0) {
 
 const basePath = process.env.BASE_PATH || "/";
 
+// Precarga el chunk de la página inicial (home) en index.html. El navegador
+// descarga el bundle principal (~676 kB) ANTES de pedir el chunk lazy del home
+// (49 kB); con <link rel="modulepreload"> ambos se descargan en paralelo y el
+// primer paint del home llega sensiblemente antes en redes lentas.
+// No toca manualChunks (históricamente rompió la app en producción).
+function preloadHomeChunk(): Plugin {
+  return {
+    name: "preload-home-chunk",
+    apply: "build",
+    closeBundle() {
+      const outDir = path.resolve(import.meta.dirname, "dist/public");
+      const htmlPath = path.join(outDir, "index.html");
+      const assetsDir = path.join(outDir, "assets");
+      let html: string;
+      let homeChunk: string | undefined;
+      try {
+        html = readFileSync(htmlPath, "utf8");
+        homeChunk = readdirSync(assetsDir).find((f) => /^home-.*\.js$/.test(f));
+      } catch {
+        return; // build sin home o sin index.html: no hacemos nada
+      }
+      if (!homeChunk || html.includes(homeChunk)) return;
+      const base = basePath.endsWith("/") ? basePath : `${basePath}/`;
+      const link = `    <link rel="modulepreload" href="${base}assets/${homeChunk}" />\n`;
+      writeFileSync(htmlPath, html.replace("<head>", `<head>\n${link}`));
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     react(),
     tailwindcss(),
     runtimeErrorModal(),
+    preloadHomeChunk(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
