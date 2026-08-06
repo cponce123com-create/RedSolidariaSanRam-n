@@ -75,7 +75,6 @@
   },
   "dependencies": {
     "@types/canvas-confetti": "^1.9.0",
-    "canvas-confetti": "^1.9.4",
-    "react-helmet-async": "^3.0.0"
+    "canvas-confetti": "^1.9.4"
   }
 }

@@ -12,6 +12,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: "10000"
+      - key: BASE_PATH
+        value: "/"
       - key: SESSION_SECRET
         generateValue: true
       - key: ADMIN_USERNAME
