@@ -30,8 +30,18 @@ export interface UploadSignature {
   timestamp: string;
   publicId: string;
   folder: string;
+  // Restricciones firmadas: el cliente debe enviarlas tal cual al subir o
+  // Cloudinary rechaza la petición (formato y tamaño máximos).
+  allowedFormats: string;
+  maxBytes: string;
   signature: string;
 }
+
+// Formatos y tamaño máximo permitidos en las subidas firmadas. Coinciden con
+// la validación del cliente (validateProofImage): imágenes JPG/PNG/WebP ≤ 8 MB.
+// Al estar firmados, el cliente no puede alterarlos sin invalidar la firma.
+const ALLOWED_UPLOAD_FORMATS = "jpg,png,webp";
+const MAX_UPLOAD_BYTES = String(8 * 1024 * 1024);
 
 export function getUploadSignature(
   folder: string,
@@ -43,6 +53,8 @@ export function getUploadSignature(
     folder,
     public_id: publicId,
     timestamp,
+    allowed_formats: ALLOWED_UPLOAD_FORMATS,
+    max_bytes: MAX_UPLOAD_BYTES,
   };
   return {
     cloudName: cloudName!,
@@ -50,6 +62,8 @@ export function getUploadSignature(
     timestamp,
     publicId,
     folder,
+    allowedFormats: ALLOWED_UPLOAD_FORMATS,
+    maxBytes: MAX_UPLOAD_BYTES,
     signature: createUploadSignature(params, apiSecret!),
   };
 }

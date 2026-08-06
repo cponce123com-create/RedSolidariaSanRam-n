@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  typecheck-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      # La preinstall del root exige pnpm (valida $npm_config_user_agent)
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # typecheck:libs compila los paquetes TS (d.ts de lib/db y lib/api-zod)
+      # antes del typecheck de los artifacts, en orden de dependencias.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm -r --if-present test

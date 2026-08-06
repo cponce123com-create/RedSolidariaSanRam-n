@@ -41,6 +41,10 @@ export async function uploadImageToCloudinary(
   form.append("timestamp", sig.timestamp);
   form.append("api_key", sig.apiKey);
   form.append("signature", sig.signature);
+  // Parámetros firmados por el servidor: si el cliente no los envía tal cual,
+  // Cloudinary invalida la subida (formato y tamaño máximos).
+  form.append("allowed_formats", sig.allowedFormats);
+  form.append("max_bytes", sig.maxBytes);
 
   const upload = await fetch(
     `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,

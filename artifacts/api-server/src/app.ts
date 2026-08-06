@@ -13,6 +13,7 @@ import path from "path";
 import { pool } from "@workspace/db";
 import { apiLimiter } from "./middleware/rate-limit";
 import router from "./routes";
+import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -91,11 +92,17 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// SEO: sitemap.xml y robots.txt en la raíz del dominio (no bajo /api) y ANTES
+// del SPA fallback y de los archivos estáticos de producción.
+app.use(sitemapRouter);
+
 // Rate limiter global para toda la API
 app.use("/api", apiLimiter);
 
-// Validación de variables obligatorias en producción
-if (process.env.NODE_ENV === "production") {
+// Validación de variables obligatorias en cualquier entorno que no sea
+// desarrollo local: evita que las credenciales por defecto (o secretos
+// hardcodeados) queden activas en staging/producción si falta una variable.
+if (process.env.NODE_ENV !== "development") {
   const missing = [
     !process.env.SESSION_SECRET && "SESSION_SECRET",
     !process.env.ADMIN_USERNAME && "ADMIN_USERNAME",
@@ -104,7 +111,7 @@ if (process.env.NODE_ENV === "production") {
 
   if (missing.length > 0) {
     throw new Error(
-      `Required environment variables in production: ${missing.join(", ")}. ` +
+      `Required environment variables in non-development environments: ${missing.join(", ")}. ` +
         `Defínelas en Render para evitar credenciales por defecto.`,
     );
   }

@@ -10,8 +10,6 @@ import { eq, gte, sql, desc, count, sum } from "drizzle-orm";
 const router = Router();
 
 router.get("/admin/dashboard", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
-
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixMonthsAgo = new Date(now.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);

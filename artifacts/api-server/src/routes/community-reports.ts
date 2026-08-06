@@ -37,9 +37,6 @@ router.get("/reports/featured", async (req, res) => {
 
 // ─── ADMIN: List all reports (with optional status filter) ───────────────────
 router.get("/admin/reports", async (req, res) => {
-  if (!(req.session as any).adminUser) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
   const { status } = req.query;
   let query = db.select().from(communityReportsTable).$dynamic();
   if (status && typeof status === "string" && status !== "all") {
@@ -51,9 +48,6 @@ router.get("/admin/reports", async (req, res) => {
 
 // ─── ADMIN: Get single report ─────────────────────────────────────────────────
 router.get("/admin/reports/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
   const id = Number(req.params.id);
   const [report] = await db.select().from(communityReportsTable).where(eq(communityReportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Reporte no encontrado" });
@@ -62,9 +56,6 @@ router.get("/admin/reports/:id", async (req, res) => {
 
 // ─── ADMIN: Update report status / notes / featured ──────────────────────────
 router.patch("/admin/reports/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
   const id = Number(req.params.id);
   const parsed = updateCommunityReportSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -81,9 +72,6 @@ router.patch("/admin/reports/:id", async (req, res) => {
 
 // ─── ADMIN: Convert report to campaign ───────────────────────────────────────
 router.post("/admin/reports/:id/convert", async (req, res) => {
-  if (!(req.session as any).adminUser) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
   const id = Number(req.params.id);
   const [report] = await db.select().from(communityReportsTable).where(eq(communityReportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Reporte no encontrado" });
@@ -114,9 +102,6 @@ router.post("/admin/reports/:id/convert", async (req, res) => {
 
 // ─── ADMIN: Delete report ─────────────────────────────────────────────────────
 router.delete("/admin/reports/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) {
-    return res.status(401).json({ error: "unauthorized" });
-  }
   const id = Number(req.params.id);
   await db.delete(communityReportsTable).where(eq(communityReportsTable.id, id));
   return res.status(204).send();

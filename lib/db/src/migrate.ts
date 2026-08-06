@@ -44,6 +44,14 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ALTER TABLE donations ADD COLUMN IF NOT EXISTS public_proof boolean NOT NULL DEFAULT false;
     `,
   },
+  {
+    name: "003_admin_2fa.sql",
+    sql: `
+      -- 2FA (TOTP) para administradores: secreto + flag de activación
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS two_factor_secret text;
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS two_factor_enabled boolean NOT NULL DEFAULT false;
+    `,
+  },
 ];
 
 /**

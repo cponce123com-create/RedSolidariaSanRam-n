@@ -20,7 +20,6 @@ router.post("/volunteers", volunteerLimiter, async (req, res) => {
 
 // ─── ADMIN: List all volunteers ───────────────────────────────────────────────
 router.get("/admin/volunteers", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const { status } = req.query;
   let query = db.select().from(volunteersTable).$dynamic();
   if (status && status !== "all") query = query.where(eq(volunteersTable.status, status as string));
@@ -30,7 +29,6 @@ router.get("/admin/volunteers", async (req, res) => {
 
 // ─── ADMIN: Update volunteer status ──────────────────────────────────────────
 router.patch("/admin/volunteers/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const id = Number(req.params.id);
   const { status, adminNotes } = req.body;
   const [updated] = await db.update(volunteersTable).set({ status, adminNotes }).where(eq(volunteersTable.id, id)).returning();

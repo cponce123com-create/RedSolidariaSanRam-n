@@ -7,8 +7,12 @@ import { loginLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "redsolidaria2024";
+// El superadmin de respaldo (env var) solo permite credenciales por defecto en
+// desarrollo local. En cualquier otro entorno app.ts exige ADMIN_USERNAME y
+// ADMIN_PASSWORD, así el fallback nunca queda activo en staging/producción.
+const isDev = process.env.NODE_ENV === "development";
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || (isDev ? "admin" : "");
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (isDev ? "redsolidaria2024" : "");
 
 const loginSchema = z.object({
   username: z.string(),
@@ -31,6 +35,26 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       const isValid = await verifyPassword(password, dbUser.password);
       
       if (isValid) {
+        // 2FA activo: exigir el código TOTP antes de abrir la sesión (paso 2).
+        // Se devuelve el userId para completar el login en /admin/2fa/login.
+        if (dbUser.twoFactorEnabled && dbUser.twoFactorSecret) {
+          await logAuditAction({
+            userId: dbUser.id,
+            username: dbUser.username,
+            action: "LOGIN_2FA_PENDING",
+            resource: "admin_users",
+            ipAddress: req.ip || req.connection?.remoteAddress || null,
+            userAgent: req.get("user-agent") || null,
+            details: { success: true },
+          });
+          return res.json({
+            success: false,
+            twoFactorRequired: true,
+            userId: dbUser.id,
+            message: "Se requiere el código de verificación",
+          });
+        }
+
         // Actualizar último login
         await db.update(adminUsersTable)
           .set({ lastLoginAt: new Date() })

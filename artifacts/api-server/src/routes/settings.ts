@@ -15,14 +15,12 @@ router.get("/settings", async (_req, res) => {
 
 // GET /admin/settings — admin (full rows with metadata)
 router.get("/admin/settings", async (req, res) => {
-  if (!(req.session as any)?.adminUser) return res.status(401).json({ error: "No autorizado" });
   const rows = await db.select().from(settings).orderBy(settings.group, settings.key);
   return res.json(rows);
 });
 
 // PUT /admin/settings/:key — update one setting
 router.put("/admin/settings/:key", async (req, res) => {
-  if (!(req.session as any)?.adminUser) return res.status(401).json({ error: "No autorizado" });
   const { key } = req.params;
   const { value } = req.body;
   if (typeof value !== "string") return res.status(400).json({ error: "Valor requerido" });
@@ -39,7 +37,6 @@ router.put("/admin/settings/:key", async (req, res) => {
 
 // PUT /admin/settings — batch update
 router.put("/admin/settings", async (req, res) => {
-  if (!(req.session as any)?.adminUser) return res.status(401).json({ error: "No autorizado" });
   const updates = req.body as Record<string, string>;
   if (!updates || typeof updates !== "object") return res.status(400).json({ error: "Body inválido" });
 

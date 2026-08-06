@@ -48,5 +48,15 @@ export const publicInsertPetSchema = createInsertSchema(petsTable).omit({
   featuredOnHome: true,
 });
 
+// Schema de actualización admin: el insert schema omite status/featuredOnHome/
+// submittedByPublic (los gestiona el servidor), pero el PATCH admin SÍ debe
+// poder cambiarlos (p.ej. aprobar una mascota). id/createdAt/updatedAt quedan
+// excluidos: nunca se pueden modificar desde el body (anti mass-assignment).
+export const updatePetSchema = insertPetSchema.partial().extend({
+  status: z.enum(["available", "adopted", "in-process", "reviewing", "inactive"]).optional(),
+  submittedByPublic: z.boolean().optional(),
+  featuredOnHome: z.boolean().optional(),
+});
+
 export type InsertPet = z.infer<typeof insertPetSchema>;
 export type Pet = typeof petsTable.$inferSelect;

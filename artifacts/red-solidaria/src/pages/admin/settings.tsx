@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Settings, Phone, Share2, DollarSign, Loader2 } from "lucide-react";
+import { Save, Settings, Phone, Share2, DollarSign, Loader2, ShieldCheck, Smartphone } from "lucide-react";
 
 interface SettingRow {
   id: number;
@@ -28,6 +28,149 @@ const GROUP_LABELS: Record<string, string> = {
   redes: "Redes Sociales",
   donaciones: "Métodos de Donación",
 };
+
+// Gestión de 2FA (TOTP) para la cuenta del usuario logueado: setup, activación
+// con código, y desactivación. El secreto solo se muestra una vez (al configurar).
+function TwoFactorCard() {
+  const { toast } = useToast();
+  const [setup, setSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
+  const [code, setCode] = useState("");
+
+  const status = useQuery({
+    queryKey: ["2fa-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/2fa/status", { credentials: "include" });
+      if (!res.ok) throw new Error("Error al consultar 2FA");
+      return res.json() as Promise<{ enabled: boolean }>;
+    },
+  });
+
+  const startSetup = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/2fa/setup", { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const e = await res.json().catch(() => null);
+        throw new Error((e as { message?: string } | null)?.message || "Error al configurar 2FA");
+      }
+      return res.json() as Promise<{ secret: string; otpauthUri: string }>;
+    },
+    onSuccess: (data) => { setSetup(data); setCode(""); },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const verify = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/2fa/verify", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) throw new Error("Código incorrecto");
+    },
+    onSuccess: () => {
+      toast({ title: "2FA activado", description: "En el próximo login se pedirá el código." });
+      setSetup(null);
+      setCode("");
+      status.refetch();
+    },
+    onError: () => toast({ title: "Código incorrecto", variant: "destructive" }),
+  });
+
+  const disable = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/2fa/disable", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      if (!res.ok) throw new Error("Código incorrecto");
+    },
+    onSuccess: () => { toast({ title: "2FA desactivado" }); setCode(""); status.refetch(); },
+    onError: () => toast({ title: "Código incorrecto", variant: "destructive" }),
+  });
+
+  const enabled = status.data?.enabled ?? false;
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-50 bg-gray-50/50">
+        <span className="text-primary"><ShieldCheck className="w-4 h-4" /></span>
+        <h2 className="font-semibold text-gray-800">Seguridad de mi cuenta (2FA)</h2>
+      </div>
+      <div className="p-6 space-y-4">
+        {enabled ? (
+          <>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5" /> 2FA activo
+              </span>
+              <span className="text-muted-foreground">Verificación en dos pasos habilitada para tu usuario.</span>
+            </div>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <Label htmlFor="2fa-disable-code">Código actual</Label>
+                <Input
+                  id="2fa-disable-code"
+                  className="mt-1"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="••••••"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+              <Button variant="outline" className="rounded-xl" onClick={() => disable.mutate()} disabled={code.length !== 6 || disable.isPending}>
+                Desactivar 2FA
+              </Button>
+            </div>
+          </>
+        ) : setup ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Escanea el código con Google Authenticator (o Authy), o ingresa el secreto manualmente. Luego escribe el
+              código de 6 dígitos para activarlo.
+            </p>
+            <div className="bg-secondary/40 rounded-xl p-4 space-y-2 font-mono text-sm break-all">
+              <p className="font-sans text-xs font-semibold text-muted-foreground uppercase">URI otpauth</p>
+              <p>{setup.otpauthUri}</p>
+              <p className="font-sans text-xs font-semibold text-muted-foreground uppercase pt-2">Secreto</p>
+              <p>{setup.secret}</p>
+            </div>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <Label htmlFor="2fa-verify-code">Código de verificación</Label>
+                <Input
+                  id="2fa-verify-code"
+                  className="mt-1"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="••••••"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                />
+              </div>
+              <Button className="rounded-xl" onClick={() => verify.mutate()} disabled={code.length !== 6 || verify.isPending}>
+                <Smartphone className="w-4 h-4 mr-1" /> Activar 2FA
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Añade una capa extra de seguridad a tu cuenta. Necesitarás una aplicación autenticadora (Google
+              Authenticator, Authy, etc.).
+            </p>
+            <Button className="rounded-xl" onClick={() => startSetup.mutate()} disabled={startSetup.isPending}>
+              {startSetup.isPending ? "Generando..." : "Configurar 2FA"}
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminSettings() {
   const { toast } = useToast();
@@ -166,6 +309,8 @@ export default function AdminSettings() {
           </Button>
         </div>
       )}
+
+      <TwoFactorCard />
     </div>
   );
 }

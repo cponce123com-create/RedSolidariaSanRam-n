@@ -15,7 +15,7 @@ router.get("/sitemap.xml", async (_req, res) => {
   const [allCampaigns, allNews, allPets] = await Promise.all([
     db.select({ id: campaignsTable.id }).from(campaignsTable),
     db.select({ id: newsTable.id }).from(newsTable),
-    db.select({ id: petsTable.id }).from(petsTable).where(eq(petsTable.status, "disponible")),
+    db.select({ id: petsTable.id }).from(petsTable).where(eq(petsTable.status, "available")),
   ]);
 
   const staticPaths = ["/", "/nosotros", "/campanas", "/noticias", "/contacto", "/voluntario", "/adopciones", "/bienestar-animal", "/casos-urgentes", "/aliados", "/como-ayudar", "/faq"];

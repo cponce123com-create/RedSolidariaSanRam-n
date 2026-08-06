@@ -82,7 +82,7 @@ router.post("/admin/users", async (req, res) => {
 // ─── Update admin user ───────────────────────────────────────────────────────
 router.patch("/admin/users/:id", async (req, res) => {
   if (!isSuperAdmin(req)) return res.status(403).json({ error: "Solo superadmin" });
-  const { password, ...safeFields } = req.body;
+  const { password, twoFactorSecret, twoFactorEnabled, ...safeFields } = req.body;
   
   let updateData: any = { ...safeFields };
   

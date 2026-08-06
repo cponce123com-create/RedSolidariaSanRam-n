@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { petsTable, insertPetSchema, publicInsertPetSchema, adoptionRequestsTable, insertAdoptionRequestSchema } from "@workspace/db/schema";
+import { petsTable, insertPetSchema, publicInsertPetSchema, updatePetSchema, adoptionRequestsTable, insertAdoptionRequestSchema } from "@workspace/db/schema";
 import { eq, desc, and, or } from "drizzle-orm";
 
 const router = Router();
@@ -59,7 +59,6 @@ router.post("/pets/:id/adopt", async (req, res) => {
 
 // ─── ADMIN: List all pets ─────────────────────────────────────────────────────
 router.get("/admin/pets", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const { status } = req.query;
   let query = db.select().from(petsTable).$dynamic();
   if (status && status !== "all") query = query.where(eq(petsTable.status, status as string));
@@ -69,7 +68,6 @@ router.get("/admin/pets", async (req, res) => {
 
 // ─── ADMIN: Get single pet ────────────────────────────────────────────────────
 router.get("/admin/pets/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const id = Number(req.params.id);
   const [pet] = await db.select().from(petsTable).where(eq(petsTable.id, id));
   if (!pet) return res.status(404).json({ error: "Mascota no encontrada" });
@@ -78,7 +76,6 @@ router.get("/admin/pets/:id", async (req, res) => {
 
 // ─── ADMIN: Create pet ────────────────────────────────────────────────────────
 router.post("/admin/pets", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const parsed = insertPetSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   const [pet] = await db.insert(petsTable).values({ ...parsed.data, status: "available" }).returning();
@@ -87,23 +84,24 @@ router.post("/admin/pets", async (req, res) => {
 
 // ─── ADMIN: Update pet ────────────────────────────────────────────────────────
 router.patch("/admin/pets/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const id = Number(req.params.id);
-  const [updated] = await db.update(petsTable).set({ ...req.body, updatedAt: new Date() }).where(eq(petsTable.id, id)).returning();
+  // updatePetSchema deriva del insert schema: id/createdAt/updatedAt quedan
+  // excluidos y las claves desconocidas se descartan (anti mass-assignment).
+  const parsed = updatePetSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
+  const [updated] = await db.update(petsTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(petsTable.id, id)).returning();
   if (!updated) return res.status(404).json({ error: "Mascota no encontrada" });
   return res.json(updated);
 });
 
 // ─── ADMIN: Delete pet ────────────────────────────────────────────────────────
 router.delete("/admin/pets/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   await db.delete(petsTable).where(eq(petsTable.id, Number(req.params.id)));
   return res.status(204).send();
 });
 
 // ─── ADMIN: List adoption requests ───────────────────────────────────────────
 router.get("/admin/adoption-requests", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const { status, petId } = req.query;
   let query = db.select().from(adoptionRequestsTable).$dynamic();
   const filters: any[] = [];
@@ -116,7 +114,6 @@ router.get("/admin/adoption-requests", async (req, res) => {
 
 // ─── ADMIN: Update adoption request status ────────────────────────────────────
 router.patch("/admin/adoption-requests/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const id = Number(req.params.id);
   const { status, adminNotes } = req.body;
   const [updated] = await db.update(adoptionRequestsTable).set({ status, adminNotes }).where(eq(adoptionRequestsTable.id, id)).returning();

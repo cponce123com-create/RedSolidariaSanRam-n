@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
 import { db, statsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { requireAdmin } from "../middleware/require-admin";
+import { adminActionLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
@@ -27,7 +29,7 @@ router.get("/stats", async (req, res) => {
   }
 });
 
-router.put("/stats", async (req, res) => {
+router.put("/stats", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
     const { childrenHelped, campaignsRun, volunteers, donationsReceived, animalsHelped } = req.body;
     const updates: Record<string, number> = {

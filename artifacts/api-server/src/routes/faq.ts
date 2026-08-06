@@ -14,14 +14,12 @@ router.get("/faq", async (req, res) => {
 
 // ─── ADMIN: All FAQs ──────────────────────────────────────────────────────────
 router.get("/admin/faq", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const faqs = await db.select().from(faqTable).orderBy(asc(faqTable.sortOrder), asc(faqTable.createdAt));
   return res.json(faqs);
 });
 
 // ─── ADMIN: Create ────────────────────────────────────────────────────────────
 router.post("/admin/faq", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   const parsed = insertFaqSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Datos inválidos" });
   const [faq] = await db.insert(faqTable).values(parsed.data).returning();
@@ -30,15 +28,17 @@ router.post("/admin/faq", async (req, res) => {
 
 // ─── ADMIN: Update ────────────────────────────────────────────────────────────
 router.patch("/admin/faq/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
-  const [updated] = await db.update(faqTable).set(req.body).where(eq(faqTable.id, Number(req.params.id))).returning();
+  // Schema parcial derivado del insert: id/createdAt excluidos y claves
+  // desconocidas descartadas (anti mass-assignment).
+  const parsed = insertFaqSchema.partial().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
+  const [updated] = await db.update(faqTable).set(parsed.data).where(eq(faqTable.id, Number(req.params.id))).returning();
   if (!updated) return res.status(404).json({ error: "No encontrado" });
   return res.json(updated);
 });
 
 // ─── ADMIN: Delete ────────────────────────────────────────────────────────────
 router.delete("/admin/faq/:id", async (req, res) => {
-  if (!(req.session as any).adminUser) return res.status(401).json({ error: "unauthorized" });
   await db.delete(faqTable).where(eq(faqTable.id, Number(req.params.id)));
   return res.status(204).send();
 });
