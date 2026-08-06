@@ -79,15 +79,27 @@ router.post("/admin/users", async (req, res) => {
   }
 });
 
+// Schema de actualización: solo campos editables del perfil admin (username,
+// role, name, email, active). El password se maneja aparte (se hashea) y
+// twoFactorSecret/twoFactorEnabled ni siquiera están en el schema: Zod los
+// descarta silenciosamente, de modo que este endpoint genérico no puede
+// desactivar/alterar el 2FA de nadie (anti mass-assignment).
+export const updateAdminUserSchema = insertAdminUserSchema.omit({ password: true }).partial();
+
 // ─── Update admin user ───────────────────────────────────────────────────────
 router.patch("/admin/users/:id", async (req, res) => {
   if (!isSuperAdmin(req)) return res.status(403).json({ error: "Solo superadmin" });
-  const { password, twoFactorSecret, twoFactorEnabled, ...safeFields } = req.body;
-  
-  let updateData: any = { ...safeFields };
-  
+  const { password, twoFactorSecret, twoFactorEnabled, ...safeBody } = req.body;
+  const parsed = updateAdminUserSchema.safeParse(safeBody);
+  if (!parsed.success) return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
+
+  let updateData: any = { ...parsed.data };
+
   // Si se cambia la contraseña, hashearla y actualizar timestamp
   if (password) {
+    if (typeof password !== "string" || password.length < 6) {
+      return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+    }
     updateData.password = await hashPassword(password);
     updateData.passwordChangedAt = new Date();
   }
@@ -122,7 +134,7 @@ router.patch("/admin/users/:id", async (req, res) => {
     details: { 
       updatedUserId: userId,
       updatedUsername: updated.username,
-      changedFields: Object.keys(safeFields),
+      changedFields: Object.keys(parsed.data),
       passwordChanged: !!password,
     },
   });

@@ -225,7 +225,7 @@ export default function AdminVolunteers() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
           { label: "Total", value: volunteers.length, color: "text-foreground" },
-          { label: "Pendientes", value: volunteers.filter(v => v.status === "pending").length, color: "text-yellow-600" },
+          { label: "Pendientes", value: volunteers.filter(v => v.status === "pending").length, color: "text-yellow-700" },
           { label: "Aprobados", value: volunteers.filter(v => v.status === "approved" || v.status === "contacted").length, color: "text-green-600" },
           { label: "Rechazados", value: volunteers.filter(v => v.status === "rejected").length, color: "text-red-600" },
         ].map((stat, i) => (

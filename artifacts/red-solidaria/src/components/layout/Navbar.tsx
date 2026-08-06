@@ -64,7 +64,7 @@ export function Navbar() {
                     link.urgent
                       ? location === link.href || location.startsWith(link.href + "/")
                         ? "text-orange-700 bg-orange-100 font-semibold"
-                        : "text-orange-600 hover:bg-orange-50 font-semibold flex items-center gap-1"
+                        : "text-orange-700 hover:bg-orange-50 font-semibold flex items-center gap-1"
                       : link.animal
                       ? location === link.href || location.startsWith(link.href + "/")
                         ? "text-amber-700 bg-amber-100 font-semibold"
@@ -125,7 +125,7 @@ export function Navbar() {
                     href={link.href}
                     className={`p-3 rounded-xl text-base font-medium flex items-center gap-2 ${
                       location === link.href ? "bg-primary/10 text-primary" :
-                      link.urgent ? "text-orange-600 hover:bg-orange-50" :
+                      link.urgent ? "text-orange-700 hover:bg-orange-50" :
                       link.animal ? "text-amber-700 hover:bg-amber-50" :
                       "text-foreground hover:bg-secondary"
                     }`}
@@ -140,7 +140,7 @@ export function Navbar() {
                 })}
                 <div className="border-t border-border mt-2 pt-2 space-y-2">
                 <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-orange-200 text-orange-600 hover:bg-orange-50">
+                  <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-orange-300 text-orange-700 hover:bg-orange-50">
                     <AlertTriangle className="w-4 h-4" />
                     Reportar Caso
                   </Button>

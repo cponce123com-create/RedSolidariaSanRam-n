@@ -79,7 +79,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : (item as any).highlight && !isActive
-                      ? "text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+                      ? "text-orange-700 hover:bg-orange-50 hover:text-orange-800"
                       : (item as any).animal && !isActive
                       ? "text-amber-700 hover:bg-amber-50 hover:text-amber-800"
                       : (item as any).system && !isActive

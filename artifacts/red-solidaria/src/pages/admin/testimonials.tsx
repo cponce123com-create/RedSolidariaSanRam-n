@@ -130,7 +130,7 @@ export default function AdminTestimonials() {
                         </div>
                       )}
                       <div>
-                        <p className="font-bold text-sm">{t.name}</p>
+                        <h3 className="font-bold text-sm">{t.name}</h3>
                         <p className="text-xs text-muted-foreground">{t.role}</p>
                       </div>
                     </div>

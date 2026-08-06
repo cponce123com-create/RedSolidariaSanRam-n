@@ -97,7 +97,7 @@ export default function AdminDonations() {
           </div>
           <div className="bg-card border-l-4 border-yellow-500 p-5 rounded-2xl shadow-sm">
             <div className="text-sm font-medium text-muted-foreground mb-1">Pendientes</div>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</div>
+            <div className="text-2xl font-bold text-yellow-700">{stats.pendingCount}</div>
           </div>
           <div className="bg-card border-l-4 border-accent p-5 rounded-2xl shadow-sm">
             <div className="text-sm font-medium text-muted-foreground mb-1">Aprobadas</div>

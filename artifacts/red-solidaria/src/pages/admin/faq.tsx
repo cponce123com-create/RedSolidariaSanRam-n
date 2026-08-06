@@ -180,7 +180,7 @@ export default function AdminFaq() {
                         {!f.active && <span className="text-xs text-muted-foreground">(Oculta)</span>}
                         <span className="text-xs text-muted-foreground">Orden: {f.sortOrder}</span>
                       </div>
-                      <p className="font-bold mb-1">{f.question}</p>
+                      <h3 className="font-bold mb-1">{f.question}</h3>
                       <p className="text-sm text-muted-foreground leading-relaxed">{f.answer}</p>
                     </div>
                     <div className="flex gap-1.5 shrink-0">

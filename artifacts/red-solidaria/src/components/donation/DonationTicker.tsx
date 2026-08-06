@@ -38,7 +38,7 @@ export function DonationTicker() {
           <User className="w-4 h-4" />
           <span>{viewerCount} personas están viendo esta campaña</span>
         </div>
-        <div className="flex items-center gap-1 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+        <div className="flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
           En vivo
         </div>

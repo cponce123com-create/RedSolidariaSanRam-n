@@ -31,3 +31,8 @@ jobs:
 
       - name: Test
         run: pnpm -r --if-present test
+
+      # Build de producción (vite build de la web + build.mjs del API) para
+      # detectar errores de compilación específicos de prod antes de Render.
+      - name: Build
+        run: pnpm -r --if-present run build

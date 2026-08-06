@@ -47,10 +47,10 @@ type AdoptFormValues = z.infer<typeof adoptSchema>;
 const SIZE_LABELS: Record<string, string> = { small: "Pequeño", medium: "Mediano", large: "Grande", giant: "Gigante" };
 const AGE_LABELS: Record<string, string> = { puppy: "Cachorro", adult: "Adulto", senior: "Adulto mayor" };
 const HEALTH_LABELS: Record<string, { label: string; color: string }> = {
-  excellent: { label: "Excelente", color: "text-green-600" },
-  good: { label: "Bueno", color: "text-green-500" },
-  fair: { label: "Regular", color: "text-yellow-600" },
-  needs_care: { label: "Necesita cuidados", color: "text-orange-600" },
+  excellent: { label: "Excelente", color: "text-green-700" },
+  good: { label: "Bueno", color: "text-green-700" },
+  fair: { label: "Regular", color: "text-yellow-700" },
+  needs_care: { label: "Necesita cuidados", color: "text-orange-700" },
 };
 const HOUSING_TYPES = [
   { value: "casa-propia", label: "Casa propia" },
@@ -201,7 +201,7 @@ export default function PetDetail() {
             <div className="flex gap-2 mt-3">
               {photos.map((photo, i) => (
                 <button key={i} onClick={() => setPhotoIdx(i)}
-                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors ${i === photoIdx ? "border-primary" : "border-transparent"}`}>
+                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${i === photoIdx ? "border-primary" : "border-transparent"}`}>
                   <img src={photo} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
@@ -284,7 +284,7 @@ export default function PetDetail() {
             {pet.contactPhone && (
               <div className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                <a href={`https://wa.me/51${pet.contactPhone.replace(/\s/g, "")}`} target="_blank" rel="noopener noreferrer" className="text-green-600 font-medium hover:underline">
+                <a href={`https://wa.me/51${pet.contactPhone.replace(/\s/g, "")}`} target="_blank" rel="noopener noreferrer" className="text-green-700 font-medium hover:underline">
                   {pet.contactPhone}
                 </a>
               </div>

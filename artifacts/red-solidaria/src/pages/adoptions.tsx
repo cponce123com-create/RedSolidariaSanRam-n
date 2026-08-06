@@ -85,7 +85,7 @@ function PetCard({ pet }: { pet: Pet }) {
 
         <div className="flex items-center gap-3 text-xs flex-wrap">
           {pet.vaccinated && (
-            <span className="flex items-center gap-1 text-green-600">
+            <span className="flex items-center gap-1 text-green-700">
               <Syringe className="w-3.5 h-3.5" /> Vacunado
             </span>
           )}

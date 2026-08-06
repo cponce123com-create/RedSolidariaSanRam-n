@@ -45,7 +45,7 @@ function MessageRow({ msg }: { msg: Message }) {
               </a>
               {msg.phone && (
                 <a href={`https://wa.me/51${msg.phone.replace(/\s/g, "")}`} target="_blank" rel="noopener noreferrer"
-                  className="text-xs font-semibold text-green-600 hover:underline flex items-center gap-1">
+                  className="text-xs font-semibold text-green-700 hover:underline flex items-center gap-1">
                   <Phone className="w-3.5 h-3.5" /> WhatsApp
                 </a>
               )}

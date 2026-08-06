@@ -119,7 +119,7 @@ export default function CampaignDetail() {
               {campaign.category}
             </Badge>
             {campaign.featured && (
-              <Badge variant="outline" className="px-4 py-1 text-sm text-yellow-600 border-yellow-300 bg-yellow-50">
+              <Badge variant="outline" className="px-4 py-1 text-sm text-yellow-700 border-yellow-300 bg-yellow-50">
                 ⭐ Destacada
               </Badge>
             )}

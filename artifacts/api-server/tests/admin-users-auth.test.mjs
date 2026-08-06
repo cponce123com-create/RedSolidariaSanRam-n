@@ -92,3 +92,29 @@ test("PATCH /api/admin/users/1 con sesión no-superadmin → 403", async () => {
     assert.equal(res.status, 403);
   });
 });
+
+test("PATCH /api/admin/users/1 con body inválido → 400 (schema Zod)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await fetch(`${base}/api/admin/users/1`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-test-admin": "1" },
+      body: JSON.stringify({ name: 123 }),
+    });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("updateAdminUserSchema filtra 2FA/password y valida tipos (anti mass-assignment)", async () => {
+  const mod = await import("./dist/routes/admin-users.mjs");
+  const ok = mod.updateAdminUserSchema.safeParse({ name: "Nuevo", role: "moderador" });
+  assert.equal(ok.success, true);
+  // Regresión: campos sensibles no deben pasar por el PATCH genérico
+  const stripped = mod.updateAdminUserSchema.safeParse({ name: "X", twoFactorEnabled: true, twoFactorSecret: "abc", password: "123456" });
+  assert.equal(stripped.success, true);
+  assert.equal(stripped.data.twoFactorEnabled, undefined);
+  assert.equal(stripped.data.twoFactorSecret, undefined);
+  assert.equal(stripped.data.password, undefined);
+  const bad = mod.updateAdminUserSchema.safeParse({ name: 123 });
+  assert.equal(bad.success, false);
+});

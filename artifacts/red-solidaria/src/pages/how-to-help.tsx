@@ -127,8 +127,8 @@ const HELP_WAYS = [
 const PAYMENT_METHODS = [
   { icon: QrCode, label: "Yape", value: "921 615 737", color: "text-purple-600" },
   { icon: QrCode, label: "Plin", value: "921 615 737", color: "text-blue-600" },
-  { icon: Banknote, label: "BCP", value: "193-12345678-0-55", color: "text-orange-600" },
-  { icon: CreditCard, label: "Efectivo", value: "Coordinamos en San Ramón", color: "text-green-600" },
+  { icon: Banknote, label: "BCP", value: "193-12345678-0-55", color: "text-orange-700" },
+  { icon: CreditCard, label: "Efectivo", value: "Coordinamos en San Ramón", color: "text-green-700" },
 ];
 
 export default function HowToHelp() {
@@ -192,14 +192,14 @@ export default function HowToHelp() {
           {PAYMENT_METHODS.map((pm, i) => (
             <div key={i} className="bg-secondary/40 rounded-2xl p-5 text-center border border-border">
               <pm.icon className={`w-8 h-8 mx-auto mb-3 ${pm.color}`} />
-              <p className="font-bold mb-1">{pm.label}</p>
+              <h3 className="font-bold mb-1">{pm.label}</h3>
               <p className="text-xs text-muted-foreground">{pm.value}</p>
             </div>
           ))}
         </div>
         <p className="text-center text-sm text-muted-foreground mt-6">
           Después de tu donación, envía el comprobante al{" "}
-          <a href="https://wa.me/51921615737" className="text-green-600 font-semibold hover:underline">WhatsApp 921 615 737</a>
+          <a href="https://wa.me/51921615737" className="text-green-700 font-semibold hover:underline">WhatsApp 921 615 737</a>
         </p>
       </div>
 
@@ -224,7 +224,7 @@ export default function HowToHelp() {
 
       {/* FAQ rapida */}
       <div className="bg-secondary/30 rounded-3xl p-8">
-        <h3 className="text-2xl font-display font-bold mb-6 text-center">Preguntas frecuentes</h3>
+        <h2 className="text-2xl font-display font-bold mb-6 text-center">Preguntas frecuentes</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {[
             { q: "¿Las donaciones son deducibles de impuestos?", a: "Trabajamos en ello. Por ahora emitimos constancia de donación para quienes la necesiten." },
@@ -233,7 +233,7 @@ export default function HowToHelp() {
             { q: "¿Hay un monto mínimo para donar?", a: "No. Desde S/ 1 ya es una donación bienvenida. Cada sol suma para la causa." },
           ].map((faq, i) => (
             <div key={i} className="bg-card border border-border rounded-2xl p-5">
-              <p className="font-bold text-sm mb-2">{faq.q}</p>
+              <h3 className="font-bold text-sm mb-2">{faq.q}</h3>
               <p className="text-muted-foreground text-sm">{faq.a}</p>
             </div>
           ))}

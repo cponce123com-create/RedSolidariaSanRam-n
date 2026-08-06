@@ -248,7 +248,7 @@ export default function AdminCampaignDetail() {
             </Button>
           )}
           {campaign.status === 'active' && (
-            <Button variant="outline" className="rounded-xl border-yellow-500/30 text-yellow-600 hover:bg-yellow-500/10" onClick={() => handleStatusChange("paused")}>
+            <Button variant="outline" className="rounded-xl border-yellow-500/30 text-yellow-700 hover:bg-yellow-500/10" onClick={() => handleStatusChange("paused")}>
               <Pause className="w-4 h-4 mr-2" /> Pausar
             </Button>
           )}

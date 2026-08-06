@@ -24,9 +24,9 @@ const CASE_TYPES = [
 ];
 
 const URGENCY_LEVELS = [
-  { value: "low", label: "Baja — Puede esperar", color: "text-green-600 bg-green-50 border-green-200" },
-  { value: "medium", label: "Media — Necesita atención", color: "text-yellow-600 bg-yellow-50 border-yellow-200" },
-  { value: "high", label: "Alta — Urgente", color: "text-orange-600 bg-orange-50 border-orange-200" },
+  { value: "low", label: "Baja — Puede esperar", color: "text-green-700 bg-green-50 border-green-200" },
+  { value: "medium", label: "Media — Necesita atención", color: "text-yellow-700 bg-yellow-50 border-yellow-200" },
+  { value: "high", label: "Alta — Urgente", color: "text-orange-700 bg-orange-50 border-orange-200" },
   { value: "critical", label: "Crítica — Emergencia", color: "text-red-600 bg-red-50 border-red-200" },
 ];
 

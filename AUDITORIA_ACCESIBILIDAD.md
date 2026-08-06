@@ -15,12 +15,12 @@ La base de accesibilidad es **buena para una app de este tamaño**: los formular
 | Imágenes (`alt`) | ✅ Correcto (público y admin) |
 | Labels de formularios | ✅ Correcto (shadcn FormLabel) |
 | Componentes Radix (Switch/Select/Dialog) | ✅ Correcto (ARIA nativo) |
-| Botones icono-only del admin | 🟠 Sin `aria-label` (editar/eliminar) |
-| Toggles personalizados | 🟠 Sin `role="switch"` / `aria-checked` |
-| Encabezados / jerarquía H1-H2 | 🟠 Irregular en varias páginas |
-| Skip link / salto de navegación | 🔴 Ausente |
-| Contraste de color | ⚪ Pendiente de medir (Lighthouse) |
-| Navegación por teclado en admin | 🟡 Verificar focus visible (Tailwind puede eliminar outline) |
+| Botones icono-only del admin | ✅ Corregido (6 ago 2026): `aria-label` añadido |
+| Toggles personalizados | ✅ Corregido (6 ago 2026): `role="switch"` / `aria-checked` |
+| Encabezados / jerarquía H1-H2 | ✅ Corregido (6 ago 2026): títulos de tarjetas/secciones a `h2/h3`, `h2` sr-only donde no había encabezado visible |
+| Skip link / salto de navegación | ✅ Corregido (6 ago 2026): "Saltar al contenido" en el layout principal |
+| Contraste de color | ✅ Pasada de contraste en fondos claros (6 ago 2026): naranjas/amarillos/verdes a `*-700`, badges y estadísticas del admin incluidos. Falta medición automatizada (Lighthouse) |
+| Navegación por teclado | ✅ Corregido (6 ago 2026): `focus-visible:ring-2` en miniaturas de galería de `pet-detail.tsx`; componentes `ui/*` ya usan `focus-visible:ring-*` |
 
 ---
 
@@ -81,8 +81,9 @@ Tailwind y shadcn suelen remover el `outline` por defecto y confiar en `ring-*`.
 
 1. ✅ **Corregido (6 ago 2026):** `aria-label` en botones icono-only del admin (`users.tsx`, `news.tsx`, `allies.tsx`, `faq.tsx`) y `role="switch"`/`aria-checked` en toggles (`users.tsx`, `submit-pet.tsx`, `pet-detail.tsx`).
 2. ✅ **Corregido (6 ago 2026):** skip link "Saltar al contenido" en el layout principal + `id="main-content"`.
-3. ⏳ **Pendiente:** jerarquía de encabezados (4) y focus visible (5) — revisar en la siguiente pasada.
-4. **Con navegador disponible:** correr Lighthouse (Performance/A11y/SEO) y axe sobre las 5 páginas clave (home, campañas, adopciones, donación, panel admin), y medir contraste (6).
+3. ✅ **Corregido (6 ago 2026):** jerarquía de encabezados en `home.tsx`, `how-to-help.tsx`, `volunteer.tsx` y `campaign-detail.tsx` (títulos de tarjetas/secciones a `h2/h3` reales; `h2` sr-only donde la sección no tenía encabezado visible) + `focus-visible:ring-2` en las miniaturas de galería de `pet-detail.tsx`.
+4. ✅ **Pasada de contraste (6 ago 2026):** textos naranja/amarillo/verde sobre fondos claros subidos a `*-700` en `home.tsx`, `how-to-help.tsx`, `Navbar.tsx`, `campaign-detail.tsx`, `campaign-transparency.tsx`, `pet-detail.tsx` y estadísticas de `admin/donations.tsx`, `admin/volunteers.tsx`, `admin/layout.tsx`. Pendiente medición automatizada.
+5. **Con navegador disponible:** correr Lighthouse (Performance/A11y/SEO) y axe sobre las 5 páginas clave (home, campañas, adopciones, donación, panel admin), y medir contraste (6).
 
 ---
 

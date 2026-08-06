@@ -160,7 +160,7 @@ export default function CampaignTransparency() {
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-spent">
             <div className="absolute -right-4 -top-4 w-20 h-20 bg-orange-50 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
-              <div className="p-2.5 bg-orange-100 text-orange-600 rounded-xl">
+              <div className="p-2.5 bg-orange-100 text-orange-700 rounded-xl">
                 <Receipt className="w-5 h-5" />
               </div>
               <span className="font-semibold text-muted-foreground">Gastado</span>
@@ -222,13 +222,13 @@ export default function CampaignTransparency() {
                 <div className="space-y-5">
                   {transparency.recentMovements.map((mov, i) => (
                     <div key={i} className="flex items-start gap-4">
-                      <div className={`mt-0.5 p-2 rounded-full flex-shrink-0 ${mov.type === 'ingreso' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                      <div className={`mt-0.5 p-2 rounded-full flex-shrink-0 ${mov.type === 'ingreso' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-700'}`}>
                         {mov.type === 'ingreso' ? <TrendingUp className="w-4 h-4" /> : <Receipt className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1 gap-2">
                           <p className="text-sm font-semibold text-foreground truncate">{mov.description}</p>
-                          <span className={`text-sm font-bold whitespace-nowrap ${mov.type === 'ingreso' ? 'text-green-600' : 'text-foreground'}`}>
+                          <span className={`text-sm font-bold whitespace-nowrap ${mov.type === 'ingreso' ? 'text-green-700' : 'text-foreground'}`}>
                             {mov.type === 'ingreso' ? '+' : '-'}{formatCurrency(mov.amount)}
                           </span>
                         </div>

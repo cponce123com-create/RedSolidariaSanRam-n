@@ -309,7 +309,7 @@ export default function StockCatalog() {
           </p>
           <Button 
             size="lg" 
-            className="bg-white text-green-600 hover:bg-white/90 rounded-xl text-lg h-14 px-8 shadow-lg"
+            className="bg-white text-green-700 hover:bg-white/90 rounded-xl text-lg h-14 px-8 shadow-lg"
             onClick={handleGeneralSponsorClick}
           >
             <MessageCircle className="w-5 h-5 mr-2" />

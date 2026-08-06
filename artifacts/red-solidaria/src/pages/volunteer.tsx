@@ -151,6 +151,7 @@ export default function Volunteer() {
 
       {/* Benefits strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
+        <h2 className="sr-only">Beneficios de ser voluntario</h2>
         {[
           { icon: Clock, title: "Flexible", desc: "Elige tu propio horario y tipo de participación" },
           { icon: Users, title: "Comunidad", desc: "Formarás parte de una red solidaria real y activa" },
@@ -159,7 +160,7 @@ export default function Volunteer() {
           <div key={i} className="flex gap-4 items-start bg-secondary/30 rounded-2xl p-5">
             <div className="p-2 bg-primary/10 rounded-xl shrink-0"><b.icon className="w-5 h-5 text-primary" /></div>
             <div>
-              <p className="font-bold mb-0.5">{b.title}</p>
+              <h3 className="font-bold mb-0.5">{b.title}</h3>
               <p className="text-sm text-muted-foreground">{b.desc}</p>
             </div>
           </div>

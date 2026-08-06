@@ -152,13 +152,13 @@ export default function Home() {
               <div className="max-w-2xl">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
-                  <span className="text-orange-600 font-bold text-sm uppercase tracking-wider">Casos que necesitan ayuda ahora</span>
+                  <span className="text-orange-700 font-bold text-sm uppercase tracking-wider">Casos que necesitan ayuda ahora</span>
                 </div>
                 <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Casos Urgentes</h2>
                 <p className="text-lg text-muted-foreground">Personas reales de nuestra comunidad que atraviesan situaciones difíciles. Cada pequeña ayuda marca una diferencia enorme.</p>
               </div>
               <Link href="/casos-urgentes">
-                <Button variant="outline" className="rounded-xl bg-white border-orange-200 text-orange-600 hover:bg-orange-50">
+                <Button variant="outline" className="rounded-xl bg-white border-orange-300 text-orange-700 hover:bg-orange-50">
                   Ver todos los casos <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>

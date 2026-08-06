@@ -222,7 +222,7 @@ export default function AdminUsers() {
           <div key={r.value} className="bg-secondary/30 rounded-xl p-4 flex gap-3 items-start">
             <r.icon className={`w-5 h-5 ${r.color} shrink-0 mt-0.5`} />
             <div>
-              <p className="font-bold text-sm">{r.label}</p>
+              <h3 className="font-bold text-sm">{r.label}</h3>
               <p className="text-xs text-muted-foreground">{r.desc}</p>
             </div>
           </div>
