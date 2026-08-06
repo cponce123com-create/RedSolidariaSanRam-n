@@ -41,6 +41,11 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
       "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      // Fuerza UNA única copia de React en dev (pre-bundle y módulos): evita el
+      // error de runtime "Cannot set properties of undefined (setting 'Children')"
+      // por dos copias de React o interop CJS/ESM rota en la caché de optimizeDeps.
+      react: path.resolve(import.meta.dirname, "node_modules", "react"),
+      "react-dom": path.resolve(import.meta.dirname, "node_modules", "react-dom"),
     },
     dedupe: ["react", "react-dom"],
   },
