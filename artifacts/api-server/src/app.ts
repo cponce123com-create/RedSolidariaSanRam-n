@@ -11,6 +11,7 @@ import session from "express-session";
 import pgSession from "connect-pg-simple";
 import path from "path";
 import { randomBytes } from "node:crypto";
+import fs from "node:fs";
 import { pool } from "@workspace/db";
 import { apiLimiter } from "./middleware/rate-limit";
 import router from "./routes";
@@ -181,6 +182,28 @@ if (process.env.NODE_ENV === "production") {
       path.join(process.cwd(), "artifacts/red-solidaria/dist/public"),
   );
   logger.info({ staticPath }, "Serving static files from");
+
+  // Assets pre-comprimidos (.gz generados por el build de Vite): el bundle JS
+  // principal (~676 kB) viaja a ~200 kB cuando el cliente acepta gzip. Sin esto
+  // Express serviría los archivos crudos (no usa el paquete compression).
+  const GZIP_CONTENT_TYPES: Record<string, string> = {
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+  };
+  app.use("/assets", (req, res, next) => {
+    if (!req.headers["accept-encoding"]?.includes("gzip")) return next();
+    // Nota: dentro de app.use("/assets", ...) req.path ya NO incluye el prefijo
+    // /assets; originalUrl sí lo incluye (sin query string).
+    const gzFile = path.join(staticPath, `${req.originalUrl.split("?")[0]}.gz`);
+    if (!fs.existsSync(gzFile)) return next();
+    res.setHeader("Content-Encoding", "gzip");
+    res.setHeader(
+      "Content-Type",
+      GZIP_CONTENT_TYPES[path.extname(req.path)] || "application/octet-stream",
+    );
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    return res.sendFile(gzFile);
+  });
 
   // Assets estáticos con cache de 1 año (hash en nombres de archivo).
   // fallthrough por defecto (true): las rutas que no son archivos pasan al SPA fallback.

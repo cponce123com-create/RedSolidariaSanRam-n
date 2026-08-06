@@ -26,9 +26,25 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Fonts: preconnect + descarga no bloqueante (antes el @import en el CSS
+         retrasaba la descarga hasta después de bajar el bundle principal) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" />
+    </noscript>
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">
@@ -60,9 +76,117 @@
       "knowsAbout": ["donaciones", "voluntariado", "adopción animal", "bienestar comunitario", "casos sociales"]
     }
     </script>
+
+    <style>
+      /* Skeleton de la portada: se ve al instante (sin JS) mientras descarga
+         React; createRoot().render lo reemplaza al montar. */
+      #hero-skeleton {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2rem 1.25rem;
+        background: linear-gradient(160deg, #f0fdf4, #ecfdf5 55%, #f0fdfa);
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #14281a;
+        animation: hero-fade 0.6s ease-out;
+      }
+      #hero-skeleton .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(22, 163, 74, 0.1);
+        color: #15803d;
+        font-weight: 600;
+        font-size: 0.875rem;
+        padding: 0.5rem 1.1rem;
+        border-radius: 9999px;
+      }
+      #hero-skeleton .badge::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 9999px;
+        background: #16a34a;
+        box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
+        animation: pulse-dot 2s infinite;
+      }
+      #hero-skeleton h1 {
+        font-size: clamp(2.3rem, 7vw, 4.2rem);
+        font-weight: 800;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+        margin: 1.4rem 0 0.75rem;
+      }
+      #hero-skeleton h1 span { color: #15803d; }
+      #hero-skeleton p {
+        max-width: 34rem;
+        color: #475569;
+        font-size: clamp(1.05rem, 2.5vw, 1.3rem);
+        line-height: 1.6;
+      }
+      #hero-skeleton .ctas {
+        display: flex;
+        gap: 0.85rem;
+        margin-top: 1.75rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      #hero-skeleton .ctas span {
+        padding: 0.95rem 2.1rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+      }
+      #hero-skeleton .ctas .primary { background: #15803d; color: #fff; }
+      #hero-skeleton .ctas .ghost { background: #fff; border: 1px solid #e2e8f0; color: #14281a; }
+      #hero-skeleton .trust {
+        margin-top: 2.2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        color: #64748b;
+        font-size: 0.9rem;
+      }
+      #hero-skeleton .trust .avatars { display: flex; }
+      #hero-skeleton .trust .avatars span {
+        width: 34px;
+        height: 34px;
+        border-radius: 9999px;
+        border: 2px solid #fff;
+        background: linear-gradient(135deg, #a7f3d0, #6ee7b7);
+        margin-left: -8px;
+      }
+      #hero-skeleton .trust .avatars span:first-child { margin-left: 0; }
+      @keyframes pulse-dot {
+        0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); }
+        70% { box-shadow: 0 0 0 9px rgba(22, 163, 74, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+      }
+      @keyframes hero-fade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="hero-skeleton">
+        <div class="badge">San Ramón, Chanchamayo</div>
+        <h1>Uniendo corazones,<br /><span>transformando vidas</span></h1>
+        <p>Empezamos llevando sonrisas en Navidad. Hoy somos una red de voluntarios comprometidos con el bienestar de niños, familias y animales en nuestra comunidad.</p>
+        <div class="ctas">
+          <span class="primary">Donar Ahora</span>
+          <span class="ghost">Nuestra Historia</span>
+        </div>
+        <div class="trust">
+          <div class="avatars"><span></span><span></span><span></span></div>
+          <div><strong>+87 voluntarios</strong> ya están cambiando vidas en la región</div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

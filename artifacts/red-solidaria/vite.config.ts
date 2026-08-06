@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { gzipSync } from "node:zlib";
 import runtimeErrorModal from "@replit/vite-plugin-runtime-error-modal";
 
 // PORT y BASE_PATH los inyectan Replit y el script dev del root; fuera de esos
@@ -47,6 +48,30 @@ function preloadHomeChunk(): Plugin {
   };
 }
 
+// Genera un archivo .gz junto a cada asset .js/.css. Express lo sirve con
+// Content-Encoding: gzip cuando el cliente lo acepta (el API no usa el paquete
+// compression; sin esto el bundle de ~676 kB viaja crudo).
+function gzipBuildAssets(): Plugin {
+  return {
+    name: "gzip-build-assets",
+    apply: "build",
+    closeBundle() {
+      const assetsDir = path.resolve(import.meta.dirname, "dist/public/assets");
+      let files: string[];
+      try {
+        files = readdirSync(assetsDir);
+      } catch {
+        return;
+      }
+      for (const f of files) {
+        if (!/\.(js|css)$/.test(f) || f.endsWith(".gz")) continue;
+        const src = readFileSync(path.join(assetsDir, f));
+        writeFileSync(path.join(assetsDir, `${f}.gz`), gzipSync(src, { level: 9 }));
+      }
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -54,6 +79,7 @@ export default defineConfig({
     tailwindcss(),
     runtimeErrorModal(),
     preloadHomeChunk(),
+    gzipBuildAssets(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
