@@ -15,6 +15,7 @@ const About = lazy(() => import("./pages/about"));
 const Campaigns = lazy(() => import("./pages/campaigns"));
 const CampaignDetail = lazy(() => import("./pages/campaign-detail"));
 const CampaignTransparency = lazy(() => import("./pages/campaign-transparency"));
+const Transparency = lazy(() => import("./pages/transparency"));
 const News = lazy(() => import("./pages/news"));
 const Contact = lazy(() => import("./pages/contact"));
 const NotFound = lazy(() => import("./pages/not-found"));
@@ -54,8 +55,14 @@ const queryClient = new QueryClient();
 function MainLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-white focus:text-primary focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
+      >
+        Saltar al contenido
+      </a>
       <Navbar />
-      <main className="flex-grow pb-16 md:pb-0">{children}</main>
+      <main id="main-content" className="flex-grow pb-16 md:pb-0">{children}</main>
       <Footer />
       <FloatingWhatsApp />
       <MobileBottomNav />
@@ -170,6 +177,11 @@ function App() {
               <Route path="/campanas/:id/transparencia">
                 <MainLayout>
                   <CampaignTransparency />
+                </MainLayout>
+              </Route>
+              <Route path="/transparencia">
+                <MainLayout>
+                  <Transparency />
                 </MainLayout>
               </Route>
               <Route path="/campanas/:id">

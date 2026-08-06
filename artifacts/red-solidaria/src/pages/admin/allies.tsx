@@ -284,15 +284,16 @@ export default function AdminAllies() {
                       <div className="flex gap-2 shrink-0">
                         <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0"
                           onClick={() => toggleActive.mutate({ id: ally.id, active: !ally.active })}
-                          title={ally.active ? "Ocultar" : "Mostrar"}>
+                          title={ally.active ? "Ocultar" : "Mostrar"}
+                          aria-label={ally.active ? `Ocultar ${ally.name}` : `Mostrar ${ally.name}`}>
                           {ally.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                         </Button>
                         <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0"
-                          onClick={() => setEditingAlly(ally)}>
+                          onClick={() => setEditingAlly(ally)} aria-label={`Editar ${ally.name}`}>
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
                         <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                          onClick={() => { if (confirm(`¿Eliminar aliado "${ally.name}"?`)) deleteAlly.mutate(ally.id); }}>
+                          onClick={() => { if (confirm(`¿Eliminar aliado "${ally.name}"?`)) deleteAlly.mutate(ally.id); }} aria-label={`Eliminar ${ally.name}`}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>

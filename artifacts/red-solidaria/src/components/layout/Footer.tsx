@@ -60,9 +60,9 @@ export function Footer() {
             <p className="text-muted-foreground mb-4">
               Cada donación está documentada. Publicamos reportes de gastos y evidencias de entrega para cada campaña.
             </p>
-            <Link href="/nosotros">
+            <Link href="/transparencia">
               <span className="text-primary font-medium hover:underline flex items-center gap-1">
-                Conoce más sobre nuestro impacto <span aria-hidden="true">&rarr;</span>
+                Ver reporte de transparencia <span aria-hidden="true">&rarr;</span>
               </span>
             </Link>
           </div>

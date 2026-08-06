@@ -42,6 +42,8 @@ const BOOL_TOGGLE = (label: string, sub: string, key: keyof FormValues, form: an
     </div>
     <button
       type="button"
+      role="switch"
+      aria-checked={form.watch(key)}
       onClick={() => form.setValue(key, !form.watch(key))}
       className={`relative w-10 h-5 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}
     >

@@ -79,9 +79,10 @@ Tailwind y shadcn suelen remover el `outline` por defecto y confiar en `ring-*`.
 
 ## Recomendaciones priorizadas
 
-1. **Esta semana:** `aria-label` en botones icono-only del admin (hallazgo 1) y `role="switch"`/`aria-checked` en toggles (hallazgo 2). Cambios de una línea, bajo riesgo.
-2. **Próximo mes:** skip link (3) + jerarquía de encabezados (4).
-3. **Con navegador disponible:** correr Lighthouse (Performance/A11y/SEO) y axe sobre las 5 páginas clave (home, campañas, adopciones, donación, panel admin), y medir contraste (6).
+1. ✅ **Corregido (6 ago 2026):** `aria-label` en botones icono-only del admin (`users.tsx`, `news.tsx`, `allies.tsx`, `faq.tsx`) y `role="switch"`/`aria-checked` en toggles (`users.tsx`, `submit-pet.tsx`, `pet-detail.tsx`).
+2. ✅ **Corregido (6 ago 2026):** skip link "Saltar al contenido" en el layout principal + `id="main-content"`.
+3. ⏳ **Pendiente:** jerarquía de encabezados (4) y focus visible (5) — revisar en la siguiente pasada.
+4. **Con navegador disponible:** correr Lighthouse (Performance/A11y/SEO) y axe sobre las 5 páginas clave (home, campañas, adopciones, donación, panel admin), y medir contraste (6).
 
 ---
 

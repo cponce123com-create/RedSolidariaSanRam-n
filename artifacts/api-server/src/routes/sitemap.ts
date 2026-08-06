@@ -18,7 +18,7 @@ router.get("/sitemap.xml", async (_req, res) => {
     db.select({ id: petsTable.id }).from(petsTable).where(eq(petsTable.status, "available")),
   ]);
 
-  const staticPaths = ["/", "/nosotros", "/campanas", "/noticias", "/contacto", "/voluntario", "/adopciones", "/bienestar-animal", "/casos-urgentes", "/aliados", "/como-ayudar", "/faq"];
+  const staticPaths = ["/", "/nosotros", "/campanas", "/noticias", "/contacto", "/voluntariado", "/adopciones", "/bienestar-animal", "/casos-urgentes", "/aliados", "/como-ayudar", "/faq", "/reportar", "/publicar-mascota", "/catalogo", "/transparencia"];
   const campaignPaths = allCampaigns.map((c) => `/campanas/${c.id}`);
   const newsPaths = allNews.map((n) => `/noticias/${n.id}`);
   const petPaths = allPets.map((p) => `/adopciones/${p.id}`);

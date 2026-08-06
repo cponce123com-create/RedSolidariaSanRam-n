@@ -397,14 +397,14 @@ export default function PetDetail() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
                         <p className="text-sm font-medium">¿Tienes patio o jardín?</p>
-                        <button type="button" onClick={() => form.setValue("hasYard", !form.watch("hasYard"))}
+                        <button type="button" role="switch" aria-checked={form.watch("hasYard")} onClick={() => form.setValue("hasYard", !form.watch("hasYard"))}
                           className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("hasYard") ? "bg-primary" : "bg-border"}`}>
                           <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("hasYard") ? "translate-x-5" : "translate-x-0.5"}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
                         <p className="text-sm font-medium">¿Experiencia con mascotas?</p>
-                        <button type="button" onClick={() => form.setValue("hasPetExperience", !form.watch("hasPetExperience"))}
+                        <button type="button" role="switch" aria-checked={form.watch("hasPetExperience")} onClick={() => form.setValue("hasPetExperience", !form.watch("hasPetExperience"))}
                           className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("hasPetExperience") ? "bg-primary" : "bg-border"}`}>
                           <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("hasPetExperience") ? "translate-x-5" : "translate-x-0.5"}`} />
                         </button>
@@ -435,7 +435,7 @@ export default function PetDetail() {
                         <p className="font-semibold text-sm">Acepto seguimiento post-adopción</p>
                         <p className="text-xs text-muted-foreground">Permitir visitas de verificación en los primeros 3 meses</p>
                       </div>
-                      <button type="button" onClick={() => form.setValue("acceptsFollowUp", !form.watch("acceptsFollowUp"))}
+                      <button type="button" role="switch" aria-checked={form.watch("acceptsFollowUp")} onClick={() => form.setValue("acceptsFollowUp", !form.watch("acceptsFollowUp"))}
                         className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("acceptsFollowUp") ? "bg-primary" : "bg-border"}`}>
                         <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("acceptsFollowUp") ? "translate-x-5" : "translate-x-0.5"}`} />
                       </button>

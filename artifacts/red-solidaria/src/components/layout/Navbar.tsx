@@ -21,6 +21,7 @@ export function Navbar() {
     { href: "/", label: "Inicio" },
     { href: "/nosotros", label: "Nosotros" },
     { href: "/campanas", label: "Campañas" },
+    { href: "/transparencia", label: "Transparencia" },
     { href: "/casos-urgentes", label: "Casos Urgentes", urgent: true },
     { href: "/como-ayudar", label: "Cómo Ayudar" },
     { href: "/catalogo", label: "Catálogo", icon: Package },

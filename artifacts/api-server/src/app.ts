@@ -10,6 +10,7 @@ import pinoHttp from "pino-http";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
 import path from "path";
+import { randomBytes } from "node:crypto";
 import { pool } from "@workspace/db";
 import { apiLimiter } from "./middleware/rate-limit";
 import router from "./routes";
@@ -132,16 +133,34 @@ if (process.env.NODE_ENV !== "development") {
   }
 }
 
+// Secreto de sesión: en staging/producción se exige SESSION_SECRET (validación
+// de arriba). En desarrollo local, si no está definido, se genera uno aleatorio
+// por arranque: sin secretos hardcodeados en el repositorio (las sesiones de
+// dev se invalidan al reiniciar el servidor, comportamiento aceptable).
+const sessionSecret =
+  process.env.SESSION_SECRET ||
+  (process.env.NODE_ENV === "development"
+    ? randomBytes(32).toString("hex")
+    : "");
+
 // Store de sesiones en PostgreSQL: escalable y persistente entre deploys
 // (MemoryStore pierde sesiones en cada reinicio y no escala multi-instancia)
 const PostgresSessionStore = pgSession(session);
 
 app.use(
   session({
-    store: new PostgresSessionStore({ pool, tableName: "session" }),
-    secret: process.env.SESSION_SECRET || "redsolidaria-secret-key-2024",
+    store: new PostgresSessionStore({
+      pool,
+      tableName: "session",
+      // Limpieza periódica de sesiones expiradas (evita crecimiento del store)
+      pruneSessionInterval: 300,
+    }),
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
+    // rolling: renueva la cookie en cada petición → la sesión expira tras 24h
+    // de INACTIVIDAD (no 24h desde el login, que expulsaría admins activos).
+    rolling: true,
     cookie: {
       secure: process.env.NODE_ENV === "production", // Solo HTTPS en producción
       httpOnly: true,

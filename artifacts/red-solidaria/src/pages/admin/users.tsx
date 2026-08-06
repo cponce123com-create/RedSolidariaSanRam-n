@@ -155,7 +155,7 @@ function EditUserForm({ user, onSave, onCancel }: { user: AdminUser; onSave: () 
           </div>
           <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
             <p className="text-sm font-medium">Usuario activo</p>
-            <button type="button" onClick={() => form.setValue("active", !form.watch("active"))}
+            <button type="button" role="switch" aria-checked={form.watch("active")} onClick={() => form.setValue("active", !form.watch("active"))}
               className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("active") ? "bg-primary" : "bg-border"}`}>
               <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("active") ? "translate-x-5" : "translate-x-0.5"}`} />
             </button>
@@ -265,11 +265,11 @@ export default function AdminUsers() {
                     <p className="text-sm text-muted-foreground">@{u.username}{u.email ? ` • ${u.email}` : ""}</p>
                   </div>
                   <div className="flex gap-2 shrink-0">
-                    <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0" onClick={() => setEditing(u)}>
+                    <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0" onClick={() => setEditing(u)} aria-label={`Editar ${u.name}`}>
                       <Edit2 className="w-3.5 h-3.5" />
                     </Button>
                     <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                      onClick={() => { if (confirm(`¿Eliminar usuario "${u.name}"?`)) deleteUser.mutate(u.id); }}>
+                      onClick={() => { if (confirm(`¿Eliminar usuario "${u.name}"?`)) deleteUser.mutate(u.id); }} aria-label={`Eliminar ${u.name}`}>
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>

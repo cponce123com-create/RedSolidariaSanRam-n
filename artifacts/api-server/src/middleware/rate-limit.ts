@@ -32,13 +32,33 @@ export const loginLimiter = rateLimit({
   },
 });
 
-// Rate limiter para acciones administrativas críticas
+// Presupuesto de acciones administrativas según el rol de la sesión.
+// Superadmin: holgado (gestión de usuarios y config). Admin/moderador:
+// presupuesto medio. Sin sesión: mínimo (protege el gate /admin de fuerza
+// bruta, p.ej. al enumerar endpoints sin credenciales).
+export function adminActionLimitForRole(role?: string): number {
+  if (role === "superadmin") return 100;
+  if (role) return 30; // administrador / moderador
+  return 20; // sin sesión
+}
+
+// Rate limiter para acciones administrativas críticas.
+// keyGenerator por usuario admin (no por IP): cada admin tiene su propio
+// presupuesto y un moderador no puede agotar el del superadmin compartiendo
+// IP. Sin sesión cae a la IP normalizada (ipKeyGenerator evita el
+// ValidationError de IPv6 de express-rate-limit v8).
 export const adminActionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 50, // 50 acciones administrativas
+  limit: (req) => adminActionLimitForRole((req as any).session?.adminUser?.role),
+  keyGenerator: (req) => {
+    const admin = (req as any).session?.adminUser;
+    const ip = ipKeyGenerator(req.ip ?? "unknown");
+    return admin ? `admin:${admin.id}` : `ip:${ip}`;
+  },
   message: { error: "Demasiadas acciones administrativas. Por favor espera." },
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: false,
 });
 
 export const contactLimiter = rateLimit({

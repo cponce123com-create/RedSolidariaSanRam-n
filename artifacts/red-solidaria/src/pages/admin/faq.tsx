@@ -186,14 +186,15 @@ export default function AdminFaq() {
                     <div className="flex gap-1.5 shrink-0">
                       <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0"
                         onClick={() => toggleActive.mutate({ id: f.id, active: !f.active })}
-                        title={f.active ? "Ocultar" : "Mostrar"}>
+                        title={f.active ? "Ocultar" : "Mostrar"}
+                        aria-label={f.active ? `Ocultar pregunta ${f.question}` : `Mostrar pregunta ${f.question}`}>
                         {f.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                       </Button>
-                      <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0" onClick={() => setEditing(f)}>
+                      <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0" onClick={() => setEditing(f)} aria-label={`Editar pregunta ${f.question}`}>
                         <Edit2 className="w-3.5 h-3.5" />
                       </Button>
                       <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                        onClick={() => { if (confirm("¿Eliminar esta pregunta?")) deleteItem.mutate(f.id); }}>
+                        onClick={() => { if (confirm("¿Eliminar esta pregunta?")) deleteItem.mutate(f.id); }} aria-label={`Eliminar pregunta ${f.question}`}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
