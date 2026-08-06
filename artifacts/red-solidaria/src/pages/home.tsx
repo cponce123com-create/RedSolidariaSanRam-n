@@ -1,11 +1,67 @@
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform, useInView, animate, MotionConfig } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import SEO from "@/components/shared/SEO";
 import { useQuery } from "@tanstack/react-query";
 import { useGetStats, useGetCampaigns } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { CampaignCard } from "@/components/shared/CampaignCard";
-import { Heart, Users, Gift, ShieldCheck, PawPrint, AlertTriangle, MapPin, ArrowRight, Baby, PersonStanding, Cat, Home as HomeIcon, Zap } from "lucide-react";
+import { Heart, Users, Gift, ShieldCheck, PawPrint, AlertTriangle, MapPin, ArrowRight, Baby, PersonStanding, Cat, Home as HomeIcon, Zap, Sparkles, Star, ChevronDown, HandHeart } from "lucide-react";
+
+// Contador animado para la franja de estadísticas
+function CountUp({ value }: { value: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-40px" });
+  const [display, setDisplay] = useState("0");
+  useEffect(() => {
+    if (!inView) return;
+    const controls = animate(0, value, {
+      duration: 1.8,
+      ease: "easeOut",
+      onUpdate: (v) => setDisplay(Math.round(v).toLocaleString("es-PE")),
+    });
+    return () => controls.stop();
+  }, [inView, value]);
+  return <span ref={ref}>{display}</span>;
+}
+
+// Tarjeta flotante decorativa del hero (solo escritorio)
+function HeroCard({ img, icon, title, subtitle, accent }: {
+  img?: string; icon?: React.ReactNode; title: string; subtitle: string; accent?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 bg-white/85 backdrop-blur-md rounded-2xl py-3 pl-3 pr-5 shadow-lg shadow-primary/10 border border-white/60">
+      {img ? (
+        <img src={img} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" />
+      ) : (
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">{icon}</div>
+      )}
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-foreground leading-tight">{title}</p>
+        <p className={`text-xs font-medium ${accent ?? "text-muted-foreground"}`}>{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+// Partículas decorativas que flotan sobre el fondo del hero
+const FLOATING_PARTICLES = [
+  { Icon: Heart, className: "top-[16%] left-[7%]", size: "w-6 h-6", color: "text-rose-300/80", delay: 0, duration: 7 },
+  { Icon: Sparkles, className: "top-[30%] right-[9%] hidden md:block", size: "w-7 h-7", color: "text-yellow-300/80", delay: 1.2, duration: 8 },
+  { Icon: PawPrint, className: "bottom-[26%] left-[12%] hidden sm:block", size: "w-6 h-6", color: "text-emerald-400/70", delay: 0.6, duration: 9 },
+  { Icon: Star, className: "top-[14%] right-[30%] hidden lg:block", size: "w-5 h-5", color: "text-amber-300/80", delay: 2, duration: 6.5 },
+  { Icon: Gift, className: "bottom-[30%] right-[16%] hidden sm:block", size: "w-6 h-6", color: "text-teal-400/70", delay: 1.6, duration: 8.5 },
+  { Icon: Heart, className: "top-[58%] left-[22%] hidden xl:block", size: "w-4 h-4", color: "text-primary/50", delay: 2.4, duration: 7.5 },
+  { Icon: Sparkles, className: "bottom-[16%] left-[30%] hidden lg:block", size: "w-5 h-5", color: "text-emerald-300/70", delay: 0.9, duration: 9.5 },
+  { Icon: HandHeart, className: "top-[46%] right-[5%] hidden xl:block", size: "w-6 h-6", color: "text-rose-400/60", delay: 1.8, duration: 8 },
+];
+
+// Avatares demo para la fila de confianza (Unsplash)
+const HERO_AVATARS = [
+  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=80&q=80",
+  "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=80&q=80",
+  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=80&q=80",
+];
 
 interface FeaturedReport {
   id: number; type: string; title: string; description: string;
@@ -31,66 +87,204 @@ export default function Home() {
       return res.json();
     },
   });
+  // Parallax del hero al hacer scroll
+  const { scrollY } = useScroll();
+  const bgY = useTransform(scrollY, [0, 700], [0, 140]);
+  const contentOpacity = useTransform(scrollY, [0, 500], [1, 0.35]);
+  const contentY = useTransform(scrollY, [0, 500], [0, -50]);
 
   return (
     <div className="min-h-screen pt-20">
       <SEO />
       {/* HERO SECTION */}
+      <MotionConfig reducedMotion="user">
       <section className="relative overflow-hidden bg-background">
-        <div className="absolute inset-0 z-0">
+        {/* Fondo: gradiente + blobs animados + patrón de puntos */}
+        <motion.div className="absolute inset-0 z-0" style={{ y: bgY }}>
           <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-emerald-50/60 to-teal-50/40"></div>
-          <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-yellow-100/40 blur-3xl -translate-y-1/3 translate-x-1/4"></div>
-          <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full bg-teal-100/50 blur-3xl translate-y-1/3 -translate-x-1/4"></div>
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/60 to-background"></div>
-        </div>
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-20 pb-32 lg:pt-32 lg:pb-48 flex flex-col items-center text-center">
+          <motion.div
+            className="absolute top-0 right-0 w-[34rem] h-[34rem] rounded-full bg-yellow-200/40 blur-3xl"
+            animate={{ x: [0, -50, 0], y: [0, 40, 0], scale: [1, 1.1, 1] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute bottom-0 left-0 w-[30rem] h-[30rem] rounded-full bg-teal-200/50 blur-3xl"
+            animate={{ x: [0, 50, 0], y: [0, -35, 0], scale: [1.05, 1, 1.05] }}
+            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
+          />
+          <motion.div
+            className="absolute top-[32%] left-[22%] w-[26rem] h-[26rem] rounded-full bg-emerald-200/40 blur-3xl"
+            animate={{ x: [0, 30, -20, 0], y: [0, -30, 20, 0], scale: [1, 1.12, 1] }}
+            transition={{ duration: 16, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
+          />
+          <div
+            className="absolute inset-0 opacity-60"
+            style={{
+              backgroundImage: "radial-gradient(circle at 1px 1px, rgb(16 185 129 / 0.14) 1px, transparent 0)",
+              backgroundSize: "28px 28px",
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background"></div>
+        </motion.div>
+
+        {/* Partículas flotantes */}
+        {FLOATING_PARTICLES.map(({ Icon, className, size, color, delay, duration }, i) => (
+          <motion.span
+            key={i}
+            aria-hidden="true"
+            className={`absolute z-[1] pointer-events-none ${className}`}
+            animate={{ y: [0, -18, 0], rotate: [0, 8, -4, 0] }}
+            transition={{ duration, delay, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Icon className={`${size} ${color}`} />
+          </motion.span>
+        ))}
+
+        {/* Tarjetas flotantes decorativas (solo escritorio) */}
+        <motion.div
+          className="absolute right-[6%] top-[22%] z-10 hidden xl:flex flex-col gap-4 pointer-events-none"
+          animate={{ y: [0, -14, 0] }}
+          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <HeroCard
+            img="https://images.unsplash.com/photo-1543589077-47d81606c1bf?auto=format&fit=crop&w=160&q=80"
+            title="Chocolatada Navideña"
+            subtitle="Meta al 65% · 500 niños"
+            accent="text-green-700"
+          />
+          <HeroCard
+            icon={<Heart className="w-6 h-6" />}
+            title="S/ 3,250 recaudados"
+            subtitle="esta semana, ¡gracias!"
+          />
+        </motion.div>
+        <motion.div
+          className="absolute left-[5%] bottom-[24%] z-10 hidden xl:flex flex-col gap-4 pointer-events-none"
+          animate={{ y: [0, 12, 0] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        >
+          <HeroCard
+            img="https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=160&q=80"
+            title="Luna busca hogar"
+            subtitle="Adoptable en San Ramón"
+            accent="text-amber-700"
+          />
+          <HeroCard
+            icon={<Gift className="w-6 h-6" />}
+            title="Útiles escolares"
+            subtitle="300 kits para marzo 2025"
+          />
+        </motion.div>
+
+        {/* Contenido */}
+        <motion.div
+          style={{ opacity: contentOpacity, y: contentY }}
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-24 pb-40 lg:pt-36 lg:pb-56 flex flex-col items-center text-center"
+        >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary font-medium text-sm mb-8"
+            className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-primary/10 text-primary font-medium text-sm mb-8"
           >
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
+            </span>
             <Heart className="w-4 h-4" /> San Ramón, Chanchamayo
           </motion.div>
-          
-          <motion.h1 
+
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold text-foreground tracking-tight max-w-4xl leading-[1.1] mb-6">
+            <span className="block">
+              {["Uniendo", "corazones,"].map((word, i) => (
+                <motion.span
+                  key={i}
+                  className="inline-block mr-[0.25em]"
+                  initial={{ opacity: 0, y: 42 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: 0.25 + i * 0.12, ease: "easeOut" }}
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </span>
+            <span className="block">
+              {["transformando", "vidas"].map((word, i) => (
+                <motion.span
+                  key={i}
+                  className="inline-block mr-[0.25em] text-primary"
+                  initial={{ opacity: 0, y: 42 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: 0.49 + i * 0.12, ease: "easeOut" }}
+                >
+                  {word}
+                </motion.span>
+              ))}
+            </span>
+          </h1>
+
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold text-foreground tracking-tight max-w-4xl leading-tight mb-6"
-          >
-            Uniendo corazones, <span className="text-primary">transformando vidas</span>
-          </motion.h1>
-          
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
+            transition={{ duration: 0.7, delay: 0.75 }}
             className="text-xl md:text-2xl text-muted-foreground max-w-2xl mb-10 leading-relaxed"
           >
             Empezamos llevando sonrisas en Navidad. Hoy somos una red de voluntarios comprometidos con el bienestar de niños, familias y animales en nuestra comunidad.
           </motion.p>
-          
-          <motion.div 
+
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
+            transition={{ duration: 0.7, delay: 0.9 }}
             className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
           >
             <Link href="/campanas">
-              <Button size="lg" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 shadow-xl shadow-primary/25 hover:-translate-y-1 transition-transform">
+              <Button size="lg" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 shadow-xl shadow-primary/25 hover:-translate-y-1 transition-transform group">
+                <Heart className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
                 Donar Ahora
               </Button>
             </Link>
             <Link href="/nosotros">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 bg-white/50 backdrop-blur-sm border-border hover:bg-white/80">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 bg-white/60 backdrop-blur-sm border-border hover:bg-white/90">
                 Nuestra Historia
               </Button>
             </Link>
           </motion.div>
-        </div>
+
+          {/* Fila de confianza */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 1.05 }}
+            className="mt-10 flex items-center gap-3"
+          >
+            <div className="flex -space-x-2.5">
+              {HERO_AVATARS.map((url) => (
+                <img key={url} src={url} alt="" className="w-10 h-10 rounded-full border-2 border-white object-cover shadow-sm" />
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground text-left leading-tight">
+              <span className="font-semibold text-foreground">+87 voluntarios</span> ya están
+              <br /> cambiando vidas en la región
+            </p>
+          </motion.div>
+        </motion.div>
+
+        {/* Indicador de scroll */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.6, duration: 1 }}
+          className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 hidden md:flex flex-col items-center gap-1 text-muted-foreground"
+          aria-hidden="true"
+        >
+          <span className="text-[11px] uppercase tracking-[0.2em] font-medium">Descubre</span>
+          <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}>
+            <ChevronDown className="w-5 h-5" />
+          </motion.div>
+        </motion.div>
       </section>
+      </MotionConfig>
 
       {/* STATS SECTION */}
       <section className="py-20 bg-primary text-primary-foreground relative -mt-10 rounded-t-[3rem] z-20">
@@ -110,7 +304,9 @@ export default function Home() {
                 transition={{ delay: i * 0.1 }}
                 className="flex flex-col items-center"
               >
-                <div className="text-4xl md:text-5xl font-display font-bold mb-2">{stat.value}</div>
+                <div className="text-4xl md:text-5xl font-display font-bold mb-2">
+                  {typeof stat.value === "number" ? <CountUp value={stat.value} /> : stat.value}
+                </div>
                 <div className="text-sm md:text-base text-primary-foreground/80 font-medium uppercase tracking-wider">{stat.label}</div>
               </motion.div>
             ))}
