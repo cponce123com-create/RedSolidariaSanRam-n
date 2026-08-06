@@ -83,7 +83,7 @@ Tailwind y shadcn suelen remover el `outline` por defecto y confiar en `ring-*`.
 2. ✅ **Corregido (6 ago 2026):** skip link "Saltar al contenido" en el layout principal + `id="main-content"`.
 3. ✅ **Corregido (6 ago 2026):** jerarquía de encabezados en `home.tsx`, `how-to-help.tsx`, `volunteer.tsx` y `campaign-detail.tsx` (títulos de tarjetas/secciones a `h2/h3` reales; `h2` sr-only donde la sección no tenía encabezado visible) + `focus-visible:ring-2` en las miniaturas de galería de `pet-detail.tsx`.
 4. ✅ **Pasada de contraste (6 ago 2026):** textos naranja/amarillo/verde sobre fondos claros subidos a `*-700` en `home.tsx`, `how-to-help.tsx`, `Navbar.tsx`, `campaign-detail.tsx`, `campaign-transparency.tsx`, `pet-detail.tsx` y estadísticas de `admin/donations.tsx`, `admin/volunteers.tsx`, `admin/layout.tsx`. Pendiente medición automatizada.
-5. **Con navegador disponible:** correr Lighthouse (Performance/A11y/SEO) y axe sobre las 5 páginas clave (home, campañas, adopciones, donación, panel admin), y medir contraste (6).
+5. ✅ **Configurado en CI (6 ago 2026):** job `lighthouse-audit` en `.github/workflows/ci.yml` con `treosh/lighthouse-ci-action` (v12), umbrales en `lighthouserc.json` (a11y ≥ 0.95, best-practices ≥ 0.9, SEO ≥ 0.9 como `error`; performance ≥ 0.6 como `warn`). Corre en push a `main` contra producción y con `workflow_dispatch` permite apuntar a un preview de Render. `continue-on-error: true` → informativo, no bloquea deploy ni merge. **Pendiente:** primera corrida real con navegador para ajustar umbrales.
 
 ---
 
@@ -100,3 +100,5 @@ npx lighthouse https://redsolidariasanramon.org --preset=desktop --output=html -
 ```
 
 Ambos generan reportes accionables y complementan esta revisión estática.
+
+> **Ya está automatizado en CI:** el job `lighthouse-audit` corre con GitHub Actions (runner con Chrome). Umbrales configurables en `lighthouserc.json`. Para auditar un preview de Render de un PR: *Actions → CI → Run workflow* e ingresar la URL en el input `url`.

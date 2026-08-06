@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Auditoría Lighthouse manual: permite apuntar a un preview de Render
+  # específico de un PR. Sin input usa la URL de producción.
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL a auditar con Lighthouse (default: producción)"
+        required: false
+        default: "https://redsolidariasanramon.org"
 
 jobs:
   typecheck-and-test:
@@ -36,3 +44,22 @@ jobs:
       # detectar errores de compilación específicos de prod antes de Render.
       - name: Build
         run: pnpm -r --if-present run build
+
+  # Auditoría de accesibilidad/rendimiento/SEO con Lighthouse (treosh/lhci).
+  # Es informativa: continue-on-error evita que bloquee deploy o merge de PRs.
+  # En push a main audita producción; con workflow_dispatch se puede apuntar
+  # a un preview de Render. Umbrales y reporte en ./lighthouserc.json.
+  lighthouse-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lighthouse CI Action
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ inputs.url || 'https://redsolidariasanramon.org' }}
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
