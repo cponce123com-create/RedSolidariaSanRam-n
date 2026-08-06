@@ -56,27 +56,12 @@ export default defineConfig({
     target: "esnext",
     minify: "esbuild",
     sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes("node_modules")) {
-            if (id.includes("/react/") || id.includes("/react-dom/")) {
-              return "react-vendor";
-            }
-            if (id.includes("radix-ui")) {
-              return "radix-vendor";
-            }
-            if (id.includes("framer-motion")) {
-              return "animation-vendor";
-            }
-            if (id.includes("recharts") || id.includes("/d3-")) {
-              return "charts-vendor";
-            }
-            return "vendor";
-          }
-        },
-      },
-    },
+    // NO usar manualChunks personalizado: partir react/react-dom/react-query en
+    // chunks separados crea imports circulares entre chunks y los consumidores
+    // CJS (p.ej. @tanstack/react-query → use-sync-external-store/shim) llaman a
+    // React en el top-level del chunk ANTES de que el chunk de React termine de
+    // inicializarse → "Cannot read properties of undefined (reading 'exports')"
+    // → página en blanco en producción. Vite ya separa las rutas lazy solas.
     chunkSizeWarningLimit: 500,
   },
   server: {
@@ -94,6 +79,16 @@ export default defineConfig({
     allowedHosts: true,
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "wouter", "@tanstack/react-query"],
+    include: [
+      "react",
+      "react-dom",
+      "wouter",
+      "@tanstack/react-query",
+      // react-redux (vía recharts 3 en la raíz) + su shim de useSyncExternalStore:
+      // se pre-bundlean contra el react único del alias para evitar la interop
+      // CJS/ESM rota ("Cannot set properties of undefined (setting 'Children')").
+      "react-redux",
+      "use-sync-external-store",
+    ],
   },
 });
