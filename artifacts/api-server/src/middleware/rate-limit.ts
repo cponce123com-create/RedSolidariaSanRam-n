@@ -27,9 +27,9 @@ export const loginLimiter = rateLimit({
   legacyHeaders: false,
   skipSuccessfulRequests: false,
   keyGenerator: (req) => {
-    // Limitar por IP normalizada y email combinados para login
-    const email = req.body?.email || 'unknown';
-    return `${ipKeyGenerator(req.ip ?? "unknown")}-${email}`;
+    // Limitar por IP normalizada y username combinados para login
+    const username = req.body?.username || 'unknown';
+    return `${ipKeyGenerator(req.ip ?? "unknown")}-${username}`;
   },
 });
 

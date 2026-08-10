@@ -134,7 +134,7 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
 
     return res.status(401).json({ error: "unauthorized", message: "Usuario o contraseña incorrectos" });
   } catch (err) {
-    console.error("Login error:", err);
+    req.log.error({ err }, "Login error");
     return res.status(400).json({ error: "validation_error", message: "Invalid login data" });
   }
 });

@@ -1,13 +1,14 @@
-import { pgTable, text, serial, real, boolean, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { money } from "./money";
 
 export const campaignExpensesTable = pgTable("campaign_expenses", {
   id: serial("id").primaryKey(),
   campaignId: integer("campaign_id").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull().default("general"),
-  amount: real("amount").notNull(),
+  amount: money("amount").notNull(),
   date: text("date").notNull(),
   responsible: text("responsible"),
   observations: text("observations"),

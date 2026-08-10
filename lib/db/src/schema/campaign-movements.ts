@@ -1,5 +1,6 @@
-import { pgTable, text, serial, integer, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp } from "drizzle-orm/pg-core";
 import { campaignsTable } from "./campaigns";
+import { money } from "./money";
 
 // Ledger inmutable de movimientos de campaña (patrón Trust Pay).
 // Cadena de hashes a prueba de manipulación: cada entrada referencia el hash
@@ -12,7 +13,7 @@ export const campaignMovementsTable = pgTable("campaign_movements", {
     .notNull()
     .references(() => campaignsTable.id, { onDelete: "cascade" }),
   kind: text("kind").notNull(), // "ingreso" | "gasto"
-  amount: real("amount").notNull(),
+  amount: money("amount").notNull(),
   description: text("description").notNull(),
   sourceType: text("source_type").notNull(), // "donation" | "expense"
   sourceId: integer("source_id").notNull(),

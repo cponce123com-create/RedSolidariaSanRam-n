@@ -1,5 +1,13 @@
 import { build } from "esbuild";
 import { rmSync } from "node:fs";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import esbuildPluginPino from "esbuild-plugin-pino";
+
+// Los plugins (esbuild-plugin-pino) usan require para resolver dependencias.
+globalThis.require = createRequire(import.meta.url);
+globalThis.__filename = fileURLToPath(import.meta.url);
+globalThis.__dirname = new URL(".", import.meta.url).pathname;
 
 // Limpia salidas previas para no dejar módulos stale que rompan los tests
 rmSync("tests/dist", { recursive: true, force: true });
@@ -29,6 +37,11 @@ await build({
   outdir: "tests/dist",
   outExtension: { ".js": ".mjs" },
   logLevel: "silent",
+  plugins: [
+    // pino (via logger de auth-utils) usa workers para logging; el plugin
+    // copia los workers (thread-stream) junto a los outputs del bundle.
+    esbuildPluginPino({ transports: ["pino-pretty"] }),
+  ],
   // Mismo banner que build.mjs: permite que los require dinámicos de paquetes
   // CJS (p.ej. express) funcionen en el bundle ESM via createRequire.
   banner: {

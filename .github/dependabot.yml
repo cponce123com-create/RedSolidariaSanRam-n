@@ -1,0 +1,15 @@
+# Dependabot para este repositorio (monorepo pnpm + GitHub Actions).
+# Abre PRs semanales con actualizaciones; el CI los valida automáticamente
+# (typecheck + tests + build + pnpm audit).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    # pnpm workspaces: dependabot detecta pnpm-lock.yaml automáticamente
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

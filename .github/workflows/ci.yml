@@ -40,6 +40,10 @@ jobs:
       - name: Test
         run: pnpm -r --if-present test
 
+      # Dependencias: auditoría de vulnerabilidades (falla el job ante CVEs).
+      - name: Audit de dependencias
+        run: pnpm audit --prod
+
       # Build de producción (vite build de la web + build.mjs del API) para
       # detectar errores de compilación específicos de prod antes de Render.
       - name: Build

@@ -84,6 +84,19 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_movements_source ON campaign_movements(source_type, source_id);
     `,
   },
+  {
+    name: "006_amount_numeric.sql",
+    sql: `
+      -- Montos a numeric(12,2): float4 (real) introduce errores de redondeo
+      -- acumulados en SUM/agregaciones (100.10 se guarda como 100.099998...).
+      -- Compatible con el ledger existente: los hashes se calcularon con la
+      -- representación canónica toFixed(2) del valor leído; al redondear
+      -- 100.099998 → 100.10 el hash recomputado es idéntico.
+      ALTER TABLE donations ALTER COLUMN amount TYPE numeric(12,2) USING amount::numeric;
+      ALTER TABLE campaign_expenses ALTER COLUMN amount TYPE numeric(12,2) USING amount::numeric;
+      ALTER TABLE campaign_movements ALTER COLUMN amount TYPE numeric(12,2) USING amount::numeric;
+    `,
+  },
 ];
 
 /**

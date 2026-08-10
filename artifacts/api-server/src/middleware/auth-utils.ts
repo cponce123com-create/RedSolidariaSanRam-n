@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db, auditLogsTable } from "@workspace/db";
+import { logger } from "../lib/logger";
 
 // Augmentación de tipos para la sesión de admin (express-session)
 declare module "express-session" {
@@ -57,7 +58,7 @@ export async function logAuditAction(params: {
     });
   } catch (error) {
     // No fallar la operación principal si el audit log falla
-    console.error("Error writing audit log:", error);
+    logger.error({ error }, "Error writing audit log");
   }
 }
 
@@ -96,7 +97,9 @@ export function createAuditLogger(action: string, resource: string) {
         ipAddress: req.ip || req.connection?.remoteAddress || null,
         userAgent: req.get("user-agent") || null,
         details,
-      }).catch(console.error);
+      }).catch((err) => {
+        logger.error({ err, action }, "Audit log write failed");
+      });
       
       res.send = originalSend;
       return res.send.call(this, body);

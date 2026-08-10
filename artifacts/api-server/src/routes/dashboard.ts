@@ -15,9 +15,10 @@ router.get("/admin/dashboard", async (req, res) => {
   const sixMonthsAgo = new Date(now.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
 
   const [
-    allCampaigns,
-    allDonations,
-    allExpenses,
+    campaignStats,
+    donationStats,
+    expenseStats,
+    petStats,
     pendingReports,
     pendingAdoptions,
     recentVolunteers,
@@ -28,11 +29,23 @@ router.get("/admin/dashboard", async (req, res) => {
     expensesByCategory,
     pendingVolunteers,
     recentNews,
-    allPets,
   ] = await Promise.all([
-    db.select().from(campaignsTable),
-    db.select().from(donationsTable),
-    db.select().from(campaignExpensesTable),
+    // Agregaciones en SQL (no full-table-scans en Node): COUNT/SUM con FILTER
+    // evitan traer todo el histórico de donaciones/gastos a memoria.
+    db.execute(sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status = 'active')::int AS active,
+        COUNT(*) FILTER (WHERE status IN ('completed', 'inactive'))::int AS completed
+      FROM campaigns
+    `),
+    db.execute(sql`
+      SELECT COALESCE(SUM(amount), 0) AS total_raised
+      FROM donations
+      WHERE status = 'approved'
+    `),
+    db.execute(sql`SELECT COALESCE(SUM(amount), 0) AS total_spent FROM campaign_expenses`),
+    db.execute(sql`SELECT COUNT(*) FILTER (WHERE status = 'available')::int AS available FROM pets`),
     db.select({ count: count() }).from(communityReportsTable).where(eq(communityReportsTable.status, "pending")),
     db.select({ count: count() }).from(adoptionRequestsTable).where(eq(adoptionRequestsTable.status, "pending")),
     db.select().from(volunteersTable).where(gte(volunteersTable.createdAt, thirtyDaysAgo)).orderBy(desc(volunteersTable.createdAt)).limit(5),
@@ -57,20 +70,21 @@ router.get("/admin/dashboard", async (req, res) => {
     `),
     db.select({ count: count() }).from(volunteersTable).where(eq(volunteersTable.status, "pending")),
     db.select().from(newsTable).orderBy(desc(newsTable.createdAt)).limit(5),
-    db.select().from(petsTable),
   ]);
 
-  const activeCampaigns = allCampaigns.filter(c => c.status === "active").length;
-  const completedCampaigns = allCampaigns.filter(c => c.status === "completed" || c.status === "inactive").length;
-  const totalRaised = allDonations.filter(d => d.status === "approved").reduce((acc, d) => acc + d.amount, 0);
-  const totalSpent = allExpenses.reduce((acc, e) => acc + e.amount, 0);
-  const availablePets = allPets.filter(p => p.status === "available").length;
+  // SUM sobre numeric devuelve string desde pg; Number() normaliza.
+  const [campaignRow] = campaignStats.rows as [{ total: number; active: number; completed: number }?];
+  const [donationRow] = donationStats.rows as [{ total_raised: number }?];
+  const [expenseRow] = expenseStats.rows as [{ total_spent: number }?];
+  const [petRow] = petStats.rows as [{ available: number }?];
+  const totalRaised = Number(donationRow?.total_raised ?? 0);
+  const totalSpent = Number(expenseRow?.total_spent ?? 0);
 
   return res.json({
     summary: {
-      totalCampaigns: allCampaigns.length,
-      activeCampaigns,
-      completedCampaigns,
+      totalCampaigns: campaignRow?.total ?? 0,
+      activeCampaigns: campaignRow?.active ?? 0,
+      completedCampaigns: campaignRow?.completed ?? 0,
       totalRaised,
       totalSpent,
       balance: totalRaised - totalSpent,
@@ -78,7 +92,7 @@ router.get("/admin/dashboard", async (req, res) => {
       pendingAdoptions: pendingAdoptions[0]?.count ?? 0,
       pendingVolunteers: pendingVolunteers[0]?.count ?? 0,
       newVolunteersThisMonth: recentVolunteers.length,
-      availablePets,
+      availablePets: petRow?.available ?? 0,
     },
     charts: {
       monthlyDonations: monthlyDonations.rows.map((r: any) => ({

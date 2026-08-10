@@ -18,7 +18,7 @@ catalog:
   '@vitejs/plugin-react': ^5.0.4
   class-variance-authority: ^0.7.1
   clsx: 2.1.1
-  drizzle-orm: ^0.45.1
+  drizzle-orm: ^0.45.2
   framer-motion: 12.35.1
   lucide-react: ^0.545.0
   react: 19.1.0
@@ -42,6 +42,13 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # Parches de seguridad para transits de express/express-rate-limit:
+  # los rangos semver de los padres no alcanzan las versiones parcheadas
+  # (qs DoS, body-parser DoS, path-to-regexp DoS/ReDoS, ip-address SSRF/XSS).
+  qs: ^6.15.2
+  body-parser: ^2.3.0
+  path-to-regexp: ^8.4.0
+  ip-address: ^10.3.1
   # Fuerza una única versión de React en todo el monorepo: evita el error de
   # runtime "Cannot set properties of undefined (setting 'Children')" cuando
   # una dependencia arrastra una segunda copia de React.

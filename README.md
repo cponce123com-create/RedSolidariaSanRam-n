@@ -86,7 +86,9 @@ pnpm build
 
 ### Performance ⚡
 - Code splitting avanzado (React, Radix UI, Framer Motion, Charts)
-- Bundle reducido ~40% con manualChunks optimizados
+- Bundle optimizado con code-splitting por ruta (React.lazy) — sin manualChunks
+  (partir react/react-dom/query en chunks separados rompía la app en prod por
+  imports circulares; ver comentario en vite.config.ts)
 - HTTP caching optimizado (1 año para assets con hash)
 - Sourcemaps SOLO en desarrollo (en producción no se exponen los .map)
 - Compresión gzip/brotli en respuestas JSON del API (compression)
