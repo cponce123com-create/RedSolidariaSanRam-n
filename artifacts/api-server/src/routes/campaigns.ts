@@ -199,6 +199,8 @@ function formatCampaign(
     category: c.category,
     startDate: c.startDate,
     endDate: c.endDate,
+    latitude: c.latitude,
+    longitude: c.longitude,
     createdAt: c.createdAt.toISOString(),
   };
 }

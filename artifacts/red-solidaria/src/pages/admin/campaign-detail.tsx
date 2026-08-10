@@ -53,6 +53,8 @@ const infoSchema = z.object({
   startDate: z.string(),
   endDate: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
+  latitude: z.coerce.number().min(-90).max(90).optional().nullable(),
+  longitude: z.coerce.number().min(-180).max(180).optional().nullable(),
 });
 
 const imageSchema = z.object({
@@ -158,6 +160,9 @@ export default function AdminCampaignDetail() {
         startDate: campaign.startDate,
         endDate: campaign.endDate || "",
         imageUrl: campaign.imageUrl || "",
+        // El tipo generado (spec OpenAPI) aún no incluye lat/lng
+        latitude: (campaign as { latitude?: number | null }).latitude ?? undefined,
+        longitude: (campaign as { longitude?: number | null }).longitude ?? undefined,
       });
     }
   }, [campaign, infoForm]);
@@ -323,6 +328,24 @@ export default function AdminCampaignDetail() {
               <FormField control={infoForm.control} name="imageUrl" render={({ field }) => (
                 <FormItem><FormLabel>URL de Imagen de Portada</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" value={field.value || ""} onChange={field.onChange} placeholder="https://..."/></FormControl></FormItem>
               )} />
+
+              {/* Geolocalización (vista de mapa — fase 2 del rediseño) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField control={infoForm.control} name="latitude" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Latitud (Opcional)</FormLabel>
+                    <FormControl><Input type="number" step="0.0001" placeholder="-11.1229" className="rounded-xl bg-secondary/30" value={field.value ?? ""} onChange={field.onChange} /></FormControl>
+                    <p className="text-xs text-muted-foreground">Para mostrarla en el mapa de campañas.</p>
+                  </FormItem>
+                )} />
+                <FormField control={infoForm.control} name="longitude" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Longitud (Opcional)</FormLabel>
+                    <FormControl><Input type="number" step="0.0001" placeholder="-75.3548" className="rounded-xl bg-secondary/30" value={field.value ?? ""} onChange={field.onChange} /></FormControl>
+                    <p className="text-xs text-muted-foreground">Puedes copiarlas desde Google Maps (clic derecho → "¿Qué hay aquí?").</p>
+                  </FormItem>
+                )} />
+              </div>
 
               <div className="pt-4 border-t border-border flex justify-end">
                 <Button type="submit" className="h-12 px-8 rounded-xl text-lg shadow-md hover-elevate" disabled={updateCampaign.isPending} data-testid="btn-save-campaign">

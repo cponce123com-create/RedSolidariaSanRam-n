@@ -97,6 +97,17 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ALTER TABLE campaign_movements ALTER COLUMN amount TYPE numeric(12,2) USING amount::numeric;
     `,
   },
+  {
+    name: "007_campaigns_location.sql",
+    sql: `
+      -- Geolocalización de campañas para la vista de mapa (fase 2 del
+      -- rediseño del frontend). Nullable: campañas sin ubicación se omiten
+      -- del mapa pero siguen visibles en la grilla.
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS latitude real;
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS longitude real;
+      CREATE INDEX IF NOT EXISTS idx_campaigns_location ON campaigns(latitude, longitude);
+    `,
+  },
 ];
 
 /**

@@ -123,6 +123,8 @@ async function seedCampaigns() {
         category: "niñez",
         startDate: "2024-11-01",
         endDate: "2024-12-25",
+        latitude: -11.1229,
+        longitude: -75.3548,
         imageUrl: CAMPAIGN_IMAGES["Chocolatada Navideña 2024"],
       },
       {
@@ -135,6 +137,8 @@ async function seedCampaigns() {
         category: "educación",
         startDate: "2025-01-15",
         endDate: "2025-03-30",
+        latitude: -11.1021,
+        longitude: -75.3321,
         imageUrl: CAMPAIGN_IMAGES["Campaña Escolar 2025"],
       },
       {
@@ -146,6 +150,8 @@ async function seedCampaigns() {
         featured: true,
         category: "animales",
         startDate: "2024-09-01",
+        latitude: -11.1378,
+        longitude: -75.3612,
         imageUrl: CAMPAIGN_IMAGES["Rescate Animal San Ramón"],
       },
       {
@@ -158,6 +164,8 @@ async function seedCampaigns() {
         category: "vivienda",
         startDate: "2024-03-01",
         endDate: "2024-08-31",
+        latitude: -11.2510,
+        longitude: -75.3010,
         imageUrl: CAMPAIGN_IMAGES["Techado para Familias"],
       },
       {
@@ -170,6 +178,8 @@ async function seedCampaigns() {
         category: "salud",
         startDate: "2024-10-01",
         endDate: "2025-06-30",
+        latitude: -10.9261,
+        longitude: -74.8688,
         imageUrl: CAMPAIGN_IMAGES["Brigada Médica Rural"],
       },
       {
@@ -182,6 +192,8 @@ async function seedCampaigns() {
         category: "adultos-mayores",
         startDate: "2025-05-01",
         endDate: "2025-08-31",
+        latitude: -11.1542,
+        longitude: -75.3789,
         imageUrl: CAMPAIGN_IMAGES["Calor para Adultos Mayores"],
       },
       {
@@ -194,6 +206,8 @@ async function seedCampaigns() {
         category: "agua",
         startDate: "2025-02-01",
         endDate: "2025-09-30",
+        latitude: -11.3402,
+        longitude: -75.2704,
         imageUrl: CAMPAIGN_IMAGES["Agua Limpia para Comunidades"],
       },
     ]);

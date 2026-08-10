@@ -14,6 +14,9 @@ export const campaignsTable = pgTable("campaigns", {
   category: text("category").notNull().default("general"),
   startDate: text("start_date").notNull(),
   endDate: text("end_date"),
+  // Geolocalización para la vista de mapa (fase 2 del rediseño)
+  latitude: real("latitude"),
+  longitude: real("longitude"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
