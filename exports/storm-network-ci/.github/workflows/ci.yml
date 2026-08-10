@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  app:
+    name: App (Expo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Lint (expo lint)
+        run: npm run lint
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+      - name: Build web (expo export)
+        run: npm run build:web
+
+  supabase:
+    name: Supabase (migraciones)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      # Valida que TODAS las migraciones de supabase/migrations aplican
+      # limpias en un Postgres real (mismo comportamiento que el deploy).
+      - name: Levantar Supabase local y aplicar migraciones
+        run: |
+          supabase db start
+          supabase db reset
+          supabase db stop
