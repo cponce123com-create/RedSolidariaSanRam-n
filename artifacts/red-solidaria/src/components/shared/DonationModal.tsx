@@ -388,7 +388,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                     {proofUrl ? (
                       <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
                         <div className="flex items-start gap-4">
-                          <img src={proofUrl} alt="Comprobante" className="w-24 h-24 object-cover rounded-xl border border-green-200 bg-white" />
+                          <img src={proofUrl} alt="Comprobante" className="w-24 h-24 object-cover rounded-xl border border-green-200 bg-card" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-green-800 truncate">{proofFileName || "Comprobante subido"}</p>
                             <p className="text-xs text-green-700 mt-0.5">Listo para validación por el equipo.</p>

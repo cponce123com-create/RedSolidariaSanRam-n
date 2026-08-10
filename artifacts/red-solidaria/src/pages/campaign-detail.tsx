@@ -208,7 +208,7 @@ export default function CampaignDetail() {
                   <div className="space-y-4 text-base text-muted-foreground">
                     <p>Si prefieres hacer una transferencia directa, puedes usar nuestras cuentas oficiales. Por favor, asegúrate de enviar el voucher al WhatsApp para registrarlo en esta campaña.</p>
                     <div className="grid sm:grid-cols-2 gap-4 mt-4">
-                      <div className="bg-white dark:bg-black rounded-xl p-4 border border-border shadow-sm">
+                      <div className="bg-card dark:bg-black rounded-xl p-4 border border-border shadow-sm">
                         <div className="font-bold text-foreground mb-1">Cta. BCP (Soles)</div>
                         <div className="font-mono text-lg flex items-center justify-between">
                           193-12345678-0-55
@@ -216,7 +216,7 @@ export default function CampaignDetail() {
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">CCI: 00219312345678055</div>
                       </div>
-                      <div className="bg-white dark:bg-black rounded-xl p-4 border border-border shadow-sm">
+                      <div className="bg-card dark:bg-black rounded-xl p-4 border border-border shadow-sm">
                         <div className="font-bold text-foreground mb-1">Yape / Plin</div>
                         <div className="font-mono text-lg flex items-center justify-between">
                           921 615 737
@@ -324,7 +324,7 @@ export default function CampaignDetail() {
           {/* Phase 3 Full Width Transparency Banner (Bottom) */}
           {hasTransparencyData && (
             <div className="mt-16 pt-12 border-t border-border">
-              <div className="bg-white dark:bg-card border-2 border-border shadow-lg rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group hover:border-green-300/50 transition-colors">
+              <div className="bg-card dark:bg-card border-2 border-border shadow-lg rounded-3xl p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group hover:border-green-300/50 transition-colors">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-green-50/50 rounded-full blur-3xl -z-10 group-hover:bg-green-100/50 transition-colors"></div>
                 
                 <div className="flex-1 text-center md:text-left z-10">
@@ -382,7 +382,7 @@ export default function CampaignDetail() {
             {donors && donors.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {donors.map((donor) => (
-                  <div key={donor.id} className="bg-white dark:bg-card rounded-3xl border border-border shadow-sm p-5 flex flex-col gap-3 hover-elevate transition-all">
+                  <div key={donor.id} className="bg-card dark:bg-card rounded-3xl border border-border shadow-sm p-5 flex flex-col gap-3 hover-elevate transition-all">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
@@ -405,7 +405,7 @@ export default function CampaignDetail() {
                 ))}
               </div>
             ) : (
-              <div className="bg-white dark:bg-card rounded-3xl border border-dashed border-border p-12 text-center shadow-sm">
+              <div className="bg-card dark:bg-card rounded-3xl border border-dashed border-border p-12 text-center shadow-sm">
                 <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                 <h3 className="text-xl font-bold text-foreground mb-2">Sé el primero en donar</h3>
                 <p className="text-muted-foreground">Tu apoyo se reflejará aquí una vez validemos tu donación.</p>

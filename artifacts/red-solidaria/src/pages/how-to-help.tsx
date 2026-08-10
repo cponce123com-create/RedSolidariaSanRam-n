@@ -210,12 +210,12 @@ export default function HowToHelp() {
         <p className="text-white/85 text-lg mb-6 max-w-xl mx-auto">Únete como aliado de Red Solidaria. Trabajamos con emprendimientos locales, instituciones y empresas que quieren impactar positivamente en Chanchamayo.</p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/aliados">
-            <Button size="lg" className="bg-white text-primary hover:bg-white/90 rounded-2xl h-12 px-8 font-bold">
+            <Button size="lg" className="bg-card text-primary hover:bg-card/90 rounded-2xl h-12 px-8 font-bold">
               Ver nuestros aliados
             </Button>
           </Link>
           <Link href="/contacto">
-            <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/20 rounded-2xl h-12 px-8">
+            <Button size="lg" variant="outline" className="border-white text-white hover:bg-card/20 rounded-2xl h-12 px-8">
               Ser aliado
             </Button>
           </Link>

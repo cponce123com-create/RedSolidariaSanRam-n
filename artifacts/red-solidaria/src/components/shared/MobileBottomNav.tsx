@@ -14,7 +14,7 @@ export default function MobileBottomNav() {
   const [location] = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100 shadow-lg md:hidden safe-area-pb">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-gray-100 shadow-lg md:hidden safe-area-pb">
       <div className="flex">
         {navItems.map(({ href, label, icon: Icon, donar }) => {
           const isActive = href === "/" ? location === "/" : location.startsWith(href);

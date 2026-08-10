@@ -94,7 +94,7 @@ function TwoFactorCard() {
   const enabled = status.data?.enabled ?? false;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div className="bg-card rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-50 bg-gray-50/50">
         <span className="text-primary"><ShieldCheck className="w-4 h-4" /></span>
         <h2 className="font-semibold text-gray-800">Seguridad de mi cuenta (2FA)</h2>
@@ -258,7 +258,7 @@ export default function AdminSettings() {
         const rows = byGroup[group];
         if (!rows || rows.length === 0) return null;
         return (
-          <div key={group} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div key={group} className="bg-card rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-50 bg-gray-50/50">
               <span className="text-primary">{GROUP_ICONS[group] ?? <Settings className="w-4 h-4" />}</span>
               <h2 className="font-semibold text-gray-800">{GROUP_LABELS[group] ?? group}</h2>

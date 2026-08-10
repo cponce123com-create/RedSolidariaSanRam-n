@@ -168,17 +168,17 @@ export default function PetDetail() {
                 {photos.length > 1 && (
                   <>
                     <button onClick={() => setPhotoIdx(i => (i - 1 + photos.length) % photos.length)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors">
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/90 rounded-full flex items-center justify-center shadow-md hover:bg-card transition-colors">
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button onClick={() => setPhotoIdx(i => (i + 1) % photos.length)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/90 rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors">
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/90 rounded-full flex items-center justify-center shadow-md hover:bg-card transition-colors">
                       <ChevronRight className="w-5 h-5" />
                     </button>
                     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                       {photos.map((_, i) => (
                         <button key={i} onClick={() => setPhotoIdx(i)}
-                          className={`w-2 h-2 rounded-full transition-colors ${i === photoIdx ? "bg-white" : "bg-white/50"}`} />
+                          className={`w-2 h-2 rounded-full transition-colors ${i === photoIdx ? "bg-card" : "bg-card/50"}`} />
                       ))}
                     </div>
                   </>
@@ -399,14 +399,14 @@ export default function PetDetail() {
                         <p className="text-sm font-medium">¿Tienes patio o jardín?</p>
                         <button type="button" role="switch" aria-checked={form.watch("hasYard")} onClick={() => form.setValue("hasYard", !form.watch("hasYard"))}
                           className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("hasYard") ? "bg-primary" : "bg-border"}`}>
-                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("hasYard") ? "translate-x-5" : "translate-x-0.5"}`} />
+                          <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("hasYard") ? "translate-x-5" : "translate-x-0.5"}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
                         <p className="text-sm font-medium">¿Experiencia con mascotas?</p>
                         <button type="button" role="switch" aria-checked={form.watch("hasPetExperience")} onClick={() => form.setValue("hasPetExperience", !form.watch("hasPetExperience"))}
                           className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("hasPetExperience") ? "bg-primary" : "bg-border"}`}>
-                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("hasPetExperience") ? "translate-x-5" : "translate-x-0.5"}`} />
+                          <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("hasPetExperience") ? "translate-x-5" : "translate-x-0.5"}`} />
                         </button>
                       </div>
                     </div>
@@ -437,7 +437,7 @@ export default function PetDetail() {
                       </div>
                       <button type="button" role="switch" aria-checked={form.watch("acceptsFollowUp")} onClick={() => form.setValue("acceptsFollowUp", !form.watch("acceptsFollowUp"))}
                         className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("acceptsFollowUp") ? "bg-primary" : "bg-border"}`}>
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("acceptsFollowUp") ? "translate-x-5" : "translate-x-0.5"}`} />
+                        <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("acceptsFollowUp") ? "translate-x-5" : "translate-x-0.5"}`} />
                       </button>
                     </div>
 

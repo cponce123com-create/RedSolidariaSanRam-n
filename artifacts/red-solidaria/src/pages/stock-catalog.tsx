@@ -193,7 +193,7 @@ export default function StockCatalog() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
-          className="bg-white border border-border rounded-2xl p-6 shadow-lg"
+          className="bg-card border border-border rounded-2xl p-6 shadow-lg"
         >
           <div className="flex items-start gap-4">
             <div className="p-3 bg-blue-50 rounded-xl">
@@ -242,7 +242,7 @@ export default function StockCatalog() {
                     <CardContent className="p-0 flex-1 flex flex-col">
                       {/* Header with Icon */}
                       <div className="bg-gradient-to-br from-primary/10 to-primary/5 p-6 flex items-center justify-center">
-                        <div className="w-20 h-20 rounded-full bg-white shadow-md flex items-center justify-center">
+                        <div className="w-20 h-20 rounded-full bg-card shadow-md flex items-center justify-center">
                           <Icon className="w-10 h-10 text-primary" />
                         </div>
                       </div>
@@ -309,7 +309,7 @@ export default function StockCatalog() {
           </p>
           <Button 
             size="lg" 
-            className="bg-white text-green-700 hover:bg-white/90 rounded-xl text-lg h-14 px-8 shadow-lg"
+            className="bg-card text-green-700 hover:bg-card/90 rounded-xl text-lg h-14 px-8 shadow-lg"
             onClick={handleGeneralSponsorClick}
           >
             <MessageCircle className="w-5 h-5 mr-2" />

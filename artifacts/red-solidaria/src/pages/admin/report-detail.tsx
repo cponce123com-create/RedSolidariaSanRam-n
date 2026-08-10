@@ -236,27 +236,27 @@ export default function AdminReportDetail() {
                   <p className="text-sm text-purple-700">Se creará una campaña pública a partir de este reporte.</p>
                   <div>
                     <label className="text-sm font-medium text-purple-800 block mb-1.5">Título de la campaña</label>
-                    <Input value={convertData.title} onChange={e => setConvertData(p => ({ ...p, title: e.target.value }))} className="rounded-xl bg-white/60" />
+                    <Input value={convertData.title} onChange={e => setConvertData(p => ({ ...p, title: e.target.value }))} className="rounded-xl bg-card/60" />
                   </div>
                   <div>
                     <label className="text-sm font-medium text-purple-800 block mb-1.5">Descripción</label>
-                    <Textarea value={convertData.description} onChange={e => setConvertData(p => ({ ...p, description: e.target.value }))} className="rounded-xl bg-white/60 min-h-[80px] resize-none" />
+                    <Textarea value={convertData.description} onChange={e => setConvertData(p => ({ ...p, description: e.target.value }))} className="rounded-xl bg-card/60 min-h-[80px] resize-none" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-sm font-medium text-purple-800 block mb-1.5">Meta (S/)</label>
-                      <Input type="number" value={convertData.goal} onChange={e => setConvertData(p => ({ ...p, goal: e.target.value }))} className="rounded-xl bg-white/60" />
+                      <Input type="number" value={convertData.goal} onChange={e => setConvertData(p => ({ ...p, goal: e.target.value }))} className="rounded-xl bg-card/60" />
                     </div>
                     <div>
                       <label className="text-sm font-medium text-purple-800 block mb-1.5">Categoría</label>
-                      <select value={convertData.category} onChange={e => setConvertData(p => ({ ...p, category: e.target.value }))} className="w-full h-10 px-3 rounded-xl border border-purple-200 bg-white/60 text-sm">
+                      <select value={convertData.category} onChange={e => setConvertData(p => ({ ...p, category: e.target.value }))} className="w-full h-10 px-3 rounded-xl border border-purple-200 bg-card/60 text-sm">
                         {CAMPAIGN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-purple-800 block mb-1.5">URL de imagen (opcional)</label>
-                    <Input value={convertData.imageUrl} onChange={e => setConvertData(p => ({ ...p, imageUrl: e.target.value }))} className="rounded-xl bg-white/60" placeholder="https://..." />
+                    <Input value={convertData.imageUrl} onChange={e => setConvertData(p => ({ ...p, imageUrl: e.target.value }))} className="rounded-xl bg-card/60" placeholder="https://..." />
                   </div>
                   <Button
                     className="w-full rounded-xl bg-purple-600 hover:bg-purple-700"

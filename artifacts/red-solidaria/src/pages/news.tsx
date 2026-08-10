@@ -3,6 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Newspaper } from "lucide-react";
 
 export default function News() {
   const { data: news, isLoading } = useGetNews();
@@ -28,7 +30,8 @@ export default function News() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {news?.map(post => (
+              {news && news.length > 0 ? (
+                news.map(post => (
                 <Link key={post.id} href={`/noticias/${post.id}`}>
                   <Card className="h-full overflow-hidden hover-elevate border-border/50 group cursor-pointer flex flex-col">
                     <div className="h-48 overflow-hidden bg-muted">
@@ -52,7 +55,14 @@ export default function News() {
                     </div>
                   </Card>
                 </Link>
-              ))}
+              ))) : (
+                <EmptyState
+                  icon={Newspaper}
+                  title="Aún no hay noticias"
+                  description="Las novedades de la comunidad aparecerán aquí."
+                  className="col-span-full"
+                />
+              )}
             </div>
           )}
         </div>

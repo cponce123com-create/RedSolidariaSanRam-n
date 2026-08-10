@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2f8332" />
+    <script>
+      // Anti-FOUC: aplica el tema antes del primer paint para evitar un flash
+      // de tema claro en usuarios con preferencia oscura.
+      (function () {
+        try {
+          var t = localStorage.getItem("theme");
+          var dark = t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          if (dark) document.documentElement.classList.add("dark");
+        } catch (e) {}
+      })();
+    </script>
     <title>Red Solidaria San Ramón — Juntos somos más</title>
     <meta name="description" content="Organización solidaria sin fines de lucro en San Ramón, Chanchamayo, Perú. Apoyamos campañas sociales, protección animal y bienestar comunitario." />
     <meta name="keywords" content="Red Solidaria, San Ramón, Chanchamayo, Junín, Perú, donaciones, voluntariado, adopciones, ONG, solidaridad" />

@@ -200,7 +200,7 @@ export default function Allies() {
         <p className="text-muted-foreground text-center mb-8 text-sm">Tu apoyo tiene reconocimiento. Esto es lo que obtienes al ser parte de nuestra red:</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {ALLY_BENEFITS.map((b, i) => (
-            <div key={i} className="flex items-center gap-3 bg-white/60 rounded-xl px-4 py-3">
+            <div key={i} className="flex items-center gap-3 bg-card/60 rounded-xl px-4 py-3">
               <div className="w-2 h-2 rounded-full bg-primary shrink-0" />
               <p className="text-sm font-medium">{b}</p>
             </div>

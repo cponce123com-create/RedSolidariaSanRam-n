@@ -59,21 +59,21 @@ export default function About() {
       {/* M/V/V */}
       <section className="py-20 bg-primary text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid md:grid-cols-3 gap-8">
-          <div className="bg-white/10 p-8 rounded-2xl backdrop-blur-sm border border-white/20">
+          <div className="bg-card/10 p-8 rounded-2xl backdrop-blur-sm border border-white/20">
             <Target className="w-12 h-12 mb-6 text-white/90" />
             <h3 className="text-2xl font-display font-bold mb-4">Misión</h3>
             <p className="text-white/80 leading-relaxed">
               Brindar asistencia solidaria a las poblaciones vulnerables y animales en abandono en Chanchamayo, promoviendo la empatía comunitaria y canalizando recursos de manera transparente.
             </p>
           </div>
-          <div className="bg-white/10 p-8 rounded-2xl backdrop-blur-sm border border-white/20">
+          <div className="bg-card/10 p-8 rounded-2xl backdrop-blur-sm border border-white/20">
             <Shield className="w-12 h-12 mb-6 text-white/90" />
             <h3 className="text-2xl font-display font-bold mb-4">Visión</h3>
             <p className="text-white/80 leading-relaxed">
               Ser la red de ayuda social más grande y confiable de la Selva Central, logrando un impacto sostenible que mejore la calidad de vida de nuestra comunidad.
             </p>
           </div>
-          <div className="bg-white/10 p-8 rounded-2xl backdrop-blur-sm border border-white/20">
+          <div className="bg-card/10 p-8 rounded-2xl backdrop-blur-sm border border-white/20">
             <Users className="w-12 h-12 mb-6 text-white/90" />
             <h3 className="text-2xl font-display font-bold mb-4">Valores</h3>
             <ul className="space-y-2 text-white/80">

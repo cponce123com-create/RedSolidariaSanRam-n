@@ -95,15 +95,57 @@
     @apply border-border;
   }
   body {
-    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/20 selection:text-primary;
+    @apply font-sans antialiased bg-background text-foreground selection:bg-primary/20 selection:text-primary transition-colors duration-300;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight text-foreground;
   }
 }
 
+/* Dark mode: paleta verde selva adaptada (contraste AA sobre fondo oscuro) */
+.dark {
+  --background: 122 22% 7%;
+  --foreground: 120 25% 92%;
+  --border: 122 12% 19%;
+  --input: 122 12% 19%;
+  --ring: 122 47% 48%;
+
+  --card: 122 18% 10%;
+  --card-foreground: 120 25% 92%;
+  --card-border: 122 12% 17%;
+
+  --popover: 122 18% 10%;
+  --popover-foreground: 120 25% 92%;
+  --popover-border: 122 12% 19%;
+
+  /* Verde Selva algo más claro en dark para mantener contraste AA */
+  --primary: 122 47% 46%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 122 14% 16%;
+  --secondary-foreground: 120 20% 90%;
+
+  --accent: 189 66% 55%;
+  --accent-foreground: 0 0% 100%;
+
+  --muted: 122 12% 14%;
+  --muted-foreground: 120 10% 62%;
+
+  --destructive: 0 72% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 25px 50px -12px rgb(0 0 0 / 0.6);
+}
+
 .glass-nav {
   @apply bg-white/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-white/60;
+}
+.dark .glass-nav {
+  @apply bg-card/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-card/60;
 }
 
 .hover-elevate {

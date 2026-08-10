@@ -30,7 +30,7 @@ function HeroCard({ img, icon, title, subtitle, accent }: {
   img?: string; icon?: React.ReactNode; title: string; subtitle: string; accent?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 bg-white/85 backdrop-blur-md rounded-2xl py-3 pl-3 pr-5 shadow-lg shadow-primary/10 border border-white/60">
+    <div className="flex items-center gap-3 bg-card/85 backdrop-blur-md rounded-2xl py-3 pl-3 pr-5 shadow-lg shadow-primary/10 border border-white/60">
       {img ? (
         <img src={img} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" />
       ) : (
@@ -248,7 +248,7 @@ export default function Home() {
               </Button>
             </Link>
             <Link href="/nosotros">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 bg-white/60 backdrop-blur-sm border-border hover:bg-white/90">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 bg-card/60 backdrop-blur-sm border-border hover:bg-card/90">
                 Nuestra Historia
               </Button>
             </Link>
@@ -326,7 +326,7 @@ export default function Home() {
               <p className="text-lg text-muted-foreground">Únete a nuestras iniciativas actuales y ayúdanos a llegar a la meta. Cada sol suma a la causa.</p>
             </div>
             <Link href="/campanas">
-              <Button variant="outline" className="rounded-xl bg-white">Ver todas las campañas</Button>
+              <Button variant="outline" className="rounded-xl bg-card">Ver todas las campañas</Button>
             </Link>
           </div>
 
@@ -357,7 +357,7 @@ export default function Home() {
                 <p className="text-lg text-muted-foreground">Personas reales de nuestra comunidad que atraviesan situaciones difíciles. Cada pequeña ayuda marca una diferencia enorme.</p>
               </div>
               <Link href="/casos-urgentes">
-                <Button variant="outline" className="rounded-xl bg-white border-orange-300 text-orange-700 hover:bg-orange-50">
+                <Button variant="outline" className="rounded-xl bg-card border-orange-300 text-orange-700 hover:bg-orange-50">
                   Ver todos los casos <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
@@ -383,7 +383,7 @@ export default function Home() {
                           <TypeIcon className="w-16 h-16 text-muted-foreground opacity-20" />
                         </div>
                       )}
-                      <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-white shadow-sm`}>
+                      <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-card shadow-sm`}>
                         <span className={`w-2 h-2 rounded-full ${URGENCY_COLOR[report.urgency] || "bg-secondary"}`} />
                         {report.urgency === "critical" ? "EMERGENCIA" : report.urgency === "high" ? "Urgente" : "Necesita ayuda"}
                       </div>
@@ -476,7 +476,7 @@ export default function Home() {
             Creemos que la confianza es la base de la solidaridad. Publicamos reportes detallados, boletas y evidencias fotográficas de cada céntimo que entra y sale de la organización.
           </p>
           <Link href="/nosotros">
-            <Button size="lg" className="bg-white text-primary hover:bg-white/90 rounded-xl text-lg h-14 px-8">
+            <Button size="lg" className="bg-card text-primary hover:bg-card/90 rounded-xl text-lg h-14 px-8">
               Conoce nuestro método
             </Button>
           </Link>

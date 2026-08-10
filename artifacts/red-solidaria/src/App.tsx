@@ -66,7 +66,7 @@ function MainLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex flex-col">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-white focus:text-primary focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-card focus:text-primary focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
       >
         Saltar al contenido
       </a>

@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useGetCampaigns } from "@workspace/api-client-react";
 import { CampaignCard } from "@/components/shared/CampaignCard";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
+import { Package } from "lucide-react";
 import SEO from "@/components/shared/SEO";
 
 export default function Campaigns() {
@@ -65,10 +67,11 @@ export default function Campaigns() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-20">
-              <h3 className="text-2xl font-bold mb-2">No se encontraron campañas</h3>
-              <p className="text-muted-foreground">Intenta con otro filtro de búsqueda.</p>
-            </div>
+            <EmptyState
+              icon={Package}
+              title="No se encontraron campañas"
+              description="Intenta con otro filtro de búsqueda o vuelve más tarde."
+            />
           )}
         </div>
       </section>

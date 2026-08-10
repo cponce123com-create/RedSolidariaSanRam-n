@@ -132,7 +132,7 @@ export default function AnimalWelfare() {
             className={`bg-gradient-to-br ${section.color} border rounded-3xl p-7 flex flex-col gap-4`}
           >
             <div className="flex items-start justify-between">
-              <div className={`p-3 bg-white/70 rounded-2xl`}>
+              <div className={`p-3 bg-card/70 rounded-2xl`}>
                 <section.icon className={`w-7 h-7 ${section.iconColor}`} />
               </div>
               <span className={`text-xs font-bold px-3 py-1 rounded-full ${section.badgeColor}`}>{section.badge}</span>
@@ -155,7 +155,7 @@ export default function AnimalWelfare() {
             <Link href={section.ctaHref}>
               <Button
                 size="sm"
-                className={`rounded-xl h-9 mt-auto bg-white/80 hover:bg-white text-foreground border border-white/50 shadow-sm gap-1.5`}
+                className={`rounded-xl h-9 mt-auto bg-card/80 hover:bg-card text-foreground border border-white/50 shadow-sm gap-1.5`}
               >
                 {section.cta} <ArrowRight className="w-3.5 h-3.5" />
               </Button>
@@ -178,12 +178,12 @@ export default function AnimalWelfare() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/adopciones">
-              <Button size="lg" className="bg-white text-amber-700 hover:bg-white/90 rounded-2xl h-14 px-10 font-bold shadow-xl">
+              <Button size="lg" className="bg-card text-amber-700 hover:bg-card/90 rounded-2xl h-14 px-10 font-bold shadow-xl">
                 <Heart className="w-5 h-5 mr-2" /> Ver mascotas disponibles
               </Button>
             </Link>
             <Link href="/publicar-mascota">
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white/20 rounded-2xl h-14 px-10 font-semibold">
+              <Button size="lg" variant="outline" className="border-white text-white hover:bg-card/20 rounded-2xl h-14 px-10 font-semibold">
                 Publicar en adopción
               </Button>
             </Link>

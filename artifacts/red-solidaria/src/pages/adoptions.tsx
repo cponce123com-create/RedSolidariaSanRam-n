@@ -57,7 +57,7 @@ function PetCard({ pet }: { pet: Pet }) {
             <AlertTriangle className="w-3 h-3" /> URGENTE
           </div>
         )}
-        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
+        <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
           <SpeciesIcon className="w-3.5 h-3.5 text-amber-600" />
           {pet.species === "perro" ? "Perro" : "Gato"}
         </div>

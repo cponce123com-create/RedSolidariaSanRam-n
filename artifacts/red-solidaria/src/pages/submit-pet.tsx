@@ -47,7 +47,7 @@ const BOOL_TOGGLE = (label: string, sub: string, key: keyof FormValues, form: an
       onClick={() => form.setValue(key, !form.watch(key))}
       className={`relative w-10 h-5 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}
     >
-      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-5" : "translate-x-0.5"}`} />
+      <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-5" : "translate-x-0.5"}`} />
     </button>
   </div>
 );

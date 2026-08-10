@@ -86,7 +86,7 @@ function FaqForm({ item, onSave, onCancel }: { item?: FaqItem; onSave: () => voi
             <p className="text-sm font-medium">Activa (visible en web)</p>
             <button type="button" onClick={() => form.setValue("active", !form.watch("active"))}
               className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("active") ? "bg-primary" : "bg-border"}`}>
-              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch("active") ? "translate-x-5" : "translate-x-0.5"}`} />
+              <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("active") ? "translate-x-5" : "translate-x-0.5"}`} />
             </button>
           </div>
           <div className="flex gap-3">

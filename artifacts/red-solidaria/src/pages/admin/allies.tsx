@@ -92,7 +92,7 @@ function AllyForm({ ally, onSave, onCancel }: { ally?: Ally; onSave: () => void;
       <p className="text-sm font-medium">{label}</p>
       <button type="button" onClick={() => form.setValue(key, !form.watch(key) as any)}
         className={`relative w-10 h-5 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}>
-        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-5" : "translate-x-0.5"}`} />
+        <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-5" : "translate-x-0.5"}`} />
       </button>
     </div>
   );

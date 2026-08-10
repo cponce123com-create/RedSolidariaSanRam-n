@@ -89,7 +89,7 @@ export default function CampaignTransparency() {
                 {selectedEvidence.mediaType === 'image' ? (
                   <img src={selectedEvidence.mediaUrl} alt={selectedEvidence.title} className="max-w-full max-h-[60vh] object-contain rounded-xl" />
                 ) : (
-                  <div className="flex flex-col items-center p-12 bg-white/10 rounded-2xl">
+                  <div className="flex flex-col items-center p-12 bg-card/10 rounded-2xl">
                     <FileText className="w-20 h-20 mb-4 opacity-80" />
                     <a href={selectedEvidence.mediaUrl} target="_blank" rel="noreferrer">
                       <Button className="rounded-xl"><Download className="w-4 h-4 mr-2"/> Descargar Documento</Button>
@@ -136,7 +136,7 @@ export default function CampaignTransparency() {
 
         {/* Dashboard KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate">
+          <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate">
             <div className="absolute -right-4 -top-4 w-20 h-20 bg-blue-50 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
               <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl">
@@ -149,7 +149,7 @@ export default function CampaignTransparency() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-raised">
+          <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-raised">
             <div className="absolute -right-4 -top-4 w-20 h-20 bg-green-50 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
               <div className="p-2.5 bg-green-100 text-green-600 rounded-xl">
@@ -162,7 +162,7 @@ export default function CampaignTransparency() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-spent">
+          <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-spent">
             <div className="absolute -right-4 -top-4 w-20 h-20 bg-orange-50 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
               <div className="p-2.5 bg-orange-100 text-orange-700 rounded-xl">
@@ -175,7 +175,7 @@ export default function CampaignTransparency() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-md border-2 border-primary/20 flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-balance">
+          <div className="bg-card rounded-3xl p-6 shadow-md border-2 border-primary/20 flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-balance">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-primary/10 rounded-full transition-transform group-hover:scale-150 duration-500 ease-out" />
             <div className="flex items-center gap-3 mb-4 relative z-10">
               <div className="p-2.5 bg-primary text-primary-foreground rounded-xl shadow-sm">
@@ -191,7 +191,7 @@ export default function CampaignTransparency() {
 
         {/* Progress & Secondary Stats */}
         <div className="grid lg:grid-cols-3 gap-8 mb-12">
-          <div className="lg:col-span-2 bg-white rounded-3xl p-8 shadow-sm border border-border">
+          <div className="lg:col-span-2 bg-card rounded-3xl p-8 shadow-sm border border-border">
             <div className="flex justify-between items-end mb-3">
               <h3 className="font-display font-bold text-lg text-foreground">Ejecución de Fondos</h3>
               <span className="text-3xl font-bold text-primary">{transparency.executionPercent}%</span>
@@ -202,7 +202,7 @@ export default function CampaignTransparency() {
             </p>
           </div>
           
-          <div className="bg-white rounded-3xl p-8 shadow-sm border border-border flex items-center gap-6">
+          <div className="bg-card rounded-3xl p-8 shadow-sm border border-border flex items-center gap-6">
             <div className="w-16 h-16 rounded-2xl bg-pink-100 flex items-center justify-center flex-shrink-0">
               <Heart className="w-8 h-8 text-pink-500 fill-pink-500" />
             </div>
@@ -218,7 +218,7 @@ export default function CampaignTransparency() {
           
           {/* Movements Ledger (Trust Pay) */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full flex flex-col">
+            <div className="bg-card rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full flex flex-col">
               <h3 className="text-xl font-display font-bold mb-2 flex items-center gap-2">
                 <Link2 className="w-5 h-5 text-primary" /> Movimientos Verificables
               </h3>
@@ -290,7 +290,7 @@ export default function CampaignTransparency() {
 
           {/* Expenses Table */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full flex flex-col" data-testid="transparency-expenses-table">
+            <div className="bg-card rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full flex flex-col" data-testid="transparency-expenses-table">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-display font-bold flex items-center gap-2">
                   <Receipt className="w-5 h-5 text-primary" /> Rendición de Gastos
@@ -374,7 +374,7 @@ export default function CampaignTransparency() {
               {transparency.publicEvidence.map((ev) => (
                 <div 
                   key={ev.id} 
-                  className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col group cursor-pointer hover-elevate transition-all duration-300"
+                  className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden flex flex-col group cursor-pointer hover-elevate transition-all duration-300"
                   onClick={() => setSelectedEvidence(ev)}
                 >
                   <div className="aspect-[4/3] relative overflow-hidden bg-secondary flex items-center justify-center">
@@ -408,7 +408,7 @@ export default function CampaignTransparency() {
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-3xl border border-dashed border-border p-16 text-center shadow-sm">
+            <div className="bg-card rounded-3xl border border-dashed border-border p-16 text-center shadow-sm">
               <Camera className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
               <h3 className="text-xl font-bold text-foreground mb-2">Sin evidencias aún</h3>
               <p className="text-muted-foreground">Las fotos y reportes de impacto aparecerán aquí una vez que se realicen las actividades.</p>

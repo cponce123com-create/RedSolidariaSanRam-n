@@ -229,7 +229,7 @@ export default function AdminCampaignDetail() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center gap-4 mb-8">
         <Link href="/admin/campanas">
-          <Button variant="ghost" size="icon" className="rounded-full shadow-sm bg-white"><ArrowLeft className="w-5 h-5"/></Button>
+          <Button variant="ghost" size="icon" className="rounded-full shadow-sm bg-card"><ArrowLeft className="w-5 h-5"/></Button>
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
@@ -423,21 +423,21 @@ export default function AdminCampaignDetail() {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white border border-border rounded-2xl p-4 shadow-sm flex items-center gap-4">
+            <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-red-100 text-red-600 rounded-xl"><Receipt className="w-6 h-6"/></div>
               <div>
                 <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Total Gastado</p>
                 <p className="text-2xl font-display font-bold">S/ {expenses?.reduce((sum, e) => sum + e.amount, 0).toLocaleString("es-PE") || "0"}</p>
               </div>
             </div>
-            <div className="bg-white border border-border rounded-2xl p-4 shadow-sm flex items-center gap-4">
+            <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-green-100 text-green-600 rounded-xl"><Eye className="w-6 h-6"/></div>
               <div>
                 <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Gasto Público</p>
                 <p className="text-2xl font-display font-bold text-green-700">S/ {expenses?.filter(e=>e.isPublic).reduce((sum, e) => sum + e.amount, 0).toLocaleString("es-PE") || "0"}</p>
               </div>
             </div>
-            <div className="bg-white border border-border rounded-2xl p-4 shadow-sm flex items-center gap-4">
+            <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex items-center gap-4">
               <div className="p-3 bg-secondary text-foreground rounded-xl"><ShieldAlert className="w-6 h-6"/></div>
               <div>
                 <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Registros</p>
@@ -518,7 +518,7 @@ export default function AdminCampaignDetail() {
             </Form>
           </div>
 
-          <div className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden" data-testid="expenses-table">
+          <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden" data-testid="expenses-table">
             <Table>
               <TableHeader className="bg-secondary/50">
                 <TableRow>
@@ -650,7 +650,7 @@ export default function AdminCampaignDetail() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="evidence-grid">
             {evidence?.map(ev => (
-              <div key={ev.id} className={`bg-white rounded-2xl border ${ev.isPublic ? 'border-border' : 'border-dashed border-orange-300 bg-orange-50/30'} shadow-sm overflow-hidden flex flex-col relative`}>
+              <div key={ev.id} className={`bg-card rounded-2xl border ${ev.isPublic ? 'border-border' : 'border-dashed border-orange-300 bg-orange-50/30'} shadow-sm overflow-hidden flex flex-col relative`}>
                 {!ev.isPublic && (
                   <div className="absolute top-2 left-2 z-10 bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1">
                     <EyeOff className="w-3 h-3"/> Privado

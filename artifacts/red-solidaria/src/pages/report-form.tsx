@@ -284,7 +284,7 @@ export default function ReportForm() {
                 onClick={() => form.setValue("isAnonymous", !isAnonymous)}
                 className={`relative w-12 h-6 rounded-full transition-colors ${isAnonymous ? "bg-primary" : "bg-border"}`}
               >
-                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${isAnonymous ? "translate-x-7" : "translate-x-1"}`} />
+                <span className={`absolute top-1 w-4 h-4 bg-card rounded-full shadow transition-transform ${isAnonymous ? "translate-x-7" : "translate-x-1"}`} />
               </button>
             </div>
 

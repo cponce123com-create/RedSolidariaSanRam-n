@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, Heart, X, AlertTriangle, Dog, Package } from "lucide-react";
+import { Menu, Heart, X, AlertTriangle, Dog, Package, Sun, Moon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "@/hooks/use-theme";
 
 type NavLinkItem = {
   href: string;
@@ -16,6 +17,7 @@ type NavLinkItem = {
 export function Navbar() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   const navLinks: NavLinkItem[] = [
     { href: "/", label: "Inicio" },
@@ -85,6 +87,17 @@ export function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-3">
+            {/* Toggle claro/oscuro */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label={theme === "dark" ? "Activar modo claro" : "Activar modo oscuro"}
+              className="rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary"
+            >
+              {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
+
             <Link href="/campanas">
               <Button className="hidden sm:flex rounded-full gap-2 font-semibold shadow-lg shadow-primary/25 hover-elevate text-sm px-4 h-9">
                 <Heart className="w-4 h-4" />

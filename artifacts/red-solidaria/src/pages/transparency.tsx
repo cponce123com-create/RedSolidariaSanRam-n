@@ -67,21 +67,21 @@ export default function Transparency() {
 
         {/* Resumen general */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+          <div className="bg-card rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
             <TrendingUp className="w-6 h-6 text-primary mx-auto mb-2" />
             <p className="text-2xl font-black">
               {statsQuery.data ? formatCurrency(statsQuery.data.totalAmount) : "—"}
             </p>
             <p className="text-sm text-muted-foreground mt-1">Recaudado (donaciones aprobadas)</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+          <div className="bg-card rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
             <Receipt className="w-6 h-6 text-primary mx-auto mb-2" />
             <p className="text-2xl font-black">
               {statsQuery.data ? statsQuery.data.totalDonations.toLocaleString("es-PE") : "—"}
             </p>
             <p className="text-sm text-muted-foreground mt-1">Donaciones registradas</p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+          <div className="bg-card rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
             <Users className="w-6 h-6 text-primary mx-auto mb-2" />
             <p className="text-2xl font-black">
               {statsQuery.data ? statsQuery.data.totalDonors.toLocaleString("es-PE") : "—"}
@@ -99,11 +99,11 @@ export default function Transparency() {
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm h-28 animate-pulse" />
+              <div key={i} className="bg-card rounded-2xl border border-gray-100 shadow-sm h-28 animate-pulse" />
             ))}
           </div>
         ) : campaigns.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-muted-foreground">
+          <div className="bg-card rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-muted-foreground">
             <Heart className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="font-medium">Todavía no hay campañas públicas con movimientos.</p>
             <p className="text-sm mt-1">Pronto publicaremos el detalle de cada iniciativa.</p>
@@ -113,7 +113,7 @@ export default function Transparency() {
             {campaigns.map((c) => {
               const pct = c.goal > 0 ? Math.min(100, Math.round((c.raised / c.goal) * 100)) : 0;
               return (
-                <div key={c.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div key={c.id} className="bg-card rounded-2xl border border-gray-100 shadow-sm p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                     <div>
                       <h3 className="font-bold text-lg">{c.title}</h3>

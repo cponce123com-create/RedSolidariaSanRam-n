@@ -14,9 +14,9 @@ export function Skeleton({ className, animation = "pulse" }: SkeletonProps) {
   return (
     <div
       className={cn(
-        "bg-gray-200 rounded",
+        "bg-muted rounded",
         animation === "pulse" && "animate-pulse",
-        animation === "shine" && "relative overflow-hidden bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]",
+        animation === "shine" && "relative overflow-hidden bg-gradient-to-r from-muted via-secondary to-muted bg-[length:200%_100%] animate-[shimmer_1.5s_infinite]",
         className
       )}
     />
@@ -25,7 +25,7 @@ export function Skeleton({ className, animation = "pulse" }: SkeletonProps) {
 
 export function CardSkeleton() {
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 space-y-4">
+    <div className="bg-card rounded-lg shadow-md p-6 space-y-4">
       <Skeleton className="h-48 w-full" animation="pulse" />
       <Skeleton className="h-6 w-3/4" />
       <Skeleton className="h-4 w-full" />
@@ -81,7 +81,7 @@ export function DashboardSkeleton() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-white p-6 rounded-lg shadow">
+          <div key={i} className="bg-card p-6 rounded-lg shadow">
             <Skeleton className="h-4 w-24 mb-2" />
             <Skeleton className="h-8 w-16" />
           </div>
