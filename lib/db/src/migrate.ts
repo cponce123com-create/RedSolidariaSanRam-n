@@ -62,6 +62,28 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_donations_campaign_status ON donations(campaign_id, status);
     `,
   },
+  {
+    name: "005_campaign_movements.sql",
+    sql: `
+      -- Ledger inmutable de movimientos (Trust Pay): cadena de hashes.
+      -- Append-only; nunca UPDATE/DELETE. La unicidad por (source_type,
+      -- source_id) garantiza que una donación/gasto solo genera UNA entrada.
+      CREATE TABLE IF NOT EXISTS campaign_movements (
+        id serial PRIMARY KEY,
+        campaign_id integer NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        kind text NOT NULL,
+        amount real NOT NULL,
+        description text NOT NULL,
+        source_type text NOT NULL,
+        source_id integer NOT NULL,
+        prev_hash text NOT NULL,
+        hash text NOT NULL,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_movements_campaign ON campaign_movements(campaign_id, id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_movements_source ON campaign_movements(source_type, source_id);
+    `,
+  },
 ];
 
 /**

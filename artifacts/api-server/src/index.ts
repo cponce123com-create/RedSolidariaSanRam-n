@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
 import { runMigrations } from "@workspace/db";
+import { startLedgerAnchorJob } from "./lib/anchor";
 
 const rawPort = process.env["PORT"];
 
@@ -27,6 +28,9 @@ app.listen(port, (err) => {
 
   logger.info({ port }, "Server listening");
 });
+
+// Ledger Trust Pay: ancla el root hash global al arranque y cada 24h.
+startLedgerAnchorJob();
 
 seedIfEmpty().catch((err) => {
   logger.error({ err }, "Failed to seed database, starting server anyway");

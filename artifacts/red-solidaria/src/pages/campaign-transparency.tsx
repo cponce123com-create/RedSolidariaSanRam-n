@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useCampaignTransparency, Evidence } from "@/hooks/use-phase3";
+import { useCampaignTransparency, useCampaignLedger, useCampaignLedgerVerify, Evidence } from "@/hooks/use-phase3";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Shield, 
+  ShieldCheck,
+  ShieldAlert,
+  Link2,
   Target, 
   TrendingUp, 
   Receipt, 
@@ -40,6 +43,8 @@ export default function CampaignTransparency() {
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
 
   const { data: transparency, isLoading, isError } = useCampaignTransparency(campaignId);
+  const { data: movements, isLoading: loadingMovements } = useCampaignLedger(campaignId);
+  const { data: verify, isLoading: loadingVerify } = useCampaignLedgerVerify(campaignId);
 
   if (isLoading) {
     return (
@@ -211,29 +216,61 @@ export default function CampaignTransparency() {
         {/* Two Column Layout for Movements and Expenses */}
         <div className="grid lg:grid-cols-3 gap-8 mb-12">
           
-          {/* Recent Movements */}
+          {/* Movements Ledger (Trust Pay) */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full">
-              <h3 className="text-xl font-display font-bold mb-6 flex items-center gap-2">
-                <ArrowLeft className="w-5 h-5 text-muted-foreground rotate-45" /> Últimos Movimientos
+            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full flex flex-col">
+              <h3 className="text-xl font-display font-bold mb-2 flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-primary" /> Movimientos Verificables
               </h3>
-              
-              {transparency.recentMovements.length > 0 ? (
-                <div className="space-y-5">
-                  {transparency.recentMovements.map((mov, i) => (
-                    <div key={i} className="flex items-start gap-4">
-                      <div className={`mt-0.5 p-2 rounded-full flex-shrink-0 ${mov.type === 'ingreso' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-700'}`}>
-                        {mov.type === 'ingreso' ? <TrendingUp className="w-4 h-4" /> : <Receipt className="w-4 h-4" />}
+
+              <div className="mb-5">
+                {loadingVerify || !verify ? (
+                  <Badge variant="outline" className="bg-gray-50 text-muted-foreground border-border px-3 py-1 text-xs font-semibold">
+                    Verificando integridad…
+                  </Badge>
+                ) : verify.count === 0 ? (
+                  <Badge variant="outline" className="bg-gray-50 text-muted-foreground border-border px-3 py-1 text-xs font-semibold">
+                    Sin movimientos registrados
+                  </Badge>
+                ) : verify.verified ? (
+                  <Badge className="bg-green-100 text-green-700 border-green-200 border px-3 py-1 text-xs font-semibold gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" /> Cadena íntegra · {verify.count} movimientos
+                  </Badge>
+                ) : (
+                  <Badge className="bg-red-100 text-red-700 border-red-200 border px-3 py-1 text-xs font-semibold gap-1">
+                    <ShieldAlert className="w-3.5 h-3.5" /> ¡Integridad comprometida!
+                  </Badge>
+                )}
+              </div>
+
+              {loadingMovements ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-14 bg-secondary/60 rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              ) : movements && movements.length > 0 ? (
+                <div className="space-y-5 overflow-y-auto max-h-[480px] pr-1">
+                  {movements.map((mov) => (
+                    <div key={mov.id} className="flex items-start gap-4">
+                      <div className={`mt-0.5 p-2 rounded-full flex-shrink-0 ${mov.kind === 'ingreso' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-700'}`}>
+                        {mov.kind === 'ingreso' ? <TrendingUp className="w-4 h-4" /> : <Receipt className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-start mb-1 gap-2">
                           <p className="text-sm font-semibold text-foreground truncate">{mov.description}</p>
-                          <span className={`text-sm font-bold whitespace-nowrap ${mov.type === 'ingreso' ? 'text-green-700' : 'text-foreground'}`}>
-                            {mov.type === 'ingreso' ? '+' : '-'}{formatCurrency(mov.amount)}
+                          <span className={`text-sm font-bold whitespace-nowrap ${mov.kind === 'ingreso' ? 'text-green-700' : 'text-foreground'}`}>
+                            {mov.kind === 'ingreso' ? '+' : '-'}{formatCurrency(mov.amount)}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(mov.date), "dd MMM, HH:mm", { locale: es })}
+                          {format(new Date(mov.createdAt), "dd MMM, HH:mm", { locale: es })}
+                          <span
+                            className="ml-2 font-mono text-[10px] text-primary/70"
+                            title={`Huella criptográfica: ${mov.hash}`}
+                          >
+                            #{mov.hash.slice(0, 8)}
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -242,7 +279,10 @@ export default function CampaignTransparency() {
               ) : (
                 <div className="text-center py-10 text-muted-foreground">
                   <Receipt className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                  <p>Sin movimientos aún</p>
+                  <p className="text-sm font-medium">Sin movimientos aún</p>
+                  <p className="text-xs mt-2 max-w-[240px] mx-auto">
+                    Cada donación aprobada y gasto público queda registrado aquí con su huella criptográfica.
+                  </p>
                 </div>
               )}
             </div>

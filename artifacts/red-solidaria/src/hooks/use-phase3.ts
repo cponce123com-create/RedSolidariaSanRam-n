@@ -205,3 +205,51 @@ export function useDeleteEvidence(campaignId: number) {
     },
   });
 }
+
+// ─── Ledger Trust Pay: movimientos hash-chained y verificación pública ───────
+
+export interface LedgerMovement {
+  id: number;
+  campaignId: number;
+  kind: "ingreso" | "gasto";
+  amount: number;
+  description: string;
+  sourceType: "donation" | "expense";
+  sourceId: number;
+  prevHash: string;
+  hash: string;
+  createdAt: string;
+}
+
+export interface LedgerVerifyResult {
+  campaignId: number;
+  verified: boolean;
+  brokenAt: number | null;
+  rootHash: string | null;
+  count: number;
+  verifiedAt: string;
+}
+
+export function useCampaignLedger(id: number, limit = 100) {
+  return useQuery<LedgerMovement[]>({
+    queryKey: ["/api/campaigns", id, "movements"],
+    queryFn: async () => {
+      const res = await fetch(`/api/campaigns/${id}/movements?limit=${limit}`);
+      if (!res.ok) throw new Error("Failed to fetch movements");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCampaignLedgerVerify(id: number) {
+  return useQuery<LedgerVerifyResult>({
+    queryKey: ["/api/campaigns", id, "movements", "verify"],
+    queryFn: async () => {
+      const res = await fetch(`/api/campaigns/${id}/movements/verify`);
+      if (!res.ok) throw new Error("Failed to verify movements");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}

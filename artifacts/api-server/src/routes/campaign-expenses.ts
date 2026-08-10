@@ -3,6 +3,7 @@ import { db, campaignExpensesTable, insertCampaignExpenseSchema } from "@workspa
 import { eq, and } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
+import { appendMovement } from "../lib/ledger";
 
 const router: IRouter = Router();
 
@@ -32,7 +33,23 @@ router.post(
     try {
       const campaignId = Number(req.params.id);
       const data = insertCampaignExpenseSchema.parse({ ...req.body, campaignId });
-      const [expense] = await db.insert(campaignExpensesTable).values(data).returning();
+      const expense = await db.transaction(async (tx) => {
+        const [exp] = await tx.insert(campaignExpensesTable).values(data).returning();
+        // Ledger Trust Pay: los gastos PÚBLICOS quedan encadenados en el
+        // ledger inmutable. Ediciones/deletes posteriores no tocan la cadena
+        // (append-only); el auditor ve el registro original.
+        if (exp.isPublic) {
+          await appendMovement(tx, campaignId, {
+            kind: "gasto",
+            amount: exp.amount,
+            description: exp.description,
+            sourceType: "expense",
+            sourceId: exp.id,
+            createdAt: new Date(exp.createdAt),
+          });
+        }
+        return exp;
+      });
       res.status(201).json(formatExpense(expense));
     } catch (err) {
       req.log.error({ err }, "Failed to create campaign expense");

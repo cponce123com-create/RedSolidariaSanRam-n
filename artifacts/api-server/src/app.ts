@@ -162,6 +162,9 @@ app.use(
     store: new PostgresSessionStore({
       pool,
       tableName: "session",
+      // Auto-crea la tabla de sesiones en DBs frescas (sin esto el login
+      // falla con "relation session does not exist" en entornos nuevos).
+      createTableIfMissing: true,
       // Limpieza periódica de sesiones expiradas (evita crecimiento del store)
       pruneSessionInterval: 300,
     }),

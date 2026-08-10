@@ -10,6 +10,7 @@ import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
 import { logAuditAction } from "../middleware/auth-utils";
+import { appendMovement } from "../lib/ledger";
 
 const router: IRouter = Router();
 
@@ -121,7 +122,8 @@ router.get("/donations/:id", requireAdmin, async (req, res) => {
   }
 });
 
-// PUT /donations/:id — solo admin (aprobar/rechazar) con audit log
+// PUT /donations/:id — solo admin (aprobar/rechazar) con audit log.
+// Transaccional: aprobar una donación encadena el ingreso en el ledger Trust Pay.
 router.put("/donations/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -129,11 +131,39 @@ router.put("/donations/:id", requireAdmin, adminActionLimiter, async (req, res) 
     if (!["pending", "approved", "rejected"].includes(status)) {
       return res.status(400).json({ error: "validation_error", message: "Invalid status" });
     }
-    const [donation] = await db
-      .update(donationsTable)
-      .set({ status, adminNote: adminNote || null })
-      .where(eq(donationsTable.id, id))
-      .returning();
+
+    const donation = await db.transaction(async (tx) => {
+      // Lock de la fila: evita doble aprobación concurrente (y doble entrada de ledger).
+      const [existing] = await tx
+        .select()
+        .from(donationsTable)
+        .where(eq(donationsTable.id, id))
+        .for("update");
+      if (!existing) return null;
+
+      const [updated] = await tx
+        .update(donationsTable)
+        .set({ status, adminNote: adminNote || null })
+        .where(eq(donationsTable.id, id))
+        .returning();
+
+      // Ledger Trust Pay: solo en la transición → approved (la unicidad
+      // source_type+source_id del ledger protege contra duplicados).
+      if (updated.campaignId != null && existing.status !== "approved" && status === "approved") {
+        await appendMovement(tx, updated.campaignId, {
+          kind: "ingreso",
+          amount: updated.amount,
+          description: updated.anonymous
+            ? "Donación anónima"
+            : `Donación de ${updated.firstName} ${updated.lastName}`.trim(),
+          sourceType: "donation",
+          sourceId: updated.id,
+          createdAt: new Date(),
+        });
+      }
+      return updated;
+    });
+
     if (!donation) {
       return res.status(404).json({ error: "not_found", message: "Donation not found" });
     }
