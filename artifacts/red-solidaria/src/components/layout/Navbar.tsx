@@ -38,9 +38,9 @@ export function Navbar() {
           <Link href="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
               <img
-                src={`${import.meta.env.BASE_URL}images/logo.png`}
+                src={`${import.meta.env.BASE_URL}images/logo.webp`}
                 alt="Logo"
-                className="w-8 h-8 object-contain"
+                className="w-8 h-8 rounded-full object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.parentElement!.innerHTML = '<svg class="w-6 h-6 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>';

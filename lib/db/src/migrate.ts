@@ -52,6 +52,16 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS two_factor_enabled boolean NOT NULL DEFAULT false;
     `,
   },
+  {
+    name: "004_donations_campaign_status.sql",
+    sql: `
+      -- Índice compuesto para las agregaciones públicas por campaña
+      -- (count/sum filter where status='approved'): con solo índices
+      -- individuales en campaign_id y status, Postgres escanea + filtra;
+      -- el compuesto permite un Index Only Scan directo.
+      CREATE INDEX IF NOT EXISTS idx_donations_campaign_status ON donations(campaign_id, status);
+    `,
+  },
 ];
 
 /**

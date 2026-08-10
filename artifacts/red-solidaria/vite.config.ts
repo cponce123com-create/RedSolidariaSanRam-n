@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { gzipSync } from "node:zlib";
+import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
 import runtimeErrorModal from "@replit/vite-plugin-runtime-error-modal";
 
 // PORT y BASE_PATH los inyectan Replit y el script dev del root; fuera de esos
@@ -48,12 +48,13 @@ function preloadHomeChunk(): Plugin {
   };
 }
 
-// Genera un archivo .gz junto a cada asset .js/.css. Express lo sirve con
-// Content-Encoding: gzip cuando el cliente lo acepta (el API no usa el paquete
-// compression; sin esto el bundle de ~676 kB viaja crudo).
-function gzipBuildAssets(): Plugin {
+// Genera .gz y .br junto a cada asset .js/.css. Express los sirve con el
+// Content-Encoding que acepte el cliente: brotli (~15-20% más pequeño que
+// gzip) se prefiere cuando el navegador lo soporta. Sin esto el bundle de
+// ~676 kB viajaría crudo.
+function precompressBuildAssets(): Plugin {
   return {
-    name: "gzip-build-assets",
+    name: "precompress-build-assets",
     apply: "build",
     closeBundle() {
       const assetsDir = path.resolve(import.meta.dirname, "dist/public/assets");
@@ -64,22 +65,28 @@ function gzipBuildAssets(): Plugin {
         return;
       }
       for (const f of files) {
-        if (!/\.(js|css)$/.test(f) || f.endsWith(".gz")) continue;
+        if (!/\.(js|css)$/.test(f) || f.endsWith(".gz") || f.endsWith(".br")) continue;
         const src = readFileSync(path.join(assetsDir, f));
         writeFileSync(path.join(assetsDir, `${f}.gz`), gzipSync(src, { level: 9 }));
+        writeFileSync(
+          path.join(assetsDir, `${f}.br`),
+          brotliCompressSync(src, {
+            params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 11 },
+          }),
+        );
       }
     },
   };
 }
 
-export default defineConfig({
+export default defineConfig(async ({ mode }) => ({
   base: basePath,
   plugins: [
     react(),
     tailwindcss(),
     runtimeErrorModal(),
     preloadHomeChunk(),
-    gzipBuildAssets(),
+    precompressBuildAssets(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -112,7 +119,10 @@ export default defineConfig({
     emptyOutDir: true,
     target: "esnext",
     minify: "esbuild",
-    sourcemap: true,
+    // Sourcemaps SOLO en desarrollo: en producción exponen el código fuente
+    // completo (~7 MB de .map servidos públicamente en /assets/*.map) y
+    // duplican el peso del deploy. Los .map en dev permiten debuggear.
+    sourcemap: mode === "development",
     // NO usar manualChunks personalizado: partir react/react-dom/react-query en
     // chunks separados crea imports circulares entre chunks y los consumidores
     // CJS (p.ej. @tanstack/react-query → use-sync-external-store/shim) llaman a
@@ -148,4 +158,4 @@ export default defineConfig({
       "use-sync-external-store",
     ],
   },
-});
+}));

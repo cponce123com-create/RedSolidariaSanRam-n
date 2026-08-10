@@ -30,7 +30,7 @@ router.get("/campaigns", async (req, res) => {
     const rows = await db
       .select({
         campaign: campaignsTable,
-        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')`,
+        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')::int`,
         raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)`,
       })
       .from(campaignsTable)
@@ -58,7 +58,7 @@ router.get("/campaigns/:id", async (req, res) => {
     const [row] = await db
       .select({
         campaign: campaignsTable,
-        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')`,
+        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')::int`,
         raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)`,
       })
       .from(campaignsTable)
@@ -82,9 +82,25 @@ router.get("/campaigns/:id", async (req, res) => {
 // GET /campaigns/:id/donors — público: donantes aprobados de la campaña.
 // Nunca expone email/phone; el nombre se omite si la donación es anónima y
 // el comprobante solo se muestra si el donante autorizó (publicProof).
+// Paginado: ?limit= (default 50, máx 200) & ?offset= ; el total va en X-Total-Count.
 router.get("/campaigns/:id/donors", async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+
+    const approved = and(
+      eq(donationsTable.campaignId, campaignId),
+      eq(donationsTable.status, "approved"),
+    );
+
+    // count(*)::int → pg devuelve int4 como number (count nativo viene como string)
+    const [countRow] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(donationsTable)
+      .where(approved);
+    res.setHeader("X-Total-Count", String(countRow?.total ?? 0));
+
     const donors = await db
       .select({
         id: donationsTable.id,
@@ -98,13 +114,10 @@ router.get("/campaigns/:id/donors", async (req, res) => {
         createdAt: donationsTable.createdAt,
       })
       .from(donationsTable)
-      .where(
-        and(
-          eq(donationsTable.campaignId, campaignId),
-          eq(donationsTable.status, "approved"),
-        ),
-      )
-      .orderBy(desc(donationsTable.createdAt));
+      .where(approved)
+      .orderBy(desc(donationsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
 
     res.json(
       donors.map((d) => ({

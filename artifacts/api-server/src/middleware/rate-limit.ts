@@ -1,4 +1,5 @@
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import type { Request, Response, NextFunction } from "express";
 
 // Rate limiter general para la API - más estricto con configuración mejorada
 export const apiLimiter = rateLimit({
@@ -116,3 +117,13 @@ export const uploadSignatureLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// Limiter global de /api para tráfico anónimo: las sesiones admin autenticadas
+// se eximen porque ya tienen su propio presupuesto (adminActionLimiter, por
+// usuario y no por IP). Sin esta exención un panel admin activo (dashboard +
+// tablas) puede agotar el límite global por IP y quedar bloqueado, arrastrando
+// también a otros usuarios detrás de la misma IP (p. ej. CGNAT móvil).
+export function publicApiLimiter(req: Request, res: Response, next: NextFunction) {
+  if ((req as any).session?.adminUser) return next();
+  return apiLimiter(req, res, next);
+}

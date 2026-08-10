@@ -21,6 +21,8 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
         <img 
           src={campaign.imageUrl || `https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800&q=80`} 
           alt={campaign.title}
+          loading="lazy"
+          decoding="async"
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
         <div className="absolute top-4 left-4 flex gap-2">

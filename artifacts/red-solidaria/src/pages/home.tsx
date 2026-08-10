@@ -377,7 +377,7 @@ export default function Home() {
                   >
                     <div className="aspect-[4/3] bg-secondary relative overflow-hidden">
                       {photo ? (
-                        <img src={photo} alt={report.title} className="w-full h-full object-cover" />
+                        <img src={photo} alt={report.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <TypeIcon className="w-16 h-16 text-muted-foreground opacity-20" />
@@ -463,6 +463,8 @@ export default function Home() {
         <img 
           src="https://images.unsplash.com/photo-1593113598332-cd288d649433?w=1600&q=80" 
           alt="Kids playing" 
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover opacity-20"
         />
         <div className="absolute inset-0 bg-primary/90 mix-blend-multiply" />

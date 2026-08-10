@@ -12,6 +12,7 @@ function loc(path: string) {
 }
 
 router.get("/sitemap.xml", async (_req, res) => {
+  res.setHeader("Cache-Control", "public, max-age=3600");
   const [allCampaigns, allNews, allPets] = await Promise.all([
     db.select({ id: campaignsTable.id }).from(campaignsTable),
     db.select({ id: newsTable.id }).from(newsTable),
@@ -37,6 +38,7 @@ ${all.map(loc).join("\n")}
 // robots.txt
 router.get("/robots.txt", (_req, res) => {
   res.setHeader("Content-Type", "text/plain");
+  res.setHeader("Cache-Control", "public, max-age=3600");
   res.send(`User-agent: *\nAllow: /\nDisallow: /admin/\nSitemap: ${BASE_URL}/sitemap.xml\n`);
 });
 

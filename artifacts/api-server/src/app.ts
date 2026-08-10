@@ -6,6 +6,7 @@ import express, {
 } from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 import pinoHttp from "pino-http";
 import session from "express-session";
 import pgSession from "connect-pg-simple";
@@ -13,7 +14,8 @@ import path from "path";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import { pool } from "@workspace/db";
-import { apiLimiter } from "./middleware/rate-limit";
+import { publicApiLimiter } from "./middleware/rate-limit";
+import { publicApiCache } from "./middleware/cache-control";
 import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
@@ -94,12 +96,19 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Compresión gzip/brotli para respuestas JSON del API y estáticos sin
+// pre-comprimir (los assets /assets/*.gz ya viajan gzip: compression detecta
+// Content-Encoding existente y los deja intactos). Umbral 256B: responde
+// también a payloads pequeños como /campaigns en redes lentas.
+app.use(compression({ threshold: 256 }));
+
 // SEO: sitemap.xml y robots.txt en la raíz del dominio (no bajo /api) y ANTES
 // del SPA fallback y de los archivos estáticos de producción.
 app.use(sitemapRouter);
 
-// Rate limiter global para toda la API
-app.use("/api", apiLimiter);
+// El rate limiter global de /api se monta DESPUÉS de la sesión (ver abajo):
+// publicApiLimiter exime a los admins autenticados, que tienen presupuesto
+// propio vía adminActionLimiter.
 
 // Validación de variables obligatorias en cualquier entorno que no sea
 // desarrollo local: evita que las credenciales por defecto (o secretos
@@ -171,6 +180,13 @@ app.use(
   }),
 );
 
+// Rate limiter global para /api: tráfico anónimo (sesiones admin exentas).
+// Va DESPUÉS de la sesión para poder detectar adminUser.
+app.use("/api", publicApiLimiter);
+
+// Caché pública (max-age 60s) para GETs anónimos de endpoints públicos.
+app.use("/api", publicApiCache);
+
 app.use("/api", router);
 
 // Servir archivos estáticos del frontend en producción con caching optimizado
@@ -186,23 +202,44 @@ if (process.env.NODE_ENV === "production") {
   // Assets pre-comprimidos (.gz generados por el build de Vite): el bundle JS
   // principal (~676 kB) viaja a ~200 kB cuando el cliente acepta gzip. Sin esto
   // Express serviría los archivos crudos (no usa el paquete compression).
-  const GZIP_CONTENT_TYPES: Record<string, string> = {
+  const STATIC_CONTENT_TYPES: Record<string, string> = {
     ".js": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
   };
   app.use("/assets", (req, res, next) => {
-    if (!req.headers["accept-encoding"]?.includes("gzip")) return next();
     // Nota: dentro de app.use("/assets", ...) req.path ya NO incluye el prefijo
     // /assets; originalUrl sí lo incluye (sin query string).
-    const gzFile = path.join(staticPath, `${req.originalUrl.split("?")[0]}.gz`);
-    if (!fs.existsSync(gzFile)) return next();
-    res.setHeader("Content-Encoding", "gzip");
-    res.setHeader(
-      "Content-Type",
-      GZIP_CONTENT_TYPES[path.extname(req.path)] || "application/octet-stream",
-    );
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    return res.sendFile(gzFile);
+    const accept = req.headers["accept-encoding"] ?? "";
+    const url = req.originalUrl.split("?")[0];
+    const ext = path.extname(url);
+    // Brotli primero: es ~15-20% más pequeño que gzip con la misma calidad.
+    if (accept.includes("br")) {
+      const brFile = path.join(staticPath, `${url}.br`);
+      if (fs.existsSync(brFile)) {
+        res.setHeader("Content-Encoding", "br");
+        res.setHeader(
+          "Content-Type",
+          STATIC_CONTENT_TYPES[ext] || "application/octet-stream",
+        );
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.setHeader("Vary", "Accept-Encoding");
+        return res.sendFile(brFile);
+      }
+    }
+    if (accept.includes("gzip")) {
+      const gzFile = path.join(staticPath, `${url}.gz`);
+      if (fs.existsSync(gzFile)) {
+        res.setHeader("Content-Encoding", "gzip");
+        res.setHeader(
+          "Content-Type",
+          STATIC_CONTENT_TYPES[ext] || "application/octet-stream",
+        );
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.setHeader("Vary", "Accept-Encoding");
+        return res.sendFile(gzFile);
+      }
+    }
+    next();
   });
 
   // Assets estáticos con cache de 1 año (hash en nombres de archivo).

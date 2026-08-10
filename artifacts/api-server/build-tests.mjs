@@ -10,6 +10,7 @@ await build({
   entryPoints: [
     "./src/middleware/require-admin.ts",
     "./src/middleware/rate-limit.ts",
+    "./src/middleware/cache-control.ts",
     "./src/lib/cloudinary.ts",
     "./src/lib/donor-format.ts",
     "./src/lib/totp.ts",

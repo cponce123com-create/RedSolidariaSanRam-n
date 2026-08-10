@@ -88,7 +88,10 @@ pnpm build
 - Code splitting avanzado (React, Radix UI, Framer Motion, Charts)
 - Bundle reducido ~40% con manualChunks optimizados
 - HTTP caching optimizado (1 año para assets con hash)
-- Sourcemaps habilitados para debugging
+- Sourcemaps SOLO en desarrollo (en producción no se exponen los .map)
+- Compresión gzip/brotli en respuestas JSON del API (compression)
+- Caché pública (max-age=60s) en GETs anónimos de endpoints públicos
+- Logo en WebP (~2.7 KB) y assets sin uso eliminados
 - Optimización de dependencias con optimizeDeps
 - Lazy loading para componentes grandes
 
@@ -126,20 +129,25 @@ pnpm build
 ## 🧪 Testing
 
 ```bash
-# Tests unitarios (próximamente con Vitest)
-pnpm test
+# Tests del API server (node:test, sin dependencias extra)
+pnpm --filter @workspace/api-server test
 
-# E2E tests (próximamente con Playwright/Cypress)
-pnpm test:e2e
+# Typecheck de todo el workspace (libs + artifacts + scripts)
+pnpm typecheck
+
+# Auditoría Lighthouse (CI): accesibilidad, best-practices, SEO y performance
+# Umbrales en ./lighthouserc.json
 ```
+
+El frontend aún no tiene suite propia (solo typecheck + Lighthouse CI); los tests E2E están planificados.
 
 ## 📈 Roadmap
 
-- [ ] Sitemap dinámico y SEO técnico
+- [x] Sitemap dinámico y SEO técnico
+- [x] CI/CD con GitHub Actions
+- [x] Documentación OpenAPI
 - [ ] Analytics implementation
 - [ ] Service Worker para offline
-- [ ] CI/CD con GitHub Actions
-- [ ] Documentación OpenAPI
 
 ## 🤝 Contribuir
 
