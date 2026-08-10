@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Auditoría Lighthouse manual: permite apuntar a un preview específico.
+  # Sin input usa la demo pública shareish.org.
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL para auditar (default: https://shareish.org)"
+        required: false
+        default: ""
+
+jobs:
+  backend:
+    name: Backend (Django)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s --health-timeout=5s --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      # La imagen del backend instala GDAL + torch (mismo entorno que prod);
+      # compilar eso con pip en el runner (ubuntu con GDAL 3.8) rompería el
+      # pin GDAL==3.0.4, así que los tests corren DENTRO de la imagen oficial.
+      - name: Build imagen del backend (GDAL + torch)
+        run: docker build -t shareish-backend ./backend
+
+      # Los tests crean su propia test DB; migrate previo valida las migraciones.
+      - name: Migraciones y tests Django
+        env:
+          SECRET_KEY: ci-only-secret-key
+          DEBUG: "False"
+          DEV: "False"
+          # Ojo: el settings.py de Shareish mapea POSTGRES_DB → HOST y
+          # POSTGRES_NAME → nombre de la DB (nombres poco intuitivos).
+          POSTGRES_DB: 127.0.0.1
+          POSTGRES_NAME: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: "5432"
+        run: |
+          docker run --rm --network=host 
+            -e SECRET_KEY="$SECRET_KEY" -e DEBUG="$DEBUG" -e DEV="$DEV" 
+            -e POSTGRES_DB="$POSTGRES_DB" -e POSTGRES_NAME="$POSTGRES_NAME" 
+            -e POSTGRES_USER="$POSTGRES_USER" -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" 
+            -e POSTGRES_PORT="$POSTGRES_PORT" 
+            shareish-backend python manage.py migrate --noinput
+          docker run --rm --network=host 
+            -e SECRET_KEY="$SECRET_KEY" -e DEBUG="$DEBUG" -e DEV="$DEV" 
+            -e POSTGRES_DB="$POSTGRES_DB" -e POSTGRES_NAME="$POSTGRES_NAME" 
+            -e POSTGRES_USER="$POSTGRES_USER" -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" 
+            -e POSTGRES_PORT="$POSTGRES_PORT" 
+            shareish-backend python manage.py test
+
+  frontend:
+    name: Frontend (Vue 2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # node-sass ^4.13 NO compila en Node >=16 (bindings nativos).
+          # Node 14 = mismo que el Dockerfile del frontend.
+          node-version: 14
+          cache: npm
+      - name: "Instalar dependencias (igual que el Dockerfile: --force)"
+        run: npm install --force
+      - name: Lint
+        run: npm run lint
+      - name: Build de producción
+        run: npm run build
+
+  lighthouse:
+    name: Lighthouse CI (a11y, SEO, best-practices, perf)
+    runs-on: ubuntu-latest
+    # Informativo: mide la demo pública / preview pero no bloquea los PRs.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Auditoría Lighthouse
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ inputs.url || 'https://shareish.org' }}
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true

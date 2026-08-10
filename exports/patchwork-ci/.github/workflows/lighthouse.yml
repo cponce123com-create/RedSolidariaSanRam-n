@@ -1,0 +1,52 @@
+name: Lighthouse CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL externa a auditar (vacío = preview local del web)"
+        required: false
+        default: ""
+
+jobs:
+  lighthouse:
+    name: Lighthouse (a11y, SEO, best-practices, perf)
+    runs-on: ubuntu-latest
+    # Informativo: mide el shell del web sin bloquear PRs.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Preview local autocontenido: audita el web de CADA PR sin URL externa
+      # (la API no corre en CI: el shell, a11y, SEO y LCP se miden igual).
+      - name: Instalar y compilar el web
+        if: inputs.url == ''
+        run: |
+          npm ci
+          VITE_API_BASE_URL=/api npm run build -w @patchwork/web
+      - name: Servir dist en background
+        if: inputs.url == ''
+        run: nohup python3 -m http.server 4173 -d apps/web/dist >/tmp/preview.log 2>&1 &
+
+      - name: Auditoría Lighthouse (URL externa)
+        if: inputs.url != ''
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: ${{ inputs.url }}
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+
+      - name: Auditoría Lighthouse (preview local)
+        if: inputs.url == ''
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: http://127.0.0.1:4173
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
