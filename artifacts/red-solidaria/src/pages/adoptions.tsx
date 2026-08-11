@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
@@ -20,15 +21,16 @@ interface Pet {
 
 const SPECIES_ICON: Record<string, React.ElementType> = { perro: Dog, gato: Cat };
 
+// Los valores son claves i18n: los etiquetados se traducen con t() en el render.
 const SIZE_LABELS: Record<string, string> = {
-  small: "Pequeño", medium: "Mediano", large: "Grande", giant: "Gigante",
+  small: "adoptions.sizeSmall", medium: "adoptions.sizeMedium", large: "adoptions.sizeLarge", giant: "adoptions.sizeGiant",
 };
 
 const AGE_LABELS: Record<string, string> = {
-  puppy: "Cachorro", adult: "Adulto", senior: "Adulto mayor",
+  puppy: "adoptions.agePuppy", adult: "adoptions.ageAdult", senior: "adoptions.ageSenior",
 };
 
-const SEX_LABELS: Record<string, string> = { macho: "Macho", hembra: "Hembra" };
+const SEX_LABELS: Record<string, string> = { macho: "adoptions.sexMale", hembra: "adoptions.sexFemale" };
 
 const HEALTH_COLORS: Record<string, string> = {
   excellent: "text-green-600", good: "text-green-500",
@@ -36,6 +38,7 @@ const HEALTH_COLORS: Record<string, string> = {
 };
 
 function PetCard({ pet }: { pet: Pet }) {
+  const { t } = useTranslation();
   const photo = pet.photos?.[0];
   const SpeciesIcon = SPECIES_ICON[pet.species] || Dog;
 
@@ -54,16 +57,16 @@ function PetCard({ pet }: { pet: Pet }) {
         )}
         {pet.urgent && (
           <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
-            <AlertTriangle className="w-3 h-3" /> URGENTE
+            <AlertTriangle className="w-3 h-3" /> {t("adoptions.urgentBadge")}
           </div>
         )}
         <div className="absolute top-3 right-3 bg-card/90 backdrop-blur-sm text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
           <SpeciesIcon className="w-3.5 h-3.5 text-amber-600" />
-          {pet.species === "perro" ? "Perro" : "Gato"}
+          {pet.species === "perro" ? t("adoptions.speciesDog") : t("adoptions.speciesCat")}
         </div>
         {pet.status === "in-process" && (
           <div className="absolute bottom-0 left-0 right-0 bg-blue-600/90 text-white text-xs font-bold text-center py-1.5">
-            En proceso de adopción
+            {t("adoptions.inProcess")}
           </div>
         )}
       </div>
@@ -72,11 +75,11 @@ function PetCard({ pet }: { pet: Pet }) {
         <div>
           <div className="flex items-center justify-between mb-1">
             <h3 className="font-display font-bold text-xl">{pet.name}</h3>
-            <span className="text-xs text-muted-foreground">{SEX_LABELS[pet.sex] || pet.sex}</span>
+            <span className="text-xs text-muted-foreground">{SEX_LABELS[pet.sex] ? t(SEX_LABELS[pet.sex]) : pet.sex}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-            <span className="bg-secondary px-2 py-0.5 rounded-full">{AGE_LABELS[pet.ageCategory] || pet.ageCategory}</span>
-            <span className="bg-secondary px-2 py-0.5 rounded-full">{SIZE_LABELS[pet.size] || pet.size}</span>
+            <span className="bg-secondary px-2 py-0.5 rounded-full">{AGE_LABELS[pet.ageCategory] ? t(AGE_LABELS[pet.ageCategory]) : pet.ageCategory}</span>
+            <span className="bg-secondary px-2 py-0.5 rounded-full">{SIZE_LABELS[pet.size] ? t(SIZE_LABELS[pet.size]) : pet.size}</span>
             {pet.breed && <span className="text-muted-foreground/70">{pet.breed}</span>}
           </div>
         </div>
@@ -86,17 +89,17 @@ function PetCard({ pet }: { pet: Pet }) {
         <div className="flex items-center gap-3 text-xs flex-wrap">
           {pet.vaccinated && (
             <span className="flex items-center gap-1 text-green-700">
-              <Syringe className="w-3.5 h-3.5" /> Vacunado
+              <Syringe className="w-3.5 h-3.5" /> {t("adoptions.vaccinated")}
             </span>
           )}
           {pet.sterilized && (
             <span className="flex items-center gap-1 text-blue-600">
-              <Scissors className="w-3.5 h-3.5" /> Esterilizado
+              <Scissors className="w-3.5 h-3.5" /> {t("adoptions.sterilized")}
             </span>
           )}
           {pet.dewormed && (
             <span className="flex items-center gap-1 text-purple-600">
-              <Shield className="w-3.5 h-3.5" /> Desparasitado
+              <Shield className="w-3.5 h-3.5" /> {t("adoptions.dewormed")}
             </span>
           )}
         </div>
@@ -113,11 +116,11 @@ function PetCard({ pet }: { pet: Pet }) {
             disabled={pet.status === "adopted"}
           >
             {pet.status === "adopted" ? (
-              <><Check className="w-4 h-4 mr-1" /> Ya adoptado</>
+              <><Check className="w-4 h-4 mr-1" /> {t("adoptions.adopted")}</>
             ) : pet.status === "in-process" ? (
-              <><Heart className="w-4 h-4 mr-1" /> Ver ficha</>
+              <><Heart className="w-4 h-4 mr-1" /> {t("adoptions.viewProfile")}</>
             ) : (
-              <><Heart className="w-4 h-4 mr-1" /> Quiero adoptarlo</>
+              <><Heart className="w-4 h-4 mr-1" /> {t("adoptions.wantToAdopt")}</>
             )}
           </Button>
         </Link>
@@ -128,28 +131,29 @@ function PetCard({ pet }: { pet: Pet }) {
 
 const FILTER_GROUPS = [
   {
-    key: "species", label: "Especie", options: [
-      { value: "", label: "Todos" }, { value: "perro", label: "Perros" }, { value: "gato", label: "Gatos" },
+    key: "species", labelKey: "adoptions.filterSpecies", options: [
+      { value: "", labelKey: "adoptions.filterAllSpecies" }, { value: "perro", labelKey: "adoptions.filterDogs" }, { value: "gato", labelKey: "adoptions.filterCats" },
     ],
   },
   {
-    key: "sex", label: "Sexo", options: [
-      { value: "", label: "Ambos" }, { value: "macho", label: "Macho" }, { value: "hembra", label: "Hembra" },
+    key: "sex", labelKey: "adoptions.filterSex", options: [
+      { value: "", labelKey: "adoptions.filterBoth" }, { value: "macho", labelKey: "adoptions.sexMale" }, { value: "hembra", labelKey: "adoptions.sexFemale" },
     ],
   },
   {
-    key: "ageCategory", label: "Edad", options: [
-      { value: "", label: "Cualquier edad" }, { value: "puppy", label: "Cachorro" }, { value: "adult", label: "Adulto" }, { value: "senior", label: "Adulto mayor" },
+    key: "ageCategory", labelKey: "adoptions.filterAge", options: [
+      { value: "", labelKey: "adoptions.filterAnyAge" }, { value: "puppy", labelKey: "adoptions.agePuppy" }, { value: "adult", labelKey: "adoptions.ageAdult" }, { value: "senior", labelKey: "adoptions.ageSenior" },
     ],
   },
   {
-    key: "size", label: "Tamaño", options: [
-      { value: "", label: "Cualquier tamaño" }, { value: "small", label: "Pequeño" }, { value: "medium", label: "Mediano" }, { value: "large", label: "Grande" },
+    key: "size", labelKey: "adoptions.filterSize", options: [
+      { value: "", labelKey: "adoptions.filterAnySize" }, { value: "small", labelKey: "adoptions.sizeSmall" }, { value: "medium", labelKey: "adoptions.sizeMedium" }, { value: "large", labelKey: "adoptions.sizeLarge" },
     ],
   },
 ];
 
 export default function Adoptions() {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState<Record<string, string>>({
     species: "", sex: "", ageCategory: "", size: "", vaccinated: "", sterilized: "", urgent: "",
   });
@@ -188,24 +192,24 @@ export default function Adoptions() {
           <div className="p-3 bg-amber-100 rounded-2xl">
             <Dog className="w-7 h-7 text-amber-600" />
           </div>
-          <span className="bg-amber-100 text-amber-700 text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">Bienestar Animal</span>
+          <span className="bg-amber-100 text-amber-700 text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">{t("adoptions.badge")}</span>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
           <div>
-            <h1 className="text-4xl sm:text-5xl font-display font-black text-foreground mb-3">Adopta, no compres</h1>
+            <h1 className="text-4xl sm:text-5xl font-display font-black text-foreground mb-3">{t("adoptions.title")}</h1>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              Cada mascota aquí tiene una historia y merece una familia. Todos han sido rescatados, atendidos y están listos para darte todo su amor.
+              {t("adoptions.subtitle")}
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
             <Link href="/publicar-mascota">
               <Button variant="outline" className="rounded-2xl border-amber-200 text-amber-700 hover:bg-amber-50">
-                <Plus className="w-4 h-4 mr-2" /> Publicar mascota
+                <Plus className="w-4 h-4 mr-2" /> {t("adoptions.publishPet")}
               </Button>
             </Link>
             <Link href="/ayuda-animal">
               <Button className="rounded-2xl bg-amber-500 hover:bg-amber-600">
-                <Heart className="w-4 h-4 mr-2" /> Ayuda Animal
+                <Heart className="w-4 h-4 mr-2" /> {t("adoptions.animalWelfare")}
               </Button>
             </Link>
           </div>
@@ -214,7 +218,7 @@ export default function Adoptions() {
           <div className="mt-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 animate-pulse" />
             <p className="text-red-700 font-semibold">
-              {urgentCount} mascota{urgentCount > 1 ? "s" : ""} marcada{urgentCount > 1 ? "s" : ""} como urgente{urgentCount > 1 ? "s" : ""} — necesitan hogar cuanto antes.
+              {t("adoptions.urgentBanner", { count: urgentCount })}
             </p>
           </div>
         )}
@@ -224,14 +228,14 @@ export default function Adoptions() {
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar por nombre o raza..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl bg-secondary/30" />
+          <Input placeholder={t("adoptions.searchPlaceholder")} value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl bg-secondary/30" />
         </div>
         <Button
           variant="outline"
           className={`rounded-xl gap-2 ${showFilters ? "bg-secondary" : ""}`}
           onClick={() => setShowFilters(!showFilters)}
         >
-          <SlidersHorizontal className="w-4 h-4" /> Filtros
+          <SlidersHorizontal className="w-4 h-4" /> {t("adoptions.filters")}
           {Object.values(filters).some(v => v) && (
             <span className="w-2 h-2 rounded-full bg-primary" />
           )}
@@ -239,9 +243,9 @@ export default function Adoptions() {
         {/* Quick filters */}
         <div className="flex gap-2">
           {[
-            { key: "urgent", value: "true", label: "⚡ Urgentes" },
-            { key: "vaccinated", value: "true", label: "💉 Vacunados" },
-            { key: "sterilized", value: "true", label: "✂️ Esterilizados" },
+            { key: "urgent", value: "true", labelKey: "adoptions.filterUrgent" },
+            { key: "vaccinated", value: "true", labelKey: "adoptions.filterVaccinated" },
+            { key: "sterilized", value: "true", labelKey: "adoptions.filterSterilized" },
           ].map(f => (
             <button
               key={f.key}
@@ -250,7 +254,7 @@ export default function Adoptions() {
                 filters[f.key] === f.value ? "bg-primary text-white" : "bg-secondary text-muted-foreground hover:bg-secondary/80"
               }`}
             >
-              {f.label}
+              {t(f.labelKey)}
             </button>
           ))}
         </div>
@@ -261,7 +265,7 @@ export default function Adoptions() {
         <div className="bg-card border border-border rounded-3xl p-6 mb-6 grid grid-cols-2 sm:grid-cols-4 gap-6">
           {FILTER_GROUPS.map(group => (
             <div key={group.key}>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{group.label}</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t(group.labelKey)}</p>
               <div className="space-y-1">
                 {group.options.map(opt => (
                   <button
@@ -273,7 +277,7 @@ export default function Adoptions() {
                         : "text-foreground hover:bg-secondary"
                     }`}
                   >
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </button>
                 ))}
               </div>
@@ -284,7 +288,7 @@ export default function Adoptions() {
 
       {/* Count */}
       <p className="text-sm text-muted-foreground mb-6">
-        {isLoading ? "Cargando..." : `${filtered.length} mascota${filtered.length !== 1 ? "s" : ""} disponible${filtered.length !== 1 ? "s" : ""}`}
+        {isLoading ? t("common.loading") : t("adoptions.availableCount", { count: filtered.length })}
       </p>
 
       {/* Grid */}
@@ -306,14 +310,14 @@ export default function Adoptions() {
           <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto">
             <Dog className="w-10 h-10 text-amber-300" />
           </div>
-          <h3 className="text-xl font-bold">No hay mascotas con esos filtros</h3>
-          <p className="text-muted-foreground">Prueba con otros criterios o conoce cómo ayudar de otra forma.</p>
+          <h3 className="text-xl font-bold">{t("adoptions.emptyTitle")}</h3>
+          <p className="text-muted-foreground">{t("adoptions.emptyDescription")}</p>
           <div className="flex gap-3 justify-center mt-2">
             <Button variant="outline" className="rounded-xl" onClick={() => setFilters({ species: "", sex: "", ageCategory: "", size: "", vaccinated: "", sterilized: "", urgent: "" })}>
-              Limpiar filtros
+              {t("adoptions.clearFilters")}
             </Button>
             <Link href="/ayuda-animal">
-              <Button className="rounded-xl bg-amber-500 hover:bg-amber-600">Ver ayuda animal</Button>
+              <Button className="rounded-xl bg-amber-500 hover:bg-amber-600">{t("adoptions.viewAnimalWelfare")}</Button>
             </Link>
           </div>
         </div>
@@ -326,11 +330,11 @@ export default function Adoptions() {
       {/* Bottom CTA */}
       <div className="mt-16 bg-amber-50 border border-amber-200 rounded-3xl p-8 text-center">
         <Dog className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-        <h3 className="font-display font-bold text-2xl mb-2">¿Tienes una mascota que necesita un hogar?</h3>
-        <p className="text-muted-foreground mb-5">Publica su ficha en nuestra red y encontraremos una familia responsable para ella.</p>
+        <h3 className="font-display font-bold text-2xl mb-2">{t("adoptions.ctaTitle")}</h3>
+        <p className="text-muted-foreground mb-5">{t("adoptions.ctaDescription")}</p>
         <Link href="/publicar-mascota">
           <Button className="rounded-2xl px-8 h-12 bg-amber-500 hover:bg-amber-600 shadow-md hover-elevate">
-            <Plus className="w-4 h-4 mr-2" /> Publicar para adopción
+            <Plus className="w-4 h-4 mr-2" /> {t("adoptions.publishForAdoption")}
           </Button>
         </Link>
       </div>

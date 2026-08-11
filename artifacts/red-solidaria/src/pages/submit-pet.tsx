@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Link, useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,31 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Dog, Cat, Heart, CheckCircle, ArrowLeft, Camera, Shield, Info } from "lucide-react";
 
-const schema = z.object({
-  name: z.string().min(1, "Nombre requerido"),
-  species: z.enum(["perro", "gato"]),
-  breed: z.string().optional(),
-  sex: z.enum(["macho", "hembra"]),
-  ageCategory: z.enum(["puppy", "adult", "senior"]),
-  ageApprox: z.string().optional(),
-  size: z.enum(["small", "medium", "large", "giant"]),
-  photos: z.string().optional(),
-  description: z.string().min(30, "Describe bien a la mascota (mínimo 30 caracteres)"),
-  history: z.string().optional(),
-  vaccinated: z.boolean().default(false),
-  sterilized: z.boolean().default(false),
-  dewormed: z.boolean().default(false),
-  location: z.string().min(3, "Indica dónde se encuentra"),
-  contactName: z.string().min(2, "Tu nombre es requerido"),
-  contactPhone: z.string().optional(),
-  contactEmail: z.string().email("Email inválido").optional().or(z.literal("")),
-  urgent: z.boolean().default(false),
-  adoptionRequirements: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
-
-const BOOL_TOGGLE = (label: string, sub: string, key: keyof FormValues, form: any) => (
+const BOOL_TOGGLE = (label: string, sub: string, key: string, form: any) => (
   <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3 border border-border">
     <div>
       <p className="text-sm font-medium">{label}</p>
@@ -53,10 +30,34 @@ const BOOL_TOGGLE = (label: string, sub: string, key: keyof FormValues, form: an
 );
 
 export default function SubmitPet() {
+  const { t } = useTranslation();
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  const schema = z.object({
+    name: z.string().min(1, t("submitPet.nameRequired")),
+    species: z.enum(["perro", "gato"]),
+    breed: z.string().optional(),
+    sex: z.enum(["macho", "hembra"]),
+    ageCategory: z.enum(["puppy", "adult", "senior"]),
+    ageApprox: z.string().optional(),
+    size: z.enum(["small", "medium", "large", "giant"]),
+    photos: z.string().optional(),
+    description: z.string().min(30, t("submitPet.descriptionMin")),
+    history: z.string().optional(),
+    vaccinated: z.boolean().default(false),
+    sterilized: z.boolean().default(false),
+    dewormed: z.boolean().default(false),
+    location: z.string().min(3, t("submitPet.locationRequired")),
+    contactName: z.string().min(2, t("submitPet.contactNameRequired")),
+    contactPhone: z.string().optional(),
+    contactEmail: z.string().email(t("donation.invalidEmail")).optional().or(z.literal("")),
+    urgent: z.boolean().default(false),
+    adoptionRequirements: z.string().optional(),
+  });
+  type FormValues = z.infer<typeof schema>;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -84,7 +85,7 @@ export default function SubmitPet() {
       if (!res.ok) throw new Error("Error al enviar");
       setSubmitted(true);
     } catch {
-      toast({ title: "Error al enviar", description: "Por favor intenta de nuevo.", variant: "destructive" });
+      toast({ title: t("submitPet.toastError"), description: t("submitPet.toastErrorDesc"), variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -98,22 +99,22 @@ export default function SubmitPet() {
             <CheckCircle className="w-10 h-10 text-amber-600" />
           </div>
           <div>
-            <h2 className="text-3xl font-display font-bold mb-2">¡Publicación enviada!</h2>
-            <p className="text-muted-foreground text-lg">Revisaremos la ficha de tu mascota y la publicaremos en el catálogo en menos de 48 horas.</p>
+            <h2 className="text-3xl font-display font-bold mb-2">{t("submitPet.successTitle")}</h2>
+            <p className="text-muted-foreground text-lg">{t("submitPet.successDescription")}</p>
           </div>
           <div className="bg-secondary/50 rounded-2xl p-5 text-left text-sm text-muted-foreground space-y-2">
-            <p className="font-semibold text-foreground">¿Qué sigue?</p>
-            <p>1. Nuestro equipo revisa la información</p>
-            <p>2. Puede que te contactemos para más fotos o datos</p>
-            <p>3. La publicamos en el catálogo de adopciones</p>
-            <p>4. Te avisamos cuando alguien quiera adoptarla</p>
+            <p className="font-semibold text-foreground">{t("submitPet.nextSteps")}</p>
+            <p>{t("submitPet.nextStep1")}</p>
+            <p>{t("submitPet.nextStep2")}</p>
+            <p>{t("submitPet.nextStep3")}</p>
+            <p>{t("submitPet.nextStep4")}</p>
           </div>
           <div className="flex gap-3 justify-center">
             <Link href="/adopciones">
-              <Button variant="outline" className="rounded-xl">Ver adopciones</Button>
+              <Button variant="outline" className="rounded-xl">{t("submitPet.viewAdoptions")}</Button>
             </Link>
             <Button className="rounded-xl bg-amber-500 hover:bg-amber-600" onClick={() => { setSubmitted(false); form.reset(); }}>
-              Publicar otra mascota
+              {t("submitPet.publishAnother")}
             </Button>
           </div>
         </div>
@@ -125,23 +126,23 @@ export default function SubmitPet() {
     <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
       <Link href="/adopciones">
         <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Volver al catálogo
+          <ArrowLeft className="w-4 h-4" /> {t("submitPet.backToCatalog")}
         </button>
       </Link>
 
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-3 bg-amber-100 rounded-2xl"><Heart className="w-7 h-7 text-amber-600" /></div>
-          <span className="bg-amber-100 text-amber-700 text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">Ayuda a encontrar un hogar</span>
+          <span className="bg-amber-100 text-amber-700 text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">{t("submitPet.badge")}</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-display font-black mb-3">Publicar mascota en adopción</h1>
-        <p className="text-muted-foreground text-lg">Completa la ficha de tu mascota para que la comunidad pueda conocerla. Tu publicación será revisada antes de aparecer en el catálogo.</p>
+        <h1 className="text-4xl sm:text-5xl font-display font-black mb-3">{t("submitPet.title")}</h1>
+        <p className="text-muted-foreground text-lg">{t("submitPet.subtitle")}</p>
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-8 flex gap-3">
         <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
         <p className="text-sm text-blue-800">
-          <strong>Adopción responsable.</strong> Solo publicamos mascotas para dar en adopción gratuitamente, con seguimiento post-adopción. No aceptamos ventas de animales.
+          <strong>{t("submitPet.responsibleAdoption")}</strong> {t("submitPet.responsibleAdoptionText")}
         </p>
       </div>
 
@@ -152,19 +153,19 @@ export default function SubmitPet() {
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
             <h2 className="font-display font-bold text-xl flex items-center gap-2">
               <span className="w-7 h-7 bg-amber-500 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
-              Información básica
+              {t("submitPet.section1Title")}
             </h2>
 
             <div className="grid grid-cols-2 gap-4">
               {/* Species */}
               <FormField control={form.control} name="species" render={({ field }) => (
                 <FormItem className="col-span-2">
-                  <FormLabel>Especie</FormLabel>
+                  <FormLabel>{t("submitPet.fieldSpecies")}</FormLabel>
                   <div className="grid grid-cols-2 gap-3 mt-1">
-                    {[{ value: "perro", label: "Perro", icon: Dog }, { value: "gato", label: "Gato", icon: Cat }].map(s => (
+                    {[{ value: "perro", labelKey: "submitPet.speciesDog", icon: Dog }, { value: "gato", labelKey: "submitPet.speciesCat", icon: Cat }].map(s => (
                       <button key={s.value} type="button" onClick={() => field.onChange(s.value)}
                         className={`flex items-center justify-center gap-2 py-3 rounded-2xl border-2 font-semibold text-sm transition-all ${field.value === s.value ? "border-amber-400 bg-amber-50 text-amber-700" : "border-border bg-secondary/30 text-muted-foreground"}`}>
-                        <s.icon className="w-5 h-5" />{s.label}
+                        <s.icon className="w-5 h-5" />{t(s.labelKey)}
                       </button>
                     ))}
                   </div>
@@ -173,15 +174,15 @@ export default function SubmitPet() {
 
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nombre</FormLabel>
-                  <FormControl><Input placeholder="Luna, Max, Pelusa..." className="rounded-xl bg-secondary/30" {...field} /></FormControl>
+                  <FormLabel>{t("submitPet.fieldName")}</FormLabel>
+                  <FormControl><Input placeholder={t("submitPet.fieldNamePlaceholder")} className="rounded-xl bg-secondary/30" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="breed" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Raza (opcional)</FormLabel>
-                  <FormControl><Input placeholder="Mestizo, Labrador..." className="rounded-xl bg-secondary/30" {...field} /></FormControl>
+                  <FormLabel>{t("submitPet.fieldBreed")}</FormLabel>
+                  <FormControl><Input placeholder={t("submitPet.fieldBreedPlaceholder")} className="rounded-xl bg-secondary/30" {...field} /></FormControl>
                 </FormItem>
               )} />
             </div>
@@ -190,12 +191,12 @@ export default function SubmitPet() {
               {/* Sex */}
               <FormField control={form.control} name="sex" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Sexo</FormLabel>
+                  <FormLabel>{t("submitPet.fieldSex")}</FormLabel>
                   <div className="grid grid-cols-1 gap-2 mt-1">
-                    {[{ v: "macho", l: "Macho" }, { v: "hembra", l: "Hembra" }].map(s => (
+                    {[{ v: "macho", lk: "submitPet.sexMale" }, { v: "hembra", lk: "submitPet.sexFemale" }].map(s => (
                       <button key={s.v} type="button" onClick={() => field.onChange(s.v)}
                         className={`py-2 rounded-xl text-sm border-2 font-medium ${field.value === s.v ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/30 text-muted-foreground"}`}>
-                        {s.l}
+                        {t(s.lk)}
                       </button>
                     ))}
                   </div>
@@ -204,12 +205,12 @@ export default function SubmitPet() {
               {/* Age */}
               <FormField control={form.control} name="ageCategory" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Etapa</FormLabel>
+                  <FormLabel>{t("submitPet.fieldAgeStage")}</FormLabel>
                   <div className="grid grid-cols-1 gap-2 mt-1">
-                    {[{ v: "puppy", l: "Cachorro" }, { v: "adult", l: "Adulto" }, { v: "senior", l: "Mayor" }].map(a => (
+                    {[{ v: "puppy", lk: "submitPet.agePuppy" }, { v: "adult", lk: "submitPet.ageAdult" }, { v: "senior", lk: "submitPet.ageSenior" }].map(a => (
                       <button key={a.v} type="button" onClick={() => field.onChange(a.v)}
                         className={`py-2 rounded-xl text-sm border-2 font-medium ${field.value === a.v ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/30 text-muted-foreground"}`}>
-                        {a.l}
+                        {t(a.lk)}
                       </button>
                     ))}
                   </div>
@@ -218,12 +219,12 @@ export default function SubmitPet() {
               {/* Size */}
               <FormField control={form.control} name="size" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tamaño</FormLabel>
+                  <FormLabel>{t("submitPet.fieldSize")}</FormLabel>
                   <div className="grid grid-cols-1 gap-2 mt-1">
-                    {[{ v: "small", l: "Pequeño" }, { v: "medium", l: "Mediano" }, { v: "large", l: "Grande" }].map(s => (
+                    {[{ v: "small", lk: "submitPet.sizeSmall" }, { v: "medium", lk: "submitPet.sizeMedium" }, { v: "large", lk: "submitPet.sizeLarge" }].map(s => (
                       <button key={s.v} type="button" onClick={() => field.onChange(s.v)}
                         className={`py-2 rounded-xl text-sm border-2 font-medium ${field.value === s.v ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/30 text-muted-foreground"}`}>
-                        {s.l}
+                        {t(s.lk)}
                       </button>
                     ))}
                   </div>
@@ -233,8 +234,8 @@ export default function SubmitPet() {
 
             <FormField control={form.control} name="ageApprox" render={({ field }) => (
               <FormItem>
-                <FormLabel>Edad aproximada (opcional)</FormLabel>
-                <FormControl><Input placeholder="Ej. 2 años, 6 meses..." className="rounded-xl bg-secondary/30" {...field} /></FormControl>
+                <FormLabel>{t("submitPet.fieldApproxAge")}</FormLabel>
+                <FormControl><Input placeholder={t("submitPet.fieldApproxAgePlaceholder")} className="rounded-xl bg-secondary/30" {...field} /></FormControl>
               </FormItem>
             )} />
           </div>
@@ -243,30 +244,30 @@ export default function SubmitPet() {
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
             <h2 className="font-display font-bold text-xl flex items-center gap-2">
               <span className="w-7 h-7 bg-amber-500 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
-              Descripción e historia
+              {t("submitPet.section2Title")}
             </h2>
             <FormField control={form.control} name="description" render={({ field }) => (
               <FormItem>
-                <FormLabel>Descripción de la mascota</FormLabel>
+                <FormLabel>{t("submitPet.fieldDescription")}</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="¿Cómo es su personalidad? ¿Es juguetón, tranquilo, cariñoso? ¿Cómo se lleva con otros animales o niños?" className="min-h-[110px] rounded-xl bg-secondary/30 resize-none" {...field} />
+                  <Textarea placeholder={t("submitPet.fieldDescriptionPlaceholder")} className="min-h-[110px] rounded-xl bg-secondary/30 resize-none" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <FormField control={form.control} name="history" render={({ field }) => (
               <FormItem>
-                <FormLabel>Su historia (opcional)</FormLabel>
+                <FormLabel>{t("submitPet.fieldHistory")}</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="¿Cómo llegó a tus manos? ¿Fue rescatado, abandonado? Contar su historia ayuda a que más personas se identifiquen con ella." className="min-h-[80px] rounded-xl bg-secondary/30 resize-none" {...field} />
+                  <Textarea placeholder={t("submitPet.fieldHistoryPlaceholder")} className="min-h-[80px] rounded-xl bg-secondary/30 resize-none" {...field} />
                 </FormControl>
               </FormItem>
             )} />
             <FormField control={form.control} name="photos" render={({ field }) => (
               <FormItem>
-                <FormLabel className="flex items-center gap-2"><Camera className="w-4 h-4 text-amber-600" /> URLs de fotos (opcional)</FormLabel>
-                <FormControl><Input placeholder="https://... (separa varias URLs con coma)" className="rounded-xl bg-secondary/30" {...field} /></FormControl>
-                <p className="text-xs text-muted-foreground">Sube las fotos a Google Drive o WhatsApp Web y pega los enlaces aquí.</p>
+                <FormLabel className="flex items-center gap-2"><Camera className="w-4 h-4 text-amber-600" /> {t("submitPet.fieldPhotos")}</FormLabel>
+                <FormControl><Input placeholder={t("submitPet.fieldPhotosPlaceholder")} className="rounded-xl bg-secondary/30" {...field} /></FormControl>
+                <p className="text-xs text-muted-foreground">{t("submitPet.fieldPhotosHint")}</p>
               </FormItem>
             )} />
           </div>
@@ -275,17 +276,17 @@ export default function SubmitPet() {
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-4">
             <h2 className="font-display font-bold text-xl flex items-center gap-2">
               <span className="w-7 h-7 bg-amber-500 text-white rounded-full flex items-center justify-center text-sm font-bold">3</span>
-              Estado de salud
+              {t("submitPet.section3Title")}
             </h2>
-            {BOOL_TOGGLE("Vacunado/a", "Tiene sus vacunas al día", "vaccinated", form)}
-            {BOOL_TOGGLE("Esterilizado/a", "Ha sido operado/a", "sterilized", form)}
-            {BOOL_TOGGLE("Desparasitado/a", "Con tratamiento antiparásitos", "dewormed", form)}
-            {BOOL_TOGGLE("¡URGENTE! Necesita hogar cuanto antes", "Se marcará con badge urgente en el catálogo", "urgent", form)}
+            {BOOL_TOGGLE(t("submitPet.toggleVaccinated"), t("submitPet.toggleVaccinatedSub"), "vaccinated", form)}
+            {BOOL_TOGGLE(t("submitPet.toggleSterilized"), t("submitPet.toggleSterilizedSub"), "sterilized", form)}
+            {BOOL_TOGGLE(t("submitPet.toggleDewormed"), t("submitPet.toggleDewormedSub"), "dewormed", form)}
+            {BOOL_TOGGLE(t("submitPet.toggleUrgent"), t("submitPet.toggleUrgentSub"), "urgent", form)}
             <FormField control={form.control} name="adoptionRequirements" render={({ field }) => (
               <FormItem>
-                <FormLabel>Requisitos de adopción (opcional)</FormLabel>
+                <FormLabel>{t("submitPet.fieldRequirements")}</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="Ej. Necesita patio, no compatible con gatos, busca familia con experiencia..." className="min-h-[80px] rounded-xl bg-secondary/30 resize-none" {...field} />
+                  <Textarea placeholder={t("submitPet.fieldRequirementsPlaceholder")} className="min-h-[80px] rounded-xl bg-secondary/30 resize-none" {...field} />
                 </FormControl>
               </FormItem>
             )} />
@@ -295,32 +296,32 @@ export default function SubmitPet() {
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm space-y-5">
             <h2 className="font-display font-bold text-xl flex items-center gap-2">
               <span className="w-7 h-7 bg-amber-500 text-white rounded-full flex items-center justify-center text-sm font-bold">4</span>
-              Ubicación y contacto
+              {t("submitPet.section4Title")}
             </h2>
             <FormField control={form.control} name="location" render={({ field }) => (
               <FormItem>
-                <FormLabel>¿Dónde se encuentra la mascota?</FormLabel>
-                <FormControl><Input placeholder="Ej. San Ramón, Chanchamayo" className="rounded-xl bg-secondary/30" {...field} /></FormControl>
+                <FormLabel>{t("submitPet.fieldLocation")}</FormLabel>
+                <FormControl><Input placeholder={t("submitPet.fieldLocationPlaceholder")} className="rounded-xl bg-secondary/30" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <FormField control={form.control} name="contactName" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tu nombre</FormLabel>
-                  <FormControl><Input placeholder="Nombre completo" className="rounded-xl bg-secondary/30" {...field} /></FormControl>
+                  <FormLabel>{t("submitPet.fieldContactName")}</FormLabel>
+                  <FormControl><Input placeholder={t("submitPet.fieldContactNamePlaceholder")} className="rounded-xl bg-secondary/30" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="contactPhone" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Celular (opcional)</FormLabel>
+                  <FormLabel>{t("submitPet.fieldContactPhone")}</FormLabel>
                   <FormControl><Input placeholder="921 615 737" className="rounded-xl bg-secondary/30" {...field} /></FormControl>
                 </FormItem>
               )} />
               <FormField control={form.control} name="contactEmail" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email (opcional)</FormLabel>
+                  <FormLabel>{t("submitPet.fieldContactEmail")}</FormLabel>
                   <FormControl><Input type="email" placeholder="tu@email.com" className="rounded-xl bg-secondary/30" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -330,9 +331,9 @@ export default function SubmitPet() {
 
           <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto px-10 h-14 text-base rounded-2xl bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-500/20 hover-elevate">
             {isSubmitting ? (
-              <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Enviando...</span>
+              <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> {t("contact.sending")}</span>
             ) : (
-              <span className="flex items-center gap-2"><Heart className="w-5 h-5" /> Enviar ficha para revisión</span>
+              <span className="flex items-center gap-2"><Heart className="w-5 h-5" /> {t("submitPet.submitButton")}</span>
             )}
           </Button>
         </form>

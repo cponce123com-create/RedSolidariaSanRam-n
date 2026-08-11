@@ -1,8 +1,10 @@
 import { MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 export function FloatingWhatsApp() {
-  const whatsappUrl = "https://wa.me/51921615737?text=Hola,%20quisiera%20más%20información%20sobre%20cómo%20ayudar.";
+  const { t } = useTranslation();
+  const whatsappUrl = `https://wa.me/51921615737?text=${encodeURIComponent(t("whatsapp.message"))}`;
 
   return (
     <motion.a
@@ -16,7 +18,7 @@ export function FloatingWhatsApp() {
       whileTap={{ scale: 0.95 }}
     >
       <MessageCircle className="w-7 h-7" />
-      <span className="sr-only">Contactar por WhatsApp</span>
+      <span className="sr-only">{t("whatsapp.aria")}</span>
     </motion.a>
   );
 }

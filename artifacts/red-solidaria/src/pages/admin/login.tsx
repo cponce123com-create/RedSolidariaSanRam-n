@@ -150,7 +150,11 @@ export default function AdminLogin() {
               autenticadora (Google Authenticator, Authy, etc.).
             </p>
             <div className="space-y-2">
-              <FormLabel htmlFor="totp-code">Código de verificación</FormLabel>
+              {/* label nativo: FormLabel exige contexto de react-hook-form y
+                  crasheaba el paso TOTP (se renderiza fuera del <Form>) */}
+              <label htmlFor="totp-code" className="text-sm font-medium leading-none">
+                Código de verificación
+              </label>
               <Input
                 id="totp-code"
                 className="h-12 rounded-xl text-center text-xl font-mono tracking-[0.5em]"

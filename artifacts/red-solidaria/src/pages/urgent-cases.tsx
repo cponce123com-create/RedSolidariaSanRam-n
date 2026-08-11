@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -25,45 +26,46 @@ interface CommunityReport {
   createdAt: string;
 }
 
-const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-  "familia-vulnerable": { label: "Familia vulnerable", icon: Heart, color: "bg-pink-100 text-pink-700" },
-  "nino-necesidad": { label: "Niño en necesidad", icon: Baby, color: "bg-blue-100 text-blue-700" },
-  "adulto-mayor": { label: "Adulto mayor", icon: PersonStanding, color: "bg-purple-100 text-purple-700" },
-  "animal-herido": { label: "Animal herido", icon: Cat, color: "bg-orange-100 text-orange-700" },
-  "albergue": { label: "Albergue", icon: Home, color: "bg-green-100 text-green-700" },
-  "emergencia-comunitaria": { label: "Emergencia", icon: Zap, color: "bg-red-100 text-red-700" },
-};
-
-const URGENCY_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  low: { label: "Urgencia baja", color: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
-  medium: { label: "Urgencia media", color: "bg-yellow-100 text-yellow-700 border-yellow-200", dot: "bg-yellow-500" },
-  high: { label: "Urgencia alta", color: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
-  critical: { label: "¡EMERGENCIA!", color: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500 animate-pulse" },
-};
-
-const ALL_TYPES = [
-  { value: "all", label: "Todos" },
-  { value: "familia-vulnerable", label: "Familias" },
-  { value: "nino-necesidad", label: "Niños" },
-  { value: "adulto-mayor", label: "Adultos mayores" },
-  { value: "animal-herido", label: "Animales" },
-  { value: "albergue", label: "Albergues" },
-  { value: "emergencia-comunitaria", label: "Emergencias" },
-];
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days === 0) return "Hoy";
-  if (days === 1) return "Ayer";
-  if (days < 7) return `Hace ${days} días`;
-  if (days < 30) return `Hace ${Math.floor(days / 7)} semanas`;
-  return `Hace ${Math.floor(days / 30)} meses`;
-}
-
 export default function UrgentCases() {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+
+  const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+    "familia-vulnerable": { label: t("urgentCases.typeVulnerableFamily"), icon: Heart, color: "bg-pink-100 text-pink-700" },
+    "nino-necesidad": { label: t("urgentCases.typeChildInNeed"), icon: Baby, color: "bg-blue-100 text-blue-700" },
+    "adulto-mayor": { label: t("urgentCases.typeSenior"), icon: PersonStanding, color: "bg-purple-100 text-purple-700" },
+    "animal-herido": { label: t("urgentCases.typeInjuredAnimal"), icon: Cat, color: "bg-orange-100 text-orange-700" },
+    "albergue": { label: t("urgentCases.typeShelter"), icon: Home, color: "bg-green-100 text-green-700" },
+    "emergencia-comunitaria": { label: t("urgentCases.typeEmergency"), icon: Zap, color: "bg-red-100 text-red-700" },
+  };
+
+  const URGENCY_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
+    low: { label: t("urgentCases.urgencyLow"), color: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
+    medium: { label: t("urgentCases.urgencyMedium"), color: "bg-yellow-100 text-yellow-700 border-yellow-200", dot: "bg-yellow-500" },
+    high: { label: t("urgentCases.urgencyHigh"), color: "bg-orange-100 text-orange-700 border-orange-200", dot: "bg-orange-500" },
+    critical: { label: t("urgentCases.urgencyCritical"), color: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500 animate-pulse" },
+  };
+
+  const ALL_TYPES = [
+    { value: "all", label: t("urgentCases.typeAll") },
+    { value: "familia-vulnerable", label: t("urgentCases.typeFamilies") },
+    { value: "nino-necesidad", label: t("urgentCases.typeChildren") },
+    { value: "adulto-mayor", label: t("urgentCases.typeSeniors") },
+    { value: "animal-herido", label: t("urgentCases.typeAnimals") },
+    { value: "albergue", label: t("urgentCases.typeShelters") },
+    { value: "emergencia-comunitaria", label: t("urgentCases.typeEmergencies") },
+  ];
+
+  function timeAgo(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const days = Math.floor(diff / 86400000);
+    if (days === 0) return t("urgentCases.today");
+    if (days === 1) return t("urgentCases.yesterday");
+    if (days < 7) return t("urgentCases.daysAgo", { count: days });
+    if (days < 30) return t("urgentCases.weeksAgo", { count: Math.floor(days / 7) });
+    return t("urgentCases.monthsAgo", { count: Math.floor(days / 30) });
+  }
 
   const { data: reports = [], isLoading } = useQuery<CommunityReport[]>({
     queryKey: ["/api/reports/urgent"],
@@ -94,15 +96,14 @@ export default function UrgentCases() {
         </div>
         <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
           <div>
-            <h1 className="text-4xl sm:text-5xl font-display font-black text-foreground mb-3">Casos Urgentes</h1>
+            <h1 className="text-4xl sm:text-5xl font-display font-black text-foreground mb-3">{t("nav.urgentCases")}</h1>
             <p className="text-muted-foreground text-lg max-w-2xl">
-              Personas y familias de San Ramón y Chanchamayo que necesitan ayuda ahora mismo. 
-              Cada caso ha sido verificado por nuestro equipo.
+              {t("urgentCases.intro")}
             </p>
           </div>
           <Link href="/reportar">
             <Button className="rounded-2xl h-12 px-6 shadow-lg shadow-primary/20 hover-elevate shrink-0">
-              <Plus className="w-4 h-4 mr-2" /> Reportar un caso
+              <Plus className="w-4 h-4 mr-2" /> {t("urgentCases.reportCase")}
             </Button>
           </Link>
         </div>
@@ -111,7 +112,7 @@ export default function UrgentCases() {
           <div className="mt-6 bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
             <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse shrink-0" />
             <p className="text-red-700 font-semibold">
-              {criticalCount} caso{criticalCount > 1 ? "s" : ""} en estado de emergencia crítica requieren atención inmediata.
+              {t("urgentCases.criticalBanner", { count: criticalCount })}
             </p>
           </div>
         )}
@@ -122,22 +123,22 @@ export default function UrgentCases() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar casos..."
+            placeholder={t("urgentCases.searchPlaceholder")}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-10 rounded-xl bg-secondary/30"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
-          {ALL_TYPES.map(t => (
+          {ALL_TYPES.map(ft => (
             <button
-              key={t.value}
-              onClick={() => setFilter(t.value)}
+              key={ft.value}
+              onClick={() => setFilter(ft.value)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap ${
-                filter === t.value ? "bg-primary text-white shadow-md" : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                filter === ft.value ? "bg-primary text-white shadow-md" : "bg-secondary text-muted-foreground hover:bg-secondary/80"
               }`}
             >
-              {t.label}
+              {ft.label}
             </button>
           ))}
         </div>
@@ -163,15 +164,15 @@ export default function UrgentCases() {
             <Heart className="w-8 h-8 text-muted-foreground" />
           </div>
           <h3 className="text-xl font-bold text-foreground">
-            {reports.length === 0 ? "No hay casos publicados aún" : "No se encontraron casos"}
+            {reports.length === 0 ? t("urgentCases.emptyNoCasesTitle") : t("urgentCases.emptyNoResultsTitle")}
           </h3>
           <p className="text-muted-foreground">
             {reports.length === 0
-              ? "¿Conoces a alguien que necesita ayuda? Sé el primero en reportar."
-              : "Prueba con otros filtros o términos de búsqueda."}
+              ? t("urgentCases.emptyNoCasesDesc")
+              : t("urgentCases.emptyNoResultsDesc")}
           </p>
           <Link href="/reportar">
-            <Button className="rounded-xl mt-2">Reportar un caso</Button>
+            <Button className="rounded-xl mt-2">{t("urgentCases.reportCase")}</Button>
           </Link>
         </div>
       ) : (
@@ -207,7 +208,7 @@ export default function UrgentCases() {
                   {/* Campaign badge */}
                   {report.campaignId && (
                     <div className="absolute bottom-3 left-3 bg-green-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                      ✓ Campaña activa
+                      {t("urgentCases.activeCampaignBadge")}
                     </div>
                   )}
                 </div>
@@ -228,13 +229,13 @@ export default function UrgentCases() {
                     {report.campaignId ? (
                       <Link href={`/campanas/${report.campaignId}`} className="flex-1">
                         <Button className="w-full rounded-xl h-10" size="sm">
-                          <Heart className="w-4 h-4 mr-1" /> Ver campaña <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                          <Heart className="w-4 h-4 mr-1" /> {t("urgentCases.viewCampaign")} <ArrowRight className="w-3.5 h-3.5 ml-1" />
                         </Button>
                       </Link>
                     ) : (
                       <Link href="/reportar" className="flex-1">
                         <Button variant="outline" className="w-full rounded-xl h-10 border-primary/30 text-primary hover:bg-primary/5" size="sm">
-                          <Heart className="w-4 h-4 mr-1" /> Quiero ayudar
+                          <Heart className="w-4 h-4 mr-1" /> {t("urgentCases.wantToHelp")}
                         </Button>
                       </Link>
                     )}
@@ -249,11 +250,11 @@ export default function UrgentCases() {
       {/* CTA bottom */}
       {filtered.length > 0 && (
         <div className="mt-16 bg-primary/5 border border-primary/20 rounded-3xl p-8 text-center">
-          <h3 className="font-display font-bold text-2xl mb-2">¿Conoces otro caso urgente?</h3>
-          <p className="text-muted-foreground mb-5">Tu reporte puede salvar una vida. La comunidad de San Ramón cuida a los suyos.</p>
+          <h3 className="font-display font-bold text-2xl mb-2">{t("urgentCases.ctaTitle")}</h3>
+          <p className="text-muted-foreground mb-5">{t("urgentCases.ctaDesc")}</p>
           <Link href="/reportar">
             <Button className="rounded-2xl px-8 h-12 shadow-md shadow-primary/20 hover-elevate">
-              <Plus className="w-4 h-4 mr-2" /> Reportar un caso ahora
+              <Plus className="w-4 h-4 mr-2" /> {t("urgentCases.reportCaseNow")}
             </Button>
           </Link>
         </div>

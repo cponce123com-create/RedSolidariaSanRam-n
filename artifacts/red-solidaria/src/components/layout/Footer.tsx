@@ -1,7 +1,10 @@
 import { Link } from "wouter";
 import { Heart, Mail, MapPin, Phone, Facebook, Instagram } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function Footer() {
+  const { t } = useTranslation();
+
   return (
     <footer className="bg-card border-t border-border/50 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -12,37 +15,37 @@ export function Footer() {
               <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
                 <Heart className="w-4 h-4 text-white" />
               </div>
-              <span className="font-display font-bold text-xl">Red Solidaria</span>
+              <span className="font-display font-bold text-xl">{t("footer.brand")}</span>
             </Link>
             <p className="text-muted-foreground leading-relaxed">
-              Uniendo corazones para transformar vidas en San Ramón, Chanchamayo. Empezamos con sonrisas en Navidad, y hoy somos una familia solidaria.
+              {t("footer.tagline")}
             </p>
             <div className="flex gap-4">
-              <a href="https://facebook.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label="Facebook de Red Solidaria San Ramón" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
+              <a href="https://facebook.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label={t("footer.facebookAria")} className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
                 <Facebook className="w-5 h-5" />
               </a>
-              <a href="https://instagram.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label="Instagram de Red Solidaria San Ramón" className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
+              <a href="https://instagram.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label={t("footer.instagramAria")} className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
                 <Instagram className="w-5 h-5" />
               </a>
             </div>
           </div>
 
           <div>
-            <h3 className="font-display font-bold text-lg mb-6">Enlaces Rápidos</h3>
+            <h3 className="font-display font-bold text-lg mb-6">{t("footer.quickLinks")}</h3>
             <ul className="space-y-3">
-              <li><Link href="/nosotros" className="text-muted-foreground hover:text-primary transition-colors">Sobre Nosotros</Link></li>
-              <li><Link href="/campanas" className="text-muted-foreground hover:text-primary transition-colors">Campañas Activas</Link></li>
-              <li><Link href="/noticias" className="text-muted-foreground hover:text-primary transition-colors">Noticias y Blog</Link></li>
-              <li><Link href="/contacto" className="text-muted-foreground hover:text-primary transition-colors">Ser Voluntario</Link></li>
+              <li><Link href="/nosotros" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.aboutUs")}</Link></li>
+              <li><Link href="/campanas" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.activeCampaigns")}</Link></li>
+              <li><Link href="/noticias" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.newsBlog")}</Link></li>
+              <li><Link href="/contacto" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.volunteer")}</Link></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-display font-bold text-lg mb-6">Contacto</h3>
+            <h3 className="font-display font-bold text-lg mb-6">{t("footer.contactTitle")}</h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3 text-muted-foreground">
                 <MapPin className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                <span>San Ramón, Chanchamayo<br/>Junín, Perú</span>
+                <span>{t("footer.address")}<br/>{t("footer.country")}</span>
               </li>
               <li className="flex items-center gap-3 text-muted-foreground">
                 <Phone className="w-5 h-5 text-primary shrink-0" />
@@ -56,13 +59,13 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="font-display font-bold text-lg mb-6">Transparencia</h3>
+            <h3 className="font-display font-bold text-lg mb-6">{t("footer.transparencyTitle")}</h3>
             <p className="text-muted-foreground mb-4">
-              Cada donación está documentada. Publicamos reportes de gastos y evidencias de entrega para cada campaña.
+              {t("footer.transparencyText")}
             </p>
             <Link href="/transparencia">
               <span className="text-primary font-medium hover:underline flex items-center gap-1">
-                Ver reporte de transparencia <span aria-hidden="true">&rarr;</span>
+                {t("footer.seeReport")} <span aria-hidden="true">&rarr;</span>
               </span>
             </Link>
           </div>
@@ -71,10 +74,10 @@ export function Footer() {
 
         <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Red Solidaria San Ramón. Todos los derechos reservados.
+            © {new Date().getFullYear()} {t("footer.brand")} {t("footer.address")}. {t("footer.rights")}
           </p>
           <div className="flex gap-4 text-sm text-muted-foreground">
-            <Link href="/admin/login" className="hover:text-primary transition-colors">Portal Admin</Link>
+            <Link href="/admin/login" className="hover:text-primary transition-colors">{t("footer.adminPortal")}</Link>
           </div>
         </div>
       </div>

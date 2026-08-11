@@ -1,148 +1,158 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import {
   Heart, HandHeart, Package, Dog, Users, Building2, Megaphone,
   ArrowRight, CheckCircle, Phone, QrCode, Banknote, CreditCard,
   Gift, Leaf, Star
 } from "lucide-react";
 
-const HELP_WAYS = [
-  {
-    id: "donar-dinero",
-    icon: Heart,
-    color: "from-red-50 to-rose-50 border-red-200",
-    iconBg: "bg-red-100",
-    iconColor: "text-red-600",
-    badge: "Impacto inmediato",
-    badgeColor: "bg-red-100 text-red-700",
-    title: "Donar dinero",
-    description: "Tu donación llega directamente a las campañas más urgentes. Desde S/ 5 ya puedes marcar una diferencia real. Usamos Yape, Plin, BCP o efectivo.",
-    steps: [
-      "Elige la campaña que más te mueve",
-      "Dona por Yape (921 615 737) o Plin (921 615 737)",
-      "Envíanos el comprobante por WhatsApp",
-    ],
-    cta: "Ver campañas",
-    ctaHref: "/campanas",
-    ctaStyle: "bg-red-500 hover:bg-red-600",
-  },
-  {
-    id: "donar-productos",
-    icon: Package,
-    color: "from-blue-50 to-indigo-50 border-blue-200",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-    badge: "Donación en especie",
-    badgeColor: "bg-blue-100 text-blue-700",
-    title: "Donar productos",
-    description: "Ropa en buen estado, útiles escolares, alimentos no perecibles, medicamentos, mantas, herramientas — todo suma. Coordinamos la recepción.",
-    steps: [
-      "Selecciona los artículos a donar",
-      "Contáctanos por WhatsApp",
-      "Coordinamos la entrega o recojo",
-    ],
-    cta: "Contactar equipo",
-    ctaHref: "/contacto",
-    ctaStyle: "bg-blue-500 hover:bg-blue-600",
-  },
-  {
-    id: "donar-alimento",
-    icon: Dog,
-    color: "from-amber-50 to-orange-50 border-amber-200",
-    iconBg: "bg-amber-100",
-    iconColor: "text-amber-600",
-    badge: "Bienestar animal",
-    badgeColor: "bg-amber-100 text-amber-700",
-    title: "Donar alimento animal",
-    description: "Croquetas, balanceado, latas o donaciones en efectivo para nuestro programa de alimentación de perros callejeros y apoyo a albergues de la región.",
-    steps: [
-      "Cualquier marca de croqueta ayuda",
-      "Lo recibimos en San Ramón o coordinamos recojo",
-      "También puedes apoyar las campañas veterinarias",
-    ],
-    cta: "Ver ayuda animal",
-    ctaHref: "/ayuda-animal",
-    ctaStyle: "bg-amber-500 hover:bg-amber-600",
-  },
-  {
-    id: "voluntario",
-    icon: HandHeart,
-    color: "from-green-50 to-emerald-50 border-green-200",
-    iconBg: "bg-green-100",
-    iconColor: "text-green-600",
-    badge: "Más demandado",
-    badgeColor: "bg-green-100 text-green-700",
-    title: "Ser voluntario/a",
-    description: "Únete a nuestra red de más de 120 voluntarios. Tenemos espacio para todas las habilidades: atención directa, redes sociales, fotografía, salud, logística y más.",
-    steps: [
-      "Completa el formulario de postulación",
-      "Nos contactamos para conocerte",
-      "Te asignamos según tus intereses y disponibilidad",
-    ],
-    cta: "Postularme",
-    ctaHref: "/voluntariado",
-    ctaStyle: "bg-green-600 hover:bg-green-700",
-  },
-  {
-    id: "aliado",
-    icon: Building2,
-    color: "from-purple-50 to-violet-50 border-purple-200",
-    iconBg: "bg-purple-100",
-    iconColor: "text-purple-600",
-    badge: "Impacto social",
-    badgeColor: "bg-purple-100 text-purple-700",
-    title: "Ser aliado / auspiciador",
-    description: "Si representas una empresa, emprendimiento o institución, puedes apoyarnos con recursos, visibilidad, auspicios o convenios. Trabajamos juntos por la comunidad.",
-    steps: [
-      "Contáctanos para conocer formas de alianza",
-      "Diseñamos juntos el tipo de colaboración",
-      "Tu marca aparece en nuestros materiales",
-    ],
-    cta: "Conversar",
-    ctaHref: "/contacto",
-    ctaStyle: "bg-purple-600 hover:bg-purple-700",
-  },
-  {
-    id: "difundir",
-    icon: Megaphone,
-    color: "from-yellow-50 to-amber-50 border-yellow-200",
-    iconBg: "bg-yellow-100",
-    iconColor: "text-yellow-600",
-    badge: "Sin costo",
-    badgeColor: "bg-yellow-100 text-yellow-700",
-    title: "Difundir campañas",
-    description: "Comparte nuestras publicaciones, campañas y casos urgentes en tus redes sociales. Un share puede ser la diferencia entre que una familia reciba ayuda o no.",
-    steps: [
-      "Síguenos en redes sociales",
-      "Comparte campañas activas con tus contactos",
-      "Etiquétanos cuando difundas — nos ayuda mucho",
-    ],
-    cta: "Ver campañas",
-    ctaHref: "/campanas",
-    ctaStyle: "bg-yellow-500 hover:bg-yellow-600",
-  },
-];
-
-const PAYMENT_METHODS = [
-  { icon: QrCode, label: "Yape", value: "921 615 737", color: "text-purple-600" },
-  { icon: QrCode, label: "Plin", value: "921 615 737", color: "text-blue-600" },
-  { icon: Banknote, label: "BCP", value: "193-12345678-0-55", color: "text-orange-700" },
-  { icon: CreditCard, label: "Efectivo", value: "Coordinamos en San Ramón", color: "text-green-700" },
-];
-
 export default function HowToHelp() {
+  const { t } = useTranslation();
+
+  const HELP_WAYS = [
+    {
+      id: "donar-dinero",
+      icon: Heart,
+      color: "from-red-50 to-rose-50 border-red-200",
+      iconBg: "bg-red-100",
+      iconColor: "text-red-600",
+      badge: t("howToHelp.moneyBadge"),
+      badgeColor: "bg-red-100 text-red-700",
+      title: t("howToHelp.moneyTitle"),
+      description: t("howToHelp.moneyDesc"),
+      steps: [
+        t("howToHelp.moneyStep1"),
+        t("howToHelp.moneyStep2"),
+        t("howToHelp.moneyStep3"),
+      ],
+      cta: t("howToHelp.moneyCta"),
+      ctaHref: "/campanas",
+      ctaStyle: "bg-red-500 hover:bg-red-600",
+    },
+    {
+      id: "donar-productos",
+      icon: Package,
+      color: "from-blue-50 to-indigo-50 border-blue-200",
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-600",
+      badge: t("howToHelp.productsBadge"),
+      badgeColor: "bg-blue-100 text-blue-700",
+      title: t("howToHelp.productsTitle"),
+      description: t("howToHelp.productsDesc"),
+      steps: [
+        t("howToHelp.productsStep1"),
+        t("howToHelp.productsStep2"),
+        t("howToHelp.productsStep3"),
+      ],
+      cta: t("howToHelp.productsCta"),
+      ctaHref: "/contacto",
+      ctaStyle: "bg-blue-500 hover:bg-blue-600",
+    },
+    {
+      id: "donar-alimento",
+      icon: Dog,
+      color: "from-amber-50 to-orange-50 border-amber-200",
+      iconBg: "bg-amber-100",
+      iconColor: "text-amber-600",
+      badge: t("howToHelp.animalFoodBadge"),
+      badgeColor: "bg-amber-100 text-amber-700",
+      title: t("howToHelp.animalFoodTitle"),
+      description: t("howToHelp.animalFoodDesc"),
+      steps: [
+        t("howToHelp.animalFoodStep1"),
+        t("howToHelp.animalFoodStep2"),
+        t("howToHelp.animalFoodStep3"),
+      ],
+      cta: t("howToHelp.animalFoodCta"),
+      ctaHref: "/ayuda-animal",
+      ctaStyle: "bg-amber-500 hover:bg-amber-600",
+    },
+    {
+      id: "voluntario",
+      icon: HandHeart,
+      color: "from-green-50 to-emerald-50 border-green-200",
+      iconBg: "bg-green-100",
+      iconColor: "text-green-600",
+      badge: t("howToHelp.volunteerBadge"),
+      badgeColor: "bg-green-100 text-green-700",
+      title: t("howToHelp.volunteerTitle"),
+      description: t("howToHelp.volunteerDesc"),
+      steps: [
+        t("howToHelp.volunteerStep1"),
+        t("howToHelp.volunteerStep2"),
+        t("howToHelp.volunteerStep3"),
+      ],
+      cta: t("howToHelp.volunteerCta"),
+      ctaHref: "/voluntariado",
+      ctaStyle: "bg-green-600 hover:bg-green-700",
+    },
+    {
+      id: "aliado",
+      icon: Building2,
+      color: "from-purple-50 to-violet-50 border-purple-200",
+      iconBg: "bg-purple-100",
+      iconColor: "text-purple-600",
+      badge: t("howToHelp.allyBadge"),
+      badgeColor: "bg-purple-100 text-purple-700",
+      title: t("howToHelp.allyTitle"),
+      description: t("howToHelp.allyDesc"),
+      steps: [
+        t("howToHelp.allyStep1"),
+        t("howToHelp.allyStep2"),
+        t("howToHelp.allyStep3"),
+      ],
+      cta: t("howToHelp.allyCta"),
+      ctaHref: "/contacto",
+      ctaStyle: "bg-purple-600 hover:bg-purple-700",
+    },
+    {
+      id: "difundir",
+      icon: Megaphone,
+      color: "from-yellow-50 to-amber-50 border-yellow-200",
+      iconBg: "bg-yellow-100",
+      iconColor: "text-yellow-600",
+      badge: t("howToHelp.spreadBadge"),
+      badgeColor: "bg-yellow-100 text-yellow-700",
+      title: t("howToHelp.spreadTitle"),
+      description: t("howToHelp.spreadDesc"),
+      steps: [
+        t("howToHelp.spreadStep1"),
+        t("howToHelp.spreadStep2"),
+        t("howToHelp.spreadStep3"),
+      ],
+      cta: t("howToHelp.spreadCta"),
+      ctaHref: "/campanas",
+      ctaStyle: "bg-yellow-500 hover:bg-yellow-600",
+    },
+  ];
+
+  const PAYMENT_METHODS = [
+    { icon: QrCode, label: "Yape", value: "921 615 737", color: "text-purple-600" },
+    { icon: QrCode, label: "Plin", value: "921 615 737", color: "text-blue-600" },
+    { icon: Banknote, label: "BCP", value: "193-12345678-0-55", color: "text-orange-700" },
+    { icon: CreditCard, label: t("howToHelp.cash"), value: t("howToHelp.coordinateInSanRamon"), color: "text-green-700" },
+  ];
+
+  const FAQS = [
+    { q: t("howToHelp.faq1q"), a: t("howToHelp.faq1a") },
+    { q: t("howToHelp.faq2q"), a: t("howToHelp.faq2a") },
+    { q: t("howToHelp.faq3q"), a: t("howToHelp.faq3a") },
+    { q: t("howToHelp.faq4q"), a: t("howToHelp.faq4a") },
+  ];
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 sm:py-16">
       {/* Hero */}
       <div className="mb-14 text-center max-w-3xl mx-auto">
         <div className="flex items-center gap-3 mb-5 justify-center">
           <div className="p-3 bg-primary/10 rounded-2xl"><HandHeart className="w-7 h-7 text-primary" /></div>
-          <span className="bg-primary/10 text-primary text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">Participa</span>
+          <span className="bg-primary/10 text-primary text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">{t("howToHelp.participate")}</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-display font-black mb-4">¿Cómo puedes ayudar?</h1>
+        <h1 className="text-4xl sm:text-5xl font-display font-black mb-4">{t("howToHelp.title")}</h1>
         <p className="text-muted-foreground text-lg leading-relaxed">
-          Cada persona tiene algo que aportar. Elige la forma que mejor se adapte a ti — todas son igualmente valiosas.
+          {t("howToHelp.subtitle")}
         </p>
       </div>
 
@@ -186,8 +196,8 @@ export default function HowToHelp() {
 
       {/* Payment methods */}
       <div className="bg-card border border-border rounded-3xl p-8 mb-12">
-        <h2 className="text-2xl font-display font-bold mb-2 text-center">Métodos de pago para donaciones</h2>
-        <p className="text-muted-foreground text-center mb-8 text-sm">Elige el método que más te convenga. Todas las donaciones son transparentes y reportadas mensualmente.</p>
+        <h2 className="text-2xl font-display font-bold mb-2 text-center">{t("howToHelp.paymentTitle")}</h2>
+        <p className="text-muted-foreground text-center mb-8 text-sm">{t("howToHelp.paymentDesc")}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {PAYMENT_METHODS.map((pm, i) => (
             <div key={i} className="bg-secondary/40 rounded-2xl p-5 text-center border border-border">
@@ -198,7 +208,7 @@ export default function HowToHelp() {
           ))}
         </div>
         <p className="text-center text-sm text-muted-foreground mt-6">
-          Después de tu donación, envía el comprobante al{" "}
+          {t("howToHelp.afterDonation")}{" "}
           <a href="https://wa.me/51921615737" className="text-green-700 font-semibold hover:underline">WhatsApp 921 615 737</a>
         </p>
       </div>
@@ -206,17 +216,17 @@ export default function HowToHelp() {
       {/* Allies CTA */}
       <div className="bg-gradient-to-r from-primary to-primary/80 rounded-3xl p-8 sm:p-12 text-white text-center mb-12">
         <Building2 className="w-12 h-12 mx-auto mb-4 opacity-90" />
-        <h2 className="text-3xl font-display font-bold mb-3">¿Representas una empresa o institución?</h2>
-        <p className="text-white/85 text-lg mb-6 max-w-xl mx-auto">Únete como aliado de Red Solidaria. Trabajamos con emprendimientos locales, instituciones y empresas que quieren impactar positivamente en Chanchamayo.</p>
+        <h2 className="text-3xl font-display font-bold mb-3">{t("howToHelp.alliesTitle")}</h2>
+        <p className="text-white/85 text-lg mb-6 max-w-xl mx-auto">{t("howToHelp.alliesDesc")}</p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link href="/aliados">
             <Button size="lg" className="bg-card text-primary hover:bg-card/90 rounded-2xl h-12 px-8 font-bold">
-              Ver nuestros aliados
+              {t("howToHelp.viewAllies")}
             </Button>
           </Link>
           <Link href="/contacto">
             <Button size="lg" variant="outline" className="border-white text-white hover:bg-card/20 rounded-2xl h-12 px-8">
-              Ser aliado
+              {t("howToHelp.becomeAlly")}
             </Button>
           </Link>
         </div>
@@ -224,14 +234,9 @@ export default function HowToHelp() {
 
       {/* FAQ rapida */}
       <div className="bg-secondary/30 rounded-3xl p-8">
-        <h2 className="text-2xl font-display font-bold mb-6 text-center">Preguntas frecuentes</h2>
+        <h2 className="text-2xl font-display font-bold mb-6 text-center">{t("howToHelp.faqTitle")}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {[
-            { q: "¿Las donaciones son deducibles de impuestos?", a: "Trabajamos en ello. Por ahora emitimos constancia de donación para quienes la necesiten." },
-            { q: "¿Cómo sé que mi donación llegó?", a: "Todas las donaciones aprobadas aparecen en el Dashboard de Transparencia de cada campaña." },
-            { q: "¿Puedo donar desde otra ciudad?", a: "Sí. Las donaciones por Yape, Plin o BCP funcionan desde cualquier parte del Perú." },
-            { q: "¿Hay un monto mínimo para donar?", a: "No. Desde S/ 1 ya es una donación bienvenida. Cada sol suma para la causa." },
-          ].map((faq, i) => (
+          {FAQS.map((faq, i) => (
             <div key={i} className="bg-card border border-border rounded-2xl p-5">
               <h3 className="font-bold text-sm mb-2">{faq.q}</h3>
               <p className="text-muted-foreground text-sm">{faq.a}</p>

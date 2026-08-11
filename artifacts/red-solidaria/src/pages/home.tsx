@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import SEO from "@/components/shared/SEO";
 import { useQuery } from "@tanstack/react-query";
 import { useGetStats, useGetCampaigns } from "@workspace/api-client-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { CampaignCard } from "@/components/shared/CampaignCard";
 import { Heart, Users, Gift, ShieldCheck, PawPrint, AlertTriangle, MapPin, ArrowRight, Baby, PersonStanding, Cat, Home as HomeIcon, Zap, Sparkles, Star, ChevronDown, HandHeart } from "lucide-react";
@@ -77,6 +78,7 @@ const URGENCY_COLOR: Record<string, string> = {
 };
 
 export default function Home() {
+  const { t } = useTranslation();
   const { data: stats } = useGetStats();
   const { data: campaigns } = useGetCampaigns({ featured: true, status: "active" });
   const { data: featuredReports = [] } = useQuery<FeaturedReport[]>({
@@ -151,14 +153,14 @@ export default function Home() {
         >
           <HeroCard
             img="https://images.unsplash.com/photo-1543589077-47d81606c1bf?auto=format&fit=crop&w=160&q=80"
-            title="Chocolatada Navideña"
-            subtitle="Meta al 65% · 500 niños"
+            title={t("home.heroCardChristmasTitle")}
+            subtitle={t("home.heroCardChristmasSubtitle")}
             accent="text-green-700"
           />
           <HeroCard
             icon={<Heart className="w-6 h-6" />}
-            title="S/ 3,250 recaudados"
-            subtitle="esta semana, ¡gracias!"
+            title={t("home.heroCardRaisedTitle")}
+            subtitle={t("home.heroCardRaisedSubtitle")}
           />
         </motion.div>
         <motion.div
@@ -168,14 +170,14 @@ export default function Home() {
         >
           <HeroCard
             img="https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=160&q=80"
-            title="Luna busca hogar"
-            subtitle="Adoptable en San Ramón"
+            title={t("home.heroCardPetTitle")}
+            subtitle={t("home.heroCardPetSubtitle")}
             accent="text-amber-700"
           />
           <HeroCard
             icon={<Gift className="w-6 h-6" />}
-            title="Útiles escolares"
-            subtitle="300 kits para marzo 2025"
+            title={t("home.heroCardSchoolTitle")}
+            subtitle={t("home.heroCardSchoolSubtitle")}
           />
         </motion.div>
 
@@ -199,7 +201,7 @@ export default function Home() {
 
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-display font-extrabold text-foreground tracking-tight max-w-4xl leading-[1.1] mb-6">
             <span className="block">
-              {["Uniendo", "corazones,"].map((word, i) => (
+              {[t("home.heroTitleWord1"), t("home.heroTitleWord2")].map((word, i) => (
                 <motion.span
                   key={i}
                   className="inline-block mr-[0.25em]"
@@ -212,7 +214,7 @@ export default function Home() {
               ))}
             </span>
             <span className="block">
-              {["transformando", "vidas"].map((word, i) => (
+              {[t("home.heroTitleWord3"), t("home.heroTitleWord4")].map((word, i) => (
                 <motion.span
                   key={i}
                   className="inline-block mr-[0.25em] text-primary"
@@ -232,7 +234,7 @@ export default function Home() {
             transition={{ duration: 0.7, delay: 0.75 }}
             className="text-xl md:text-2xl text-muted-foreground max-w-2xl mb-10 leading-relaxed"
           >
-            Empezamos llevando sonrisas en Navidad. Hoy somos una red de voluntarios comprometidos con el bienestar de niños, familias y animales en nuestra comunidad.
+            {t("home.heroSubtitle")}
           </motion.p>
 
           <motion.div
@@ -244,12 +246,12 @@ export default function Home() {
             <Link href="/campanas">
               <Button size="lg" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 shadow-xl shadow-primary/25 hover:-translate-y-1 transition-transform group">
                 <Heart className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                Donar Ahora
+                {t("nav.donateNow")}
               </Button>
             </Link>
             <Link href="/nosotros">
               <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-xl text-lg h-14 px-8 bg-card/60 backdrop-blur-sm border-border hover:bg-card/90">
-                Nuestra Historia
+                {t("home.heroOurStory")}
               </Button>
             </Link>
           </motion.div>
@@ -267,8 +269,8 @@ export default function Home() {
               ))}
             </div>
             <p className="text-sm text-muted-foreground text-left leading-tight">
-              <span className="font-semibold text-foreground">+87 voluntarios</span> ya están
-              <br /> cambiando vidas en la región
+              <span className="font-semibold text-foreground">{t("home.heroTrustCount")}</span> {t("home.heroTrustPrefix")}
+              <br /> {t("home.heroTrustSuffix")}
             </p>
           </motion.div>
         </motion.div>
@@ -281,7 +283,7 @@ export default function Home() {
           className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 hidden md:flex flex-col items-center gap-1 text-muted-foreground"
           aria-hidden="true"
         >
-          <span className="text-[11px] uppercase tracking-[0.2em] font-medium">Descubre</span>
+          <span className="text-[11px] uppercase tracking-[0.2em] font-medium">{t("home.heroScroll")}</span>
           <motion.div animate={{ y: [0, 6, 0] }} transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}>
             <ChevronDown className="w-5 h-5" />
           </motion.div>
@@ -294,10 +296,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 text-center divide-x-0 md:divide-x divide-primary-foreground/20">
             {[
-              { value: stats?.childrenHelped ?? "—", label: "Niños Beneficiados" },
-              { value: stats?.campaignsRun ?? "—", label: "Campañas Exitosas" },
-              { value: stats?.volunteers ?? "—", label: "Voluntarios Activos" },
-              { value: stats?.animalsHelped ?? "—", label: "Animales Rescatados" },
+              { value: stats?.childrenHelped ?? "—", label: t("home.statChildren") },
+              { value: stats?.campaignsRun ?? "—", label: t("home.statCampaigns") },
+              { value: stats?.volunteers ?? "—", label: t("home.statVolunteers") },
+              { value: stats?.animalsHelped ?? "—", label: t("home.statAnimals") },
             ].map((stat, i) => (
               <motion.div 
                 key={i}
@@ -322,11 +324,11 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
             <div className="max-w-2xl">
-              <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Campañas Destacadas</h2>
-              <p className="text-lg text-muted-foreground">Únete a nuestras iniciativas actuales y ayúdanos a llegar a la meta. Cada sol suma a la causa.</p>
+              <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">{t("home.featuredTitle")}</h2>
+              <p className="text-lg text-muted-foreground">{t("home.featuredSubtitle")}</p>
             </div>
             <Link href="/campanas">
-              <Button variant="outline" className="rounded-xl bg-card">Ver todas las campañas</Button>
+              <Button variant="outline" className="rounded-xl bg-card">{t("home.featuredViewAll")}</Button>
             </Link>
           </div>
 
@@ -336,7 +338,7 @@ export default function Home() {
             ))}
             {!campaigns?.length && (
               <div className="col-span-full text-center py-12 text-muted-foreground">
-                Cargando campañas...
+                {t("home.featuredLoading")}
               </div>
             )}
           </div>
@@ -351,14 +353,14 @@ export default function Home() {
               <div className="max-w-2xl">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
-                  <span className="text-orange-700 font-bold text-sm uppercase tracking-wider">Casos que necesitan ayuda ahora</span>
+                  <span className="text-orange-700 font-bold text-sm uppercase tracking-wider">{t("home.urgentTag")}</span>
                 </div>
-                <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Casos Urgentes</h2>
-                <p className="text-lg text-muted-foreground">Personas reales de nuestra comunidad que atraviesan situaciones difíciles. Cada pequeña ayuda marca una diferencia enorme.</p>
+                <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">{t("nav.urgentCases")}</h2>
+                <p className="text-lg text-muted-foreground">{t("home.urgentSubtitle")}</p>
               </div>
               <Link href="/casos-urgentes">
                 <Button variant="outline" className="rounded-xl bg-card border-orange-300 text-orange-700 hover:bg-orange-50">
-                  Ver todos los casos <ArrowRight className="w-4 h-4 ml-2" />
+                  {t("home.urgentViewAll")} <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
             </div>
@@ -385,7 +387,7 @@ export default function Home() {
                       )}
                       <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-card shadow-sm`}>
                         <span className={`w-2 h-2 rounded-full ${URGENCY_COLOR[report.urgency] || "bg-secondary"}`} />
-                        {report.urgency === "critical" ? "EMERGENCIA" : report.urgency === "high" ? "Urgente" : "Necesita ayuda"}
+                        {report.urgency === "critical" ? t("home.urgencyCritical") : report.urgency === "high" ? t("home.urgencyHigh") : t("home.urgencyNormal")}
                       </div>
                     </div>
                     <div className="p-5 flex-1 flex flex-col gap-3">
@@ -398,13 +400,13 @@ export default function Home() {
                         {report.campaignId ? (
                           <Link href={`/campanas/${report.campaignId}`}>
                             <Button size="sm" className="w-full rounded-xl h-9">
-                              <Heart className="w-3.5 h-3.5 mr-1.5" /> Apoyar campaña
+                              <Heart className="w-3.5 h-3.5 mr-1.5" /> {t("campaignCard.support")}
                             </Button>
                           </Link>
                         ) : (
                           <Link href="/casos-urgentes">
                             <Button variant="outline" size="sm" className="w-full rounded-xl h-9 border-primary/30 text-primary hover:bg-primary/5">
-                              <ArrowRight className="w-3.5 h-3.5 mr-1.5" /> Ver caso completo
+                              <ArrowRight className="w-3.5 h-3.5 mr-1.5" /> {t("home.urgentViewCase")}
                             </Button>
                           </Link>
                         )}
@@ -418,7 +420,7 @@ export default function Home() {
             <div className="mt-10 text-center">
               <Link href="/reportar">
                 <Button variant="ghost" className="text-muted-foreground hover:text-foreground rounded-xl">
-                  ¿Conoces a alguien que necesite ayuda? <span className="text-primary font-semibold ml-1">Repórtalo aquí →</span>
+                  {t("home.urgentKnowSomeone")} <span className="text-primary font-semibold ml-1">{t("home.urgentReportHere")}</span>
                 </Button>
               </Link>
             </div>
@@ -430,16 +432,16 @@ export default function Home() {
       <section className="py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Múltiples Formas de Ayudar</h2>
-            <p className="text-lg text-muted-foreground">No solo necesitamos aportes económicos. Tu tiempo, habilidades y donaciones en especie son invaluables.</p>
+            <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">{t("home.helpTitle")}</h2>
+            <p className="text-lg text-muted-foreground">{t("home.helpSubtitle")}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Heart, title: "Aporte Económico", desc: "Ayuda directa a nuestras campañas para comprar víveres y medicinas.", color: "bg-primary/10 text-primary" },
-              { icon: Gift, title: "Donar Productos", desc: "Recibimos ropa, víveres, juguetes y comida para animales.", color: "bg-blue-500/10 text-blue-500" },
-              { icon: Users, title: "Ser Voluntario", desc: "Suma tus manos en las actividades de campo y logística.", color: "bg-orange-500/10 text-orange-500" },
-              { icon: PawPrint, title: "Ayuda Animal", desc: "Apoya en rescates, donando alimento o dando hogar temporal.", color: "bg-accent/10 text-accent" },
+              { icon: Heart, title: t("home.helpMonetaryTitle"), desc: t("home.helpMonetaryDesc"), color: "bg-primary/10 text-primary" },
+              { icon: Gift, title: t("home.helpProductsTitle"), desc: t("home.helpProductsDesc"), color: "bg-blue-500/10 text-blue-500" },
+              { icon: Users, title: t("home.helpVolunteerTitle"), desc: t("home.helpVolunteerDesc"), color: "bg-orange-500/10 text-orange-500" },
+              { icon: PawPrint, title: t("home.helpAnimalTitle"), desc: t("home.helpAnimalDesc"), color: "bg-accent/10 text-accent" },
             ].map((item, i) => (
               <motion.div 
                 key={i}
@@ -462,7 +464,7 @@ export default function Home() {
         {/* bg smiling kids abstract unplash image */}
         <img 
           src="https://images.unsplash.com/photo-1593113598332-cd288d649433?w=1600&q=80" 
-          alt="Kids playing" 
+          alt={t("home.transparencyImageAlt")} 
           loading="lazy"
           decoding="async"
           className="absolute inset-0 w-full h-full object-cover opacity-20"
@@ -471,13 +473,13 @@ export default function Home() {
         
         <div className="max-w-4xl mx-auto px-4 relative z-10 text-center text-white">
           <ShieldCheck className="w-16 h-16 mx-auto mb-6 opacity-90" />
-          <h2 className="text-3xl md:text-5xl font-display font-bold mb-6">100% Transparencia</h2>
+          <h2 className="text-3xl md:text-5xl font-display font-bold mb-6">{t("home.transparencyTitle")}</h2>
           <p className="text-lg md:text-xl text-white/90 mb-10 leading-relaxed">
-            Creemos que la confianza es la base de la solidaridad. Publicamos reportes detallados, boletas y evidencias fotográficas de cada céntimo que entra y sale de la organización.
+            {t("home.transparencyDesc")}
           </p>
           <Link href="/nosotros">
             <Button size="lg" className="bg-card text-primary hover:bg-card/90 rounded-xl text-lg h-14 px-8">
-              Conoce nuestro método
+              {t("home.transparencyCta")}
             </Button>
           </Link>
         </div>

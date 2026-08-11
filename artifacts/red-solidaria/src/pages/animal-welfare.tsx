@@ -1,70 +1,72 @@
 import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import {
   Dog, Cat, Heart, Shield, Syringe, Home, HandHeart, AlertTriangle,
-  ArrowRight, Star, Leaf, Sun, Users, PawPrint
+  ArrowRight, Leaf, Sun, Users, PawPrint
 } from "lucide-react";
 
+// Los valores de texto son claves i18n: se traducen con t() en el render.
 const WELFARE_SECTIONS = [
   {
     icon: Dog,
     color: "from-amber-50 to-orange-50 border-amber-200",
     iconColor: "text-amber-600",
-    badge: "Campaña activa",
+    badgeKey: "animalWelfare.section1Badge",
     badgeColor: "bg-amber-100 text-amber-700",
-    title: "Alimento para perros de la calle",
-    description: "San Ramón tiene cientos de perros callejeros que sobreviven día a día. Nuestras rondas de alimentación semanales llegan a los puntos más críticos del distrito con croquetas, agua y amor.",
+    titleKey: "animalWelfare.section1Title",
+    descKey: "animalWelfare.section1Desc",
     stats: [
-      { value: "80+", label: "Perros alimentados/semana" },
-      { value: "12", label: "Puntos de alimentación" },
+      { value: "80+", labelKey: "animalWelfare.section1Stat1" },
+      { value: "12", labelKey: "animalWelfare.section1Stat2" },
     ],
-    cta: "Donar alimento",
+    ctaKey: "animalWelfare.section1Cta",
     ctaHref: "/campanas",
   },
   {
     icon: Home,
     color: "from-blue-50 to-indigo-50 border-blue-200",
     iconColor: "text-blue-600",
-    badge: "Apoyo continuo",
+    badgeKey: "animalWelfare.section2Badge",
     badgeColor: "bg-blue-100 text-blue-700",
-    title: "Apoyo a albergues animales",
-    description: "Los albergues de la región reciben animales rescatados sin tener recursos suficientes. Apoyamos con comida, medicinas, mantas y materiales de limpieza para que puedan operar.",
+    titleKey: "animalWelfare.section2Title",
+    descKey: "animalWelfare.section2Desc",
     stats: [
-      { value: "3", label: "Albergues apoyados" },
-      { value: "150+", label: "Animales alojados" },
+      { value: "3", labelKey: "animalWelfare.section2Stat1" },
+      { value: "150+", labelKey: "animalWelfare.section2Stat2" },
     ],
-    cta: "Apoyar albergues",
+    ctaKey: "animalWelfare.section2Cta",
     ctaHref: "/campanas",
   },
   {
     icon: Syringe,
     color: "from-green-50 to-emerald-50 border-green-200",
     iconColor: "text-green-600",
-    badge: "Jornadas periódicas",
+    badgeKey: "animalWelfare.section3Badge",
     badgeColor: "bg-green-100 text-green-700",
-    title: "Campañas veterinarias",
-    description: "Organizamos jornadas de vacunación y esterilización a bajo costo o gratuitas para mascotas de familias con bajos recursos. Trabajamos con veterinarios voluntarios de Chanchamayo.",
+    titleKey: "animalWelfare.section3Title",
+    descKey: "animalWelfare.section3Desc",
     stats: [
-      { value: "200+", label: "Animales vacunados" },
-      { value: "85+", label: "Esterilizaciones" },
+      { value: "200+", labelKey: "animalWelfare.section3Stat1" },
+      { value: "85+", labelKey: "animalWelfare.section3Stat2" },
     ],
-    cta: "Ver próxima jornada",
+    ctaKey: "animalWelfare.section3Cta",
     ctaHref: "/noticias",
   },
   {
     icon: AlertTriangle,
     color: "from-red-50 to-rose-50 border-red-200",
     iconColor: "text-red-600",
-    badge: "Respuesta rápida",
+    badgeKey: "animalWelfare.section4Badge",
     badgeColor: "bg-red-100 text-red-700",
-    title: "Rescates urgentes",
-    description: "Cuando un animal está en peligro — atropellado, herido, en una zona de riesgo o maltratado — activamos nuestra red de voluntarios para rescatarlo, estabilizarlo y buscarle hogar.",
+    titleKey: "animalWelfare.section4Title",
+    descKey: "animalWelfare.section4Desc",
     stats: [
-      { value: "60+", label: "Rescates realizados" },
-      { value: "48h", label: "Tiempo medio de respuesta" },
+      { value: "60+", labelKey: "animalWelfare.section4Stat1" },
+      { value: "48h", labelKey: "animalWelfare.section4Stat2" },
     ],
-    cta: "Reportar animal",
+    ctaKey: "animalWelfare.section4Cta",
     ctaHref: "/reportar",
   },
 ];
@@ -72,49 +74,50 @@ const WELFARE_SECTIONS = [
 const AWARENESS_MSGS = [
   {
     icon: Shield,
-    title: "Un perro no es un juguete",
-    desc: "Adoptar es un compromiso de vida. Antes de llevar una mascota a casa, evalúa si tienes el tiempo, espacio y recursos para cuidarla bien.",
+    titleKey: "animalWelfare.aware1Title",
+    descKey: "animalWelfare.aware1Desc",
   },
   {
     icon: Leaf,
-    title: "Esteriliza, no abandones",
-    desc: "La esterilización previene el abandono y la sobrepoblación. Un animal esterilizado vive más tiempo, es más sano y menos agresivo.",
+    titleKey: "animalWelfare.aware2Title",
+    descKey: "animalWelfare.aware2Desc",
   },
   {
     icon: Sun,
-    title: "Adopta, no compres",
-    desc: "Hay miles de animales esperando un hogar. Adoptar salva vidas y no alimenta la cría irresponsable.",
+    titleKey: "animalWelfare.aware3Title",
+    descKey: "animalWelfare.aware3Desc",
   },
   {
     icon: Heart,
-    title: "El maltrato es delito",
-    desc: "En el Perú, el maltrato animal está penado por la Ley N.° 30407. Si ves un animal maltratado, repórtalo a las autoridades.",
+    titleKey: "animalWelfare.aware4Title",
+    descKey: "animalWelfare.aware4Desc",
   },
 ];
 
 export default function AnimalWelfare() {
+  const { t } = useTranslation();
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-10 sm:py-16">
       {/* Hero */}
       <div className="mb-14">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-3 bg-amber-100 rounded-2xl"><PawPrint className="w-7 h-7 text-amber-600" /></div>
-          <span className="bg-amber-100 text-amber-700 text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">Bienestar Animal</span>
+          <span className="bg-amber-100 text-amber-700 text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">{t("animalWelfare.badge")}</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-display font-black mb-4">Porque también merecen vivir bien</h1>
+        <h1 className="text-4xl sm:text-5xl font-display font-black mb-4">{t("animalWelfare.heroTitle")}</h1>
         <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">
-          Red Solidaria San Ramón trabaja tanto por las personas como por los animales de nuestra comunidad.
-          Creemos que el bienestar animal es parte del tejido solidario de la sociedad.
+          {t("animalWelfare.heroSubtitle")}
         </p>
         <div className="flex flex-col sm:flex-row gap-4 mt-8">
           <Link href="/adopciones">
             <Button className="rounded-2xl h-12 px-6 bg-amber-500 hover:bg-amber-600 shadow-md hover-elevate">
-              <Dog className="w-4 h-4 mr-2" /> Ver mascotas en adopción
+              <Dog className="w-4 h-4 mr-2" /> {t("animalWelfare.viewAdoptedPets")}
             </Button>
           </Link>
           <Link href="/reportar">
             <Button variant="outline" className="rounded-2xl h-12 px-6 border-red-200 text-red-600 hover:bg-red-50">
-              <AlertTriangle className="w-4 h-4 mr-2" /> Reportar animal en peligro
+              <AlertTriangle className="w-4 h-4 mr-2" /> {t("animalWelfare.reportAnimal")}
             </Button>
           </Link>
         </div>
@@ -135,19 +138,19 @@ export default function AnimalWelfare() {
               <div className={`p-3 bg-card/70 rounded-2xl`}>
                 <section.icon className={`w-7 h-7 ${section.iconColor}`} />
               </div>
-              <span className={`text-xs font-bold px-3 py-1 rounded-full ${section.badgeColor}`}>{section.badge}</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${section.badgeColor}`}>{t(section.badgeKey)}</span>
             </div>
 
             <div>
-              <h3 className="font-display font-bold text-xl mb-2">{section.title}</h3>
-              <p className="text-muted-foreground leading-relaxed text-sm">{section.description}</p>
+              <h3 className="font-display font-bold text-xl mb-2">{t(section.titleKey)}</h3>
+              <p className="text-muted-foreground leading-relaxed text-sm">{t(section.descKey)}</p>
             </div>
 
             <div className="flex gap-6">
               {section.stats.map((stat, j) => (
                 <div key={j}>
                   <p className="text-2xl font-display font-bold">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  <p className="text-xs text-muted-foreground">{t(stat.labelKey)}</p>
                 </div>
               ))}
             </div>
@@ -157,7 +160,7 @@ export default function AnimalWelfare() {
                 size="sm"
                 className={`rounded-xl h-9 mt-auto bg-card/80 hover:bg-card text-foreground border border-white/50 shadow-sm gap-1.5`}
               >
-                {section.cta} <ArrowRight className="w-3.5 h-3.5" />
+                {t(section.ctaKey)} <ArrowRight className="w-3.5 h-3.5" />
               </Button>
             </Link>
           </motion.div>
@@ -172,19 +175,19 @@ export default function AnimalWelfare() {
         </div>
         <div className="relative z-10">
           <PawPrint className="w-14 h-14 mx-auto mb-5 opacity-90" />
-          <h2 className="text-3xl sm:text-4xl font-display font-black mb-4">¿Listo para dar un hogar?</h2>
+          <h2 className="text-3xl sm:text-4xl font-display font-black mb-4">{t("animalWelfare.adoptCtaTitle")}</h2>
           <p className="text-white/90 text-lg mb-8 max-w-2xl mx-auto">
-            Tenemos perros y gatos esperando una familia responsable. Cada adopción es una vida que se transforma — la de ellos y la tuya.
+            {t("animalWelfare.adoptCtaDesc")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/adopciones">
               <Button size="lg" className="bg-card text-amber-700 hover:bg-card/90 rounded-2xl h-14 px-10 font-bold shadow-xl">
-                <Heart className="w-5 h-5 mr-2" /> Ver mascotas disponibles
+                <Heart className="w-5 h-5 mr-2" /> {t("animalWelfare.adoptCtaButton")}
               </Button>
             </Link>
             <Link href="/publicar-mascota">
               <Button size="lg" variant="outline" className="border-white text-white hover:bg-card/20 rounded-2xl h-14 px-10 font-semibold">
-                Publicar en adopción
+                {t("animalWelfare.adoptCtaPublish")}
               </Button>
             </Link>
           </div>
@@ -193,8 +196,8 @@ export default function AnimalWelfare() {
 
       {/* Mensajes de concientización */}
       <div className="mb-16">
-        <h2 className="text-3xl font-display font-bold mb-3 text-center">Adopción responsable</h2>
-        <p className="text-muted-foreground text-center mb-10">Tener una mascota es un compromiso hermoso. Estos son nuestros principios.</p>
+        <h2 className="text-3xl font-display font-bold mb-3 text-center">{t("animalWelfare.awarenessTitle")}</h2>
+        <p className="text-muted-foreground text-center mb-10">{t("animalWelfare.awarenessSubtitle")}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {AWARENESS_MSGS.map((msg, i) => (
             <motion.div
@@ -208,8 +211,8 @@ export default function AnimalWelfare() {
               <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
                 <msg.icon className="w-7 h-7 text-primary" />
               </div>
-              <h3 className="font-display font-bold text-base">{msg.title}</h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">{msg.desc}</p>
+              <h3 className="font-display font-bold text-base">{t(msg.titleKey)}</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">{t(msg.descKey)}</p>
             </motion.div>
           ))}
         </div>
@@ -217,26 +220,26 @@ export default function AnimalWelfare() {
 
       {/* Cómo ayudar */}
       <div className="bg-secondary/30 rounded-3xl p-8 text-center">
-        <h3 className="font-display font-bold text-2xl mb-2">¿Cómo puedes ayudar?</h3>
-        <p className="text-muted-foreground mb-8">No necesitas adoptar para marcar la diferencia.</p>
+        <h3 className="font-display font-bold text-2xl mb-2">{t("howToHelp.title")}</h3>
+        <p className="text-muted-foreground mb-8">{t("animalWelfare.helpSubtitle")}</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-left mb-8">
           {[
-            { icon: HandHeart, title: "Ser voluntario", desc: "Únete a nuestras jornadas de alimentación, vacunación o rescate. Un sábado al mes puede cambiar muchas vidas.", href: "/contacto" },
-            { icon: Users, title: "Hogar temporal", desc: "Acoger una mascota por semanas mientras encuentra familia definitiva. Es temporal pero transforma su vida.", href: "/contacto" },
-            { icon: Heart, title: "Donar", desc: "Alimento, medicinas, mantas o dinero para nuestras campañas veterinarias y de alimentación callejera.", href: "/campanas" },
+            { icon: HandHeart, titleKey: "animalWelfare.helpVolunteer", descKey: "animalWelfare.helpVolunteerDesc", href: "/contacto" },
+            { icon: Users, titleKey: "animalWelfare.helpFoster", descKey: "animalWelfare.helpFosterDesc", href: "/contacto" },
+            { icon: Heart, titleKey: "nav.donate", descKey: "animalWelfare.helpDonateDesc", href: "/campanas" },
           ].map((item, i) => (
             <Link href={item.href} key={i}>
               <div className="bg-card border border-border rounded-2xl p-5 hover:shadow-md transition-shadow cursor-pointer h-full">
                 <item.icon className="w-7 h-7 text-primary mb-3" />
-                <h4 className="font-bold mb-1">{item.title}</h4>
-                <p className="text-muted-foreground text-sm leading-relaxed">{item.desc}</p>
+                <h4 className="font-bold mb-1">{t(item.titleKey)}</h4>
+                <p className="text-muted-foreground text-sm leading-relaxed">{t(item.descKey)}</p>
               </div>
             </Link>
           ))}
         </div>
         <Link href="/contacto">
           <Button className="rounded-2xl px-8 h-12">
-            Quiero ser voluntario animalista <ArrowRight className="w-4 h-4 ml-2" />
+            {t("animalWelfare.volunteerCta")} <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </Link>
       </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
+import { useTranslation } from "react-i18next";
 import { useCampaignTransparency, useCampaignLedger, useCampaignLedgerVerify, Evidence } from "@/hooks/use-phase3";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ import {
   Eye
 } from "lucide-react";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFormatLocale } from "@/lib/i18n/date";
 
 const categoryColors: Record<string, string> = {
   alimentación: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -39,6 +40,7 @@ const categoryColors: Record<string, string> = {
 
 export default function CampaignTransparency() {
   const { id } = useParams();
+  const { t } = useTranslation();
   const campaignId = Number(id);
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
 
@@ -50,7 +52,7 @@ export default function CampaignTransparency() {
     return (
       <div className="min-h-screen pt-32 pb-20 flex flex-col items-center text-muted-foreground">
         <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
-        <p className="font-medium text-lg">Cargando datos de transparencia...</p>
+        <p className="font-medium text-lg">{t("campaignTransparency.loading")}</p>
       </div>
     );
   }
@@ -59,10 +61,10 @@ export default function CampaignTransparency() {
     return (
       <div className="min-h-screen pt-32 pb-20 flex flex-col items-center">
         <Shield className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-        <h2 className="text-2xl font-bold text-foreground">Información no disponible</h2>
-        <p className="text-muted-foreground mt-2 mb-6">No pudimos cargar el panel de transparencia de esta campaña.</p>
+        <h2 className="text-2xl font-bold text-foreground">{t("campaignTransparency.unavailableTitle")}</h2>
+        <p className="text-muted-foreground mt-2 mb-6">{t("campaignTransparency.unavailableDescription")}</p>
         <Link href={`/campanas/${campaignId}`}>
-          <Button variant="outline" className="rounded-xl">Volver a la campaña</Button>
+          <Button variant="outline" className="rounded-xl">{t("campaignTransparency.backToCampaign")}</Button>
         </Link>
       </div>
     );
@@ -82,7 +84,7 @@ export default function CampaignTransparency() {
                 <Badge className="bg-primary/90 hover:bg-primary">{selectedEvidence.evidenceType.toUpperCase()}</Badge>
                 <div className="text-sm font-medium opacity-80 flex items-center gap-2">
                   <Calendar className="w-4 h-4"/> 
-                  {format(new Date(selectedEvidence.date), "dd MMM yyyy", { locale: es })}
+                  {format(new Date(selectedEvidence.date), "dd MMM yyyy", { locale: getDateFormatLocale() })}
                 </div>
               </div>
               <div className="flex-1 flex items-center justify-center overflow-hidden min-h-[300px] p-0 md:p-8">
@@ -92,7 +94,7 @@ export default function CampaignTransparency() {
                   <div className="flex flex-col items-center p-12 bg-card/10 rounded-2xl">
                     <FileText className="w-20 h-20 mb-4 opacity-80" />
                     <a href={selectedEvidence.mediaUrl} target="_blank" rel="noreferrer">
-                      <Button className="rounded-xl"><Download className="w-4 h-4 mr-2"/> Descargar Documento</Button>
+                      <Button className="rounded-xl"><Download className="w-4 h-4 mr-2"/> {t("campaignTransparency.downloadDocument")}</Button>
                     </a>
                   </div>
                 )}
@@ -111,7 +113,7 @@ export default function CampaignTransparency() {
         {/* Header Section */}
         <div className="mb-10">
           <Link href={`/campanas/${campaignId}`} className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-primary transition-colors mb-6">
-            <ArrowLeft className="w-4 h-4 mr-1" /> Volver a la campaña
+            <ArrowLeft className="w-4 h-4 mr-1" /> {t("campaignTransparency.backToCampaign")}
           </Link>
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -121,14 +123,14 @@ export default function CampaignTransparency() {
                   <Shield className="w-5 h-5" />
                 </div>
                 <Badge variant="outline" className="border-green-300 text-green-700 bg-green-50 px-3 py-1 font-semibold uppercase tracking-wider text-xs">
-                  100% Transparente
+                  {t("campaignDetail.percentTransparent")}
                 </Badge>
               </div>
               <h1 className="text-4xl md:text-5xl font-display font-extrabold text-foreground tracking-tight mb-2">
-                Panel de Transparencia
+                {t("campaignTransparency.title")}
               </h1>
               <p className="text-xl text-muted-foreground font-medium">
-                Campaña: <span className="text-foreground">{transparency.title}</span>
+                {t("campaignTransparency.campaignLabel", { title: transparency.title })}
               </p>
             </div>
           </div>
@@ -142,7 +144,7 @@ export default function CampaignTransparency() {
               <div className="p-2.5 bg-blue-100 text-blue-600 rounded-xl">
                 <Target className="w-5 h-5" />
               </div>
-              <span className="font-semibold text-muted-foreground">Meta</span>
+              <span className="font-semibold text-muted-foreground">{t("campaignTransparency.kpiGoal")}</span>
             </div>
             <div className="text-3xl font-display font-bold text-foreground relative z-10">
               {formatCurrency(transparency.goal)}
@@ -155,7 +157,7 @@ export default function CampaignTransparency() {
               <div className="p-2.5 bg-green-100 text-green-600 rounded-xl">
                 <TrendingUp className="w-5 h-5" />
               </div>
-              <span className="font-semibold text-muted-foreground">Recaudado</span>
+              <span className="font-semibold text-muted-foreground">{t("campaignDetail.raised")}</span>
             </div>
             <div className="text-3xl font-display font-bold text-foreground relative z-10">
               {formatCurrency(transparency.totalRaised)}
@@ -168,7 +170,7 @@ export default function CampaignTransparency() {
               <div className="p-2.5 bg-orange-100 text-orange-700 rounded-xl">
                 <Receipt className="w-5 h-5" />
               </div>
-              <span className="font-semibold text-muted-foreground">Gastado</span>
+              <span className="font-semibold text-muted-foreground">{t("campaignDetail.spent")}</span>
             </div>
             <div className="text-3xl font-display font-bold text-foreground relative z-10">
               {formatCurrency(transparency.publicSpent)}
@@ -181,7 +183,7 @@ export default function CampaignTransparency() {
               <div className="p-2.5 bg-primary text-primary-foreground rounded-xl shadow-sm">
                 <Wallet className="w-5 h-5" />
               </div>
-              <span className="font-semibold text-foreground">Saldo Disponible</span>
+              <span className="font-semibold text-foreground">{t("campaignTransparency.availableBalance")}</span>
             </div>
             <div className="text-3xl font-display font-bold text-primary relative z-10">
               {formatCurrency(transparency.balance)}
@@ -193,12 +195,12 @@ export default function CampaignTransparency() {
         <div className="grid lg:grid-cols-3 gap-8 mb-12">
           <div className="lg:col-span-2 bg-card rounded-3xl p-8 shadow-sm border border-border">
             <div className="flex justify-between items-end mb-3">
-              <h3 className="font-display font-bold text-lg text-foreground">Ejecución de Fondos</h3>
+              <h3 className="font-display font-bold text-lg text-foreground">{t("campaignTransparency.fundsExecution")}</h3>
               <span className="text-3xl font-bold text-primary">{transparency.executionPercent}%</span>
             </div>
             <Progress value={transparency.executionPercent} className="h-4 rounded-full mb-3 bg-secondary/50" />
             <p className="text-sm text-muted-foreground font-medium">
-              Del total recaudado, el <span className="text-foreground font-bold">{transparency.executionPercent}%</span> ya ha sido ejecutado y rendido con comprobantes en esta página.
+              {t("campaignTransparency.executionText", { percent: transparency.executionPercent })}
             </p>
           </div>
           
@@ -208,7 +210,9 @@ export default function CampaignTransparency() {
             </div>
             <div>
               <div className="text-4xl font-display font-bold text-foreground mb-1">{transparency.donorCount}</div>
-              <div className="text-muted-foreground font-medium leading-tight">Corazones<br/>solidarios</div>
+              <div className="text-muted-foreground font-medium leading-tight whitespace-pre-line">
+                {t("campaignTransparency.caringHearts")}
+              </div>
             </div>
           </div>
         </div>
@@ -220,25 +224,25 @@ export default function CampaignTransparency() {
           <div className="lg:col-span-1">
             <div className="bg-card rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full flex flex-col">
               <h3 className="text-xl font-display font-bold mb-2 flex items-center gap-2">
-                <Link2 className="w-5 h-5 text-primary" /> Movimientos Verificables
+                <Link2 className="w-5 h-5 text-primary" /> {t("campaignTransparency.movementsTitle")}
               </h3>
 
               <div className="mb-5">
                 {loadingVerify || !verify ? (
                   <Badge variant="outline" className="bg-gray-50 text-muted-foreground border-border px-3 py-1 text-xs font-semibold">
-                    Verificando integridad…
+                    {t("campaignTransparency.verifying")}
                   </Badge>
                 ) : verify.count === 0 ? (
                   <Badge variant="outline" className="bg-gray-50 text-muted-foreground border-border px-3 py-1 text-xs font-semibold">
-                    Sin movimientos registrados
+                    {t("campaignTransparency.noMovements")}
                   </Badge>
                 ) : verify.verified ? (
                   <Badge className="bg-green-100 text-green-700 border-green-200 border px-3 py-1 text-xs font-semibold gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" /> Cadena íntegra · {verify.count} movimientos
+                    <ShieldCheck className="w-3.5 h-3.5" /> {t("campaignTransparency.chainIntegrity", { count: verify.count })}
                   </Badge>
                 ) : (
                   <Badge className="bg-red-100 text-red-700 border-red-200 border px-3 py-1 text-xs font-semibold gap-1">
-                    <ShieldAlert className="w-3.5 h-3.5" /> ¡Integridad comprometida!
+                    <ShieldAlert className="w-3.5 h-3.5" /> {t("campaignTransparency.integrityCompromised")}
                   </Badge>
                 )}
               </div>
@@ -264,10 +268,10 @@ export default function CampaignTransparency() {
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(mov.createdAt), "dd MMM, HH:mm", { locale: es })}
+                          {format(new Date(mov.createdAt), "dd MMM, HH:mm", { locale: getDateFormatLocale() })}
                           <span
                             className="ml-2 font-mono text-[10px] text-primary/70"
-                            title={`Huella criptográfica: ${mov.hash}`}
+                            title={t("campaignTransparency.hashTooltip", { hash: mov.hash })}
                           >
                             #{mov.hash.slice(0, 8)}
                           </span>
@@ -279,9 +283,9 @@ export default function CampaignTransparency() {
               ) : (
                 <div className="text-center py-10 text-muted-foreground">
                   <Receipt className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                  <p className="text-sm font-medium">Sin movimientos aún</p>
+                  <p className="text-sm font-medium">{t("campaignTransparency.noMovementsYet")}</p>
                   <p className="text-xs mt-2 max-w-[240px] mx-auto">
-                    Cada donación aprobada y gasto público queda registrado aquí con su huella criptográfica.
+                    {t("campaignTransparency.movementsEmptyDesc")}
                   </p>
                 </div>
               )}
@@ -293,20 +297,20 @@ export default function CampaignTransparency() {
             <div className="bg-card rounded-3xl p-6 md:p-8 shadow-sm border border-border h-full flex flex-col" data-testid="transparency-expenses-table">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-display font-bold flex items-center gap-2">
-                  <Receipt className="w-5 h-5 text-primary" /> Rendición de Gastos
+                  <Receipt className="w-5 h-5 text-primary" /> {t("campaignTransparency.expensesTitle")}
                 </h3>
-                <Badge variant="secondary" className="px-3 py-1 font-medium">{transparency.publicExpenseCount} registros</Badge>
+                <Badge variant="secondary" className="px-3 py-1 font-medium">{t("campaignTransparency.recordsCount", { count: transparency.publicExpenseCount })}</Badge>
               </div>
 
               <div className="flex-1 overflow-x-auto rounded-2xl border border-border/50">
                 <Table>
                   <TableHeader className="bg-secondary/50">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="font-semibold text-foreground">Fecha</TableHead>
-                      <TableHead className="font-semibold text-foreground">Descripción</TableHead>
-                      <TableHead className="font-semibold text-foreground">Categoría</TableHead>
-                      <TableHead className="text-right font-semibold text-foreground">Monto</TableHead>
-                      <TableHead className="text-center font-semibold text-foreground">Comp.</TableHead>
+                      <TableHead className="font-semibold text-foreground">{t("campaignTransparency.colDate")}</TableHead>
+                      <TableHead className="font-semibold text-foreground">{t("campaignTransparency.colDescription")}</TableHead>
+                      <TableHead className="font-semibold text-foreground">{t("campaignTransparency.colCategory")}</TableHead>
+                      <TableHead className="text-right font-semibold text-foreground">{t("campaignTransparency.colAmount")}</TableHead>
+                      <TableHead className="text-center font-semibold text-foreground">{t("campaignTransparency.colReceipt")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -329,7 +333,7 @@ export default function CampaignTransparency() {
                           </TableCell>
                           <TableCell className="text-center">
                             {exp.receiptUrl ? (
-                              <a href={exp.receiptUrl} target="_blank" rel="noreferrer" title="Ver comprobante" className="inline-flex p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+                              <a href={exp.receiptUrl} target="_blank" rel="noreferrer" title={t("campaignDetail.viewReceipt")} className="inline-flex p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors">
                                 <FileText className="w-4 h-4" />
                               </a>
                             ) : (
@@ -341,7 +345,7 @@ export default function CampaignTransparency() {
                     ) : (
                       <TableRow>
                         <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                          No hay gastos públicos registrados en esta campaña.
+                          {t("campaignTransparency.noExpenses")}
                         </TableCell>
                       </TableRow>
                     )}
@@ -350,7 +354,7 @@ export default function CampaignTransparency() {
               </div>
               
               <div className="mt-6 pt-5 border-t border-border flex justify-between items-center bg-gray-50 p-4 rounded-2xl">
-                <span className="font-medium text-muted-foreground">Total Rendido:</span>
+                <span className="font-medium text-muted-foreground">{t("campaignTransparency.totalReported")}</span>
                 <span className="text-2xl font-display font-bold text-foreground">{formatCurrency(transparency.publicSpent)}</span>
               </div>
             </div>
@@ -362,11 +366,11 @@ export default function CampaignTransparency() {
           <div className="flex justify-between items-end mb-8">
             <div>
               <h2 className="text-3xl font-display font-bold flex items-center gap-3 text-foreground mb-2">
-                <Camera className="w-8 h-8 text-primary" /> Evidencias de Impacto
+                <Camera className="w-8 h-8 text-primary" /> {t("campaignTransparency.evidenceTitle")}
               </h2>
-              <p className="text-muted-foreground font-medium">Fotos y documentos que demuestran el resultado de la campaña.</p>
+              <p className="text-muted-foreground font-medium">{t("campaignTransparency.evidenceSubtitle")}</p>
             </div>
-            <Badge variant="secondary" className="px-4 py-1.5 text-sm">{transparency.publicEvidenceCount} evidencias</Badge>
+            <Badge variant="secondary" className="px-4 py-1.5 text-sm">{t("campaignTransparency.evidenceCount", { count: transparency.publicEvidenceCount })}</Badge>
           </div>
 
           {transparency.publicEvidence.length > 0 ? (
@@ -388,7 +392,7 @@ export default function CampaignTransparency() {
                     ) : (
                       <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                         <FileText className="w-12 h-12 mb-2 opacity-50" />
-                        <span className="text-sm font-medium">Ver Documento</span>
+                        <span className="text-sm font-medium">{t("campaignTransparency.viewDocument")}</span>
                       </div>
                     )}
                     <Badge className="absolute top-3 right-3 bg-black/60 backdrop-blur-md hover:bg-black/80 border-none">
@@ -397,7 +401,7 @@ export default function CampaignTransparency() {
                   </div>
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="text-xs text-primary font-medium mb-1.5 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5"/> {format(new Date(ev.date), "dd MMM yyyy", { locale: es })}
+                      <Calendar className="w-3.5 h-3.5"/> {format(new Date(ev.date), "dd MMM yyyy", { locale: getDateFormatLocale() })}
                     </div>
                     <h3 className="font-bold text-foreground leading-tight mb-2 line-clamp-2">{ev.title}</h3>
                     {ev.description && (
@@ -410,8 +414,8 @@ export default function CampaignTransparency() {
           ) : (
             <div className="bg-card rounded-3xl border border-dashed border-border p-16 text-center shadow-sm">
               <Camera className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-foreground mb-2">Sin evidencias aún</h3>
-              <p className="text-muted-foreground">Las fotos y reportes de impacto aparecerán aquí una vez que se realicen las actividades.</p>
+              <h3 className="text-xl font-bold text-foreground mb-2">{t("campaignTransparency.evidenceEmptyTitle")}</h3>
+              <p className="text-muted-foreground">{t("campaignTransparency.evidenceEmptyDesc")}</p>
             </div>
           )}
         </div>

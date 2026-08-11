@@ -3,17 +3,40 @@ export interface UploadedImage {
   publicId: string;
 }
 
+/** Códigos de error de validación local: el mensaje lo traduce el llamador (i18n). */
+export type ProofImageError = "type" | "size";
+
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_SIZE = 8 * 1024 * 1024; // 8 MB
 
-export function validateProofImage(file: File): string | null {
+/**
+ * Valida el archivo y devuelve un CÓDIGO de error ("type" | "size") o null.
+ * No devuelve texto: los mensajes son responsabilidad del llamador
+ * (DonationModal traduce vía i18n; ImageUploadField/panel admin mantienen es).
+ */
+export function validateProofImage(file: File): ProofImageError | null {
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return "Solo se permiten imágenes JPG, PNG o WebP.";
+    return "type";
   }
   if (file.size > MAX_SIZE) {
-    return "La imagen no puede superar los 8 MB.";
+    return "size";
   }
   return null;
+}
+
+/**
+ * Error de subida con código para que el cliente distinga entre fallo de
+ * firma (init) y fallo de la subida a Cloudinary (upload) y pueda traducir.
+ * El mensaje en español se conserva como fallback para el panel admin.
+ */
+export class UploadError extends Error {
+  public readonly code: "init" | "upload";
+
+  constructor(message: string, code: "init" | "upload") {
+    super(message);
+    this.name = "UploadError";
+    this.code = code;
+  }
 }
 
 /**
@@ -27,9 +50,10 @@ export async function uploadImageToCloudinary(
   const res = await fetch(endpoint, { method: "POST" });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
-    throw new Error(
+    throw new UploadError(
       (body as { message?: string } | null)?.message ||
         "No se pudo iniciar la subida. Intenta más tarde.",
+      "init",
     );
   }
   const sig = await res.json();
@@ -51,7 +75,7 @@ export async function uploadImageToCloudinary(
     { method: "POST", body: form },
   );
   if (!upload.ok) {
-    throw new Error("Error al subir la imagen. Intenta más tarde.");
+    throw new UploadError("Error al subir la imagen. Intenta más tarde.", "upload");
   }
   const data = await upload.json();
   return {

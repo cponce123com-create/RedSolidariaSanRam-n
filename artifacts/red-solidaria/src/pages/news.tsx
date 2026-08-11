@@ -2,20 +2,22 @@ import { useGetNews } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { getDateFormatLocale } from "@/lib/i18n/date";
+import { useTranslation } from "react-i18next";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Newspaper } from "lucide-react";
 
 export default function News() {
+  const { t } = useTranslation();
   const { data: news, isLoading } = useGetNews();
 
   return (
     <div className="min-h-screen pt-20 bg-background">
       <section className="py-12 bg-secondary/30 border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">Noticias y Blog</h1>
+          <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">{t("footer.newsBlog")}</h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Mantente al día con nuestras actividades, rescates y eventos de la comunidad.
+            {t("news.subtitle")}
           </p>
         </div>
       </section>
@@ -43,7 +45,7 @@ export default function News() {
                     </div>
                     <div className="p-6 flex flex-col flex-grow">
                       <div className="text-sm text-primary font-medium mb-3">
-                        {format(new Date(post.publishedAt), "d 'de' MMMM, yyyy", { locale: es })}
+                        {format(new Date(post.publishedAt), t("news.dateFormat"), { locale: getDateFormatLocale() })}
                       </div>
                       <h3 className="text-xl font-display font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2">
                         {post.title}
@@ -51,15 +53,15 @@ export default function News() {
                       <p className="text-muted-foreground line-clamp-3 mb-4 flex-grow">
                         {post.summary}
                       </p>
-                      <span className="text-primary font-medium hover:underline mt-auto">Leer más &rarr;</span>
+                      <span className="text-primary font-medium hover:underline mt-auto">{t("news.readMore")}</span>
                     </div>
                   </Card>
                 </Link>
               ))) : (
                 <EmptyState
                   icon={Newspaper}
-                  title="Aún no hay noticias"
-                  description="Las novedades de la comunidad aparecerán aquí."
+                  title={t("news.emptyTitle")}
+                  description={t("news.emptyDescription")}
                   className="col-span-full"
                 />
               )}

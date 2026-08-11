@@ -1,11 +1,13 @@
 /**
- * Error Boundary para capturar errores en componentes de React
- * Previene que la aplicación completa se caiga por errores en componentes individuales
+ * Error Boundary para capturar errores en componentes de React.
+ * Previene que la aplicación completa se caiga por errores en componentes individuales.
+ * Traducido con react-i18next (withTranslation para componentes clase).
  */
 
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
+import { withTranslation, type WithTranslation } from "react-i18next";
 
-interface Props {
+interface Props extends WithTranslation {
   children: ReactNode;
   fallback?: ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
@@ -16,7 +18,7 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundaryBase extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
@@ -28,15 +30,14 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
-    
+
     // Log a servicio de monitoreo si está configurado
     if (this.props.onError) {
       this.props.onError(error, errorInfo);
     }
-    
+
     // En producción, podrías enviar a un servicio como Sentry
     if (process.env.NODE_ENV === "production") {
-      // Aquí iría el logging a servicio externo
       console.error("Production error:", {
         message: error.message,
         stack: error.stack,
@@ -50,6 +51,8 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public render() {
+    const { t } = this.props;
+
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
@@ -74,27 +77,27 @@ export class ErrorBoundary extends Component<Props, State> {
               </svg>
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Algo salió mal
+              {t("errorBoundary.title")}
             </h3>
             <p className="text-gray-500 mb-4">
-              Ha ocurrido un error inesperado. Por favor intenta recargar la página.
+              {t("errorBoundary.description")}
             </p>
             <button
               onClick={this.reset}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
             >
-              Intentar de nuevo
+              {t("errorBoundary.retry")}
             </button>
             <button
               onClick={() => window.location.reload()}
               className="ml-2 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-card hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
             >
-              Recargar página
+              {t("errorBoundary.reload")}
             </button>
             {this.state.error && process.env.NODE_ENV === "development" && (
               <details className="mt-4 text-left">
                 <summary className="cursor-pointer text-sm text-gray-500">
-                  Ver detalles del error
+                  {t("errorBoundary.details")}
                 </summary>
                 <pre className="mt-2 p-3 bg-gray-100 rounded text-xs overflow-auto max-h-48">
                   {this.state.error.toString()}
@@ -110,4 +113,5 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
+export const ErrorBoundary = withTranslation()(ErrorBoundaryBase);
 export default ErrorBoundary;

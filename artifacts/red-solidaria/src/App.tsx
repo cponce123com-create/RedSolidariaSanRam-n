@@ -3,6 +3,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useTranslation } from "react-i18next";
 
 import { Navbar } from "./components/layout/Navbar";
 import { Footer } from "./components/layout/Footer";
@@ -62,13 +63,14 @@ const queryClient = new QueryClient({
 });
 
 function MainLayout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen flex flex-col">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-4 focus:left-4 focus:bg-card focus:text-primary focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
       >
-        Saltar al contenido
+        {t("common.skipToContent")}
       </a>
       <Navbar />
       <main id="main-content" className="flex-grow pb-16 md:pb-0">{children}</main>
@@ -80,9 +82,11 @@ function MainLayout({ children }: { children: ReactNode }) {
 }
 
 function PageLoader() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="h-10 w-10 animate-spin rounded-full border-4 border-red-600 border-t-transparent" />
+      <span className="sr-only">{t("common.loading")}</span>
     </div>
   );
 }

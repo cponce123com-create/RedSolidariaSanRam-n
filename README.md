@@ -148,6 +148,10 @@ El frontend aún no tiene suite propia (solo typecheck + Lighthouse CI); los tes
 - [x] Sitemap dinámico y SEO técnico
 - [x] CI/CD con GitHub Actions
 - [x] Documentación OpenAPI
+- [x] Modo emergencia — banner + countdown para campañas por cerrar
+- [x] QR para compartir campañas
+- [x] i18n es/en (react-i18next) — switcher + 18 páginas públicas
+- [x] Tests frontend (Vitest + Testing Library) — DonationModal, login/2FA, ledger
 - [ ] Analytics implementation
 - [ ] Service Worker para offline
 

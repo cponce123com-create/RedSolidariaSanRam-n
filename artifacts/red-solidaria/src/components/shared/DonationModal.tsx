@@ -11,26 +11,23 @@ import * as z from "zod";
 import { useCreateDonation } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { CreditCard, Landmark, Phone, Heart, CheckCircle2, ChevronRight, ChevronLeft, UploadCloud, Trash2, Loader2 } from "lucide-react";
 import confetti from "canvas-confetti";
-import { uploadImageToCloudinary, validateProofImage } from "@/lib/cloudinary-upload";
+import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
 
-const donationSchema = z.object({
-  amount: z.coerce.number().min(5, "El monto mínimo es S/ 5"),
-  paymentMethod: z.enum(["yape", "plin", "transfer", "card", "cash", "other"], {
-    required_error: "Selecciona un método de pago",
-  }),
-  message: z.string().optional(),
-  anonymous: z.boolean().default(false),
-  publicProof: z.boolean().default(false),
-  firstName: z.string().min(2, "Ingresa tu nombre"),
-  lastName: z.string().min(2, "Ingresa tu apellido"),
-  email: z.string().email("Correo inválido"),
-  phone: z.string().optional(),
-  receiptNote: z.string().optional(),
-});
-
-type DonationFormValues = z.infer<typeof donationSchema>;
+type DonationFormValues = {
+  amount: number;
+  paymentMethod: "yape" | "plin" | "transfer" | "card" | "cash" | "other";
+  message?: string;
+  anonymous: boolean;
+  publicProof: boolean;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  receiptNote?: string;
+};
 
 interface DonationModalProps {
   open: boolean;
@@ -51,8 +48,26 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const createDonation = useCreateDonation();
+
+  // Schema de validación con mensajes traducidos (se reconstruye por render:
+  // es barato y mantiene los mensajes sincronizados con el idioma activo).
+  const donationSchema = z.object({
+    amount: z.coerce.number().min(5, t("donation.minAmount")),
+    paymentMethod: z.enum(["yape", "plin", "transfer", "card", "cash", "other"], {
+      required_error: t("donation.selectMethod"),
+    }),
+    message: z.string().optional(),
+    anonymous: z.boolean().default(false),
+    publicProof: z.boolean().default(false),
+    firstName: z.string().min(2, t("donation.requiredName")),
+    lastName: z.string().min(2, t("donation.requiredLastName")),
+    email: z.string().email(t("donation.invalidEmail")),
+    phone: z.string().optional(),
+    receiptNote: z.string().optional(),
+  });
 
   const form = useForm<DonationFormValues>({
     resolver: zodResolver(donationSchema),
@@ -97,7 +112,11 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
   const handleProofFile = async (file: File) => {
     const error = validateProofImage(file);
     if (error) {
-      toast({ title: "Archivo inválido", description: error, variant: "destructive" });
+      toast({
+        title: t("donation.invalidFile"),
+        description: error === "size" ? t("donation.proofSizeError") : t("donation.proofTypeError"),
+        variant: "destructive",
+      });
       return;
     }
     setUploading(true);
@@ -107,11 +126,16 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
       setProofPublicId(result.publicId);
       setProofMimeType(file.type);
       setProofFileName(file.name);
-      toast({ title: "Comprobante subido", description: "Gracias. Un administrador lo revisará para validar tu donación." });
+      toast({ title: t("donation.proofUploadedToast"), description: t("donation.proofUploadedToastDesc") });
     } catch (err) {
       toast({
-        title: "Error al subir",
-        description: err instanceof Error ? err.message : "Intenta de nuevo más tarde.",
+        title: t("donation.uploadError"),
+        description:
+          err instanceof UploadError
+            ? t(err.code === "init" ? "donation.uploadInitError" : "donation.uploadFailedError")
+            : err instanceof Error
+              ? err.message
+              : t("donation.uploadErrorRetry"),
         variant: "destructive",
       });
     } finally {
@@ -150,7 +174,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
           }
         },
         onError: () => {
-          toast({ title: "Error", description: "No se pudo procesar la donación.", variant: "destructive" });
+          toast({ title: t("donation.error"), description: t("donation.processError"), variant: "destructive" });
         }
       }
     );
@@ -179,14 +203,14 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
           <div className="mx-auto w-20 h-20 bg-accent/20 text-accent rounded-full flex items-center justify-center mb-6">
             <CheckCircle2 className="w-10 h-10" />
           </div>
-          <DialogTitle className="text-3xl font-display font-bold mb-2">¡Gracias por tu donación!</DialogTitle>
+          <DialogTitle className="text-3xl font-display font-bold mb-2">{t("donation.successTitle")}</DialogTitle>
           <DialogDescription className="text-lg text-muted-foreground mb-8">
-            Tu apoyo transforma vidas. Revisaremos tu comprobante y confirmaremos la donación en las próximas 24 horas.
+            {t("donation.successDescription")}
             <br/><br/>
-            <span className="font-semibold text-foreground">ID de Donación: #{donationId}</span>
+            <span className="font-semibold text-foreground">{t("donation.donationId", { id: donationId })}</span>
           </DialogDescription>
           <Button onClick={resetAndClose} className="w-full h-12 text-lg rounded-xl shadow-md hover-elevate">
-            Volver
+            {t("donation.backButton")}
           </Button>
         </DialogContent>
       </Dialog>
@@ -199,10 +223,10 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
         <div className="bg-primary/5 p-6 border-b border-border/50">
           <DialogHeader>
             <DialogTitle className="text-2xl font-display font-bold">
-              {campaignTitle ? `Donar a: ${campaignTitle}` : "Hacer una Donación General"}
+              {campaignTitle ? t("donation.title", { campaign: campaignTitle }) : t("donation.generalTitle")}
             </DialogTitle>
             <DialogDescription>
-              {step === 1 ? "Paso 1: Monto y Método" : "Paso 2: Tus Datos y Comprobante"}
+              {step === 1 ? t("donation.step1") : t("donation.step2")}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -218,7 +242,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-semibold">Monto a donar (S/)</FormLabel>
+                      <FormLabel className="text-base font-semibold">{t("donation.amountLabel")}</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -246,7 +270,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                 />
 
                 <div className="mt-8">
-                  <p className="text-base font-semibold block mb-4">Método de pago</p>
+                  <p className="text-base font-semibold block mb-4">{t("donation.paymentMethod")}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     
                     <div 
@@ -260,7 +284,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                         </div>
                         <span className="font-bold text-foreground">Yape</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Envía al 921 615 737</p>
+                      <p className="text-xs text-muted-foreground">{t("donation.yapeSendTo")}</p>
                     </div>
 
                     <div 
@@ -273,7 +297,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                         </div>
                         <span className="font-bold text-foreground">Plin</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Envía al 921 615 737</p>
+                      <p className="text-xs text-muted-foreground">{t("donation.plinSendTo")}</p>
                     </div>
 
                     <div 
@@ -284,9 +308,9 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                         <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center">
                           <Landmark className="w-5 h-5" />
                         </div>
-                        <span className="font-bold text-foreground">Transferencia</span>
+                        <span className="font-bold text-foreground">{t("donation.transfer")}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">BCP: 193-12345678-0-55</p>
+                      <p className="text-xs text-muted-foreground">{t("donation.transferAccount")}</p>
                     </div>
 
                     <div className="relative border rounded-2xl p-4 opacity-50 cursor-not-allowed bg-card">
@@ -294,9 +318,9 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                         <div className="w-10 h-10 rounded-full bg-slate-500/10 text-slate-600 flex items-center justify-center">
                           <CreditCard className="w-5 h-5" />
                         </div>
-                        <span className="font-bold text-foreground">Tarjeta</span>
+                        <span className="font-bold text-foreground">{t("donation.card")}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Próximamente disponible</p>
+                      <p className="text-xs text-muted-foreground">{t("donation.cardSoon")}</p>
                     </div>
 
                   </div>
@@ -310,7 +334,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                       <FormItem>
                         <FormControl>
                           <Textarea 
-                            placeholder="Deja un mensaje de aliento (opcional)" 
+                            placeholder={t("donation.messagePlaceholder")} 
                             className="resize-none rounded-xl bg-secondary/30" 
                             {...field} 
                           />
@@ -332,8 +356,8 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel className="cursor-pointer">Donar de forma anónima</FormLabel>
-                          <p className="text-sm text-muted-foreground">Tu nombre no aparecerá en la lista pública de donantes.</p>
+                          <FormLabel className="cursor-pointer">{t("donation.anonymous")}</FormLabel>
+                          <p className="text-sm text-muted-foreground">{t("donation.anonymousHint")}</p>
                         </div>
                       </FormItem>
                     )}
@@ -342,7 +366,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
 
                 <div className="mt-8">
                   <Button type="button" onClick={handleNextStep} className="w-full h-14 text-lg rounded-xl shadow-md hover-elevate">
-                    Continuar <ChevronRight className="w-5 h-5 ml-2" />
+                    {t("donation.continue")} <ChevronRight className="w-5 h-5 ml-2" />
                   </Button>
                 </div>
               </div>
@@ -351,35 +375,35 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
               <div className={step === 2 ? "block" : "hidden"}>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="firstName" render={({ field }) => (
-                    <FormItem><FormLabel>Nombre</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" data-testid="input-first-name" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("donation.firstName")}</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" data-testid="input-first-name" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="lastName" render={({ field }) => (
-                    <FormItem><FormLabel>Apellido</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("donation.lastName")}</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4 mt-4">
                   <FormField control={form.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>Correo Electrónico</FormLabel><FormControl><Input type="email" className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("donation.email")}</FormLabel><FormControl><Input type="email" className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="phone" render={({ field }) => (
-                    <FormItem><FormLabel>Teléfono (Opcional)</FormLabel><FormControl><Input type="tel" className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>{t("donation.phoneOptional")}</FormLabel><FormControl><Input type="tel" className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
 
                 {requiresReceipt && (
                   <div className="mt-6 p-5 border border-primary/20 bg-primary/5 rounded-2xl space-y-4">
                     <div className="flex items-center gap-2 text-primary font-medium">
-                      <Landmark className="w-5 h-5" /> Comprobante de pago
+                      <Landmark className="w-5 h-5" /> {t("donation.proofTitle")}
                     </div>
                     <p className="text-sm text-muted-foreground -mt-2">
-                      Sube la captura de tu {paymentMethod === "transfer" ? "transferencia" : paymentMethod.toUpperCase()}. Esto nos permite validar tu donación y sumarla al recaudado.
+                      {t("donation.proofHint", { method: paymentMethod === "transfer" ? t("donation.transfer") : paymentMethod.toUpperCase() })}
                     </p>
 
                     <FormField control={form.control} name="receiptNote" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Número de operación (opcional)</FormLabel>
-                        <FormControl><Input placeholder="Ej. Op: 12345678" className="bg-background rounded-xl" {...field} /></FormControl>
+                        <FormLabel>{t("donation.operationNumber")}</FormLabel>
+                        <FormControl><Input placeholder={t("donation.operationPlaceholder")} className="bg-background rounded-xl" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -388,12 +412,12 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                     {proofUrl ? (
                       <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
                         <div className="flex items-start gap-4">
-                          <img src={proofUrl} alt="Comprobante" className="w-24 h-24 object-cover rounded-xl border border-green-200 bg-card" />
+                          <img src={proofUrl} alt={t("donation.proofAlt")} className="w-24 h-24 object-cover rounded-xl border border-green-200 bg-card" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-green-800 truncate">{proofFileName || "Comprobante subido"}</p>
-                            <p className="text-xs text-green-700 mt-0.5">Listo para validación por el equipo.</p>
+                            <p className="text-sm font-semibold text-green-800 truncate">{proofFileName || t("donation.proofUploaded")}</p>
+                            <p className="text-xs text-green-700 mt-0.5">{t("donation.readyValidation")}</p>
                             <Button type="button" variant="ghost" size="sm" className="mt-2 text-red-600 hover:text-red-700 hover:bg-red-50 px-2 h-8" onClick={removeProof}>
-                              <Trash2 className="w-4 h-4 mr-1" /> Quitar
+                              <Trash2 className="w-4 h-4 mr-1" /> {t("donation.remove")}
                             </Button>
                           </div>
                         </div>
@@ -417,13 +441,13 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                         {uploading ? (
                           <div className="flex flex-col items-center gap-2 py-2">
                             <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                            <span className="text-sm font-medium text-muted-foreground">Subiendo comprobante...</span>
+                            <span className="text-sm font-medium text-muted-foreground">{t("donation.uploading")}</span>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center gap-2 py-2">
                             <UploadCloud className="w-8 h-8 text-primary" />
-                            <span className="text-sm font-semibold">Sube la captura de tu pago</span>
-                            <span className="text-xs text-muted-foreground">JPG, PNG o WebP · máx 8 MB</span>
+                            <span className="text-sm font-semibold">{t("donation.uploadScreenshot")}</span>
+                            <span className="text-xs text-muted-foreground">{t("donation.uploadFormats")}</span>
                           </div>
                         )}
                       </div>
@@ -443,9 +467,9 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">
-                              <FormLabel className="cursor-pointer">Mostrar mi recibo al público</FormLabel>
+                              <FormLabel className="cursor-pointer">{t("donation.showReceiptPublic")}</FormLabel>
                               <p className="text-sm text-muted-foreground">
-                                Si lo marcas, tu comprobante aparecerá en la lista de donantes de la campaña. Si no, solo el equipo lo verá al validar.
+                                {t("donation.showReceiptPublicHint")}
                               </p>
                             </div>
                           </FormItem>
@@ -456,18 +480,18 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                 )}
 
                 <div className="mt-8 bg-secondary rounded-2xl p-5 border border-border">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2"><Heart className="w-4 h-4 text-primary"/> Resumen</h4>
+                  <h4 className="font-semibold mb-3 flex items-center gap-2"><Heart className="w-4 h-4 text-primary"/> {t("donation.summary")}</h4>
                   <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">Monto:</span>
+                    <span className="text-muted-foreground">{t("donation.amount")}</span>
                     <span className="font-bold text-lg">S/ {amount}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">Método:</span>
+                    <span className="text-muted-foreground">{t("donation.method")}</span>
                     <span className="capitalize font-medium">{paymentMethod}</span>
                   </div>
                   {campaignTitle && (
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">Campaña:</span>
+                      <span className="text-muted-foreground">{t("donation.campaign")}</span>
                       <span className="font-medium text-right max-w-[200px] truncate">{campaignTitle}</span>
                     </div>
                   )}
@@ -475,10 +499,10 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
 
                 <div className="mt-8 flex gap-3">
                   <Button type="button" variant="outline" onClick={() => setStep(1)} className="h-14 px-6 rounded-xl">
-                    <ChevronLeft className="w-5 h-5 mr-1" /> Atrás
+                    <ChevronLeft className="w-5 h-5 mr-1" /> {t("donation.back")}
                   </Button>
                   <Button type="submit" className="flex-1 h-14 text-lg rounded-xl shadow-md hover-elevate" disabled={createDonation.isPending || uploading} data-testid="btn-submit-donation">
-                    {createDonation.isPending ? "Procesando..." : "Confirmar Donación"}
+                    {createDonation.isPending ? t("donation.processing") : t("donation.confirm")}
                   </Button>
                 </div>
               </div>

@@ -1,17 +1,19 @@
 import { Link, useLocation } from "wouter";
 import { Home, Heart, BookOpen, PawPrint, Phone, HeartHandshake } from "lucide-react";
-
-const navItems = [
-  { href: "/", label: "Inicio", icon: Home },
-  { href: "/campanas", label: "Campañas", icon: Heart },
-  { href: "/noticias", label: "Noticias", icon: BookOpen },
-  { href: "/adopciones", label: "Adopciones", icon: PawPrint },
-  { href: "/contacto", label: "Contacto", icon: Phone },
-  { href: "/campanas", label: "Donar", icon: HeartHandshake, donar: true },
-];
+import { useTranslation } from "react-i18next";
 
 export default function MobileBottomNav() {
   const [location] = useLocation();
+  const { t } = useTranslation();
+
+  const navItems = [
+    { href: "/", label: t("mobileNav.home"), icon: Home },
+    { href: "/campanas", label: t("mobileNav.campaigns"), icon: Heart },
+    { href: "/noticias", label: t("mobileNav.news"), icon: BookOpen },
+    { href: "/adopciones", label: t("mobileNav.adoptions"), icon: PawPrint },
+    { href: "/contacto", label: t("mobileNav.contact"), icon: Phone },
+    { href: "/campanas", label: t("mobileNav.donate"), icon: HeartHandshake, donar: true },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-gray-100 shadow-lg md:hidden safe-area-pb">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import SEO from "@/components/shared/SEO";
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useSendContactMessage } from "@workspace/api-client-react";
@@ -13,17 +14,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Card } from "@/components/ui/card";
 import { MapPin, Phone, Mail, Send } from "lucide-react";
 
-const formSchema = z.object({
-  name: z.string().min(2, "Nombre muy corto"),
-  email: z.string().email("Correo inválido"),
-  phone: z.string().optional(),
-  subject: z.string().min(4, "Asunto muy corto"),
-  message: z.string().min(10, "Mensaje muy corto"),
-});
-
 export default function Contact() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const sendMessage = useSendContactMessage();
+
+  const formSchema = z.object({
+    name: z.string().min(2, t("contact.nameTooShort")),
+    email: z.string().email(t("donation.invalidEmail")),
+    phone: z.string().optional(),
+    subject: z.string().min(4, t("contact.subjectTooShort")),
+    message: z.string().min(10, t("contact.messageTooShort")),
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -35,11 +37,11 @@ export default function Contact() {
       { data: values },
       {
         onSuccess: () => {
-          toast({ title: "Mensaje enviado", description: "Nos pondremos en contacto pronto." });
+          toast({ title: t("contact.toastSent"), description: t("contact.toastSentDesc") });
           form.reset();
         },
         onError: () => {
-          toast({ title: "Error", description: "No se pudo enviar el mensaje.", variant: "destructive" });
+          toast({ title: t("donation.error"), description: t("contact.toastErrorDesc"), variant: "destructive" });
         }
       }
     );
@@ -48,17 +50,17 @@ export default function Contact() {
   return (
     <div className="min-h-screen pt-20 bg-background">
       <SEO
-        title="Contacto"
-        description="Escríbenos o llámanos. Resolvemos tus dudas sobre donaciones, voluntariado, adopciones y reportes sociales en San Ramón, Chanchamayo."
+        title={t("nav.contact")}
+        description={t("contact.seoDescription")}
         url="/contacto"
       />
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">Contáctanos</h1>
+            <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">{t("contact.title")}</h1>
             <p className="text-lg text-muted-foreground">
-              ¿Tienes dudas sobre donaciones, quieres unirte como voluntario o reportar un caso social? Escríbenos.
+              {t("contact.subtitle")}
             </p>
           </div>
 
@@ -67,7 +69,7 @@ export default function Contact() {
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary">
                 <MapPin className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-lg mb-2">Ubicación</h3>
+              <h3 className="font-bold text-lg mb-2">{t("contact.location")}</h3>
               <p className="text-muted-foreground">San Ramón, Chanchamayo<br/>Junín, Perú</p>
             </Card>
             
@@ -75,7 +77,7 @@ export default function Contact() {
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary">
                 <Phone className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-lg mb-2">Teléfono</h3>
+              <h3 className="font-bold text-lg mb-2">{t("contact.phone")}</h3>
               <p className="text-muted-foreground">+51 921 615 737</p>
             </Card>
 
@@ -83,13 +85,13 @@ export default function Contact() {
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary">
                 <Mail className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-lg mb-2">Email</h3>
+              <h3 className="font-bold text-lg mb-2">{t("contact.email")}</h3>
               <p className="text-muted-foreground">contacto@redsolidariasanramon.org</p>
             </Card>
           </div>
 
           <div className="max-w-3xl mx-auto bg-card rounded-3xl p-8 md:p-10 shadow-xl border border-border">
-            <h2 className="text-2xl font-bold mb-8">Envíanos un mensaje</h2>
+            <h2 className="text-2xl font-bold mb-8">{t("contact.formTitle")}</h2>
             
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -99,7 +101,7 @@ export default function Contact() {
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Nombre completo</FormLabel>
+                        <FormLabel>{t("contact.fullName")}</FormLabel>
                         <FormControl>
                           <Input placeholder="Juan Pérez" className="bg-background rounded-xl" {...field} />
                         </FormControl>
@@ -112,7 +114,7 @@ export default function Contact() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Correo electrónico</FormLabel>
+                        <FormLabel>{t("contact.emailLabel")}</FormLabel>
                         <FormControl>
                           <Input placeholder="juan@ejemplo.com" className="bg-background rounded-xl" {...field} />
                         </FormControl>
@@ -128,7 +130,7 @@ export default function Contact() {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Teléfono (Opcional)</FormLabel>
+                        <FormLabel>{t("donation.phoneOptional")}</FormLabel>
                         <FormControl>
                           <Input placeholder="987654321" className="bg-background rounded-xl" {...field} />
                         </FormControl>
@@ -141,9 +143,9 @@ export default function Contact() {
                     name="subject"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Asunto</FormLabel>
+                        <FormLabel>{t("contact.subject")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Quiero ser voluntario" className="bg-background rounded-xl" {...field} />
+                          <Input placeholder={t("contact.subjectPlaceholder")} className="bg-background rounded-xl" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -156,10 +158,10 @@ export default function Contact() {
                   name="message"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Mensaje</FormLabel>
+                      <FormLabel>{t("contact.message")}</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="Escribe tu mensaje aquí..." 
+                          placeholder={t("contact.messagePlaceholder")} 
                           className="min-h-[150px] bg-background rounded-xl resize-none" 
                           {...field} 
                         />
@@ -174,10 +176,10 @@ export default function Contact() {
                   className="w-full md:w-auto px-8 rounded-xl h-12 text-base font-semibold shadow-lg shadow-primary/20 hover-elevate"
                   disabled={sendMessage.isPending}
                 >
-                  {sendMessage.isPending ? "Enviando..." : (
+                  {sendMessage.isPending ? t("contact.sending") : (
                     <>
                       <Send className="w-4 h-4 mr-2" />
-                      Enviar Mensaje
+                      {t("contact.sendMessage")}
                     </>
                   )}
                 </Button>

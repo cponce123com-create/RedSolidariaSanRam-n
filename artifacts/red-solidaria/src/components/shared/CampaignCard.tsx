@@ -4,15 +4,20 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { Flame } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { isUrgent, daysUntilEnd } from "@/lib/campaign-urgency";
 
 interface CampaignCardProps {
   campaign: Campaign;
 }
 
 export function CampaignCard({ campaign }: CampaignCardProps) {
+  const { t } = useTranslation();
   const progress = campaign.goal > 0 ? Math.min(100, Math.round((campaign.raised / campaign.goal) * 100)) : 0;
+  // Fase 3 (modo emergencia): badge "Cierra en Xd" en tarjetas por cerrar
+  const urgent = isUrgent(campaign);
+  const daysLeft = daysUntilEnd(campaign.endDate);
   
   return (
     <Card className="overflow-hidden flex flex-col hover-elevate border-border/50 group bg-card">
@@ -27,14 +32,22 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
         />
         <div className="absolute top-4 left-4 flex gap-2">
           {campaign.status === 'active' ? (
-            <Badge className="bg-accent hover:bg-accent/90 text-white border-none shadow-sm">En Curso</Badge>
+            <Badge className="bg-accent hover:bg-accent/90 text-white border-none shadow-sm">{t("campaignCard.active")}</Badge>
           ) : (
-            <Badge variant="secondary" className="shadow-sm">Finalizada</Badge>
+            <Badge variant="secondary" className="shadow-sm">{t("campaignCard.completed")}</Badge>
           )}
           {campaign.featured && (
-            <Badge className="bg-primary hover:bg-primary/90 text-white border-none shadow-sm">Destacada</Badge>
+            <Badge className="bg-primary hover:bg-primary/90 text-white border-none shadow-sm">{t("campaignCard.featured")}</Badge>
           )}
         </div>
+        {urgent && daysLeft !== null && (
+          <div className="absolute top-4 right-4">
+            <Badge className="bg-red-600 hover:bg-red-700 text-white border-none shadow-sm gap-1">
+              <Flame className="w-3 h-3" />
+              {daysLeft <= 1 ? t("campaignCard.lastDay") : t("campaignCard.closesInDays", { days: daysLeft })}
+            </Badge>
+          </div>
+        )}
       </div>
       
       <div className="p-6 flex flex-col flex-grow">
@@ -52,17 +65,17 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="font-medium text-foreground">S/ {campaign.raised.toLocaleString()}</span>
-              <span className="text-muted-foreground">de S/ {campaign.goal.toLocaleString()}</span>
+              <span className="text-muted-foreground">{t("campaignCard.ofGoal", { goal: campaign.goal.toLocaleString() })}</span>
             </div>
             <Progress value={progress} className="h-2" />
             <div className="text-right text-xs text-muted-foreground font-medium">
-              {progress}% alcanzado
+              {t("campaignCard.progress", { progress })}
             </div>
           </div>
           
           <Link href={`/campanas/${campaign.id}`} className="block">
             <Button className="w-full rounded-xl" variant={campaign.status === 'active' ? 'default' : 'outline'}>
-              {campaign.status === 'active' ? 'Apoyar Campaña' : 'Ver Resultados'}
+              {campaign.status === 'active' ? t("campaignCard.support") : t("campaignCard.viewResults")}
             </Button>
           </Link>
         </div>
