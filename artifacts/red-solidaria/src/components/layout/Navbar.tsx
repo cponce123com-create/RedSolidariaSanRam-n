@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Menu, Heart, X, AlertTriangle, Dog, Package, Sun, Moon } from "lucide-react";
+import { Menu, Heart, X, AlertTriangle, Dog, Package, Sun, Moon, ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/hooks/use-theme";
@@ -16,24 +16,113 @@ type NavLinkItem = {
   animal?: boolean;
 };
 
+// Enlaces directos del navbar (escritorio). El resto se agrupa en "Más".
+const DIRECT_LINKS: NavLinkItem[] = [
+  { href: "/", labelKey: "nav.home" },
+  { href: "/nosotros", labelKey: "nav.about" },
+  { href: "/campanas", labelKey: "nav.campaigns" },
+  { href: "/transparencia", labelKey: "nav.transparency" },
+];
+
+const MORE_LINKS: NavLinkItem[] = [
+  { href: "/casos-urgentes", labelKey: "nav.urgentCases", urgent: true },
+  { href: "/como-ayudar", labelKey: "nav.howToHelp" },
+  { href: "/catalogo", labelKey: "nav.catalog", icon: Package },
+  { href: "/adopciones", labelKey: "nav.adoptions", animal: true },
+  { href: "/ayuda-animal", labelKey: "nav.animalWelfare", animal: true },
+  { href: "/contacto", labelKey: "nav.contact" },
+];
+
+// Todos los enlaces (se usan en el menú móvil completo).
+const ALL_LINKS = [...DIRECT_LINKS, ...MORE_LINKS];
+
+function isActive(location: string, href: string) {
+  return href === "/" ? location === "/" : location.startsWith(href + "/") || location === href;
+}
+
+/** Desplegable "Más" del navbar: agrupa los enlaces secundarios. */
+function MoreDropdown({ location }: { location: string }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Cierra al hacer click fuera
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
+  const hasActive = MORE_LINKS.some((link) => isActive(location, link.href));
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={`px-3 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1 ${
+          hasActive
+            ? "text-primary bg-primary/5 font-semibold"
+            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+        }`}
+      >
+        {t("nav.more")}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+            className="absolute right-0 top-full mt-2 w-60 rounded-2xl bg-card border border-border shadow-xl shadow-primary/10 p-2 z-50 origin-top-right"
+          >
+            {MORE_LINKS.map((link) => {
+              const Icon = link.icon;
+              const active = isActive(location, link.href);
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    link.urgent
+                      ? "text-orange-700 hover:bg-orange-50"
+                      : link.animal
+                        ? "text-amber-700 hover:bg-amber-50"
+                        : active
+                          ? "text-primary bg-primary/5"
+                          : "text-foreground hover:bg-secondary"
+                  }`}
+                >
+                  {link.urgent && <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0" />}
+                  {link.animal && <Dog className="w-4 h-4 text-amber-500 shrink-0" />}
+                  {Icon && <Icon className="w-4 h-4 shrink-0" />}
+                  {t(link.labelKey)}
+                </Link>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function Navbar() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { t } = useTranslation();
-
-  const navLinks: NavLinkItem[] = [
-    { href: "/", labelKey: "nav.home" },
-    { href: "/nosotros", labelKey: "nav.about" },
-    { href: "/campanas", labelKey: "nav.campaigns" },
-    { href: "/transparencia", labelKey: "nav.transparency" },
-    { href: "/casos-urgentes", labelKey: "nav.urgentCases", urgent: true },
-    { href: "/como-ayudar", labelKey: "nav.howToHelp" },
-    { href: "/catalogo", labelKey: "nav.catalog", icon: Package },
-    { href: "/adopciones", labelKey: "nav.adoptions", animal: true },
-    { href: "/ayuda-animal", labelKey: "nav.animalWelfare", animal: true },
-    { href: "/contacto", labelKey: "nav.contact" },
-  ];
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-nav">
@@ -52,40 +141,27 @@ export function Navbar() {
                 }}
               />
             </div>
-            <span className="font-display font-bold text-xl text-foreground hidden sm:block">
-              {t("nav.brand")} <span className="text-primary">{t("nav.brandLocation")}</span>
+            <span className="font-display font-bold text-xl text-foreground hidden sm:block tracking-[0.2em]">
+              RSSR
             </span>
           </Link>
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => {
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
-                    link.urgent
-                      ? location === link.href || location.startsWith(link.href + "/")
-                        ? "text-orange-700 bg-orange-100 font-semibold"
-                        : "text-orange-700 hover:bg-orange-50 font-semibold flex items-center gap-1"
-                      : link.animal
-                      ? location === link.href || location.startsWith(link.href + "/")
-                        ? "text-amber-700 bg-amber-100 font-semibold"
-                        : "text-amber-700 hover:bg-amber-50 font-medium flex items-center gap-1"
-                      : location === link.href || (link.href !== "/" && location.startsWith(link.href + "/"))
-                      ? "text-primary bg-primary/5"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                  }`}
-                >
-                  {link.urgent && <AlertTriangle className="w-3.5 h-3.5 inline mr-0.5" />}
-                  {link.animal && <Dog className="w-3.5 h-3.5 inline mr-0.5" />}
-                  {Icon && <Icon className="w-3.5 h-3.5 inline mr-0.5" />}
-                  {t(link.labelKey)}
-                </Link>
-              );
-            })}
+            {DIRECT_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`px-3 py-2 rounded-full text-sm font-medium transition-all ${
+                  isActive(location, link.href)
+                    ? "text-primary bg-primary/5"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                }`}
+              >
+                {t(link.labelKey)}
+              </Link>
+            ))}
+            <MoreDropdown location={location} />
           </nav>
 
           {/* Actions */}
@@ -136,17 +212,20 @@ export function Navbar() {
             className="lg:hidden bg-background border-b border-border"
           >
             <nav className="flex flex-col p-4 gap-1">
-              {navLinks.map((link) => {
+              {ALL_LINKS.map((link) => {
                 const Icon = link.icon;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
                     className={`p-3 rounded-xl text-base font-medium flex items-center gap-2 ${
-                      location === link.href ? "bg-primary/10 text-primary" :
-                      link.urgent ? "text-orange-700 hover:bg-orange-50" :
-                      link.animal ? "text-amber-700 hover:bg-amber-50" :
-                      "text-foreground hover:bg-secondary"
+                      isActive(location, link.href)
+                        ? "bg-primary/10 text-primary"
+                        : link.urgent
+                          ? "text-orange-700 hover:bg-orange-50"
+                          : link.animal
+                            ? "text-amber-700 hover:bg-amber-50"
+                            : "text-foreground hover:bg-secondary"
                     }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
@@ -156,8 +235,8 @@ export function Navbar() {
                     {t(link.labelKey)}
                   </Link>
                 );
-                })}
-                <div className="border-t border-border mt-2 pt-2 space-y-2">
+              })}
+              <div className="border-t border-border mt-2 pt-2 space-y-2">
                 <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-orange-300 text-orange-700 hover:bg-orange-50">
                     <AlertTriangle className="w-4 h-4" />

@@ -15,6 +15,7 @@ export const es = {
     donate: "Donar",
     donateNow: "Donar Ahora",
     reportCase: "Reportar Caso",
+    more: "Más",
     openMenu: "Abrir menú",
     closeMenu: "Cerrar menú",
     lightMode: "Activar modo claro",
@@ -206,10 +207,11 @@ export const es = {
     placeholder: "https://...",
   },
   home: {
-    heroTitleWord1: "Uniendo",
-    heroTitleWord2: "corazones,",
-    heroTitleWord3: "transformando",
-    heroTitleWord4: "vidas",
+    heroTitleWord1: "Red",
+    heroTitleWord2: "Solidaria",
+    heroTitleWord3: "San",
+    heroTitleWord4: "Ramón",
+    heroTagline: "Uniendo corazones, transformando vidas",
     heroSubtitle:
       "Empezamos llevando sonrisas en Navidad. Hoy somos una red de voluntarios comprometidos con el bienestar de niños, familias y animales en nuestra comunidad.",
     heroOurStory: "Nuestra Historia",

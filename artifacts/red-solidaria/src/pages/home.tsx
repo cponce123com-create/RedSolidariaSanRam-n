@@ -228,10 +228,19 @@ export default function Home() {
             </span>
           </h1>
 
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.9 }}
+            className="text-xl md:text-2xl font-display font-semibold text-foreground/90 tracking-tight mb-3"
+          >
+            {t("home.heroTagline")}
+          </motion.h2>
+
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.75 }}
+            transition={{ duration: 0.7, delay: 1.05 }}
             className="text-xl md:text-2xl text-muted-foreground max-w-2xl mb-10 leading-relaxed"
           >
             {t("home.heroSubtitle")}

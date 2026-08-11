@@ -65,6 +65,10 @@ test("i18n: sin cadenas vacías ni claves sin traducir en en", () => {
   // marcas, datos bancarios, términos iguales en es/en). Añadir aquí solo con
   // intención: el test fuerza la decisión consciente de no traducir.
   const LEGIT_SHARED = new Set([
+    "home.heroTitleWord1", // Red (nombre propio)
+    "home.heroTitleWord2", // Solidaria (nombre propio)
+    "home.heroTitleWord3", // San (nombre propio)
+    "home.heroTitleWord4", // Ramón (nombre propio)
     "nav.brand", // Red Solidaria (nombre propio)
     "nav.brandLocation", // San Ramón
     "footer.brand", // Red Solidaria

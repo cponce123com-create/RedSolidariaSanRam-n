@@ -17,6 +17,7 @@ export const en: TranslationSchema = {
     donate: "Donate",
     donateNow: "Donate Now",
     reportCase: "Report a Case",
+    more: "More",
     openMenu: "Open menu",
     closeMenu: "Close menu",
     lightMode: "Switch to light mode",
@@ -208,10 +209,11 @@ export const en: TranslationSchema = {
     placeholder: "https://...",
   },
   home: {
-    heroTitleWord1: "Bringing",
-    heroTitleWord2: "hearts,",
-    heroTitleWord3: "transforming",
-    heroTitleWord4: "lives",
+    heroTitleWord1: "Red",
+    heroTitleWord2: "Solidaria",
+    heroTitleWord3: "San",
+    heroTitleWord4: "Ramón",
+    heroTagline: "Bringing hearts together, transforming lives",
     heroSubtitle:
       "We started by bringing smiles at Christmas. Today we are a network of volunteers committed to the well-being of children, families and animals in our community.",
     heroOurStory: "Our Story",
