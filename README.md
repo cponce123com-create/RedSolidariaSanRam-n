@@ -142,9 +142,10 @@ ADMIN_PASSWORD=redsolidaria2024
 
 ## 🏗️ Build y Deploy (Render)
 
-- **Build:** `npm install -g pnpm --prefix ./tmp_pnpm && export PATH=$(pwd)/tmp_pnpm/bin:$PATH && pnpm install --ignore-scripts && pnpm rebuild bcrypt esbuild && cd lib/db && npx drizzle-kit push && cd ../.. && pnpm -r --filter "@workspace/api-server" --filter "@workspace/red-solidaria" --filter "@workspace/mockup-sandbox" run build`
+- **Build:** `pnpm install --frozen-lockfile && pnpm run build` (definido en `render.yaml`; el build command del dashboard de Render debe coincidir)
 - **Start:** `node artifacts/api-server/dist/index.mjs`
 - El API sirve el frontend compilado + gzip/brotli + caché de 1 año para assets con hash
+- **Migraciones:** se aplican automáticamente al boot de la API (`lib/db/src/migrate.ts`, embebidas 001-007); no se usa `drizzle-kit push` en el deploy (en CI falla por falta de TTY y su `--force` borraría tablas como `drizzle_migrations`/`session`)
 
 ## 🧪 Testing
 
