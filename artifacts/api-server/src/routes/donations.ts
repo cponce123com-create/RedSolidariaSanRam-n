@@ -316,6 +316,11 @@ async function formatDonation(
       .where(eq(campaignsTable.id, d.campaignId));
     campaignTitle = campaign?.title ?? null;
   }
+  // Defensivo: un timestamp corrupto en BD no debe tumbar la serialización.
+  const createdAt =
+    d.createdAt instanceof Date && !Number.isNaN(d.createdAt.getTime())
+      ? d.createdAt.toISOString()
+      : null;
   return {
     id: d.id,
     campaignId: d.campaignId,
@@ -333,7 +338,7 @@ async function formatDonation(
     receiptNote: d.receiptNote,
     status: d.status,
     adminNote: d.adminNote,
-    createdAt: d.createdAt.toISOString(),
+    createdAt,
   };
 }
 

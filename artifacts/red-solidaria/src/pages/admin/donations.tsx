@@ -92,6 +92,13 @@ export default function AdminDonations() {
     rejected: "Rechazada"
   };
 
+  // Formato defensivo: un createdAt corrupto/nulo no debe tumbar la página
+  const formatDate = (value?: string | null) => {
+    if (!value) return "—";
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? "—" : format(d, "dd/MM/yy HH:mm");
+  };
+
   return (
     <div className="p-8 max-w-[1400px] mx-auto">
       <div className="mb-8">
@@ -198,7 +205,7 @@ export default function AdminDonations() {
               filteredDonations.map(d => (
                 <TableRow key={d.id}>
                   <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
-                    {format(new Date(d.createdAt), "dd/MM/yy HH:mm")}
+                    {formatDate(d.createdAt)}
                   </TableCell>
                   <TableCell>
                     {d.anonymous ? (
