@@ -419,7 +419,7 @@ export default function CampaignDetail() {
                           <p className="text-xs text-muted-foreground">{formatSafeDate(donor.date, t("campaignDetail.dateDayFormat"), { locale: getDateFormatLocale() })}</p>
                         </div>
                       </div>
-                      <span className="font-bold text-primary whitespace-nowrap">S/ {donor.amount.toLocaleString("es-PE")}</span>
+                      <span className="font-bold text-primary whitespace-nowrap">S/ {(donor.amount ?? 0).toLocaleString("es-PE")}</span>
                     </div>
                     {donor.message && <p className="text-sm text-muted-foreground line-clamp-2">"{donor.message}"</p>}
                     {donor.publicProof && donor.proofUrl && (

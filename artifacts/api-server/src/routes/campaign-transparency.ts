@@ -35,14 +35,14 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       ...approvedDonations.slice(-5).map((d) => ({
         type: "ingreso" as const,
         description: d.anonymous ? "Donación anónima" : `Donación de ${d.firstName} ${d.lastName}`,
-        amount: d.amount,
-        date: toIsoSafe(d.createdAt),
+        amount: typeof d.amount === "number" && Number.isFinite(d.amount) ? d.amount : 0,
+        date: d.createdAt.toISOString(),
       })),
       ...publicExpenses.slice(-5).map((e) => ({
         type: "gasto" as const,
         description: e.description,
-        amount: e.amount,
-        date: toIsoSafe(e.createdAt),
+        amount: typeof e.amount === "number" && Number.isFinite(e.amount) ? e.amount : 0,
+        date: e.createdAt.toISOString(),
       })),
     ]
       .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())

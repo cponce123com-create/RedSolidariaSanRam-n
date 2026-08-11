@@ -124,9 +124,9 @@ router.get("/campaigns/:id/donors", async (req, res) => {
       donors.map((d) => ({
         id: d.id,
         name: d.anonymous ? null : `${d.firstName} ${d.lastName}`.trim(),
-        amount: d.amount,
+        amount: typeof d.amount === "number" && Number.isFinite(d.amount) ? d.amount : 0,
         message: d.message,
-        date: toIsoSafe(d.createdAt),
+        date: d.createdAt.toISOString(),
         publicProof: d.publicProof,
         proofUrl: d.publicProof ? d.receiptUrl : null,
       })),

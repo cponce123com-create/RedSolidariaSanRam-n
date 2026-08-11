@@ -91,7 +91,8 @@ export default function CampaignTransparency() {
     );
   }
 
-  const formatCurrency = (val: number) => `S/ ${val.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
+  const formatCurrency = (val: number | null | undefined) =>
+    `S/ ${(val ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="min-h-screen pt-24 pb-24 bg-[#FAF9F6]" data-testid="transparency-page">

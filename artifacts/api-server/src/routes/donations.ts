@@ -321,6 +321,9 @@ async function formatDonation(
     d.createdAt instanceof Date && !Number.isNaN(d.createdAt.getTime())
       ? d.createdAt.toISOString()
       : null;
+  // Defensivo: un monto nulo/corrupto no debe romper el frontend (toLocaleString).
+  const amount =
+    typeof d.amount === "number" && Number.isFinite(d.amount) ? d.amount : 0;
   return {
     id: d.id,
     campaignId: d.campaignId,
@@ -329,7 +332,7 @@ async function formatDonation(
     lastName: d.lastName,
     email: d.email,
     phone: d.phone,
-    amount: d.amount,
+    amount,
     paymentMethod: d.paymentMethod,
     message: d.message,
     anonymous: d.anonymous,

@@ -111,7 +111,7 @@ export default function AdminDonations() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-card border border-border p-5 rounded-2xl shadow-sm">
             <div className="text-sm font-medium text-muted-foreground mb-1">Total Recaudado</div>
-            <div className="text-2xl font-bold text-foreground">S/ {stats.totalAmount.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-foreground">S/ {(stats.totalAmount ?? 0).toLocaleString()}</div>
           </div>
           <div className="bg-card border border-border p-5 rounded-2xl shadow-sm">
             <div className="text-sm font-medium text-muted-foreground mb-1">Total Donaciones</div>
@@ -226,7 +226,7 @@ export default function AdminDonations() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="font-bold text-foreground">S/ {d.amount.toLocaleString()}</div>
+                    <div className="font-bold text-foreground">S/ {(d.amount ?? 0).toLocaleString()}</div>
                     <Badge variant="outline" className="text-[10px] mt-1 uppercase px-1.5">{d.paymentMethod}</Badge>
                   </TableCell>
                   <TableCell>
