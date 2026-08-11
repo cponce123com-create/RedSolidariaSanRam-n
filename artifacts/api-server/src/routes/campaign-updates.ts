@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, campaignUpdatesTable, insertCampaignUpdateSchema } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 
@@ -62,7 +63,7 @@ function formatUpdate(u: typeof campaignUpdatesTable.$inferSelect) {
     campaignId: u.campaignId,
     title: u.title,
     content: u.content,
-    createdAt: u.createdAt.toISOString(),
+    createdAt: toIsoSafe(u.createdAt),
   };
 }
 

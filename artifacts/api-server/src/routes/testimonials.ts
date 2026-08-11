@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, testimonialsTable, insertTestimonialSchema } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter, testimonialLimiter } from "../middleware/rate-limit";
 
@@ -64,7 +65,7 @@ function formatTestimonial(t: typeof testimonialsTable.$inferSelect) {
     role: t.role,
     message: t.message,
     avatarUrl: t.avatarUrl,
-    createdAt: t.createdAt.toISOString(),
+    createdAt: toIsoSafe(t.createdAt),
   };
 }
 

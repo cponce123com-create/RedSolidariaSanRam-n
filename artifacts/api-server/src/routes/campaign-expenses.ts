@@ -7,6 +7,7 @@ import { requireRole, ROLES } from "../middleware/roles";
 // Dinero: solo administrador o superadmin.
 const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { adminActionLimiter } from "../middleware/rate-limit";
+import { toIsoSafe } from "../lib/date-format";
 import { appendMovement } from "../lib/ledger";
 
 const router: IRouter = Router();
@@ -117,7 +118,7 @@ function formatExpense(e: typeof campaignExpensesTable.$inferSelect) {
     receiptUrl: e.receiptUrl,
     receiptType: e.receiptType,
     isPublic: e.isPublic,
-    createdAt: e.createdAt.toISOString(),
+    createdAt: toIsoSafe(e.createdAt),
   };
 }
 

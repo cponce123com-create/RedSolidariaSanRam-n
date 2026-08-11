@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Heart, Share2, Calendar, Target, Users, Landmark, Clock, ImageIcon, Copy, Shield, ArrowRight, Eye, QrCode } from "lucide-react";
 import { format } from "date-fns";
-import { getDateFormatLocale } from "@/lib/i18n/date";
+import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
 import { useTranslation } from "react-i18next";
 import { DonationModal } from "@/components/shared/DonationModal";
 import { useToast } from "@/hooks/use-toast";
@@ -203,7 +203,7 @@ export default function CampaignDetail() {
                         </div>
                         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                           <div className="text-sm font-medium text-primary mb-1">
-                            {format(new Date(update.createdAt), t("campaignDetail.dateFormat"), { locale: getDateFormatLocale() })}
+                            {formatSafeDate(update.createdAt, t("campaignDetail.dateFormat"), { locale: getDateFormatLocale() })}
                           </div>
                           <h3 className="text-lg font-bold text-foreground mb-2">{update.title}</h3>
                           <p className="text-muted-foreground whitespace-pre-wrap">{update.content}</p>
@@ -279,7 +279,7 @@ export default function CampaignDetail() {
                       </div>
                       <div className="flex flex-col">
                         <span className="text-xs">{t("campaignDetail.startDate")}</span>
-                        <span className="font-semibold text-foreground">{format(new Date(campaign.startDate), t("campaignDetail.dateShortFormat"), { locale: getDateFormatLocale() })}</span>
+                        <span className="font-semibold text-foreground">{formatSafeDate(campaign.startDate, t("campaignDetail.dateShortFormat"), { locale: getDateFormatLocale() })}</span>
                       </div>
                     </div>
                     {campaign.endDate && (
@@ -289,7 +289,7 @@ export default function CampaignDetail() {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-xs">{t("campaignDetail.endDate")}</span>
-                          <span className="font-semibold text-foreground">{format(new Date(campaign.endDate), t("campaignDetail.dateShortFormat"), { locale: getDateFormatLocale() })}</span>
+                          <span className="font-semibold text-foreground">{formatSafeDate(campaign.endDate, t("campaignDetail.dateShortFormat"), { locale: getDateFormatLocale() })}</span>
                         </div>
                       </div>
                     )}
@@ -416,7 +416,7 @@ export default function CampaignDetail() {
                         </div>
                         <div className="min-w-0">
                           <p className="font-bold text-foreground truncate">{donor.name || t("campaignDetail.anonymous")}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(donor.date), t("campaignDetail.dateDayFormat"), { locale: getDateFormatLocale() })}</p>
+                          <p className="text-xs text-muted-foreground">{formatSafeDate(donor.date, t("campaignDetail.dateDayFormat"), { locale: getDateFormatLocale() })}</p>
                         </div>
                       </div>
                       <span className="font-bold text-primary whitespace-nowrap">S/ {donor.amount.toLocaleString("es-PE")}</span>

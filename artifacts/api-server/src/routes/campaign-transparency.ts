@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, campaignsTable, donationsTable, campaignExpensesTable, campaignEvidenceTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 
 const router: IRouter = Router();
 
@@ -35,16 +36,16 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
         type: "ingreso" as const,
         description: d.anonymous ? "Donación anónima" : `Donación de ${d.firstName} ${d.lastName}`,
         amount: d.amount,
-        date: d.createdAt.toISOString(),
+        date: toIsoSafe(d.createdAt),
       })),
       ...publicExpenses.slice(-5).map((e) => ({
         type: "gasto" as const,
         description: e.description,
         amount: e.amount,
-        date: e.createdAt.toISOString(),
+        date: toIsoSafe(e.createdAt),
       })),
     ]
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .sort((a, b) => new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime())
       .slice(0, 8);
 
     return res.json({

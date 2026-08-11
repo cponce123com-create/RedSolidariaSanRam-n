@@ -2,7 +2,7 @@ import { useGetNews } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { getDateFormatLocale } from "@/lib/i18n/date";
+import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
 import { useTranslation } from "react-i18next";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Newspaper } from "lucide-react";
@@ -45,7 +45,7 @@ export default function News() {
                     </div>
                     <div className="p-6 flex flex-col flex-grow">
                       <div className="text-sm text-primary font-medium mb-3">
-                        {format(new Date(post.publishedAt), t("news.dateFormat"), { locale: getDateFormatLocale() })}
+                        {formatSafeDate(post.publishedAt, t("news.dateFormat"), { locale: getDateFormatLocale() })}
                       </div>
                       <h3 className="text-xl font-display font-bold mb-3 group-hover:text-primary transition-colors line-clamp-2">
                         {post.title}

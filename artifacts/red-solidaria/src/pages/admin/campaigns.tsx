@@ -14,6 +14,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
+import { formatSafeDate } from "@/lib/i18n/date";
 import { Plus, Trash2, Edit, Star, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -201,7 +202,7 @@ export default function AdminCampaigns() {
                     <div className="text-[10px] text-muted-foreground mt-1 text-right">Meta: S/ {c.goal.toLocaleString()}</div>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground font-medium">
-                    {format(new Date(c.startDate), "dd/MM/yy")}
+                    {formatSafeDate(c.startDate, "dd/MM/yy")}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

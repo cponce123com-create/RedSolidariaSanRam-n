@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, campaignMovementsTable } from "@workspace/db";
 import { asc, eq, sql } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { verifyChain } from "../lib/ledger";
 
 const router: IRouter = Router();
@@ -94,7 +95,7 @@ function formatMovement(m: typeof campaignMovementsTable.$inferSelect) {
     sourceId: m.sourceId,
     prevHash: m.prevHash,
     hash: m.hash,
-    createdAt: m.createdAt.toISOString(),
+    createdAt: toIsoSafe(m.createdAt),
   };
 }
 

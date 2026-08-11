@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, campaignImagesTable, insertCampaignImageSchema } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 
@@ -62,7 +63,7 @@ function formatImage(i: typeof campaignImagesTable.$inferSelect) {
     campaignId: i.campaignId,
     imageUrl: i.imageUrl,
     caption: i.caption,
-    createdAt: i.createdAt.toISOString(),
+    createdAt: toIsoSafe(i.createdAt),
   };
 }
 

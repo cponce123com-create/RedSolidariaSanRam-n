@@ -27,7 +27,7 @@ import {
   Users
 } from "lucide-react";
 import { format } from "date-fns";
-import { getDateFormatLocale } from "@/lib/i18n/date";
+import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
 
 /** Donante público de una campaña (GET /campaigns/:id/donors). */
 interface PublicDonor {
@@ -105,7 +105,7 @@ export default function CampaignTransparency() {
                 <Badge className="bg-primary/90 hover:bg-primary">{selectedEvidence.evidenceType.toUpperCase()}</Badge>
                 <div className="text-sm font-medium opacity-80 flex items-center gap-2">
                   <Calendar className="w-4 h-4"/> 
-                  {format(new Date(selectedEvidence.date), "dd MMM yyyy", { locale: getDateFormatLocale() })}
+                  {formatSafeDate(selectedEvidence.date, "dd MMM yyyy", { locale: getDateFormatLocale() })}
                 </div>
               </div>
               <div className="flex-1 flex items-center justify-center overflow-hidden min-h-[300px] p-0 md:p-8">
@@ -289,7 +289,7 @@ export default function CampaignTransparency() {
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(mov.createdAt), "dd MMM, HH:mm", { locale: getDateFormatLocale() })}
+                          {formatSafeDate(mov.createdAt, "dd MMM, HH:mm", { locale: getDateFormatLocale() })}
                           <span
                             className="ml-2 font-mono text-[10px] text-primary/70"
                             title={t("campaignTransparency.hashTooltip", { hash: mov.hash })}
@@ -339,7 +339,7 @@ export default function CampaignTransparency() {
                       transparency.publicExpenses.map((exp) => (
                         <TableRow key={exp.id}>
                           <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                            {format(new Date(exp.date), "dd/MM/yyyy")}
+                            {formatSafeDate(exp.date, "dd/MM/yyyy")}
                           </TableCell>
                           <TableCell className="font-medium max-w-[200px] truncate">
                             {exp.description}
@@ -416,7 +416,7 @@ export default function CampaignTransparency() {
                           {d.name ?? t("campaignDetail.anonymous")}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(d.date), "dd MMM yyyy", { locale: getDateFormatLocale() })}
+                          {formatSafeDate(d.date, "dd MMM yyyy", { locale: getDateFormatLocale() })}
                         </p>
                       </div>
                     </div>
@@ -487,7 +487,7 @@ export default function CampaignTransparency() {
                   </div>
                   <div className="p-5 flex-1 flex flex-col">
                     <div className="text-xs text-primary font-medium mb-1.5 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5"/> {format(new Date(ev.date), "dd MMM yyyy", { locale: getDateFormatLocale() })}
+                      <Calendar className="w-3.5 h-3.5"/> {formatSafeDate(ev.date, "dd MMM yyyy", { locale: getDateFormatLocale() })}
                     </div>
                     <h3 className="font-bold text-foreground leading-tight mb-2 line-clamp-2">{ev.title}</h3>
                     {ev.description && (

@@ -41,6 +41,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { formatSafeDate } from "@/lib/i18n/date";
 
 // Selector de ubicación con mapa libre (Leaflet/OpenStreetMap) — lazy para no
 // inflar el bundle del panel admin.
@@ -442,7 +443,7 @@ export default function AdminCampaignDetail() {
               <div key={update.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <div className="text-xs text-primary font-medium mb-1">{format(new Date(update.createdAt), "dd/MM/yyyy HH:mm")}</div>
+                    <div className="text-xs text-primary font-medium mb-1">{formatSafeDate(update.createdAt, "dd/MM/yyyy HH:mm")}</div>
                     <h4 className="font-bold text-lg">{update.title}</h4>
                   </div>
                   <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 -mt-2 -mr-2" onClick={() => deleteUpdate.mutate({ id: campaignId, updateId: update.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/updates`] })})}>
@@ -572,7 +573,7 @@ export default function AdminCampaignDetail() {
               <TableBody>
                 {expenses?.map(exp => (
                   <TableRow key={exp.id}>
-                    <TableCell className="font-medium whitespace-nowrap">{format(new Date(exp.date), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="font-medium whitespace-nowrap">{formatSafeDate(exp.date, "dd/MM/yyyy")}</TableCell>
                     <TableCell>
                       <div className="font-medium text-foreground">{exp.description}</div>
                       {exp.responsible && <div className="text-xs text-muted-foreground">Resp: {exp.responsible}</div>}
@@ -705,7 +706,7 @@ export default function AdminCampaignDetail() {
                 </div>
                 <div className="p-4 flex-1 flex flex-col">
                   <h4 className="font-bold text-sm mb-1 leading-tight">{ev.title}</h4>
-                  <div className="text-xs text-muted-foreground mb-4">{format(new Date(ev.date), "dd/MM/yyyy")}</div>
+                  <div className="text-xs text-muted-foreground mb-4">{formatSafeDate(ev.date, "dd/MM/yyyy")}</div>
                   
                   <div className="mt-auto flex justify-between items-center pt-3 border-t border-border">
                     <div className="flex items-center gap-2 text-xs">

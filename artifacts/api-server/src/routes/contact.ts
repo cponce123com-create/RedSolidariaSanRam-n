@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, contactMessagesTable, insertContactMessageSchema } from "@workspace/db";
 import { desc } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { contactLimiter } from "../middleware/rate-limit";
 import { requireAdmin } from "../middleware/require-admin";
 
@@ -39,7 +40,7 @@ function formatMessage(m: typeof contactMessagesTable.$inferSelect) {
     phone: m.phone,
     message: m.message,
     subject: m.subject,
-    createdAt: m.createdAt.toISOString(),
+    createdAt: toIsoSafe(m.createdAt),
   };
 }
 

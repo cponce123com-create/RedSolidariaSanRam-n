@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, newsTable, insertNewsSchema } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 
@@ -84,7 +85,7 @@ function formatNews(n: typeof newsTable.$inferSelect) {
     summary: n.summary,
     imageUrl: n.imageUrl,
     publishedAt: n.publishedAt,
-    createdAt: n.createdAt.toISOString(),
+    createdAt: toIsoSafe(n.createdAt),
   };
 }
 

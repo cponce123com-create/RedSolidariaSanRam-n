@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, campaignEvidenceTable, insertCampaignEvidenceSchema } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
 
@@ -98,7 +99,7 @@ function formatEvidence(e: typeof campaignEvidenceTable.$inferSelect) {
     evidenceType: e.evidenceType,
     date: e.date,
     isPublic: e.isPublic,
-    createdAt: e.createdAt.toISOString(),
+    createdAt: toIsoSafe(e.createdAt),
   };
 }
 

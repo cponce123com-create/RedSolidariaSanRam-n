@@ -8,6 +8,7 @@ import {
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
+import { toIsoSafe } from "../lib/date-format";
 import { formatPublicDonor } from "../lib/donor-format";
 
 const router: IRouter = Router();
@@ -125,7 +126,7 @@ router.get("/campaigns/:id/donors", async (req, res) => {
         name: d.anonymous ? null : `${d.firstName} ${d.lastName}`.trim(),
         amount: d.amount,
         message: d.message,
-        date: d.createdAt.toISOString(),
+        date: toIsoSafe(d.createdAt),
         publicProof: d.publicProof,
         proofUrl: d.publicProof ? d.receiptUrl : null,
       })),
@@ -201,7 +202,7 @@ function formatCampaign(
     endDate: c.endDate,
     latitude: c.latitude,
     longitude: c.longitude,
-    createdAt: c.createdAt.toISOString(),
+    createdAt: toIsoSafe(c.createdAt),
   };
 }
 

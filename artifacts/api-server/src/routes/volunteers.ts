@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { volunteersTable, insertVolunteerSchema } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { toIsoSafe } from "../lib/date-format";
 import { volunteerLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
@@ -51,7 +52,7 @@ function formatVolunteer(v: typeof volunteersTable.$inferSelect) {
     priorExperience: v.priorExperience,
     status: v.status,
     adminNotes: v.adminNotes,
-    createdAt: v.createdAt.toISOString(),
+    createdAt: toIsoSafe(v.createdAt),
   };
 }
 
