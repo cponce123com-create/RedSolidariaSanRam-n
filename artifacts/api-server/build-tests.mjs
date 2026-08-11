@@ -22,6 +22,7 @@ await build({
     "./src/middleware/cache-control.ts",
     "./src/lib/cloudinary.ts",
     "./src/lib/donor-format.ts",
+    "./src/lib/amount-format.ts",
     "./src/lib/totp.ts",
     "./src/lib/ledger.ts",
     "./src/routes/stats.ts",

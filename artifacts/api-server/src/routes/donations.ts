@@ -15,6 +15,30 @@ import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
 const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { logAuditAction } from "../middleware/auth-utils";
 import { appendMovement } from "../lib/ledger";
+import { toSafeAmount } from "../lib/amount-format";
+
+// Proyección por columna (no `donation: donationsTable`): garantiza que el
+// mapper del customType money se aplique en todas las versiones de drizzle
+// bundleadas (la proyección por tabla devolvía "50.00" en algunos builds,
+// y formatDonation lo convertía a 0 con el check defensivo).
+const donationColumns = {
+  id: donationsTable.id,
+  campaignId: donationsTable.campaignId,
+  firstName: donationsTable.firstName,
+  lastName: donationsTable.lastName,
+  email: donationsTable.email,
+  phone: donationsTable.phone,
+  amount: donationsTable.amount,
+  paymentMethod: donationsTable.paymentMethod,
+  message: donationsTable.message,
+  anonymous: donationsTable.anonymous,
+  publicProof: donationsTable.publicProof,
+  receiptUrl: donationsTable.receiptUrl,
+  receiptNote: donationsTable.receiptNote,
+  status: donationsTable.status,
+  adminNote: donationsTable.adminNote,
+  createdAt: donationsTable.createdAt,
+};
 
 const router: IRouter = Router();
 
@@ -61,13 +85,15 @@ router.post("/donations", donationLimiter, async (req, res) => {
 // GET /donations/stats — público (solo agregados, sin datos personales)
 router.get("/donations/stats", async (req, res) => {
   try {
+    // Casts ::int / ::float8: pg devuelve count como string y sum(numeric)
+    // como string; el contrato DonationStats es number → normalizamos en SQL.
     const [stats] = await db
       .select({
-        totalDonations: sql<number>`count(*)`,
-        totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)`,
-        pendingCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')`,
-        approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'approved')`,
-        totalDonors: sql<number>`count(distinct ${donationsTable.email})`,
+        totalDonations: sql<number>`count(*)::int`,
+        totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)::float8`,
+        pendingCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int`,
+        approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'approved')::int`,
+        totalDonors: sql<number>`count(distinct ${donationsTable.email})::int`,
       })
       .from(donationsTable);
     res.json(stats);
@@ -90,7 +116,7 @@ router.get("/donations", ...adminOnly, async (req, res) => {
 
     const rows = await db
       .select({
-        donation: donationsTable,
+        ...donationColumns,
         campaignTitle: campaignsTable.title,
       })
       .from(donationsTable)
@@ -101,8 +127,8 @@ router.get("/donations", ...adminOnly, async (req, res) => {
       .offset(offset);
 
     res.json(
-      rows.map(({ donation, campaignTitle }) =>
-        formatDonation(donation, campaignTitle),
+      rows.map((row) =>
+        formatDonation(row, row.campaignTitle),
       ),
     );
   } catch (err) {
@@ -203,7 +229,7 @@ router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
     const campaignId = Number(req.params.id);
     const rows = await db
       .select({
-        donation: donationsTable,
+        ...donationColumns,
         campaignTitle: campaignsTable.title,
       })
       .from(donationsTable)
@@ -212,8 +238,8 @@ router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
       .orderBy(desc(donationsTable.createdAt));
 
     res.json(
-      rows.map(({ donation, campaignTitle }) =>
-        formatDonation(donation, campaignTitle),
+      rows.map((row) =>
+        formatDonation(row, row.campaignTitle),
       ),
     );
   } catch (err) {
@@ -322,8 +348,10 @@ async function formatDonation(
       ? d.createdAt.toISOString()
       : null;
   // Defensivo: un monto nulo/corrupto no debe romper el frontend (toLocaleString).
-  const amount =
-    typeof d.amount === "number" && Number.isFinite(d.amount) ? d.amount : 0;
+  // toSafeAmount acepta number Y string numérico: pg devuelve numeric como
+  // string y, según la forma de la query/versión de drizzle, el mapper del
+  // customType money puede o no haber convertido — un "50.00" NUNCA → 0.
+  const amount = toSafeAmount(d.amount);
   return {
     id: d.id,
     campaignId: d.campaignId,

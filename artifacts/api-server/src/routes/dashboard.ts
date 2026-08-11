@@ -6,6 +6,7 @@ import {
   contactMessagesTable, newsTable, petsTable
 } from "@workspace/db";
 import { eq, gte, sql, desc, count, sum } from "drizzle-orm";
+import { toSafeAmount } from "../lib/amount-format";
 
 const router = Router();
 
@@ -40,11 +41,11 @@ router.get("/admin/dashboard", async (req, res) => {
       FROM campaigns
     `),
     db.execute(sql`
-      SELECT COALESCE(SUM(amount), 0) AS total_raised
+      SELECT COALESCE(SUM(amount), 0)::float8 AS total_raised
       FROM donations
       WHERE status = 'approved'
     `),
-    db.execute(sql`SELECT COALESCE(SUM(amount), 0) AS total_spent FROM campaign_expenses`),
+    db.execute(sql`SELECT COALESCE(SUM(amount), 0)::float8 AS total_spent FROM campaign_expenses`),
     db.execute(sql`SELECT COUNT(*) FILTER (WHERE status = 'available')::int AS available FROM pets`),
     db.select({ count: count() }).from(communityReportsTable).where(eq(communityReportsTable.status, "pending")),
     db.select({ count: count() }).from(adoptionRequestsTable).where(eq(adoptionRequestsTable.status, "pending")),
@@ -54,8 +55,8 @@ router.get("/admin/dashboard", async (req, res) => {
     db.execute(sql`
       SELECT
         TO_CHAR(created_at, 'YYYY-MM') AS month,
-        SUM(amount) AS total,
-        COUNT(*) AS count
+        SUM(amount)::float8 AS total,
+        COUNT(*)::int AS count
       FROM donations
       WHERE created_at >= ${sixMonthsAgo.toISOString()}
       GROUP BY TO_CHAR(created_at, 'YYYY-MM')
@@ -63,7 +64,7 @@ router.get("/admin/dashboard", async (req, res) => {
     `),
     db.select().from(campaignsTable).orderBy(desc(campaignsTable.raised)).limit(5),
     db.execute(sql`
-      SELECT category, SUM(amount) AS total, COUNT(*) AS count
+      SELECT category, SUM(amount)::float8 AS total, COUNT(*)::int AS count
       FROM campaign_expenses
       GROUP BY category
       ORDER BY total DESC
@@ -116,7 +117,7 @@ router.get("/admin/dashboard", async (req, res) => {
       donations: recentDonations.map(d => ({
         id: d.id,
         name: d.anonymous ? "Anónimo" : `${d.firstName} ${d.lastName}`,
-        amount: d.amount,
+        amount: toSafeAmount(d.amount),
         method: d.paymentMethod,
         status: d.status,
         createdAt: d.createdAt,

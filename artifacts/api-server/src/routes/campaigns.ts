@@ -10,6 +10,7 @@ import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { toIsoSafe } from "../lib/date-format";
 import { formatPublicDonor } from "../lib/donor-format";
+import { toSafeAmount } from "../lib/amount-format";
 
 const router: IRouter = Router();
 
@@ -32,7 +33,7 @@ router.get("/campaigns", async (req, res) => {
       .select({
         campaign: campaignsTable,
         donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')::int`,
-        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)`,
+        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)::float8`,
       })
       .from(campaignsTable)
       .leftJoin(donationsTable, eq(donationsTable.campaignId, campaignsTable.id))
@@ -60,7 +61,7 @@ router.get("/campaigns/:id", async (req, res) => {
       .select({
         campaign: campaignsTable,
         donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')::int`,
-        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)`,
+        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)::float8`,
       })
       .from(campaignsTable)
       .leftJoin(donationsTable, eq(donationsTable.campaignId, campaignsTable.id))
@@ -124,7 +125,7 @@ router.get("/campaigns/:id/donors", async (req, res) => {
       donors.map((d) => ({
         id: d.id,
         name: d.anonymous ? null : `${d.firstName} ${d.lastName}`.trim(),
-        amount: typeof d.amount === "number" && Number.isFinite(d.amount) ? d.amount : 0,
+        amount: toSafeAmount(d.amount),
         message: d.message,
         date: d.createdAt.toISOString(),
         publicProof: d.publicProof,

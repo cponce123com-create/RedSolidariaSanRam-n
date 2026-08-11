@@ -22,8 +22,8 @@ interface DonationStats {
   totalDonors: number;
 }
 
-const formatCurrency = (val: number) =>
-  `S/ ${val.toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
+const formatCurrency = (val: number | string | null | undefined) =>
+  `S/ ${Number(val ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
 
 export default function Transparency() {
   const { t } = useTranslation();

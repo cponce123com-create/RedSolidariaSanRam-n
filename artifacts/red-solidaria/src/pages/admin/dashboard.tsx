@@ -250,7 +250,7 @@ export default function AdminDashboard() {
                   <p className="text-xs text-muted-foreground">{d.method} • {new Date(d.createdAt).toLocaleDateString("es-PE")}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-sm">S/ {d.amount.toFixed(0)}</p>
+                  <p className="font-bold text-sm">S/ {Number(d.amount ?? 0).toFixed(0)}</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_BADGE[d.status] || "bg-secondary"}`}>{d.status}</span>
                 </div>
               </div>
