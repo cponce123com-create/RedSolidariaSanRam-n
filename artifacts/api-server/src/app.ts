@@ -38,6 +38,10 @@ app.use(
           // Remover 'unsafe-eval' en producción - usar nonces o hashes
           ...(process.env.NODE_ENV === "development" ? ["'unsafe-eval'"] : []),
         ],
+        // Los atributos on* (onclick/onload/onerror) que crean React y Leaflet
+        // en tiempo de ejecución necesitan 'unsafe-inline' aquí; el default de
+        // helmet (script-src-attr 'none') los bloquea y rompe la SPA.
+        scriptSrcAttr: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],

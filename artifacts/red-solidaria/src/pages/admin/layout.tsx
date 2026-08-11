@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const logoutMutation = useAdminLogout();
   
   const { data: user, isError, isLoading } = useGetAdminMe({
@@ -28,7 +29,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isSuperAdmin = (user as any).role === "superadmin" || (user as any).id === 0;
   const isModerator = (user as any).role === "moderador";
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const navGroups = [
     {
