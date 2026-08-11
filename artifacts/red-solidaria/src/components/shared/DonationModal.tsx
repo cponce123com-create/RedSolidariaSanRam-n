@@ -59,7 +59,9 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
       .coerce
       .number()
       .min(5, t("donation.minAmount"))
-      .refine((v) => Math.round(v * 100) === v * 100, t("donation.twoDecimals")),
+      // Épsilon: 5.01*100 = 500.99999999999994 en float64; comparación exacta
+      // rechazaría montos legítimos con centavos (50.01, 10.10, ...).
+      .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8, t("donation.twoDecimals")),
     paymentMethod: z.enum(["yape", "plin", "transfer", "card", "cash", "other"], {
       required_error: t("donation.selectMethod"),
     }),

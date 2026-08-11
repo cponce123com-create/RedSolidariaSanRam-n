@@ -33,11 +33,13 @@ test("donationInputSchema: donación válida pasa y anula el status del cliente"
 });
 
 test("donationInputSchema: rechaza montos inválidos (negativo, 0, >2 decimales)", () => {
-  for (const amount of [-5, 0, 1, 4.99, 50.123, 50.001]) {
+  for (const amount of [-5, 0, 1, 4.99, 50.123, 50.001, 5.005]) {
     const r = donationInputSchema.safeParse({ ...VALID, amount });
     assert.equal(r.success, false, `amount ${amount} debería rechazarse`);
   }
-  for (const amount of [5, 5.5, 50, 50.99, 0.01 + 49.99]) {
+  // Incluye montos con centavos: 5.01*100 = 500.99999999999994 en float64 y
+  // una comparación exacta los rechazaría (regresión).
+  for (const amount of [5, 5.01, 5.5, 10.1, 50, 50.01, 50.99, 100.5, 0.01 + 49.99]) {
     const r = donationInputSchema.safeParse({ ...VALID, amount });
     assert.equal(r.success, true, `amount ${amount} debería aceptarse`);
   }

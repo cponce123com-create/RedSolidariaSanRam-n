@@ -28,7 +28,10 @@ export const donationInputSchema = z.object({
     .coerce
     .number()
     .min(5, "El monto mínimo es S/ 5")
-    .refine((v) => Math.round(v * 100) === v * 100, {
+    // Épsilon: 5.01*100 = 500.99999999999994 en float64; una comparación
+    // exacta rechazaría montos legítimos con centavos. Diferencia ≥ 0.01
+    // (tercer decimal real) queda fuera del margen y se rechaza.
+    .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8, {
       message: "El monto admite máximo 2 decimales",
     }),
   paymentMethod: z.enum(PAYMENT_METHODS, {
