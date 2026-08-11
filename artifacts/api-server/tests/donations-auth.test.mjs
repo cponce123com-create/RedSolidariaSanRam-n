@@ -83,3 +83,86 @@ test("POST /api/donations con tipo inválido → 400 (schema Zod antes de DB)", 
     assert.equal(res.status, 400);
   });
 });
+
+// ── Validación de negocio server-side (antes de tocar la DB) ────────────────
+
+const VALID_BODY = {
+  firstName: "María",
+  lastName: "Quispe",
+  email: "maria@example.com",
+  amount: 50,
+  paymentMethod: "yape",
+};
+
+async function postDonation(base, body) {
+  const res = await fetch(`${base}/api/donations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return res;
+}
+
+test("POST /api/donations con monto negativo → 400 (el frontend no es la frontera)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, { ...VALID_BODY, amount: -500 });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("POST /api/donations con monto cero → 400", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, { ...VALID_BODY, amount: 0 });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("POST /api/donations con monto de más de 2 decimales → 400 (no redondeo silencioso)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, { ...VALID_BODY, amount: 50.123 });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("POST /api/donations con email inválido → 400", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, { ...VALID_BODY, email: "no-es-email" });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("POST /api/donations con método de pago inválido → 400", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, { ...VALID_BODY, paymentMethod: "yapeee" });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("POST /api/donations con comprobante no-https → 400 (bloquea vectores de URL arbitraria)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, {
+      ...VALID_BODY,
+      proofImageUrl: "http://evil.com/fake-receipt.jpg",
+      proofPublicId: "x",
+    });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("POST /api/donations con comprobante de host no-Cloudinary → 400 (flujo del donante)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, {
+      ...VALID_BODY,
+      proofImageUrl: "https://example.com/receipt.jpg",
+      proofPublicId: "x",
+    });
+    assert.equal(res.status, 400);
+  });
+});

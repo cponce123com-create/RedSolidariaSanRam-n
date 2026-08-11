@@ -36,6 +36,19 @@ describe("DonationModal", () => {
     expect(screen.queryByText("Tus Datos y Comprobante")).not.toBeInTheDocument();
   });
 
+  it("rechaza montos con más de 2 decimales (sin redondeo silencioso)", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DonationModal open onClose={vi.fn()} />);
+
+    const amount = screen.getByTestId("donation-amount");
+    await user.clear(amount);
+    await user.type(amount, "50.123");
+    await user.click(screen.getByRole("button", { name: /continuar/i }));
+
+    expect(await screen.findByText("El monto admite máximo 2 decimales")).toBeInTheDocument();
+    expect(screen.queryByText("Tus Datos y Comprobante")).not.toBeInTheDocument();
+  });
+
   it("flujo completo: paso 2 → confirmación → pantalla de éxito", async () => {
     const user = userEvent.setup();
     renderWithProviders(

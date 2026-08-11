@@ -1,11 +1,5 @@
 import { Router, type IRouter } from "express";
-import {
-  db,
-  donationsTable,
-  campaignsTable,
-  donationProofsTable,
-  insertDonationSchema,
-} from "@workspace/db";
+import { db, donationsTable, campaignsTable, donationProofsTable } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
@@ -16,6 +10,31 @@ const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { logAuditAction } from "../middleware/auth-utils";
 import { appendMovement } from "../lib/ledger";
 import { toSafeAmount } from "../lib/amount-format";
+import {
+  donationInputSchema,
+  isAllowedTransition,
+  approvalRequiresProof,
+  isValidProofUrl,
+} from "../lib/donation-validation";
+
+// Errores de negocio con mensaje claro para el panel admin (400 en vez del
+// 400 genérico de validación).
+class DonationTransitionError extends Error {
+  constructor(from: string, to: string) {
+    super(
+      `No se puede cambiar la donación de ${from} a ${to}. Las donaciones aprobadas quedan registradas en el ledger de transparencia.`,
+    );
+    this.name = "DonationTransitionError";
+  }
+}
+class DonationProofRequiredError extends Error {
+  constructor() {
+    super(
+      "Se requiere un comprobante (captura de pago) para aprobar esta donación. Agrégala desde la ficha.",
+    );
+    this.name = "DonationProofRequiredError";
+  }
+}
 
 // Proyección por columna (no `donation: donationsTable`): garantiza que el
 // mapper del customType money se aplique en todas las versiones de drizzle
@@ -47,22 +66,68 @@ const router: IRouter = Router();
 // subido previamente a Cloudinary.
 router.post("/donations", donationLimiter, async (req, res) => {
   try {
-    const data = insertDonationSchema.parse({
-      ...req.body,
-      status: "pending",
-    });
-    const [donation] = await db.insert(donationsTable).values(data).returning();
+    const data = donationInputSchema.parse(req.body);
 
+    // Campaña destino: debe existir y estar activa (fondo general = null).
+    if (data.campaignId != null) {
+      const [campaign] = await db
+        .select({ status: campaignsTable.status })
+        .from(campaignsTable)
+        .where(eq(campaignsTable.id, data.campaignId));
+      if (!campaign) {
+        return res
+          .status(400)
+          .json({ error: "validation_error", message: "La campaña no existe." });
+      }
+      if (campaign.status !== "active") {
+        return res
+          .status(400)
+          .json({ error: "validation_error", message: "La campaña no está activa." });
+      }
+    }
+
+    // Comprobante del donante: la URL debe ser https de Cloudinary (las
+    // subidas usan firma del servidor, pero validamos aquí que el cliente no
+    // cuelgue URLs arbitrarias) y el publicId debe venir con la subida.
     const proofUrl =
       typeof req.body?.proofImageUrl === "string" ? req.body.proofImageUrl : null;
+    const proofPublicId =
+      typeof req.body?.proofPublicId === "string" ? req.body.proofPublicId : null;
+    if (
+      proofUrl &&
+      (!isValidProofUrl(proofUrl, { requireCloudinary: true }) || !proofPublicId)
+    ) {
+      return res.status(400).json({
+        error: "validation_error",
+        message: "Comprobante inválido. Vuelve a subir la captura.",
+      });
+    }
+
+    // Valores explícitos: `status` lo fija el servidor (el cliente no puede
+    // spoofearlo) y los booleanos sin valor caen a su default de la DB.
+    const [donation] = await db
+      .insert(donationsTable)
+      .values({
+        campaignId: data.campaignId ?? null,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone ?? null,
+        amount: data.amount,
+        paymentMethod: data.paymentMethod,
+        message: data.message ?? null,
+        anonymous: data.anonymous ?? false,
+        publicProof: data.publicProof ?? false,
+        receiptNote: data.receiptNote ?? null,
+        status: "pending",
+      })
+      .returning();
+
     if (proofUrl) {
       await db.insert(donationProofsTable).values({
         donationId: donation.id,
         imageUrl: proofUrl,
-        publicId:
-          typeof req.body?.proofPublicId === "string"
-            ? req.body.proofPublicId
-            : null,
+        publicId: proofPublicId,
         mimeType:
           typeof req.body?.proofMimeType === "string"
             ? req.body.proofMimeType
@@ -75,10 +140,10 @@ router.post("/donations", donationLimiter, async (req, res) => {
         .where(eq(donationsTable.id, donation.id));
     }
 
-    res.status(201).json(await formatDonation(donation));
+    return res.status(201).json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to create donation");
-    res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
+    return res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
   }
 });
 
@@ -171,6 +236,22 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
         .for("update");
       if (!existing) return null;
 
+      // Máquina de estados: desde approved no se puede volver (el ingreso ya
+      // está encadenado en el ledger append-only → transparencia intacta).
+      if (!isAllowedTransition(existing.status, status)) {
+        throw new DonationTransitionError(existing.status, status);
+      }
+
+      // Comprobación: para métodos digitales, aprobar sin comprobante
+      // permitiría certificar dinero no verificado.
+      if (
+        status === "approved" &&
+        approvalRequiresProof(existing.paymentMethod) &&
+        !existing.receiptUrl
+      ) {
+        throw new DonationProofRequiredError();
+      }
+
       const [updated] = await tx
         .update(donationsTable)
         .set({ status, adminNote: adminNote || null })
@@ -182,7 +263,7 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
       if (updated.campaignId != null && existing.status !== "approved" && status === "approved") {
         await appendMovement(tx, updated.campaignId, {
           kind: "ingreso",
-          amount: updated.amount,
+          amount: toSafeAmount(updated.amount),
           description: updated.anonymous
             ? "Donación anónima"
             : `Donación de ${updated.firstName} ${updated.lastName}`.trim(),
@@ -219,6 +300,14 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
     return res.json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to update donation");
+    if (
+      err instanceof DonationTransitionError ||
+      err instanceof DonationProofRequiredError
+    ) {
+      return res
+        .status(400)
+        .json({ error: "validation_error", message: err.message });
+    }
     return res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
   }
 });
@@ -275,6 +364,11 @@ router.post(
       const { imageUrl, publicId, mimeType } = req.body ?? {};
       if (typeof imageUrl !== "string" || !imageUrl.trim()) {
         return res.status(400).json({ error: "validation_error", message: "imageUrl es requerido" });
+      }
+      if (!isValidProofUrl(imageUrl)) {
+        return res
+          .status(400)
+          .json({ error: "validation_error", message: "La URL del comprobante debe ser https válida" });
       }
       const [donation] = await db
         .select()

@@ -51,6 +51,12 @@ export default function AdminDonations() {
     );
   });
 
+  // El servidor responde 400 con { error, message } (p. ej. "Se requiere un
+  // comprobante..." o transición inválida); lo mostramos tal cual.
+  const mutationError = (err: unknown) =>
+    (err as { data?: { message?: string } })?.data?.message ||
+    "No se pudo actualizar el estado de la donación.";
+
   const handleApprove = (id: number) => {
     updateStatus.mutate(
       { id, data: { status: "approved" } },
@@ -59,6 +65,9 @@ export default function AdminDonations() {
           toast({ title: "Donación aprobada", description: "El estado ha sido actualizado." });
           queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
           queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+        },
+        onError: (err) => {
+          toast({ title: "No se pudo aprobar", description: mutationError(err), variant: "destructive" });
         }
       }
     );
@@ -75,6 +84,9 @@ export default function AdminDonations() {
           queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
           setRejectDialogId(null);
           setRejectNote("");
+        },
+        onError: (err) => {
+          toast({ title: "No se pudo rechazar", description: mutationError(err), variant: "destructive" });
         }
       }
     );

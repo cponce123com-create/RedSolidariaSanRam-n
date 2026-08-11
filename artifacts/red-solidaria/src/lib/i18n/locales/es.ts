@@ -187,6 +187,7 @@ export const es = {
     requiredName: "Ingresa tu nombre",
     requiredLastName: "Ingresa tu apellido",
     invalidEmail: "Correo inválido",
+    twoDecimals: "El monto admite máximo 2 decimales",
     proofAlt: "Comprobante",
     proofTypeError: "Solo se permiten imágenes JPG, PNG o WebP.",
     proofSizeError: "La imagen no puede superar los 8 MB.",

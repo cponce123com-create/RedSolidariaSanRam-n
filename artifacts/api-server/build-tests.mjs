@@ -23,6 +23,7 @@ await build({
     "./src/lib/cloudinary.ts",
     "./src/lib/donor-format.ts",
     "./src/lib/amount-format.ts",
+    "./src/lib/donation-validation.ts",
     "./src/lib/totp.ts",
     "./src/lib/ledger.ts",
     "./src/routes/stats.ts",

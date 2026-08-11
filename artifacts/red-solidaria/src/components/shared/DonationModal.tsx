@@ -55,7 +55,11 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
   // Schema de validación con mensajes traducidos (se reconstruye por render:
   // es barato y mantiene los mensajes sincronizados con el idioma activo).
   const donationSchema = z.object({
-    amount: z.coerce.number().min(5, t("donation.minAmount")),
+    amount: z
+      .coerce
+      .number()
+      .min(5, t("donation.minAmount"))
+      .refine((v) => Math.round(v * 100) === v * 100, t("donation.twoDecimals")),
     paymentMethod: z.enum(["yape", "plin", "transfer", "card", "cash", "other"], {
       required_error: t("donation.selectMethod"),
     }),

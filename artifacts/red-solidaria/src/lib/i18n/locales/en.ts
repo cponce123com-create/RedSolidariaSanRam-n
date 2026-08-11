@@ -189,6 +189,7 @@ export const en: TranslationSchema = {
     requiredName: "Enter your first name",
     requiredLastName: "Enter your last name",
     invalidEmail: "Invalid email",
+    twoDecimals: "Amount supports up to 2 decimals",
     proofAlt: "Receipt",
     proofTypeError: "Only JPG, PNG or WebP images are allowed.",
     proofSizeError: "The image cannot exceed 8 MB.",
