@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useTranslation } from "react-i18next";
+import { useQuery } from "@tanstack/react-query";
 import { useCampaignTransparency, useCampaignLedger, useCampaignLedgerVerify, Evidence } from "@/hooks/use-phase3";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -22,10 +23,22 @@ import {
   Camera,
   Download,
   Calendar,
-  Eye
+  Eye,
+  Users
 } from "lucide-react";
 import { format } from "date-fns";
 import { getDateFormatLocale } from "@/lib/i18n/date";
+
+/** Donante público de una campaña (GET /campaigns/:id/donors). */
+interface PublicDonor {
+  id: number;
+  name: string | null;
+  amount: number;
+  message: string | null;
+  date: string;
+  publicProof: boolean;
+  proofUrl: string | null;
+}
 
 const categoryColors: Record<string, string> = {
   alimentación: "bg-yellow-100 text-yellow-800 border-yellow-200",
@@ -47,6 +60,14 @@ export default function CampaignTransparency() {
   const { data: transparency, isLoading, isError } = useCampaignTransparency(campaignId);
   const { data: movements, isLoading: loadingMovements } = useCampaignLedger(campaignId);
   const { data: verify, isLoading: loadingVerify } = useCampaignLedgerVerify(campaignId);
+  const { data: donors, isLoading: loadingDonors } = useQuery<PublicDonor[]>({
+    queryKey: ["campaign-donors", campaignId],
+    queryFn: async () => {
+      const res = await fetch(`/api/campaigns/${campaignId}/donors?limit=100`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
   if (isLoading) {
     return (
@@ -359,6 +380,71 @@ export default function CampaignTransparency() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Donors List */}
+        <div className="mb-12" data-testid="transparency-donors">
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h2 className="text-3xl font-display font-bold flex items-center gap-3 text-foreground mb-2">
+                <Users className="w-8 h-8 text-primary" /> {t("campaignDetail.donorsTitle")}
+              </h2>
+              <p className="text-muted-foreground font-medium">{t("campaignDetail.donorsSubtitle")}</p>
+            </div>
+            <Badge variant="secondary" className="px-4 py-1.5 text-sm">
+              {t("campaignTransparency.donorsCount", { count: transparency.donorCount })}
+            </Badge>
+          </div>
+
+          {loadingDonors ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-32 bg-secondary/60 rounded-2xl animate-pulse" />
+              ))}
+            </div>
+          ) : donors && donors.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {donors.map((d) => (
+                <div key={d.id} className="bg-card rounded-3xl border border-border shadow-sm p-5 flex flex-col gap-3 hover-elevate">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <Heart className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground truncate">
+                          {d.name ?? t("campaignDetail.anonymous")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(d.date), "dd MMM yyyy", { locale: getDateFormatLocale() })}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-bold text-primary whitespace-nowrap">{formatCurrency(d.amount)}</span>
+                  </div>
+                  {d.message && (
+                    <p className="text-sm text-muted-foreground italic line-clamp-2">"{d.message}"</p>
+                  )}
+                  {d.proofUrl && (
+                    <a
+                      href={d.proofUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline mt-auto"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> {t("campaignDetail.viewReceipt")}
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card rounded-3xl border border-dashed border-border p-14 text-center shadow-sm">
+              <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-foreground mb-2">{t("campaignTransparency.donorsEmptyTitle")}</h3>
+              <p className="text-muted-foreground">{t("campaignTransparency.donorsEmptyDesc")}</p>
+            </div>
+          )}
         </div>
 
         {/* Evidence Grid */}

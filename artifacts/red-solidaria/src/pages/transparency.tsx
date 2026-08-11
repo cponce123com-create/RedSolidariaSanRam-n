@@ -113,27 +113,30 @@ export default function Transparency() {
             {campaigns.map((c) => {
               const pct = c.goal > 0 ? Math.min(100, Math.round((c.raised / c.goal) * 100)) : 0;
               return (
-                <div key={c.id} className="bg-card rounded-2xl border border-gray-100 shadow-sm p-6">
+                <Link
+                  key={c.id}
+                  href={`/campanas/${c.id}/transparencia`}
+                  className="block bg-card rounded-2xl border border-gray-100 shadow-sm p-6 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all group"
+                >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                     <div>
-                      <h3 className="font-bold text-lg">{c.title}</h3>
+                      <h3 className="font-bold text-lg group-hover:text-primary transition-colors">{c.title}</h3>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {t(c.status === "active" ? "transparency.statusActive" : "transparency.statusCompleted")}
                         {c.category ? ` · ${c.category}` : ""} · {t("transparency.donorCount", { count: c.donorCount })}
                       </p>
                     </div>
-                    <Link href={`/campanas/${c.id}/transparencia`} className="shrink-0">
-                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-                        {t("transparency.viewDetail")} <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                      </span>
-                    </Link>
+                    <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary shrink-0">
+                      {t("transparency.viewDetail")}{" "}
+                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                    </span>
                   </div>
                   <Progress value={pct} className="h-2.5 mb-2" />
                   <div className="flex justify-between text-sm">
                     <span className="font-semibold text-primary">{formatCurrency(c.raised)}</span>
                     <span className="text-muted-foreground">{t("transparency.goal", { goal: formatCurrency(c.goal), pct })}</span>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>

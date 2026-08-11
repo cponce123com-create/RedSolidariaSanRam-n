@@ -3,6 +3,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Link } from "wouter";
 import { useTheme } from "@/hooks/use-theme";
+import { useTranslation } from "react-i18next";
+import { MapPin } from "lucide-react";
 
 /**
  * Mapa de campañas (fase 2 del rediseño — inspirado en shareish/Storm).
@@ -59,9 +61,24 @@ const progressPct = (raised: number, goal: number) =>
 
 export function CampaignMap({ campaigns, className }: CampaignMapProps) {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const located = campaigns.filter((c) => c.latitude != null && c.longitude != null);
 
-  if (located.length === 0) return null;
+  if (located.length === 0) {
+    return (
+      <div
+        className={`rounded-3xl border border-dashed border-border bg-secondary/30 flex flex-col items-center justify-center text-center px-6 py-20 ${className ?? ""}`}
+      >
+        <MapPin className="w-12 h-12 text-muted-foreground/40 mb-4" />
+        <p className="font-display font-bold text-lg text-foreground mb-1">
+          {t("campaigns.mapEmptyTitle")}
+        </p>
+        <p className="text-sm text-muted-foreground max-w-md">
+          {t("campaigns.mapEmptyDesc")}
+        </p>
+      </div>
+    );
+  }
 
   const bounds = L.latLngBounds(located.map((c) => [c.latitude!, c.longitude!] as [number, number]));
   const center = bounds.getCenter();

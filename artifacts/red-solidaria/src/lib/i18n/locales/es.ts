@@ -276,6 +276,9 @@ export const es = {
     viewAria: "Vista de campañas",
     viewGrid: "Grilla",
     viewMap: "Mapa",
+    mapEmptyTitle: "Aún no hay campañas con ubicación",
+    mapEmptyDesc:
+      "El mapa muestra las campañas que tienen coordenadas. Los administradores pueden marcarlas desde el panel editando la campaña.",
     emptyTitle: "No se encontraron campañas",
     emptyDescription: "Intenta con otro filtro de búsqueda o vuelve más tarde.",
   },
@@ -560,6 +563,10 @@ export const es = {
     evidenceEmptyTitle: "Sin evidencias aún",
     evidenceEmptyDesc:
       "Las fotos y reportes de impacto aparecerán aquí una vez que se realicen las actividades.",
+    donorsCount: "{{count}} donantes",
+    donorsEmptyTitle: "Aún no hay donantes públicos",
+    donorsEmptyDesc:
+      "Cuando se aprueben donaciones, aparecerán aquí con su monto y fecha. Las anónimas se muestran como \"Anónimo\".",
   },
   adoptions: {
     badge: "Bienestar Animal",
@@ -1071,3 +1078,4 @@ export const es = {
 };
 
 export type TranslationSchema = typeof es;
+

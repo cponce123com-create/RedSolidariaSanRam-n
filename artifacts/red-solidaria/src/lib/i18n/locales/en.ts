@@ -278,6 +278,9 @@ export const en: TranslationSchema = {
     viewAria: "Campaign view",
     viewGrid: "Grid",
     viewMap: "Map",
+    mapEmptyTitle: "No located campaigns yet",
+    mapEmptyDesc:
+      "The map shows campaigns with coordinates. Administrators can mark them from the panel when editing a campaign.",
     emptyTitle: "No campaigns found",
     emptyDescription: "Try a different filter or come back later.",
   },
@@ -562,6 +565,10 @@ export const en: TranslationSchema = {
     evidenceEmptyTitle: "No evidence yet",
     evidenceEmptyDesc:
       "Impact photos and reports will appear here once the activities take place.",
+    donorsCount: "{{count}} donors",
+    donorsEmptyTitle: "No public donors yet",
+    donorsEmptyDesc:
+      "Once donations are approved (non-anonymous), they will appear here with their amount and date.",
   },
   adoptions: {
     badge: "Animal Welfare",

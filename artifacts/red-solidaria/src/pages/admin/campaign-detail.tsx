@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { 
   useGetCampaign, 
@@ -41,6 +41,10 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+
+// Selector de ubicación con mapa libre (Leaflet/OpenStreetMap) — lazy para no
+// inflar el bundle del panel admin.
+const CampaignLocationPicker = lazy(() => import("@/components/admin/CampaignLocationPicker"));
 
 const infoSchema = z.object({
   title: z.string().min(3),
@@ -346,6 +350,18 @@ export default function AdminCampaignDetail() {
                   </FormItem>
                 )} />
               </div>
+
+              {/* Selector visual de ubicación (mapa libre OpenStreetMap) */}
+              <Suspense fallback={<div className="h-64 bg-muted animate-pulse rounded-2xl" />}>
+                <CampaignLocationPicker
+                  latitude={infoForm.watch("latitude") ?? null}
+                  longitude={infoForm.watch("longitude") ?? null}
+                  onChange={(lat, lng) => {
+                    infoForm.setValue("latitude", lat, { shouldDirty: true });
+                    infoForm.setValue("longitude", lng, { shouldDirty: true });
+                  }}
+                />
+              </Suspense>
 
               <div className="pt-4 border-t border-border flex justify-end">
                 <Button type="submit" className="h-12 px-8 rounded-xl text-lg shadow-md hover-elevate" disabled={updateCampaign.isPending} data-testid="btn-save-campaign">
