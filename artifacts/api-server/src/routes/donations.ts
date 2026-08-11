@@ -8,7 +8,11 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
+import { requireRole, ROLES } from "../middleware/roles";
 import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
+
+// Dinero: solo administrador o superadmin (los moderadores gestionan contenido).
+const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { logAuditAction } from "../middleware/auth-utils";
 import { appendMovement } from "../lib/ledger";
 
@@ -74,7 +78,7 @@ router.get("/donations/stats", async (req, res) => {
 });
 
 // GET /donations — solo admin (contiene datos personales de donantes)
-router.get("/donations", requireAdmin, async (req, res) => {
+router.get("/donations", ...adminOnly, async (req, res) => {
   try {
     const { campaignId, status, limit: rawLimit, offset: rawOffset } = req.query;
     const limit = Math.min(Math.max(parseInt(rawLimit as string) || 100, 1), 500);
@@ -108,7 +112,7 @@ router.get("/donations", requireAdmin, async (req, res) => {
 });
 
 // GET /donations/:id — solo admin (datos personales)
-router.get("/donations/:id", requireAdmin, async (req, res) => {
+router.get("/donations/:id", ...adminOnly, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, id));
@@ -124,7 +128,7 @@ router.get("/donations/:id", requireAdmin, async (req, res) => {
 
 // PUT /donations/:id — solo admin (aprobar/rechazar) con audit log.
 // Transaccional: aprobar una donación encadena el ingreso en el ledger Trust Pay.
-router.put("/donations/:id", requireAdmin, adminActionLimiter, async (req, res) => {
+router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const { status, adminNote } = req.body;
@@ -194,7 +198,7 @@ router.put("/donations/:id", requireAdmin, adminActionLimiter, async (req, res) 
 });
 
 // GET /campaigns/:id/donations — solo admin (datos personales)
-router.get("/campaigns/:id/donations", requireAdmin, async (req, res) => {
+router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
     const rows = await db
@@ -219,7 +223,7 @@ router.get("/campaigns/:id/donations", requireAdmin, async (req, res) => {
 });
 
 // GET /donations/:id/proofs — solo admin (comprobantes de una donación)
-router.get("/donations/:id/proofs", requireAdmin, async (req, res) => {
+router.get("/donations/:id/proofs", ...adminOnly, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const proofs = await db
@@ -237,7 +241,7 @@ router.get("/donations/:id/proofs", requireAdmin, async (req, res) => {
 // POST /donations/:id/proofs — solo admin (comprobante manual, p. ej. por WhatsApp)
 router.post(
   "/donations/:id/proofs",
-  requireAdmin,
+  ...adminOnly,
   adminActionLimiter,
   async (req, res) => {
     try {
@@ -279,7 +283,7 @@ router.post(
 // DELETE /donations/:id/proofs/:proofId — solo admin
 router.delete(
   "/donations/:id/proofs/:proofId",
-  requireAdmin,
+  ...adminOnly,
   adminActionLimiter,
   async (req, res) => {
     try {

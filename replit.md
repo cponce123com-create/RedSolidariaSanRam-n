@@ -66,8 +66,11 @@ A full-stack NGO/solidarity organization website for Red Solidaria San Ramón (C
 - Evidence types: compra, entrega, actividad, resultado, reporte
 
 ### Admin Credentials
-- Username: `admin`
-- Password: `redsolidaria2024`
+- Superadmin (env var, producción): `ADMIN_USERNAME` / `ADMIN_PASSWORD` — en dev: `admin` / `redsolidaria2024`
+- Cuentas demo del seed (solo desarrollo, creadas en `seedAdminUsers`):
+  - Administrador: `admin` / `admin2024` (rol `administrador` — campañas, donaciones, gastos, stats)
+  - Moderador: `moderador` / `moderador2024` (rol `moderador` — contenido y comunidad, sin dinero ni sistema)
+- Roles: `superadmin` (usuarios, configuración, 2FA reset) > `administrador` > `moderador`
 
 ### Color Palette
 - Primary: Coral red (HSL: 0 77% 58%)

@@ -4,6 +4,10 @@ import {
   isCloudinaryConfigured,
 } from "../lib/cloudinary";
 import { requireAdmin } from "../middleware/require-admin";
+import { requireRole, ROLES } from "../middleware/roles";
+
+// Subidas del sistema: solo administrador o superadmin.
+const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { adminActionLimiter, uploadSignatureLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
@@ -22,7 +26,7 @@ router.post("/uploads/signature", uploadSignatureLimiter, (_req, res) => {
 // Firma para admin: comprobantes de gastos y evidencias de campaña
 router.post(
   "/uploads/admin-signature",
-  requireAdmin,
+  ...adminOnly,
   adminActionLimiter,
   (_req, res) => {
     if (!isCloudinaryConfigured()) {

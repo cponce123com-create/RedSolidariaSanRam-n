@@ -14,9 +14,11 @@ import {
   campaignImagesTable,
   campaignExpensesTable,
   campaignEvidenceTable,
+  adminUsersTable,
 } from "@workspace/db";
 import { eq, isNull, sql } from "drizzle-orm";
 import { logger } from "./logger";
+import { hashPassword } from "../middleware/auth-utils";
 
 // ─── Imágenes demo ───────────────────────────────────────────────────────────
 // Mientras no se configuren credenciales de Cloudinary usamos imágenes públicas
@@ -95,6 +97,7 @@ async function isEmpty(tableName: string): Promise<boolean> {
 export async function seedIfEmpty(): Promise<void> {
   logger.info("Checking database seed state...");
 
+  await seedAdminUsers();
   await seedCampaigns();
   await seedStats();
   await seedTestimonials();
@@ -107,6 +110,34 @@ export async function seedIfEmpty(): Promise<void> {
   await seedCampaignMedia();
 
   logger.info("Seed check complete");
+}
+
+// Cuentas de administración de ejemplo (SOLO desarrollo): en producción el
+// superadmin se gestiona con ADMIN_USERNAME/ADMIN_PASSWORD y el resto de
+// cuentas (administrador/moderador) se crean desde el panel → Usuarios.
+async function seedAdminUsers() {
+  if (process.env.NODE_ENV === "production") return;
+
+  const demoUsers = [
+    { username: "admin", password: "admin2024", name: "Administrador", role: "administrador" },
+    { username: "moderador", password: "moderador2024", name: "Moderador", role: "moderador" },
+  ];
+
+  for (const demo of demoUsers) {
+    const existing = await db
+      .select({ id: adminUsersTable.id })
+      .from(adminUsersTable)
+      .where(eq(adminUsersTable.username, demo.username));
+    if (existing.length > 0) continue;
+
+    logger.info(`Seeding admin user: ${demo.username} (${demo.role})`);
+    await db.insert(adminUsersTable).values({
+      username: demo.username,
+      password: await hashPassword(demo.password),
+      name: demo.name,
+      role: demo.role,
+    });
+  }
 }
 
 async function seedCampaigns() {

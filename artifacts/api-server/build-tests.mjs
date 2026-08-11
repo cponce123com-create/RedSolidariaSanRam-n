@@ -17,6 +17,7 @@ rmSync("tests/dist", { recursive: true, force: true });
 await build({
   entryPoints: [
     "./src/middleware/require-admin.ts",
+    "./src/middleware/roles.ts",
     "./src/middleware/rate-limit.ts",
     "./src/middleware/cache-control.ts",
     "./src/lib/cloudinary.ts",

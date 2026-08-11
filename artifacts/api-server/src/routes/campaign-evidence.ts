@@ -2,6 +2,10 @@ import { Router, type IRouter } from "express";
 import { db, campaignEvidenceTable, insertCampaignEvidenceSchema } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
+import { requireRole, ROLES } from "../middleware/roles";
+
+// Evidencias financieras: solo administrador o superadmin.
+const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { adminActionLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
@@ -26,7 +30,7 @@ router.get("/campaigns/:id/evidence", async (req, res) => {
 
 router.post(
   "/campaigns/:id/evidence",
-  requireAdmin,
+  ...adminOnly,
   adminActionLimiter,
   async (req, res) => {
     try {
@@ -43,7 +47,7 @@ router.post(
 
 router.put(
   "/campaigns/:id/evidence/:evidenceId",
-  requireAdmin,
+  ...adminOnly,
   adminActionLimiter,
   async (req, res) => {
     try {
@@ -66,7 +70,7 @@ router.put(
 
 router.delete(
   "/campaigns/:id/evidence/:evidenceId",
-  requireAdmin,
+  ...adminOnly,
   adminActionLimiter,
   async (req, res) => {
     try {

@@ -27,6 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const isSuperAdmin = (user as any).role === "superadmin" || (user as any).id === 0;
+  const isModerator = (user as any).role === "moderador";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const navGroups = [
@@ -40,7 +41,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       label: "Operaciones",
       items: [
         { href: "/admin/campanas", icon: Target, label: "Campañas" },
-        { href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" },
+        ...(isModerator
+          ? []
+          : [{ href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" }]),
         { href: "/admin/reportes", icon: AlertTriangle, label: "Reportes", highlight: true },
         { href: "/admin/adopciones", icon: Dog, label: "Adopciones", animal: true },
         { href: "/admin/voluntarios", icon: Users, label: "Voluntarios" },
