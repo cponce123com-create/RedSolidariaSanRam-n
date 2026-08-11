@@ -57,7 +57,23 @@ export default function AdminDonations() {
     (err as { data?: { message?: string } })?.data?.message ||
     "No se pudo actualizar el estado de la donación.";
 
+  // Guard anti-stale: si la fila no trae id numérico (p. ej. datos cacheados
+  // de una sesión anterior a un redeploy), NO disparamos PUT /undefined:
+  // recargamos la lista y avisamos.
+  const isInvalidRowId = (id: unknown): boolean =>
+    typeof id !== "number" || !Number.isFinite(id);
+
   const handleApprove = (id: number) => {
+    if (isInvalidRowId(id)) {
+      toast({
+        title: "Datos desactualizados",
+        description: "Recargando las donaciones…",
+        variant: "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+      return;
+    }
     updateStatus.mutate(
       { id, data: { status: "approved" } },
       {
@@ -74,9 +90,20 @@ export default function AdminDonations() {
   };
 
   const handleReject = () => {
-    if (!rejectDialogId) return;
+    const id = rejectDialogId;
+    if (typeof id !== "number" || !Number.isFinite(id)) {
+      setRejectDialogId(null);
+      toast({
+        title: "Datos desactualizados",
+        description: "Recargando las donaciones…",
+        variant: "destructive",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+      return;
+    }
     updateStatus.mutate(
-      { id: rejectDialogId, data: { status: "rejected", adminNote: rejectNote } },
+      { id, data: { status: "rejected", adminNote: rejectNote } },
       {
         onSuccess: () => {
           toast({ title: "Donación rechazada", description: "Se guardó la nota de rechazo." });

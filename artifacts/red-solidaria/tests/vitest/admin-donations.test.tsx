@@ -2,8 +2,11 @@
 // devolver amount como string numérico ("50.00") cuando el mapper del
 // customType money no convierte (pg numeric → string). La página debe
 // formatear Number("50.00") = 50 → "S/ 50", NUNCA "S/ 0".
+// También cubre el guard anti-stale: una fila sin id numérico no dispara
+// PUT /api/donations/undefined.
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import AdminDonations from "@/pages/admin/donations";
 import { renderWithProviders } from "./test-utils";
 
@@ -38,10 +41,12 @@ const donationsMock = vi.hoisted(() => ({
   },
 }));
 
+const updateStatusMock = vi.hoisted(() => ({ mutate: vi.fn() }));
+
 vi.mock("@workspace/api-client-react", () => ({
   useGetDonations: () => ({ data: donationsMock.donations, isLoading: false }),
   useGetDonationStats: () => ({ data: donationsMock.stats }),
-  useUpdateDonationStatus: () => ({ mutate: vi.fn() }),
+  useUpdateDonationStatus: () => ({ mutate: updateStatusMock.mutate, isPending: false }),
 }));
 
 describe("AdminDonations", () => {
@@ -55,5 +60,33 @@ describe("AdminDonations", () => {
     // Nunca muestra el monto crudo ni un cero inventado
     expect(screen.queryByText("S/ 50.00")).not.toBeInTheDocument();
     expect(screen.queryByText("S/ 0")).not.toBeInTheDocument();
+  });
+
+  it("fila sin id numérico (datos stale de un redeploy) no dispara PUT /undefined", async () => {
+    // Simula la sesión con datos de antes del redeploy: la fila no trae id.
+    donationsMock.donations = [{
+      ...donationsMock.donations[0],
+      id: undefined as unknown as number,
+      status: "pending",
+    }];
+    updateStatusMock.mutate.mockClear();
+
+    renderWithProviders(<AdminDonations />);
+
+    await screen.findByTestId("btn-approve-donation");
+    const user = userEvent.setup();
+    await user.click(screen.getByTestId("btn-approve-donation"));
+
+    // Nunca llama a la mutation (evita el PUT /api/donations/undefined)
+    expect(updateStatusMock.mutate).not.toHaveBeenCalled();
+    // Avisa que los datos están desactualizados
+    expect(screen.getByText("Datos desactualizados")).toBeInTheDocument();
+
+    // Restaura para no contaminar otros tests
+    donationsMock.donations = [{
+      ...donationsMock.donations[0],
+      id: 1,
+      status: "approved",
+    }];
   });
 });
