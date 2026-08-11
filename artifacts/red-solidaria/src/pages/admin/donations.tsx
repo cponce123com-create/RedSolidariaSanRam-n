@@ -5,6 +5,7 @@ import {
   useGetDonationStats 
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -19,6 +20,7 @@ type FilterStatus = "all" | "pending" | "approved" | "rejected";
 
 export default function AdminDonations() {
   const [filter, setFilter] = useState<FilterStatus>("all");
+  const [search, setSearch] = useState("");
   const [rejectDialogId, setRejectDialogId] = useState<number | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
@@ -35,6 +37,19 @@ export default function AdminDonations() {
   const { data: donations, isLoading } = useGetDonations(
     apiFilterStatus ? { status: apiFilterStatus } : undefined
   );
+
+  // Búsqueda local por donante, email, campaña o método
+  const query = search.trim().toLowerCase();
+  const filteredDonations = (donations ?? []).filter((d) => {
+    if (!query) return true;
+    const donor = d.anonymous ? "" : `${d.firstName} ${d.lastName}`.toLowerCase();
+    return (
+      donor.includes(query) ||
+      (d.email ?? "").toLowerCase().includes(query) ||
+      (d.campaignTitle ?? "").toLowerCase().includes(query) ||
+      (d.paymentMethod ?? "").toLowerCase().includes(query)
+    );
+  });
 
   const handleApprove = (id: number) => {
     updateStatus.mutate(
@@ -106,18 +121,31 @@ export default function AdminDonations() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex gap-2 mb-6 bg-secondary/50 p-1.5 rounded-xl inline-flex">
-        {(["all", "pending", "approved", "rejected"] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === tab ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
-            data-testid={`filter-tab-${tab}`}
-          >
-            {tab === "all" ? "Todas" : statusLabels[tab]}
-          </button>
-        ))}
+      {/* Filters + Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="flex gap-2 bg-secondary/50 p-1.5 rounded-xl inline-flex">
+          {(["all", "pending", "approved", "rejected"] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setFilter(tab)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === tab ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+              data-testid={`filter-tab-${tab}`}
+            >
+              {tab === "all" ? "Todas" : statusLabels[tab]}
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full sm:w-auto sm:min-w-[260px] sm:ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            type="search"
+            placeholder="Buscar por donante, email, campaña..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 rounded-xl bg-background"
+            aria-label="Buscar donaciones"
+          />
+        </div>
       </div>
 
       {/* Reject Dialog */}
@@ -166,8 +194,8 @@ export default function AdminDonations() {
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Cargando donaciones...</TableCell></TableRow>
-            ) : donations && donations.length > 0 ? (
-              donations.map(d => (
+            ) : filteredDonations.length > 0 ? (
+              filteredDonations.map(d => (
                 <TableRow key={d.id}>
                   <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
                     {format(new Date(d.createdAt), "dd/MM/yy HH:mm")}

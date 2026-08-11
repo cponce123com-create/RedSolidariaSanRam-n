@@ -3,18 +3,18 @@ import { Link } from "wouter";
 import { useGetCampaigns, useCreateCampaign, useDeleteCampaign } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, Edit, Star } from "lucide-react";
+import { Plus, Trash2, Edit, Star, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
@@ -32,6 +32,7 @@ type FilterStatus = "all" | "active" | "paused" | "completed";
 
 export default function AdminCampaigns() {
   const [filter, setFilter] = useState<FilterStatus>("all");
+  const [search, setSearch] = useState("");
   const apiFilter = filter === "all" ? undefined : filter;
   const { data: campaigns, isLoading } = useGetCampaigns(apiFilter ? { status: apiFilter } : undefined);
   const createMutation = useCreateCampaign();
@@ -39,6 +40,16 @@ export default function AdminCampaigns() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+
+  // Búsqueda local por título o categoría
+  const query = search.trim().toLowerCase();
+  const filteredCampaigns = (campaigns ?? []).filter((c) => {
+    if (!query) return true;
+    return (
+      c.title.toLowerCase().includes(query) ||
+      (c.category ?? "").toLowerCase().includes(query)
+    );
+  });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -125,16 +136,30 @@ export default function AdminCampaigns() {
         </Dialog>
       </div>
 
-      <div className="flex gap-2 mb-6 bg-secondary/50 p-1.5 rounded-xl inline-flex">
-        {(["all", "active", "paused", "completed"] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === tab ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
-          >
-            {tab === "all" ? "Todas" : statusLabels[tab]}
-          </button>
-        ))}
+      {/* Filters + Search */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="flex gap-2 bg-secondary/50 p-1.5 rounded-xl inline-flex">
+          {(["all", "active", "paused", "completed"] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setFilter(tab)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === tab ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+            >
+              {tab === "all" ? "Todas" : statusLabels[tab]}
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full sm:w-auto sm:min-w-[260px] sm:ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            type="search"
+            placeholder="Buscar por título o categoría..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 rounded-xl bg-background"
+            aria-label="Buscar campañas"
+          />
+        </div>
       </div>
 
       <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
@@ -151,7 +176,7 @@ export default function AdminCampaigns() {
           <TableBody>
             {isLoading ? (
               <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">Cargando campañas...</TableCell></TableRow>
-            ) : campaigns?.map((c) => {
+            ) : filteredCampaigns.map((c) => {
               const progress = Math.min(100, Math.round((c.raised / c.goal) * 100)) || 0;
               return (
                 <TableRow key={c.id}>
@@ -193,7 +218,7 @@ export default function AdminCampaigns() {
                 </TableRow>
               );
             })}
-            {campaigns?.length === 0 && (
+            {!isLoading && filteredCampaigns.length === 0 && (
               <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No se encontraron campañas.</TableCell></TableRow>
             )}
           </TableBody>
