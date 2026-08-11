@@ -67,8 +67,9 @@ A full-stack NGO/solidarity organization website for Red Solidaria San Ramón (C
 
 ### Admin Credentials
 - Superadmin (env var, producción): `ADMIN_USERNAME` / `ADMIN_PASSWORD` — en dev: `admin` / `redsolidaria2024`
+  - ⚠️ El fallback env var solo aplica si NO existe un usuario con ese nombre en BD (el login usa primero la BD).
 - Cuentas demo del seed (solo desarrollo, creadas en `seedAdminUsers`):
-  - Administrador: `admin` / `admin2024` (rol `administrador` — campañas, donaciones, gastos, stats)
+  - Administrador: `administrador` / `admin2024` (rol `administrador` — campañas, donaciones, gastos, stats)
   - Moderador: `moderador` / `moderador2024` (rol `moderador` — contenido y comunidad, sin dinero ni sistema)
 - Roles: `superadmin` (usuarios, configuración, 2FA reset) > `administrador` > `moderador`
 

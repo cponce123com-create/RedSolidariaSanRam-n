@@ -119,7 +119,7 @@ async function seedAdminUsers() {
   if (process.env.NODE_ENV === "production") return;
 
   const demoUsers = [
-    { username: "admin", password: "admin2024", name: "Administrador", role: "administrador" },
+    { username: "administrador", password: "admin2024", name: "Administrador", role: "administrador" },
     { username: "moderador", password: "moderador2024", name: "Moderador", role: "moderador" },
   ];
 
