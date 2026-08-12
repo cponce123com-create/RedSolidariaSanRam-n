@@ -19,6 +19,7 @@ import {
 import { eq, isNull, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { hashPassword } from "../middleware/auth-utils";
+import { generateRandomPassword } from "./random-password";
 
 // ─── Imágenes demo ───────────────────────────────────────────────────────────
 // Mientras no se configuren credenciales de Cloudinary usamos imágenes públicas
@@ -115,12 +116,14 @@ export async function seedIfEmpty(): Promise<void> {
 // Cuentas de administración de ejemplo (SOLO desarrollo): en producción el
 // superadmin se gestiona con ADMIN_USERNAME/ADMIN_PASSWORD y el resto de
 // cuentas (administrador/moderador) se crean desde el panel → Usuarios.
+// No existen credenciales por defecto: la contraseña de cada cuenta demo se
+// genera aleatoriamente al crearla y se imprime en la consola.
 async function seedAdminUsers() {
   if (process.env.NODE_ENV === "production") return;
 
   const demoUsers = [
-    { username: "administrador", password: "admin2024", name: "Administrador", role: "administrador" },
-    { username: "moderador", password: "moderador2024", name: "Moderador", role: "moderador" },
+    { username: "administrador", name: "Administrador", role: "administrador" },
+    { username: "moderador", name: "Moderador", role: "moderador" },
   ];
 
   for (const demo of demoUsers) {
@@ -130,10 +133,15 @@ async function seedAdminUsers() {
       .where(eq(adminUsersTable.username, demo.username));
     if (existing.length > 0) continue;
 
+    const password = generateRandomPassword();
     logger.info(`Seeding admin user: ${demo.username} (${demo.role})`);
+    logger.warn(
+      { username: demo.username, role: demo.role },
+      `Cuenta demo (solo desarrollo): ${demo.username} / ${password} — contraseña generada aleatoriamente`,
+    );
     await db.insert(adminUsersTable).values({
       username: demo.username,
-      password: await hashPassword(demo.password),
+      password: await hashPassword(password),
       name: demo.name,
       role: demo.role,
     });

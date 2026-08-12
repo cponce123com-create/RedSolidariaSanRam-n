@@ -4,15 +4,27 @@ import { db, adminUsersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword, logAuditAction } from "../middleware/auth-utils";
 import { loginLimiter } from "../middleware/rate-limit";
+import { logger } from "../lib/logger";
+import { generateRandomPassword } from "../lib/random-password";
 
 const router: IRouter = Router();
 
-// El superadmin de respaldo (env var) solo permite credenciales por defecto en
-// desarrollo local. En cualquier otro entorno app.ts exige ADMIN_USERNAME y
-// ADMIN_PASSWORD, así el fallback nunca queda activo en staging/producción.
+// El superadmin de respaldo (env var) no tiene credenciales por defecto: en
+// desarrollo local, si faltan ADMIN_USERNAME/ADMIN_PASSWORD se generan
+// aleatoriamente al arrancar y se imprimen en consola. En cualquier otro
+// entorno app.ts exige ambas variables, así el fallback nunca queda activo en
+// staging/producción.
 const isDev = process.env.NODE_ENV === "development";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || (isDev ? "admin" : "");
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (isDev ? "redsolidaria2024" : "");
+const ADMIN_PASSWORD =
+  process.env.ADMIN_PASSWORD || (isDev ? generateRandomPassword() : "");
+
+if (isDev && !process.env.ADMIN_PASSWORD) {
+  logger.warn(
+    { username: ADMIN_USERNAME },
+    `Superadmin de desarrollo: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD} — contraseña generada aleatoriamente. Define ADMIN_PASSWORD para fijarla.`,
+  );
+}
 
 const loginSchema = z.object({
   username: z.string(),

@@ -26,6 +26,7 @@ await build({
     "./src/lib/donation-validation.ts",
     "./src/lib/totp.ts",
     "./src/lib/two-factor-lockout.ts",
+    "./src/lib/random-password.ts",
     "./src/lib/ledger.ts",
     "./src/routes/stats.ts",
     "./src/routes/sitemap.ts",

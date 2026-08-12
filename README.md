@@ -125,20 +125,20 @@ NODE_ENV=development
 PORT=5173
 BASE_PATH=/
 CORS_ORIGIN=https://tudominio.com
-# Superadmin (obligatorio en producción; en dev: admin / redsolidaria2024)
+# Superadmin (obligatorio en producción; en dev se genera una contraseña aleatoria)
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=redsolidaria2024
+ADMIN_PASSWORD=genera-una-contraseña-segura
 ```
 
 ### Credenciales de administración
 
-| Rol | Usuario (dev) | Contraseña (dev) | Acceso |
-|---|---|---|---|
-| 🟣 **Superadmin** | `admin` (env var) | `redsolidaria2024` | Total + usuarios + configuración + 2FA |
-| 🔵 **Administrador** | `administrador` | `admin2024` | Todo lo operativo (dinero incluido) |
-| 🟢 **Moderador** | `moderador` | `moderador2024` | Contenido y comunidad (sin dinero ni sistema) |
+| Rol | Usuario (dev) | Acceso |
+|---|---|---|
+| 🟣 **Superadmin** | `admin` (env var) | Total + usuarios + configuración + 2FA |
+| 🔵 **Administrador** | `administrador` (seed) | Todo lo operativo (dinero incluido) |
+| 🟢 **Moderador** | `moderador` (seed) | Contenido y comunidad (sin dinero ni sistema) |
 
-> ⚠️ Las cuentas demo del seed solo se crean en **desarrollo**. En producción, el superadmin se define por variables de entorno y los demás usuarios se crean desde *Panel → Usuarios*.
+> 🔑 **No existen credenciales por defecto.** En **desarrollo**, el seed y el superadmin de respaldo generan contraseñas aleatorias y las imprimen en la consola al arrancar (busca "contraseña generada aleatoriamente"). En **producción**, el superadmin se define con `ADMIN_USERNAME`/`ADMIN_PASSWORD` (obligatorias) y los demás usuarios se crean desde *Panel → Usuarios*.
 
 ## 🏗️ Build y Deploy (Render)
 
@@ -202,3 +202,4 @@ MIT License — ver archivo LICENSE para detalles
 ---
 
 <div align="center">Hecho con ❤️ para la comunidad de San Ramón, Chanchamayo 🇵🇪</div>
+s
