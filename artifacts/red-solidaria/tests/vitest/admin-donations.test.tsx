@@ -42,11 +42,13 @@ const donationsMock = vi.hoisted(() => ({
 }));
 
 const updateStatusMock = vi.hoisted(() => ({ mutate: vi.fn() }));
+const addProofMock = vi.hoisted(() => ({ mutate: vi.fn() }));
 
 vi.mock("@workspace/api-client-react", () => ({
   useGetDonations: () => ({ data: donationsMock.donations, isLoading: false }),
   useGetDonationStats: () => ({ data: donationsMock.stats }),
   useUpdateDonationStatus: () => ({ mutate: updateStatusMock.mutate, isPending: false }),
+  useAddDonationProof: () => ({ mutate: addProofMock.mutate, isPending: false }),
 }));
 
 describe("AdminDonations", () => {
@@ -60,6 +62,25 @@ describe("AdminDonations", () => {
     // Nunca muestra el monto crudo ni un cero inventado
     expect(screen.queryByText("S/ 50.00")).not.toBeInTheDocument();
     expect(screen.queryByText("S/ 0")).not.toBeInTheDocument();
+  });
+
+  it("muestra el botón Adjuntar comprobante en donaciones sin adjunto (soporte admin)", () => {
+    // La donación del mock no trae receiptUrl → debe ofrecer adjuntar el comprobante
+    donationsMock.donations = [{
+      ...donationsMock.donations[0],
+      receiptUrl: null,
+    }];
+
+    renderWithProviders(<AdminDonations />);
+
+    expect(screen.getByText("Sin adjunto")).toBeInTheDocument();
+    expect(screen.getByTestId("btn-attach-proof")).toBeInTheDocument();
+
+    // Restaura para no contaminar otros tests
+    donationsMock.donations = [{
+      ...donationsMock.donations[0],
+      receiptUrl: null,
+    }];
   });
 
   it("fila sin id numérico (datos stale de un redeploy) no dispara PUT /undefined", async () => {

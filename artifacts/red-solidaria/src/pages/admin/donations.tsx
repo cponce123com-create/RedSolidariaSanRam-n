@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { 
   useGetDonations, 
   useUpdateDonationStatus, 
-  useGetDonationStats 
+  useGetDonationStats,
+  useAddDonationProof
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +13,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { CheckCircle, XCircle, Search, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { CheckCircle, XCircle, Search, ExternalLink, Image as ImageIcon, UploadCloud, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
 
 type FilterStatus = "all" | "pending" | "approved" | "rejected";
 
@@ -24,10 +26,14 @@ export default function AdminDonations() {
   const [rejectDialogId, setRejectDialogId] = useState<number | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
+  const [proofUploadId, setProofUploadId] = useState<number | null>(null);
+  const [proofUploading, setProofUploading] = useState(false);
+  const proofFileRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const updateStatus = useUpdateDonationStatus();
+  const addProof = useAddDonationProof();
 
   // Fetch stats unconditionally
   const { data: stats } = useGetDonationStats();
@@ -117,6 +123,52 @@ export default function AdminDonations() {
         }
       }
     );
+  };
+
+  // Adjuntar comprobante como admin: sube la imagen a Cloudinary (firma del
+  // servidor admin) y la registra en la donación vía POST /donations/:id/proofs.
+  const handleAttachProofFile = async (id: number, file: File) => {
+    const error = validateProofImage(file);
+    if (error) {
+      toast({
+        title: "Archivo inválido",
+        description: error === "size" ? "Máximo 8 MB." : "Solo JPG, PNG o WebP.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setProofUploading(true);
+    try {
+      const { imageUrl, publicId } = await uploadImageToCloudinary(file, "/api/uploads/admin-signature");
+      addProof.mutate(
+        { id, data: { imageUrl, publicId, mimeType: file.type } },
+        {
+          onSuccess: () => {
+            toast({ title: "Comprobante adjuntado", description: "Se guardó el comprobante de la donación." });
+            queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
+            queryClient.invalidateQueries({ queryKey: [`/api/donations/${id}/proofs`] });
+            setProofUploadId(null);
+            if (proofFileRef.current) proofFileRef.current.value = "";
+          },
+          onError: (err) => {
+            toast({ title: "No se pudo adjuntar", description: mutationError(err), variant: "destructive" });
+          },
+        },
+      );
+    } catch (err) {
+      toast({
+        title: "Error al subir",
+        description:
+          err instanceof UploadError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "No se pudo subir la imagen. Intenta más tarde.",
+        variant: "destructive",
+      });
+    } finally {
+      setProofUploading(false);
+    }
   };
 
   const statusColors = {
@@ -216,6 +268,48 @@ export default function AdminDonations() {
         </DialogContent>
       </Dialog>
 
+      {/* Adjuntar Comprobante Dialog (soporte admin: el comprobante es opcional) */}
+      <Dialog open={!!proofUploadId} onOpenChange={(open) => !open && setProofUploadId(null)}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Adjuntar Comprobante</DialogTitle>
+            <DialogDescription>
+              Sube la captura de pago (Yape/Plin/transferencia) de esta donación. Es opcional: si no se adjunta, la donación igual puede aprobarse.
+            </DialogDescription>
+          </DialogHeader>
+          <input
+            ref={proofFileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-accent file:text-accent-foreground file:text-sm file:font-semibold hover:file:bg-accent/90 cursor-pointer"
+            disabled={proofUploading}
+            data-testid="proof-file-input"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file && typeof proofUploadId === "number") handleAttachProofFile(proofUploadId, file);
+            }}
+          />
+          {proofUploading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> Subiendo imagen…
+            </div>
+          )}
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              disabled={proofUploading}
+              onClick={() => {
+                setProofUploadId(null);
+                if (proofFileRef.current) proofFileRef.current.value = "";
+              }}
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Image Preview Dialog */}
       <Dialog open={!!receiptImage} onOpenChange={() => setReceiptImage(null)}>
         <DialogContent className="max-w-2xl bg-transparent border-none shadow-none">
@@ -290,7 +384,19 @@ export default function AdminDonations() {
                           📝 {d.receiptNote}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground italic">Sin adjunto</span>
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="text-xs text-muted-foreground italic">Sin adjunto</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs rounded-lg"
+                            onClick={() => setProofUploadId(d.id)}
+                            disabled={proofUploading}
+                            data-testid="btn-attach-proof"
+                          >
+                            <UploadCloud className="w-3 h-3 mr-1" /> Adjuntar
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </TableCell>

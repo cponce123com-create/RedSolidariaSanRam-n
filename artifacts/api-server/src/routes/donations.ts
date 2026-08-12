@@ -13,7 +13,6 @@ import { toSafeAmount } from "../lib/amount-format";
 import {
   donationInputSchema,
   isAllowedTransition,
-  approvalRequiresProof,
   isValidProofUrl,
 } from "../lib/donation-validation";
 
@@ -34,14 +33,6 @@ class DonationTransitionError extends Error {
       `No se puede cambiar la donación de ${from} a ${to}. Las donaciones aprobadas quedan registradas en el ledger de transparencia.`,
     );
     this.name = "DonationTransitionError";
-  }
-}
-class DonationProofRequiredError extends Error {
-  constructor() {
-    super(
-      "Se requiere un comprobante (captura de pago) para aprobar esta donación. Agrégala desde la ficha.",
-    );
-    this.name = "DonationProofRequiredError";
   }
 }
 
@@ -250,16 +241,6 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
         throw new DonationTransitionError(existing.status, status);
       }
 
-      // Comprobación: para métodos digitales, aprobar sin comprobante
-      // permitiría certificar dinero no verificado.
-      if (
-        status === "approved" &&
-        approvalRequiresProof(existing.paymentMethod) &&
-        !existing.receiptUrl
-      ) {
-        throw new DonationProofRequiredError();
-      }
-
       const [updated] = await tx
         .update(donationsTable)
         .set({ status, adminNote: adminNote || null })
@@ -308,10 +289,7 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
     return res.json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to update donation");
-    if (
-      err instanceof DonationTransitionError ||
-      err instanceof DonationProofRequiredError
-    ) {
+    if (err instanceof DonationTransitionError) {
       return res
         .status(400)
         .json({ error: "validation_error", message: err.message });
