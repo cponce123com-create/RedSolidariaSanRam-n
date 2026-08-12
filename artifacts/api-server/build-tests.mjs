@@ -27,6 +27,7 @@ await build({
     "./src/lib/totp.ts",
     "./src/lib/two-factor-lockout.ts",
     "./src/lib/random-password.ts",
+    "./src/lib/csp.ts",
     "./src/lib/ledger.ts",
     "./src/routes/stats.ts",
     "./src/routes/sitemap.ts",

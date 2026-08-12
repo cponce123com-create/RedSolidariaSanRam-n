@@ -19,6 +19,7 @@ import { publicApiCache } from "./middleware/cache-control";
 import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
+import { buildCspDirectives } from "./lib/csp";
 
 const app: Express = express();
 
@@ -26,33 +27,21 @@ const app: Express = express();
 // obtener la IP real del cliente (rate limiting y audit logs correctos).
 app.set("trust proxy", 1);
 
+// Ruta de los estáticos del frontend. Se calcula ANTES de helmet porque el CSP
+// lee el index.html servido para hashear sus scripts inline (ver lib/csp.ts).
+const staticPath = path.resolve(
+  process.env.STATIC_FILES_PATH ||
+    path.join(process.cwd(), "artifacts/red-solidaria/dist/public"),
+);
+
 // Helmet.js para seguridad de headers HTTP
 app.use(
   helmet({
     contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          // Remover 'unsafe-eval' en producción - usar nonces o hashes
-          ...(process.env.NODE_ENV === "development" ? ["'unsafe-eval'"] : []),
-        ],
-        // Los atributos on* (onclick/onload/onerror) que crean React y Leaflet
-        // en tiempo de ejecución necesitan 'unsafe-inline' aquí; el default de
-        // helmet (script-src-attr 'none') los bloquea y rompe la SPA.
-        scriptSrcAttr: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        connectSrc: [
-          "'self'",
-          process.env.API_URL || "https://api.redsolidaria.com",
-        ],
-        frameSrc: ["'none'"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: [],
-      },
+      directives: buildCspDirectives({
+        isDev: process.env.NODE_ENV === "development",
+        indexHtmlPath: path.join(staticPath, "index.html"),
+      }),
     },
     crossOriginEmbedderPolicy: false,
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
@@ -198,12 +187,9 @@ app.use("/api", router);
 
 // Servir archivos estáticos del frontend en producción con caching optimizado
 if (process.env.NODE_ENV === "production") {
-  // STATIC_FILES_PATH puede venir relativo (config de Replit/Render): sendFile
-  // requiere ruta absoluta, así que la normalizamos contra el cwd.
-  const staticPath = path.resolve(
-    process.env.STATIC_FILES_PATH ||
-      path.join(process.cwd(), "artifacts/red-solidaria/dist/public"),
-  );
+  // staticPath ya se calculó arriba (se usa también para el CSP); aquí solo se
+  // loguea la ruta resuelta (STATIC_FILES_PATH puede venir relativo de la
+  // config de Replit/Render y sendFile requiere ruta absoluta).
   logger.info({ staticPath }, "Serving static files from");
 
   // Assets pre-comprimidos (.gz generados por el build de Vite): el bundle JS

@@ -14,6 +14,14 @@
           if (dark) document.documentElement.classList.add("dark");
         } catch (e) {}
       })();
+      // Carga no bloqueante de fuentes: cuando el CSS termine de descargar se
+      // cambia media a 'all'. Equivalente al hack onload inline pero con
+      // addEventListener (CSP: script-src-attr 'none' en producción, sin
+      // 'unsafe-inline').
+      (function () {
+        var f = document.getElementById("fonts-css");
+        if (f) f.addEventListener("load", function () { f.media = "all"; });
+      })();
     </script>
     <title>Red Solidaria San Ramón — Juntos somos más</title>
     <meta name="description" content="Organización solidaria sin fines de lucro en San Ramón, Chanchamayo, Perú. Apoyamos campañas sociales, protección animal y bienestar comunitario." />
@@ -48,10 +56,10 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
     />
     <link
+      id="fonts-css"
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
       media="print"
-      onload="this.media='all'"
     />
     <noscript>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" />
