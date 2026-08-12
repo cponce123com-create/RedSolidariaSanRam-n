@@ -17,6 +17,15 @@ import {
   isValidProofUrl,
 } from "../lib/donation-validation";
 
+// NOTA sobre la proyección de los listados admin:
+// Se usa proyección por tabla (`donation: donationsTable`) + leftJoin, NO
+// proyección plana por columna. En la versión de drizzle empaquetada en
+// producción, la combinación "proyección plana + leftJoin" devuelve las filas
+// con TODOS los campos undefined (fecha "—", donante vacío, amount 0 en el
+// panel admin). La proyección por tabla + leftJoin es el patrón que funciona
+// (endpoint público /campaigns); el monto de la columna money llega como
+// string ("500.00") y formatDonation lo normaliza con toSafeAmount.
+
 // Errores de negocio con mensaje claro para el panel admin (400 en vez del
 // 400 genérico de validación).
 class DonationTransitionError extends Error {
@@ -35,32 +44,6 @@ class DonationProofRequiredError extends Error {
     this.name = "DonationProofRequiredError";
   }
 }
-
-// Proyección por columna (no `donation: donationsTable`): garantiza que el
-// mapper del customType money se aplique en todas las versiones de drizzle
-// bundleadas (la proyección por tabla devolvía "50.00" en algunos builds,
-// y formatDonation lo convertía a 0 con el check defensivo).
-// El monto se normaliza ADEMÁS con cast SQL ::float8 (mismo patrón que
-// stats/campaigns/transparency): el contrato es number real, sin depender
-// de cómo drizzle aplique el mapper del customType a través del leftJoin.
-const donationColumns = {
-  id: donationsTable.id,
-  campaignId: donationsTable.campaignId,
-  firstName: donationsTable.firstName,
-  lastName: donationsTable.lastName,
-  email: donationsTable.email,
-  phone: donationsTable.phone,
-  amount: sql<number>`coalesce(${donationsTable.amount}::float8, 0)`,
-  paymentMethod: donationsTable.paymentMethod,
-  message: donationsTable.message,
-  anonymous: donationsTable.anonymous,
-  publicProof: donationsTable.publicProof,
-  receiptUrl: donationsTable.receiptUrl,
-  receiptNote: donationsTable.receiptNote,
-  status: donationsTable.status,
-  adminNote: donationsTable.adminNote,
-  createdAt: donationsTable.createdAt,
-};
 
 const router: IRouter = Router();
 
@@ -184,7 +167,7 @@ router.get("/donations", ...adminOnly, async (req, res) => {
 
     const rows = await db
       .select({
-        ...donationColumns,
+        donation: donationsTable,
         campaignTitle: campaignsTable.title,
       })
       .from(donationsTable)
@@ -195,8 +178,8 @@ router.get("/donations", ...adminOnly, async (req, res) => {
       .offset(offset);
 
     res.json(
-      rows.map((row) =>
-        formatDonation(row, row.campaignTitle),
+      rows.map(({ donation, campaignTitle }) =>
+        formatDonation(donation, campaignTitle),
       ),
     );
   } catch (err) {
@@ -321,7 +304,7 @@ router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
     const campaignId = Number(req.params.id);
     const rows = await db
       .select({
-        ...donationColumns,
+        donation: donationsTable,
         campaignTitle: campaignsTable.title,
       })
       .from(donationsTable)
@@ -330,8 +313,8 @@ router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
       .orderBy(desc(donationsTable.createdAt));
 
     res.json(
-      rows.map((row) =>
-        formatDonation(row, row.campaignTitle),
+      rows.map(({ donation, campaignTitle }) =>
+        formatDonation(donation, campaignTitle),
       ),
     );
   } catch (err) {
