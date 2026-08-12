@@ -30,3 +30,20 @@ test("toSafeAmount: null/undefined/NaN/corrupto → 0 (no rompe el frontend)", (
   assert.equal(toSafeAmount(Infinity), 0);
   assert.equal(toSafeAmount(-Infinity), 0);
 });
+
+// Regresión "montos en ceros": la columna money leída con proyección por tabla
+// puede llegar como string ("3250.00") o null según la versión de drizzle.
+// formatCampaign hace Math.max(toSafeAmount(raised), raisedFromDonations):
+// el resultado debe ser un number real (la donación aprobada suma), nunca NaN.
+test("regresión: Math.max(toSafeAmount(raised), donaciones) nunca devuelve NaN/0 falso", () => {
+  // Columna raised como string (mapper no aplicado) + donaciones aprobadas
+  assert.equal(Math.max(toSafeAmount("3250.00"), 195), 3250);
+  // raised null/corrupto → cae a 0 y gana la suma real de donaciones
+  assert.equal(Math.max(toSafeAmount(null), 195), 195);
+  assert.equal(Math.max(toSafeAmount(undefined), 195), 195);
+  assert.equal(Math.max(toSafeAmount("abc"), 195), 195);
+  // Ambos ceros (sin donaciones ni raised) → 0 estable, no NaN
+  assert.equal(Math.max(toSafeAmount(null), 0), 0);
+  // number puro (mapper aplicado) sigue funcionando
+  assert.equal(Math.max(toSafeAmount(3250), 195), 3250);
+});

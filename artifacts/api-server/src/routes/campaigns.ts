@@ -186,7 +186,10 @@ function formatCampaign(
 ) {
   // El monto recaudado proviene de las donaciones aprobadas (fuente de verdad);
   // la columna raised solo se usa como respaldo durante el seed.
-  const raised = Math.max(c.raised, raisedFromDonations);
+  // toSafeAmount: la proyección por tabla puede devolver la columna money como
+  // string ("3250.00") según la versión de drizzle — Math.max lo coercearía,
+  // pero normalizamos para que el contrato sea number real siempre.
+  const raised = Math.max(toSafeAmount(c.raised), raisedFromDonations);
 
   return {
     id: c.id,

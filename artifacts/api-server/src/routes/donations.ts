@@ -40,6 +40,9 @@ class DonationProofRequiredError extends Error {
 // mapper del customType money se aplique en todas las versiones de drizzle
 // bundleadas (la proyección por tabla devolvía "50.00" en algunos builds,
 // y formatDonation lo convertía a 0 con el check defensivo).
+// El monto se normaliza ADEMÁS con cast SQL ::float8 (mismo patrón que
+// stats/campaigns/transparency): el contrato es number real, sin depender
+// de cómo drizzle aplique el mapper del customType a través del leftJoin.
 const donationColumns = {
   id: donationsTable.id,
   campaignId: donationsTable.campaignId,
@@ -47,7 +50,7 @@ const donationColumns = {
   lastName: donationsTable.lastName,
   email: donationsTable.email,
   phone: donationsTable.phone,
-  amount: donationsTable.amount,
+  amount: sql<number>`coalesce(${donationsTable.amount}::float8, 0)`,
   paymentMethod: donationsTable.paymentMethod,
   message: donationsTable.message,
   anonymous: donationsTable.anonymous,
