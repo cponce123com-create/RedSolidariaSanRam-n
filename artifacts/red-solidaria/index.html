@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#2f8332" />
+    <meta name="theme-color" content="#238b35" />
     <script>
       // Anti-FOUC: aplica el tema antes del primer paint para evitar un flash
       // de tema claro en usuarios con preferencia oscura.
@@ -23,9 +23,9 @@
         if (f) f.addEventListener("load", function () { f.media = "all"; });
       })();
     </script>
-    <title>Red Solidaria San Ramón — Juntos somos más</title>
-    <meta name="description" content="Organización solidaria sin fines de lucro en San Ramón, Chanchamayo, Perú. Apoyamos campañas sociales, protección animal y bienestar comunitario." />
-    <meta name="keywords" content="Red Solidaria, San Ramón, Chanchamayo, Junín, Perú, donaciones, voluntariado, adopciones, ONG, solidaridad" />
+    <title>Red Solidaria San Ramón — Cuando alguien necesita ayuda, la comunidad responde</title>
+    <meta name="description" content="Red de personas que se unen para ayudar a familias, niños y animales de San Ramón, Chanchamayo. Dona, hazte voluntario o pide ayuda: la comunidad responde." />
+    <meta name="keywords" content="Red Solidaria, San Ramón, Chanchamayo, Junín, Perú, donaciones, voluntariado, adopciones, ONG, solidaridad, ayuda" />
     <meta name="robots" content="index, follow" />
     <meta name="language" content="Spanish" />
     <meta name="author" content="Red Solidaria San Ramón" />
@@ -33,14 +33,14 @@
     <!-- Open Graph defaults -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Red Solidaria San Ramón" />
-    <meta property="og:title" content="Red Solidaria San Ramón — Juntos somos más" />
-    <meta property="og:description" content="Organización solidaria en San Ramón, Chanchamayo, Perú. Apoyamos campañas sociales, protección animal y bienestar comunitario." />
+    <meta property="og:title" content="Red Solidaria San Ramón — Cuando alguien necesita ayuda, la comunidad responde" />
+    <meta property="og:description" content="Red de personas que se unen para ayudar a familias, niños y animales de San Ramón, Chanchamayo. Dona, hazte voluntario o pide ayuda." />
     <meta property="og:locale" content="es_PE" />
 
     <!-- Twitter Card defaults -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Red Solidaria San Ramón" />
-    <meta name="twitter:description" content="Organización solidaria en San Ramón, Chanchamayo, Perú." />
+    <meta name="twitter:description" content="Red de personas que se unen para ayudar a familias, niños y animales de San Ramón, Chanchamayo." />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -98,91 +98,117 @@
 
     <style>
       /* Skeleton de la portada: se ve al instante (sin JS) mientras descarga
-         React; createRoot().render lo reemplaza al montar. */
+         React; createRoot().render lo reemplaza al montar.
+         Nueva composición editorial: texto a la izquierda, foto a la derecha,
+         sobre fondo crema (#fafcf8). */
       #hero-skeleton {
         min-height: 100vh;
         display: flex;
-        flex-direction: column;
         align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 2rem 1.25rem;
-        background: linear-gradient(160deg, #f0fdf4, #ecfdf5 55%, #f0fdfa);
+        background: #fafcf8;
         font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-        color: #14281a;
+        color: #17201a;
         animation: hero-fade 0.6s ease-out;
+      }
+      #hero-skeleton .shell {
+        width: 100%;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 7rem 1.5rem 3rem;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 2.5rem;
+        align-items: center;
       }
       #hero-skeleton .badge {
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        background: rgba(22, 163, 74, 0.1);
-        color: #15803d;
+        background: rgba(35, 139, 53, 0.1);
+        color: #238b35;
         font-weight: 600;
-        font-size: 0.875rem;
-        padding: 0.5rem 1.1rem;
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 0.45rem 1rem;
         border-radius: 9999px;
-      }
-      #hero-skeleton .badge::before {
-        content: "";
-        width: 8px;
-        height: 8px;
-        border-radius: 9999px;
-        background: #16a34a;
-        box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
-        animation: pulse-dot 2s infinite;
       }
       #hero-skeleton h1 {
-        font-size: clamp(2.3rem, 7vw, 4.2rem);
+        font-size: clamp(2.6rem, 6vw, 4rem);
         font-weight: 800;
-        line-height: 1.1;
+        line-height: 1.05;
         letter-spacing: -0.02em;
-        margin: 1.4rem 0 0.75rem;
+        margin: 1.25rem 0 0;
+        color: #17201a;
       }
-      #hero-skeleton h1 span { color: #15803d; }
-      #hero-skeleton p {
+      #hero-skeleton h1 span { color: #238b35; display: block; }
+      #hero-skeleton .lead {
+        font-size: clamp(1.15rem, 2.4vw, 1.45rem);
+        font-weight: 600;
+        color: #17201a;
+        margin: 1.25rem 0 0;
+      }
+      #hero-skeleton p.intro {
         max-width: 34rem;
-        color: #475569;
-        font-size: clamp(1.05rem, 2.5vw, 1.3rem);
+        color: #66736a;
+        font-size: clamp(1rem, 2vw, 1.15rem);
         line-height: 1.6;
+        margin: 0.75rem 0 0;
       }
       #hero-skeleton .ctas {
         display: flex;
         gap: 0.85rem;
         margin-top: 1.75rem;
         flex-wrap: wrap;
-        justify-content: center;
       }
       #hero-skeleton .ctas span {
-        padding: 0.95rem 2.1rem;
+        padding: 0.95rem 1.9rem;
         border-radius: 0.75rem;
         font-weight: 600;
-        font-size: 1.05rem;
+        font-size: 1rem;
       }
-      #hero-skeleton .ctas .primary { background: #15803d; color: #fff; }
-      #hero-skeleton .ctas .ghost { background: #fff; border: 1px solid #e2e8f0; color: #14281a; }
-      #hero-skeleton .trust {
-        margin-top: 2.2rem;
+      #hero-skeleton .ctas .primary { background: #238b35; color: #fff; }
+      #hero-skeleton .ctas .ghost { background: #fff; border: 1px solid rgba(18, 59, 36, 0.25); color: #123b24; }
+      #hero-skeleton .photo {
+        position: relative;
+        aspect-ratio: 4 / 3;
+        border-radius: 1.5rem;
+        overflow: hidden;
+        background: linear-gradient(135deg, #d9f0dd, #bcdcc4 60%, #a8cfb2);
+        box-shadow: 0 24px 50px -12px rgba(18, 59, 36, 0.25);
+        border: 1px solid rgba(18, 59, 36, 0.08);
+      }
+      #hero-skeleton .photo::after {
+        content: "…";
+        position: absolute;
+        inset: 0;
         display: flex;
         align-items: center;
-        gap: 0.6rem;
-        color: #64748b;
-        font-size: 0.9rem;
+        justify-content: center;
+        font-size: 2rem;
+        color: rgba(18, 59, 36, 0.35);
       }
-      #hero-skeleton .trust .avatars { display: flex; }
-      #hero-skeleton .trust .avatars span {
-        width: 34px;
-        height: 34px;
-        border-radius: 9999px;
-        border: 2px solid #fff;
-        background: linear-gradient(135deg, #a7f3d0, #6ee7b7);
-        margin-left: -8px;
+      #hero-skeleton .caption {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+        color: #66736a;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
       }
-      #hero-skeleton .trust .avatars span:first-child { margin-left: 0; }
-      @keyframes pulse-dot {
-        0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5); }
-        70% { box-shadow: 0 0 0 9px rgba(22, 163, 74, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+      #hero-skeleton .caption::after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: #e3eae4;
+      }
+      @media (min-width: 1024px) {
+        #hero-skeleton .shell {
+          grid-template-columns: 1fr 1fr;
+        }
       }
       @keyframes hero-fade {
         from { opacity: 0; }
@@ -193,16 +219,21 @@
   <body>
     <div id="root">
       <div id="hero-skeleton">
-        <div class="badge">San Ramón, Chanchamayo</div>
-        <h1>Uniendo corazones,<br /><span>transformando vidas</span></h1>
-        <p>Empezamos llevando sonrisas en Navidad. Hoy somos una red de voluntarios comprometidos con el bienestar de niños, familias y animales en nuestra comunidad.</p>
-        <div class="ctas">
-          <span class="primary">Donar Ahora</span>
-          <span class="ghost">Nuestra Historia</span>
-        </div>
-        <div class="trust">
-          <div class="avatars"><span></span><span></span><span></span></div>
-          <div><strong>+87 voluntarios</strong> ya están cambiando vidas en la región</div>
+        <div class="shell">
+          <div>
+            <div class="badge">San Ramón · Chanchamayo · Selva Central</div>
+            <h1>Red Solidaria<span>San Ramón</span></h1>
+            <p class="lead">Cuando alguien necesita ayuda, la comunidad responde.</p>
+            <p class="intro">Una red de personas que se unen para ayudar a familias, niños y animales de nuestra comunidad.</p>
+            <div class="ctas">
+              <span class="primary">Quiero ayudar</span>
+              <span class="ghost">Necesito ayuda</span>
+            </div>
+          </div>
+          <div>
+            <div class="photo" aria-hidden="true"></div>
+            <div class="caption">La red en acción · San Ramón, Chanchamayo</div>
+          </div>
         </div>
       </div>
     </div>

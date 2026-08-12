@@ -31,6 +31,10 @@
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-muted-border: hsl(var(--border));
 
+  /* Identidad: verde selva profundo (texto/overlays) y crema cálido */
+  --color-forest: #123b24;
+  --color-cream: #fafcf8;
+
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
   --color-accent-border: hsl(var(--accent));
@@ -49,34 +53,37 @@
 }
 
 :root {
-  --background: 120 10% 99%;
-  --foreground: 122 20% 12%;
+  /* Crema cálido — fondo de la plataforma (#FAFCF8) */
+  --background: 100 13% 98%;
+  /* Verde casi negro — texto principal (#17201A) */
+  --foreground: 140 16% 11%;
   --border: 120 10% 88%;
   --input: 120 10% 88%;
-  --ring: 122 47% 35%;
+  --ring: 130 60% 34%;
 
   --card: 0 0% 100%;
-  --card-foreground: 122 20% 12%;
+  --card-foreground: 140 16% 11%;
   --card-border: 120 10% 91%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 122 20% 12%;
+  --popover-foreground: 140 16% 11%;
   --popover-border: 120 10% 88%;
 
-  /* Verde Selva — color principal del logo */
-  --primary: 122 47% 35%;
+  /* Verde selva — color principal del logo (#238B35) */
+  --primary: 130 60% 34%;
   --primary-foreground: 0 0% 100%;
 
-  /* Verde claro suave — secundario */
-  --secondary: 120 30% 94%;
-  --secondary-foreground: 122 30% 18%;
+  /* Verde suave — secundario (#EAF6EC) */
+  --secondary: 129 40% 94%;
+  --secondary-foreground: 140 30% 16%;
 
   /* Teal/Cyan — acento del logo */
   --accent: 189 66% 46%;
   --accent-foreground: 0 0% 100%;
 
   --muted: 120 10% 95%;
-  --muted-foreground: 120 8% 44%;
+  /* Gris secundario — texto de apoyo (#66736A) */
+  --muted-foreground: 139 6% 43%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;

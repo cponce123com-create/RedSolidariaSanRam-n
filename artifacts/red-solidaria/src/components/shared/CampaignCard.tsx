@@ -5,16 +5,18 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Flame } from "lucide-react";
+import { Flame, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { isUrgent, daysUntilEnd } from "@/lib/campaign-urgency";
 import { optimizeImageUrl } from "@/lib/image-url";
 
 interface CampaignCardProps {
   campaign: Campaign;
+  /** Muestra la ubicación de la red bajo el título (uso en el home). */
+  showLocation?: boolean;
 }
 
-const CampaignCard = memo(function CampaignCard({ campaign }: CampaignCardProps) {
+const CampaignCard = memo(function CampaignCard({ campaign, showLocation = false }: CampaignCardProps) {
   const { t } = useTranslation();
   const progress = campaign.goal > 0 ? Math.min(100, Math.round((campaign.raised / campaign.goal) * 100)) : 0;
   // Fase 3 (modo emergencia): badge "Cierra en Xd" en tarjetas por cerrar
@@ -59,6 +61,12 @@ const CampaignCard = memo(function CampaignCard({ campaign }: CampaignCardProps)
         <h3 className="font-display font-bold text-xl mb-2 line-clamp-2 text-foreground group-hover:text-primary transition-colors">
           {campaign.title}
         </h3>
+        {showLocation && (
+          <p className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground mb-2">
+            <MapPin className="w-3.5 h-3.5" aria-hidden />
+            {t("home.campaignsLocation")}
+          </p>
+        )}
         <p className="text-muted-foreground text-sm line-clamp-2 mb-6 flex-grow">
           {campaign.description}
         </p>

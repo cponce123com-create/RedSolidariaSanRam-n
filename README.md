@@ -202,4 +202,3 @@ MIT License — ver archivo LICENSE para detalles
 ---
 
 <div align="center">Hecho con ❤️ para la comunidad de San Ramón, Chanchamayo 🇵🇪</div>
-s

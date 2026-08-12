@@ -51,77 +51,116 @@ export function Footer() {
   const { t } = useTranslation();
 
   return (
-    <footer className="bg-card border-t border-border/50 pt-16 pb-8">
+    <footer className="bg-card border-t border-border/50 pt-14 pb-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-          
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-12 mb-10">
+          {/* Marca + descripción + redes */}
+          <div className="space-y-4 lg:col-span-4">
             <Link href="/" className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <Heart className="w-4 h-4 text-white" />
+              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center">
+                <Heart className="w-4.5 h-4.5 text-white" />
               </div>
-              <span className="font-display font-bold text-xl">{t("footer.brand")}</span>
+              <span className="flex flex-col leading-none">
+                <span className="font-display font-bold text-lg text-foreground tracking-[0.12em]">
+                  {t("footer.brand").toUpperCase()}
+                </span>
+                <span className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.24em] text-primary">
+                  {t("nav.brandLocation").toUpperCase()}
+                </span>
+              </span>
             </Link>
-            <p className="text-muted-foreground leading-relaxed">
+            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
               {t("footer.tagline")}
             </p>
-            <div className="flex gap-4">
-              <a href="https://facebook.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label={t("footer.facebookAria")} className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
-                <FacebookIcon className="w-5 h-5" />
+            <div className="flex gap-3">
+              <a
+                href="https://facebook.com/redsolidariasanramon"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("footer.facebookAria")}
+                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors"
+              >
+                <FacebookIcon className="w-4.5 h-4.5" />
               </a>
-              <a href="https://instagram.com/redsolidariasanramon" target="_blank" rel="noopener noreferrer" aria-label={t("footer.instagramAria")} className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors">
-                <InstagramIcon className="w-5 h-5" />
+              <a
+                href="https://instagram.com/redsolidariasanramon"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={t("footer.instagramAria")}
+                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-foreground hover:bg-primary hover:text-white transition-colors"
+              >
+                <InstagramIcon className="w-4.5 h-4.5" />
               </a>
             </div>
           </div>
 
-          <div>
-            <h3 className="font-display font-bold text-lg mb-6">{t("footer.quickLinks")}</h3>
-            <ul className="space-y-3">
+          {/* Navegación */}
+          <nav className="lg:col-span-2" aria-label={t("footer.quickLinks")}>
+            <h3 className="font-display font-bold text-base mb-4 text-foreground">
+              {t("footer.quickLinks")}
+            </h3>
+            <ul className="space-y-2.5 text-sm">
+              <li><Link href="/" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.home")}</Link></li>
               <li><Link href="/nosotros" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.aboutUs")}</Link></li>
-              <li><Link href="/campanas" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.activeCampaigns")}</Link></li>
+              <li><Link href="/casos-urgentes" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.urgentCases")}</Link></li>
+              <li><Link href="/como-ayudar" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.howToHelp")}</Link></li>
               <li><Link href="/noticias" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.newsBlog")}</Link></li>
-              <li><Link href="/contacto" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.volunteer")}</Link></li>
             </ul>
-          </div>
+          </nav>
 
-          <div>
-            <h3 className="font-display font-bold text-lg mb-6">{t("footer.contactTitle")}</h3>
-            <ul className="space-y-4">
-              <li className="flex items-start gap-3 text-muted-foreground">
-                <MapPin className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-                <span>{t("footer.address")}<br/>{t("footer.country")}</span>
-              </li>
-              <li className="flex items-center gap-3 text-muted-foreground">
-                <Phone className="w-5 h-5 text-primary shrink-0" />
-                <span>+51 921 615 737</span>
-              </li>
-              <li className="flex items-center gap-3 text-muted-foreground">
-                <Mail className="w-5 h-5 text-primary shrink-0" />
-                <span>contacto@redsolidariasanramon.org</span>
-              </li>
+          {/* Campañas / acciones */}
+          <nav className="lg:col-span-3" aria-label={t("nav.campaigns")}>
+            <h3 className="font-display font-bold text-base mb-4 text-foreground">
+              {t("nav.campaigns")}
+            </h3>
+            <ul className="space-y-2.5 text-sm">
+              <li><Link href="/campanas" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.activeCampaigns")}</Link></li>
+              <li><Link href="/adopciones" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.adoptions")}</Link></li>
+              <li><Link href="/voluntariado" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.volunteer")}</Link></li>
+              <li><Link href="/reportar" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.reportCase")}</Link></li>
             </ul>
-          </div>
+          </nav>
 
-          <div>
-            <h3 className="font-display font-bold text-lg mb-6">{t("footer.transparencyTitle")}</h3>
-            <p className="text-muted-foreground mb-4">
+          {/* Transparencia + contacto */}
+          <div className="lg:col-span-3">
+            <h3 className="font-display font-bold text-base mb-4 text-foreground">
+              {t("footer.transparencyTitle")}
+            </h3>
+            <p className="text-sm leading-relaxed text-muted-foreground mb-3">
               {t("footer.transparencyText")}
             </p>
-            <Link href="/transparencia">
-              <span className="text-primary font-medium hover:underline flex items-center gap-1">
-                {t("footer.seeReport")} <span aria-hidden="true">&rarr;</span>
-              </span>
+            <Link href="/transparencia" className="inline-block text-sm font-semibold text-primary hover:underline">
+              {t("footer.seeReport")} →
             </Link>
-          </div>
 
+            <ul className="mt-5 space-y-2.5 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2.5">
+                <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <span>
+                  {t("footer.address")} · {t("footer.country")}
+                </span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Phone className="w-4 h-4 text-primary shrink-0" />
+                <a href="tel:+51921615737" className="hover:text-primary transition-colors">+51 921 615 737</a>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Mail className="w-4 h-4 text-primary shrink-0" />
+                <a href="mailto:contacto@redsolidariasanramon.org" className="hover:text-primary transition-colors">
+                  contacto@redsolidariasanramon.org
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
 
-        <div className="pt-8 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} {t("footer.brand")} {t("footer.address")}. {t("footer.rights")}
+        {/* Barra inferior */}
+        <div className="pt-6 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-3">
+          <p className="text-xs text-muted-foreground">
+            © {new Date().getFullYear()} {t("footer.brand")} · {t("footer.address")}. {t("footer.rights")}
           </p>
-          <div className="flex gap-4 text-sm text-muted-foreground">
+          <div className="flex gap-4 text-xs text-muted-foreground">
+            <Link href="/contacto" className="hover:text-primary transition-colors">{t("nav.contact")}</Link>
             <Link href="/admin/login" className="hover:text-primary transition-colors">{t("footer.adminPortal")}</Link>
           </div>
         </div>
