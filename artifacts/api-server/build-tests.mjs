@@ -25,6 +25,7 @@ await build({
     "./src/lib/amount-format.ts",
     "./src/lib/donation-validation.ts",
     "./src/lib/totp.ts",
+    "./src/lib/two-factor-lockout.ts",
     "./src/lib/ledger.ts",
     "./src/routes/stats.ts",
     "./src/routes/sitemap.ts",
@@ -44,6 +45,20 @@ await build({
     // pino (via logger de auth-utils) usa workers para logging; el plugin
     // copia los workers (thread-stream) junto a los outputs del bundle.
     esbuildPluginPino({ transports: ["pino-pretty"] }),
+    // El lockout 2FA se mantiene como módulo compartido (no inline) dentro del
+    // bundle de admin-2fa: así la ruta y los tests usan la misma instancia del
+    // store en memoria y el test HTTP del 429 puede sembrar el bloqueo.
+    {
+      name: "external-two-factor-lockout",
+      setup(build) {
+        build.onResolve({ filter: /two-factor-lockout$/ }, (args) => {
+          if (args.importer && /\/routes\/admin-2fa\.ts$/.test(args.importer)) {
+            return { path: "../lib/two-factor-lockout.mjs", external: true };
+          }
+          return undefined;
+        });
+      },
+    },
   ],
   // Mismo banner que build.mjs: permite que los require dinámicos de paquetes
   // CJS (p.ej. express) funcionen en el bundle ESM via createRequire.

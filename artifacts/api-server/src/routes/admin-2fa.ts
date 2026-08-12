@@ -6,6 +6,12 @@ import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter, loginLimiter } from "../middleware/rate-limit";
 import { logAuditAction } from "../middleware/auth-utils";
 import { buildOtpauthUri, generateSecret, verifyTOTP } from "../lib/totp";
+import {
+  clearFailedAttempts,
+  getLockoutRemainingMs,
+  MAX_2FA_ATTEMPTS,
+  registerFailedAttempt,
+} from "../lib/two-factor-lockout";
 
 const router: IRouter = Router();
 
@@ -36,6 +42,19 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
   }
   const { userId, code } = parsed.data;
 
+  // Bloqueo anti fuerza bruta: el check va ANTES de tocar la DB (el body trae
+  // userId). El contador solo se incrementa con usuarios reales verificados en
+  // DB, así un atacante no puede ensuciar el store con userIds inexistentes.
+  const lockoutMs = getLockoutRemainingMs(userId);
+  if (lockoutMs > 0) {
+    req.log?.warn({ userId }, "2FA login blocked: account temporarily locked");
+    return res.status(429).json({
+      error: "too_many_attempts",
+      message: `Demasiados intentos fallidos de 2FA. Intenta de nuevo en ${Math.max(1, Math.ceil(lockoutMs / 60000))} minuto(s).`,
+      retryAfterSeconds: Math.ceil(lockoutMs / 1000),
+    });
+  }
+
   try {
     const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, userId));
     if (!user || !user.active || !user.twoFactorEnabled || !user.twoFactorSecret) {
@@ -52,9 +71,32 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
         userAgent: uaOf(req),
         details: { reason: "invalid_totp" },
       });
+
+      const { locked, remainingMs } = registerFailedAttempt(user.id);
+      if (locked) {
+        await logAuditAction({
+          userId: user.id,
+          username: user.username,
+          action: "LOGIN_2FA_LOCKED",
+          resource: "admin_users",
+          ipAddress: ipOf(req),
+          userAgent: uaOf(req),
+          details: {
+            reason: "too_many_failed_attempts",
+            maxAttempts: MAX_2FA_ATTEMPTS,
+            lockoutMinutes: Math.ceil(remainingMs / 60000),
+          },
+        });
+        return res.status(429).json({
+          error: "too_many_attempts",
+          message: `Demasiados intentos fallidos de 2FA. Intenta de nuevo en ${Math.max(1, Math.ceil(remainingMs / 60000))} minuto(s).`,
+          retryAfterSeconds: Math.ceil(remainingMs / 1000),
+        });
+      }
       return res.status(401).json({ error: "unauthorized", message: "Código incorrecto" });
     }
 
+    clearFailedAttempts(user.id);
     await db.update(adminUsersTable).set({ lastLoginAt: new Date() }).where(eq(adminUsersTable.id, user.id));
 
     (req.session as any).adminUser = {
@@ -194,6 +236,9 @@ router.post("/admin/2fa/disable", requireAdmin, adminActionLimiter, async (req, 
 
     await db.update(adminUsersTable).set({ twoFactorSecret: null, twoFactorEnabled: false }).where(eq(adminUsersTable.id, user.id));
 
+    // Al desactivar 2FA con código válido se reinicia el contador de lockout.
+    clearFailedAttempts(user.id);
+
     await logAuditAction({
       userId: user.id,
       username: user.username,
@@ -225,6 +270,9 @@ router.post("/admin/users/:id/2fa/reset", requireAdmin, adminActionLimiter, asyn
       .where(eq(adminUsersTable.id, userId))
       .returning({ id: adminUsersTable.id, username: adminUsersTable.username });
     if (!updated) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
+
+    // El escape hatch también desbloquea la cuenta (limpieza del lockout).
+    clearFailedAttempts(userId);
 
     await logAuditAction({
       userId: admin?.id ?? null,

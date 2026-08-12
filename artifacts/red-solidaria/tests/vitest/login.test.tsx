@@ -75,7 +75,35 @@ describe("AdminLogin (login + 2FA)", () => {
     await user.click(screen.getByRole("button", { name: /verificar código/i }));
 
     expect(
-      await screen.findByText("Código de verificación incorrecto o expirado"),
+      await screen.findByText("Código incorrecto"),
+    ).toBeInTheDocument();
+  });
+
+  it("muestra el mensaje del servidor cuando la cuenta está bloqueada (429)", async () => {
+    const user = userEvent.setup();
+    loginMutateMock.mockImplementation((_args: unknown, opts?: { onSuccess?: (d: unknown) => void }) => {
+      opts?.onSuccess?.({ success: false, twoFactorRequired: true, userId: 5 });
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        json: async () => ({ message: "Demasiados intentos fallidos de 2FA. Intenta de nuevo en 15 minuto(s)." }),
+      }),
+    );
+
+    renderWithProviders(<AdminLogin />);
+    await user.type(screen.getByLabelText("Usuario"), "admin");
+    await user.type(screen.getByLabelText("Contraseña"), "secreto");
+    await user.click(screen.getByRole("button", { name: /iniciar sesión/i }));
+
+    const code = await screen.findByLabelText("Código de verificación");
+    await user.type(code, "123456");
+    await user.click(screen.getByRole("button", { name: /verificar código/i }));
+
+    expect(
+      await screen.findByText(/Demasiados intentos fallidos de 2FA/),
     ).toBeInTheDocument();
   });
 });

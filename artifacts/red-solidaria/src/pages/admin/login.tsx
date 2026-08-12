@@ -82,11 +82,23 @@ export default function AdminLogin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: pendingUserId, code: parsed.data.code }),
       });
-      if (!res.ok) throw new Error("Código incorrecto");
+      if (!res.ok) {
+        // 429 → la cuenta está temporalmente bloqueada por intentos fallidos;
+        // el mensaje del servidor es más útil que el error genérico.
+        if (res.status === 429) {
+          const body = await res.json().catch(() => null);
+          throw new Error(body?.message ?? "Demasiados intentos fallidos de 2FA");
+        }
+        throw new Error("Código incorrecto");
+      }
       toast({ title: "Acceso concedido" });
       setLocation("/admin/campanas");
-    } catch {
-      toast({ title: "Error", description: "Código de verificación incorrecto o expirado", variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Código de verificación incorrecto o expirado",
+        variant: "destructive",
+      });
     } finally {
       setVerifying(false);
     }

@@ -8,6 +8,11 @@ process.env.DATABASE_URL ??= "postgres://localhost:5432/nonexistent";
 
 const { default: twoFactorRouter } = await import("./dist/routes/admin-2fa.mjs");
 
+// Módulo de lockout compartido con el bundle de la ruta (ver build-tests.mjs):
+// la ruta lo importa como externo, así este import y la ruta usan la misma
+// instancia del store en memoria y el test HTTP puede sembrar el bloqueo.
+const lockout = await import("./dist/lib/two-factor-lockout.mjs");
+
 function buildApp() {
   const app = express();
   app.use(express.json());
@@ -109,5 +114,34 @@ test("POST /admin/users/1/2fa/reset con sesión admin → no 401 (rol se evalúa
     // Con sesión superadmin el handler intenta la DB (500) o responde 200;
     // sin sesión o sin rol daría 401/403 — ninguno de los dos debe ocurrir aquí.
     assert.notEqual(res.status, 401);
+  });
+});
+
+test("POST /admin/2fa/login con cuenta bloqueada → 429 (antes de tocar la DB)", async () => {
+  lockout.resetLockoutStore();
+  try {
+    for (let i = 0; i < lockout.MAX_2FA_ATTEMPTS; i++) lockout.registerFailedAttempt(99);
+    const app = buildApp();
+    await withServer(app, async (base) => {
+      const res = await post(base, "/api/admin/2fa/login", { userId: 99, code: "123456" });
+      assert.equal(res.status, 429);
+      const body = await res.json();
+      assert.equal(body.error, "too_many_attempts");
+      assert.ok(body.retryAfterSeconds > 0);
+      assert.match(body.message, /minuto/);
+    });
+  } finally {
+    lockout.resetLockoutStore();
+  }
+});
+
+test("POST /admin/2fa/login con cuenta sin bloqueo → nunca 429", async () => {
+  lockout.resetLockoutStore();
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await post(base, "/api/admin/2fa/login", { userId: 1, code: "123456" });
+    // Sin DB el flujo cae en el catch (500); el punto es que el pre-check
+    // no bloquea a cuentas limpias.
+    assert.notEqual(res.status, 429);
   });
 });
