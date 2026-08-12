@@ -9,6 +9,7 @@ import {
   MapPin, Clock, Filter, Plus, ArrowRight, Search
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { optimizeImageUrl } from "@/lib/image-url";
 
 interface CommunityReport {
   id: number;
@@ -188,7 +189,7 @@ export default function UrgentCases() {
                 {/* Photo or placeholder */}
                 <div className="aspect-[4/3] bg-secondary flex items-center justify-center overflow-hidden relative">
                   {photo ? (
-                    <img src={photo} alt={report.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img src={optimizeImageUrl(photo, { width: 640 })} alt={report.title} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
                     <div className={`w-full h-full flex flex-col items-center justify-center gap-3 ${typeConfig.color}`}>
                       <TypeIcon className="w-16 h-16 opacity-30" />

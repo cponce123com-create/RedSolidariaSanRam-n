@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { optimizeImageUrl } from "@/lib/image-url";
 import {
   Dog, Cat, Heart, ArrowLeft, MapPin, Syringe, Scissors, Shield,
   Phone, Mail, User, Home, Check, ChevronLeft, ChevronRight, Star,
@@ -166,7 +167,7 @@ export default function PetDetail() {
           <div className="aspect-[4/3] bg-secondary rounded-3xl overflow-hidden relative shadow-lg">
             {photos.length > 0 ? (
               <>
-                <img src={photos[photoIdx]} alt={pet.name} className="w-full h-full object-cover" />
+                <img src={optimizeImageUrl(photos[photoIdx], { width: 1200 })} alt={pet.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 {photos.length > 1 && (
                   <>
                     <button onClick={() => setPhotoIdx(i => (i - 1 + photos.length) % photos.length)}
@@ -204,7 +205,7 @@ export default function PetDetail() {
               {photos.map((photo, i) => (
                 <button key={i} onClick={() => setPhotoIdx(i)}
                   className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${i === photoIdx ? "border-primary" : "border-transparent"}`}>
-                  <img src={photo} alt="" className="w-full h-full object-cover" />
+                  <img src={optimizeImageUrl(photo, { width: 240 })} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>

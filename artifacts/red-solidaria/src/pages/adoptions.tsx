@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { optimizeImageUrl } from "@/lib/image-url";
 import { motion } from "framer-motion";
 import {
   Dog, Cat, Heart, Search, Filter, Plus, Star, Shield, Syringe,
@@ -37,7 +38,7 @@ const HEALTH_COLORS: Record<string, string> = {
   fair: "text-yellow-600", needs_care: "text-orange-600",
 };
 
-function PetCard({ pet }: { pet: Pet }) {
+const PetCard = memo(function PetCard({ pet }: { pet: Pet }) {
   const { t } = useTranslation();
   const photo = pet.photos?.[0];
   const SpeciesIcon = SPECIES_ICON[pet.species] || Dog;
@@ -49,7 +50,7 @@ function PetCard({ pet }: { pet: Pet }) {
     >
       <div className="aspect-[4/3] bg-secondary relative overflow-hidden">
         {photo ? (
-          <img src={photo} alt={pet.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <img src={optimizeImageUrl(photo, { width: 640 })} alt={pet.name} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-orange-50 to-amber-50">
             <SpeciesIcon className="w-20 h-20 text-amber-300" />
@@ -127,7 +128,7 @@ function PetCard({ pet }: { pet: Pet }) {
       </div>
     </motion.div>
   );
-}
+});
 
 const FILTER_GROUPS = [
   {

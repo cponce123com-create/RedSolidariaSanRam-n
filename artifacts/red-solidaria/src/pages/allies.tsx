@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { optimizeImageUrl } from "@/lib/image-url";
 import { motion } from "framer-motion";
 import {
   Building2, Star, Globe, ArrowRight, HandHeart, Users,
@@ -47,7 +48,7 @@ function AllyCard({ ally, featured = false }: { ally: Ally; featured?: boolean }
       {/* Logo */}
       <div className="w-20 h-20 rounded-2xl bg-secondary flex items-center justify-center overflow-hidden mx-auto">
         {ally.logo ? (
-          <img src={ally.logo} alt={ally.name} className="w-full h-full object-contain p-2" />
+          <img src={optimizeImageUrl(ally.logo, { width: 200 })} alt={ally.name} loading="lazy" decoding="async" className="w-full h-full object-contain p-2" />
         ) : (
           <Building2 className="w-10 h-10 text-muted-foreground opacity-30" />
         )}

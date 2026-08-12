@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Campaign } from "@workspace/api-client-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,12 +8,13 @@ import { Link } from "wouter";
 import { Flame } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { isUrgent, daysUntilEnd } from "@/lib/campaign-urgency";
+import { optimizeImageUrl } from "@/lib/image-url";
 
 interface CampaignCardProps {
   campaign: Campaign;
 }
 
-export function CampaignCard({ campaign }: CampaignCardProps) {
+const CampaignCard = memo(function CampaignCard({ campaign }: CampaignCardProps) {
   const { t } = useTranslation();
   const progress = campaign.goal > 0 ? Math.min(100, Math.round((campaign.raised / campaign.goal) * 100)) : 0;
   // Fase 3 (modo emergencia): badge "Cierra en Xd" en tarjetas por cerrar
@@ -24,7 +26,7 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
       <div className="relative h-48 sm:h-56 overflow-hidden">
         {/* Unsplash placeholder logic based on category if image is missing */}
         <img 
-          src={campaign.imageUrl || `https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800&q=80`} 
+          src={optimizeImageUrl(campaign.imageUrl, { width: 800 }) || `https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=800&q=80`} 
           alt={campaign.title}
           loading="lazy"
           decoding="async"
@@ -82,4 +84,6 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
       </div>
     </Card>
   );
-}
+});
+
+export { CampaignCard };

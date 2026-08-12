@@ -123,13 +123,49 @@ export default defineConfig(async ({ mode }) => ({
     // completo (~7 MB de .map servidos públicamente en /assets/*.map) y
     // duplican el peso del deploy. Los .map en dev permiten debuggear.
     sourcemap: mode === "development",
-    // NO usar manualChunks personalizado: partir react/react-dom/react-query en
-    // chunks separados crea imports circulares entre chunks y los consumidores
-    // CJS (p.ej. @tanstack/react-query → use-sync-external-store/shim) llaman a
-    // React en el top-level del chunk ANTES de que el chunk de React termine de
-    // inicializarse → "Cannot read properties of undefined (reading 'exports')"
-    // → página en blanco en producción. Vite ya separa las rutas lazy solas.
+    // Split de vendor. Históricamente, partir react/react-dom en chunks
+    // separados de sus consumidores CJS (p.ej. @tanstack/react-query →
+    // use-sync-external-store/shim) creaba imports circulares entre chunks y
+    // los consumidores llamaban a React en el top-level ANTES de que el chunk
+    // de React inicializara → página en blanco en producción.
+    // El split SEGURO agrupa react + react-dom + scheduler + react-redux +
+    // react-is + hoist-non-react-statics + use-sync-external-store +
+    // @tanstack/react-query en UN solo chunk (vendor-react): todos los
+    // consumidores CJS de React comparten chunk con React, sin llamadas
+    // top-level entre chunks distintos y sin ciclos (verificado en build).
+    // framer-motion/lucide-react (ESM puro) van a vendor-ui. El resto de
+    // node_modules queda en el entry (como el build original): un bucket
+    // catch-all "vendor" crea ciclos vendor ↔ vendor-react y arrastra
+    // dependencias lazy (recharts/leaflet) a la carga inicial (+40% bytes).
     chunkSizeWarningLimit: 500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/scheduler/") ||
+            id.includes("/react-redux/") ||
+            id.includes("/use-sync-external-store/") ||
+            id.includes("/@tanstack/react-query/") ||
+            id.includes("/react-is/") ||
+            id.includes("/hoist-non-react-statics/")
+          ) {
+            return "vendor-react";
+          }
+          if (
+            id.includes("/framer-motion/") ||
+            id.includes("/motion-dom/") ||
+            id.includes("/motion-utils/") ||
+            id.includes("/lucide-react/")
+          ) {
+            return "vendor-ui";
+          }
+          return undefined;
+        },
+      },
+    },
   },
   server: {
     port,

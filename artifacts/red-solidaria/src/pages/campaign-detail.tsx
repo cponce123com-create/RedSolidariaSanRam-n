@@ -14,6 +14,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Heart, Share2, Calendar, Target, Users, Landmark, Clock, ImageIcon, Copy, Shield, ArrowRight, Eye, QrCode } from "lucide-react";
 import { format } from "date-fns";
 import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
+import { optimizeImageUrl } from "@/lib/image-url";
 import { useTranslation } from "react-i18next";
 import { DonationModal } from "@/components/shared/DonationModal";
 import { useToast } from "@/hooks/use-toast";
@@ -102,7 +103,7 @@ export default function CampaignDetail() {
         <DialogContent className="max-w-4xl bg-transparent border-none shadow-none p-0 overflow-hidden group">
           {selectedImage && (
             <div className="relative rounded-2xl overflow-hidden bg-black/90">
-              <img src={selectedImage.url} alt={t("campaignDetail.galleryViewAlt")} className="w-full max-h-[80vh] object-contain" />
+              <img src={optimizeImageUrl(selectedImage.url, { width: 1400 })} alt={t("campaignDetail.galleryViewAlt")} className="w-full max-h-[80vh] object-contain" />
               {selectedImage.caption && (
                 <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white p-4 text-center backdrop-blur-sm">
                   {selectedImage.caption}
@@ -117,7 +118,7 @@ export default function CampaignDetail() {
       <div className="w-full h-[40vh] md:h-[55vh] relative">
         {/* Landing page hero scenic mountain landscape */}
         <img 
-          src={campaign.imageUrl || `https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1600&q=80`} 
+          src={optimizeImageUrl(campaign.imageUrl, { width: 1600 }) || `https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1600&q=80`} 
           alt={campaign.title}
           className="w-full h-full object-cover"
         />
@@ -175,7 +176,7 @@ export default function CampaignDetail() {
                         className="aspect-square rounded-2xl overflow-hidden cursor-pointer group relative border border-border shadow-sm"
                         onClick={() => setSelectedImage({ url: img.imageUrl, caption: img.caption || undefined })}
                       >
-                        <img src={img.imageUrl} alt={img.caption || t("campaignDetail.galleryImageAlt")} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <img src={optimizeImageUrl(img.imageUrl, { width: 800 })} alt={img.caption || t("campaignDetail.galleryImageAlt")} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                       </div>
                     ))}
@@ -443,7 +444,7 @@ export default function CampaignDetail() {
           <Dialog open={!!selectedProof} onOpenChange={() => setSelectedProof(null)}>
             <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black/95 border-none shadow-2xl rounded-3xl">
               {selectedProof && (
-                <img src={selectedProof} alt={t("campaignDetail.receiptAlt")} className="w-full max-h-[80vh] object-contain" />
+                <img src={optimizeImageUrl(selectedProof, { width: 1400 })} alt={t("campaignDetail.receiptAlt")} className="w-full max-h-[80vh] object-contain" />
               )}
             </DialogContent>
           </Dialog>

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
+import { optimizeImageUrl } from "@/lib/image-url";
 
 /** Donante público de una campaña (GET /campaigns/:id/donors). */
 interface PublicDonor {
@@ -111,7 +112,7 @@ export default function CampaignTransparency() {
               </div>
               <div className="flex-1 flex items-center justify-center overflow-hidden min-h-[300px] p-0 md:p-8">
                 {selectedEvidence.mediaType === 'image' ? (
-                  <img src={selectedEvidence.mediaUrl} alt={selectedEvidence.title} className="max-w-full max-h-[60vh] object-contain rounded-xl" />
+                  <img src={optimizeImageUrl(selectedEvidence.mediaUrl, { width: 1400 })} alt={selectedEvidence.title} className="max-w-full max-h-[60vh] object-contain rounded-xl" />
                 ) : (
                   <div className="flex flex-col items-center p-12 bg-card/10 rounded-2xl">
                     <FileText className="w-20 h-20 mb-4 opacity-80" />
@@ -471,7 +472,7 @@ export default function CampaignTransparency() {
                   <div className="aspect-[4/3] relative overflow-hidden bg-secondary flex items-center justify-center">
                     {ev.mediaType === 'image' ? (
                       <>
-                        <img src={ev.mediaUrl} alt={ev.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                        <img src={optimizeImageUrl(ev.mediaUrl, { width: 800 })} alt={ev.title} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                           <Eye className="text-white opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 drop-shadow-md" />
                         </div>

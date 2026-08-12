@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, campaignEvidenceTable, insertCampaignEvidenceSchema } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
@@ -11,23 +11,51 @@ import { adminActionLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
+// Público: SOLO evidencias publicadas (is_public=true). El filtro va en SQL
+// para que las filas privadas NUNCA salgan por este endpoint anónimo (antes
+// devolvía TODAS las filas salvo ?publicOnly=true, exponiendo datos internos
+// con caché pública). El panel admin usa GET /admin/campaigns/:id/evidence.
 router.get("/campaigns/:id/evidence", async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
-    const { publicOnly } = req.query;
-    let evidence = await db
+    const evidence = await db
       .select()
       .from(campaignEvidenceTable)
-      .where(eq(campaignEvidenceTable.campaignId, campaignId));
-    if (publicOnly === "true") {
-      evidence = evidence.filter((e) => e.isPublic);
-    }
-    res.json(evidence.map(formatEvidence).reverse());
+      .where(
+        and(
+          eq(campaignEvidenceTable.campaignId, campaignId),
+          eq(campaignEvidenceTable.isPublic, true),
+        ),
+      )
+      .orderBy(desc(campaignEvidenceTable.createdAt));
+    res.json(evidence.map(formatEvidence));
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign evidence");
     res.status(500).json({ error: "server_error", message: "Failed to get evidence" });
   }
 });
+
+// Admin: TODAS las evidencias (públicas y privadas) para gestión interna.
+// Protegido por el gate global /admin/* (index.ts) y por adminOnly.
+router.get(
+  "/admin/campaigns/:id/evidence",
+  ...adminOnly,
+  adminActionLimiter,
+  async (req, res) => {
+    try {
+      const campaignId = Number(req.params.id);
+      const evidence = await db
+        .select()
+        .from(campaignEvidenceTable)
+        .where(eq(campaignEvidenceTable.campaignId, campaignId))
+        .orderBy(desc(campaignEvidenceTable.createdAt));
+      res.json(evidence.map(formatEvidence));
+    } catch (err) {
+      req.log.error({ err }, "Failed to get campaign evidence (admin)");
+      res.status(500).json({ error: "server_error", message: "Failed to get evidence" });
+    }
+  },
+);
 
 router.post(
   "/campaigns/:id/evidence",
@@ -88,7 +116,7 @@ router.delete(
   },
 );
 
-function formatEvidence(e: typeof campaignEvidenceTable.$inferSelect) {
+export function formatEvidence(e: typeof campaignEvidenceTable.$inferSelect) {
   return {
     id: e.id,
     campaignId: e.campaignId,

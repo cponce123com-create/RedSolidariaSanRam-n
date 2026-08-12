@@ -1,147 +1,130 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  campaignsTable, donationsTable, campaignExpensesTable,
-  communityReportsTable, adoptionRequestsTable, volunteersTable,
-  contactMessagesTable, newsTable, petsTable
+  campaignsTable,
+  donationsTable,
+  campaignExpensesTable,
+  campaignEvidenceTable,
+  campaignMovementsTable,
 } from "@workspace/db";
-import { eq, gte, sql, desc, count, sum } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { toSafeAmount } from "../lib/amount-format";
+import { toIsoSafe } from "../lib/date-format";
+import { formatExpense } from "./campaign-expenses";
+import { formatEvidence } from "./campaign-evidence";
 
 const router = Router();
 
-router.get("/admin/dashboard", async (req, res) => {
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const sixMonthsAgo = new Date(now.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
+// GET /campaigns/:id/transparency — público.
+// Arma el panel de transparencia de una campaña en UN solo request: agregados
+// (recaudado, gastado, donantes) calculados en SQL con FILTER + las listas
+// públicas de gastos/evidencias + últimos movimientos del ledger.
+// Antes este archivo era una copia byte-idéntica de dashboard.ts (solo definía
+// GET /admin/dashboard), por lo que este endpoint NO existía y la página
+// pública de transparencia recibía 404 (y /admin/dashboard quedaba duplicado).
+router.get("/campaigns/:id/transparency", async (req, res) => {
+  try {
+    const campaignId = Number(req.params.id);
+    const [campaign] = await db
+      .select()
+      .from(campaignsTable)
+      .where(eq(campaignsTable.id, campaignId));
+    if (!campaign) {
+      return res.status(404).json({ error: "not_found", message: "Campaign not found" });
+    }
 
-  const [
-    campaignStats,
-    donationStats,
-    expenseStats,
-    petStats,
-    pendingReports,
-    pendingAdoptions,
-    recentVolunteers,
-    recentMessages,
-    recentDonations,
-    monthlyDonations,
-    topCampaigns,
-    expensesByCategory,
-    pendingVolunteers,
-    recentNews,
-  ] = await Promise.all([
-    // Agregaciones en SQL (no full-table-scans en Node): COUNT/SUM con FILTER
-    // evitan traer todo el histórico de donaciones/gastos a memoria.
-    db.execute(sql`
-      SELECT
-        COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE status = 'active')::int AS active,
-        COUNT(*) FILTER (WHERE status IN ('completed', 'inactive'))::int AS completed
-      FROM campaigns
-    `),
-    db.execute(sql`
-      SELECT COALESCE(SUM(amount), 0)::float8 AS total_raised
-      FROM donations
-      WHERE status = 'approved'
-    `),
-    db.execute(sql`SELECT COALESCE(SUM(amount), 0)::float8 AS total_spent FROM campaign_expenses`),
-    db.execute(sql`SELECT COUNT(*) FILTER (WHERE status = 'available')::int AS available FROM pets`),
-    db.select({ count: count() }).from(communityReportsTable).where(eq(communityReportsTable.status, "pending")),
-    db.select({ count: count() }).from(adoptionRequestsTable).where(eq(adoptionRequestsTable.status, "pending")),
-    db.select().from(volunteersTable).where(gte(volunteersTable.createdAt, thirtyDaysAgo)).orderBy(desc(volunteersTable.createdAt)).limit(5),
-    db.select().from(contactMessagesTable).orderBy(desc(contactMessagesTable.createdAt)).limit(5),
-    db.select().from(donationsTable).orderBy(desc(donationsTable.createdAt)).limit(8),
-    db.execute(sql`
-      SELECT
-        TO_CHAR(created_at, 'YYYY-MM') AS month,
-        SUM(amount)::float8 AS total,
-        COUNT(*)::int AS count
-      FROM donations
-      WHERE created_at >= ${sixMonthsAgo.toISOString()}
-      GROUP BY TO_CHAR(created_at, 'YYYY-MM')
-      ORDER BY month ASC
-    `),
-    db.select().from(campaignsTable).orderBy(desc(campaignsTable.raised)).limit(5),
-    db.execute(sql`
-      SELECT category, SUM(amount)::float8 AS total, COUNT(*)::int AS count
-      FROM campaign_expenses
-      GROUP BY category
-      ORDER BY total DESC
-    `),
-    db.select({ count: count() }).from(volunteersTable).where(eq(volunteersTable.status, "pending")),
-    db.select().from(newsTable).orderBy(desc(newsTable.createdAt)).limit(5),
-  ]);
+    const [donationStats, expenseStats, evidenceStats, publicExpenses, publicEvidence, recentMovements] =
+      await Promise.all([
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(amount) FILTER (WHERE status = 'approved'), 0)::float8 AS total_raised,
+            COUNT(*) FILTER (WHERE status = 'approved')::int AS donor_count
+          FROM donations
+          WHERE campaign_id = ${campaignId}
+        `),
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(amount), 0)::float8 AS total_spent,
+            COALESCE(SUM(amount) FILTER (WHERE is_public), 0)::float8 AS public_spent,
+            COUNT(*)::int AS expense_count,
+            COUNT(*) FILTER (WHERE is_public)::int AS public_expense_count
+          FROM campaign_expenses
+          WHERE campaign_id = ${campaignId}
+        `),
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int AS evidence_count,
+            COUNT(*) FILTER (WHERE is_public)::int AS public_evidence_count
+          FROM campaign_evidence
+          WHERE campaign_id = ${campaignId}
+        `),
+        db
+          .select()
+          .from(campaignExpensesTable)
+          .where(
+            and(
+              eq(campaignExpensesTable.campaignId, campaignId),
+              eq(campaignExpensesTable.isPublic, true),
+            ),
+          )
+          .orderBy(desc(campaignExpensesTable.createdAt)),
+        db
+          .select()
+          .from(campaignEvidenceTable)
+          .where(
+            and(
+              eq(campaignEvidenceTable.campaignId, campaignId),
+              eq(campaignEvidenceTable.isPublic, true),
+            ),
+          )
+          .orderBy(desc(campaignEvidenceTable.createdAt)),
+        db
+          .select()
+          .from(campaignMovementsTable)
+          .where(eq(campaignMovementsTable.campaignId, campaignId))
+          .orderBy(desc(campaignMovementsTable.createdAt))
+          .limit(10),
+      ]);
 
-  // SUM sobre numeric devuelve string desde pg; Number() normaliza.
-  const [campaignRow] = campaignStats.rows as [{ total: number; active: number; completed: number }?];
-  const [donationRow] = donationStats.rows as [{ total_raised: number }?];
-  const [expenseRow] = expenseStats.rows as [{ total_spent: number }?];
-  const [petRow] = petStats.rows as [{ available: number }?];
-  const totalRaised = Number(donationRow?.total_raised ?? 0);
-  const totalSpent = Number(expenseRow?.total_spent ?? 0);
+    const [donationRow] = donationStats.rows as [{ total_raised: number; donor_count: number }?];
+    const [expenseRow] = expenseStats.rows as [
+      { total_spent: number; public_spent: number; expense_count: number; public_expense_count: number }?,
+    ];
+    const [evidenceRow] = evidenceStats.rows as [{ evidence_count: number; public_evidence_count: number }?];
 
-  return res.json({
-    summary: {
-      totalCampaigns: campaignRow?.total ?? 0,
-      activeCampaigns: campaignRow?.active ?? 0,
-      completedCampaigns: campaignRow?.completed ?? 0,
+    const totalRaised = Number(donationRow?.total_raised ?? 0);
+    const totalSpent = Number(expenseRow?.total_spent ?? 0);
+    const publicSpent = Number(expenseRow?.public_spent ?? 0);
+    const goal = campaign.goal || 0;
+
+    return res.json({
+      campaignId: campaign.id,
+      title: campaign.title,
+      goal,
       totalRaised,
       totalSpent,
+      publicSpent,
       balance: totalRaised - totalSpent,
-      pendingReports: pendingReports[0]?.count ?? 0,
-      pendingAdoptions: pendingAdoptions[0]?.count ?? 0,
-      pendingVolunteers: pendingVolunteers[0]?.count ?? 0,
-      newVolunteersThisMonth: recentVolunteers.length,
-      availablePets: petRow?.available ?? 0,
-    },
-    charts: {
-      monthlyDonations: monthlyDonations.rows.map((r: any) => ({
-        month: r.month,
-        total: Number(r.total),
-        count: Number(r.count),
+      donorCount: donationRow?.donor_count ?? 0,
+      executionPercent: goal > 0 ? Math.min(100, Math.round((totalSpent / goal) * 100)) : 0,
+      raisedPercent: goal > 0 ? Math.min(100, Math.round((totalRaised / goal) * 100)) : 0,
+      expenseCount: expenseRow?.expense_count ?? 0,
+      publicExpenseCount: expenseRow?.public_expense_count ?? 0,
+      evidenceCount: evidenceRow?.evidence_count ?? 0,
+      publicEvidenceCount: evidenceRow?.public_evidence_count ?? 0,
+      publicExpenses: publicExpenses.map(formatExpense),
+      publicEvidence: publicEvidence.map(formatEvidence),
+      recentMovements: recentMovements.map((m) => ({
+        type: m.kind,
+        description: m.description,
+        amount: toSafeAmount(m.amount),
+        date: toIsoSafe(m.createdAt),
       })),
-      topCampaigns: topCampaigns.map(c => ({
-        title: c.title.length > 30 ? c.title.slice(0, 30) + "…" : c.title,
-        raised: c.raised,
-        goal: c.goal,
-        status: c.status,
-      })),
-      expensesByCategory: expensesByCategory.rows.map((r: any) => ({
-        category: r.category,
-        total: Number(r.total),
-        count: Number(r.count),
-      })),
-    },
-    recent: {
-      donations: recentDonations.map(d => ({
-        id: d.id,
-        name: d.anonymous ? "Anónimo" : `${d.firstName} ${d.lastName}`,
-        amount: toSafeAmount(d.amount),
-        method: d.paymentMethod,
-        status: d.status,
-        createdAt: d.createdAt,
-      })),
-      volunteers: recentVolunteers.map(v => ({
-        id: v.id,
-        name: v.name,
-        availability: v.availability,
-        status: v.status,
-        createdAt: v.createdAt,
-      })),
-      messages: recentMessages.map(m => ({
-        id: m.id,
-        name: m.name,
-        subject: m.subject,
-        createdAt: m.createdAt,
-      })),
-      news: recentNews.map(n => ({
-        id: n.id,
-        title: n.title,
-        createdAt: n.createdAt,
-      })),
-    },
-  });
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to get campaign transparency");
+    return res.status(500).json({ error: "server_error", message: "Failed to get transparency" });
+  }
 });
 
 export default router;

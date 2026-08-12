@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
+import { optimizeImageUrl } from "@/lib/image-url";
 import { useTranslation } from "react-i18next";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Newspaper } from "lucide-react";
@@ -38,8 +39,10 @@ export default function News() {
                   <Card className="h-full overflow-hidden hover-elevate border-border/50 group cursor-pointer flex flex-col">
                     <div className="h-48 overflow-hidden bg-muted">
                       <img 
-                        src={post.imageUrl || "https://images.unsplash.com/photo-1593113630400-ea4288922497?w=800&q=80"} 
+                        src={optimizeImageUrl(post.imageUrl, { width: 800 }) || "https://images.unsplash.com/photo-1593113630400-ea4288922497?w=800&q=80"} 
                         alt={post.title}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       />
                     </div>

@@ -7,6 +7,7 @@ import { useGetStats, useGetCampaigns } from "@workspace/api-client-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { CampaignCard } from "@/components/shared/CampaignCard";
+import { optimizeImageUrl } from "@/lib/image-url";
 import { Heart, Users, Gift, ShieldCheck, PawPrint, AlertTriangle, MapPin, ArrowRight, Baby, PersonStanding, Cat, Home as HomeIcon, Zap, Sparkles, Star, ChevronDown, HandHeart } from "lucide-react";
 
 // Contador animado para la franja de estadísticas
@@ -33,7 +34,7 @@ function HeroCard({ img, icon, title, subtitle, accent }: {
   return (
     <div className="flex items-center gap-3 bg-card/85 backdrop-blur-md rounded-2xl py-3 pl-3 pr-5 shadow-lg shadow-primary/10 border border-white/60">
       {img ? (
-        <img src={img} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" />
+        <img src={optimizeImageUrl(img, { width: 96 })} alt="" loading="lazy" className="w-12 h-12 rounded-xl object-cover shrink-0" />
       ) : (
         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">{icon}</div>
       )}
@@ -388,7 +389,7 @@ export default function Home() {
                   >
                     <div className="aspect-[4/3] bg-secondary relative overflow-hidden">
                       {photo ? (
-                        <img src={photo} alt={report.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <img src={optimizeImageUrl(photo, { width: 800 })} alt={report.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <TypeIcon className="w-16 h-16 text-muted-foreground opacity-20" />
@@ -472,7 +473,7 @@ export default function Home() {
       <section className="py-20 relative overflow-hidden">
         {/* bg smiling kids abstract unplash image */}
         <img 
-          src="https://images.unsplash.com/photo-1593113598332-cd288d649433?w=1600&q=80" 
+          src={optimizeImageUrl("https://images.unsplash.com/photo-1593113598332-cd288d649433?w=1600&q=80", { width: 800 })} 
           alt={t("home.transparencyImageAlt")} 
           loading="lazy"
           decoding="async"

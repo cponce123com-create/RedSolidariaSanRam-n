@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, campaignExpensesTable, insertCampaignExpenseSchema } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
 
@@ -12,23 +12,52 @@ import { appendMovement } from "../lib/ledger";
 
 const router: IRouter = Router();
 
+// Público: SOLO gastos publicados (is_public=true). El filtro va en SQL para
+// que las filas privadas (responsable, observaciones, comprobantes) NUNCA
+// salgan por este endpoint anónimo (antes devolvía TODAS salvo
+// ?publicOnly=true, con caché pública). El panel admin usa
+// GET /admin/campaigns/:id/expenses.
 router.get("/campaigns/:id/expenses", async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
-    const { publicOnly } = req.query;
-    let expenses = await db
+    const expenses = await db
       .select()
       .from(campaignExpensesTable)
-      .where(eq(campaignExpensesTable.campaignId, campaignId));
-    if (publicOnly === "true") {
-      expenses = expenses.filter((e) => e.isPublic);
-    }
-    res.json(expenses.map(formatExpense).reverse());
+      .where(
+        and(
+          eq(campaignExpensesTable.campaignId, campaignId),
+          eq(campaignExpensesTable.isPublic, true),
+        ),
+      )
+      .orderBy(desc(campaignExpensesTable.createdAt));
+    res.json(expenses.map(formatExpense));
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign expenses");
     res.status(500).json({ error: "server_error", message: "Failed to get expenses" });
   }
 });
+
+// Admin: TODOS los gastos (públicos y privados) para gestión interna.
+// Protegido por el gate global /admin/* (index.ts) y por adminOnly.
+router.get(
+  "/admin/campaigns/:id/expenses",
+  ...adminOnly,
+  adminActionLimiter,
+  async (req, res) => {
+    try {
+      const campaignId = Number(req.params.id);
+      const expenses = await db
+        .select()
+        .from(campaignExpensesTable)
+        .where(eq(campaignExpensesTable.campaignId, campaignId))
+        .orderBy(desc(campaignExpensesTable.createdAt));
+      res.json(expenses.map(formatExpense));
+    } catch (err) {
+      req.log.error({ err }, "Failed to get campaign expenses (admin)");
+      res.status(500).json({ error: "server_error", message: "Failed to get expenses" });
+    }
+  },
+);
 
 router.post(
   "/campaigns/:id/expenses",
@@ -105,7 +134,7 @@ router.delete(
   },
 );
 
-function formatExpense(e: typeof campaignExpensesTable.$inferSelect) {
+export function formatExpense(e: typeof campaignExpensesTable.$inferSelect) {
   return {
     id: e.id,
     campaignId: e.campaignId,

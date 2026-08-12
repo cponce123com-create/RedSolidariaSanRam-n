@@ -11,11 +11,11 @@ import {
   useDeleteCampaignUpdate
 } from "@workspace/api-client-react";
 import { 
-  useCampaignExpenses, 
+  useAdminCampaignExpenses, 
   useCreateExpense, 
   useUpdateExpense, 
   useDeleteExpense,
-  useCampaignEvidence,
+  useAdminCampaignEvidence,
   useCreateEvidence,
   useUpdateEvidence,
   useDeleteEvidence
@@ -104,8 +104,8 @@ export default function AdminCampaignDetail() {
   const { data: campaign, isLoading } = useGetCampaign(campaignId);
   const { data: images } = useGetCampaignImages(campaignId);
   const { data: updates } = useGetCampaignUpdates(campaignId);
-  const { data: expenses } = useCampaignExpenses(campaignId);
-  const { data: evidence } = useCampaignEvidence(campaignId);
+  const { data: expenses } = useAdminCampaignExpenses(campaignId);
+  const { data: evidence } = useAdminCampaignEvidence(campaignId);
 
   const updateCampaign = useUpdateCampaign();
   const addImage = useAddCampaignImage();
