@@ -155,31 +155,53 @@ router.get("/donations/stats", async (req, res) => {
 });
 
 // GET /donations — solo admin (contiene datos personales de donantes)
+// SQL crudo con db.execute (patrón probado en dashboard/stats): el mapeo de
+// filas de drizzle con leftJoin está roto en el bundle desplegado (todas las
+// columnas volvían undefined → panel admin con fechas "—", donante vacío y
+// montos S/ 0). pg devuelve los valores directos; el mapeo es manual y
+// determinista, con casts ::float8 para el monto.
 router.get("/donations", ...adminOnly, async (req, res) => {
   try {
     const { campaignId, status, limit: rawLimit, offset: rawOffset } = req.query;
     const limit = Math.min(Math.max(parseInt(rawLimit as string) || 100, 1), 500);
     const offset = Math.max(parseInt(rawOffset as string) || 0, 0);
 
-    const conditions = [];
-    if (campaignId) conditions.push(eq(donationsTable.campaignId, Number(campaignId)));
-    if (status && status !== "all") conditions.push(eq(donationsTable.status, status as string));
+    const whereParts: ReturnType<typeof sql>[] = [];
+    if (campaignId) whereParts.push(sql`d.campaign_id = ${Number(campaignId)}`);
+    if (status && status !== "all") whereParts.push(sql`d.status = ${status}`);
+    const whereClause = whereParts.length
+      ? sql`WHERE ${sql.join(whereParts, sql.raw(" AND "))}`
+      : sql``;
 
-    const rows = await db
-      .select({
-        donation: donationsTable,
-        campaignTitle: campaignsTable.title,
-      })
-      .from(donationsTable)
-      .leftJoin(campaignsTable, eq(donationsTable.campaignId, campaignsTable.id))
-      .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(donationsTable.createdAt))
-      .limit(limit)
-      .offset(offset);
+    const result = await db.execute(sql`
+      SELECT
+        d.id,
+        d.campaign_id,
+        d.first_name,
+        d.last_name,
+        d.email,
+        d.phone,
+        COALESCE(d.amount::float8, 0) AS amount,
+        d.payment_method,
+        d.message,
+        d.anonymous,
+        d.public_proof,
+        d.receipt_url,
+        d.receipt_note,
+        d.status,
+        d.admin_note,
+        d.created_at,
+        c.title AS campaign_title
+      FROM donations d
+      LEFT JOIN campaigns c ON c.id = d.campaign_id
+      ${whereClause}
+      ORDER BY d.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
 
     res.json(
-      rows.map(({ donation, campaignTitle }) =>
-        formatDonation(donation, campaignTitle),
+      (result.rows as Record<string, unknown>[]).map((r) =>
+        formatDonationRow(r),
       ),
     );
   } catch (err) {
@@ -299,22 +321,39 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
 });
 
 // GET /campaigns/:id/donations — solo admin (datos personales)
+// Mismo patrón SQL crudo que el listado general (mapeo de drizzle con
+// leftJoin roto en el bundle desplegado).
 router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
-    const rows = await db
-      .select({
-        donation: donationsTable,
-        campaignTitle: campaignsTable.title,
-      })
-      .from(donationsTable)
-      .leftJoin(campaignsTable, eq(donationsTable.campaignId, campaignsTable.id))
-      .where(eq(donationsTable.campaignId, campaignId))
-      .orderBy(desc(donationsTable.createdAt));
+    const result = await db.execute(sql`
+      SELECT
+        d.id,
+        d.campaign_id,
+        d.first_name,
+        d.last_name,
+        d.email,
+        d.phone,
+        COALESCE(d.amount::float8, 0) AS amount,
+        d.payment_method,
+        d.message,
+        d.anonymous,
+        d.public_proof,
+        d.receipt_url,
+        d.receipt_note,
+        d.status,
+        d.admin_note,
+        d.created_at,
+        c.title AS campaign_title
+      FROM donations d
+      LEFT JOIN campaigns c ON c.id = d.campaign_id
+      WHERE d.campaign_id = ${campaignId}
+      ORDER BY d.created_at DESC
+    `);
 
     res.json(
-      rows.map(({ donation, campaignTitle }) =>
-        formatDonation(donation, campaignTitle),
+      (result.rows as Record<string, unknown>[]).map((r) =>
+        formatDonationRow(r),
       ),
     );
   } catch (err) {
@@ -449,6 +488,41 @@ async function formatDonation(
     receiptNote: d.receiptNote,
     status: d.status,
     adminNote: d.adminNote,
+    createdAt,
+  };
+}
+
+/**
+ * Mapea una fila cruda de pg (SQL explícito, columnas snake_case) al contrato
+ * Donation. No depende del mapper de drizzle: el monto viene con cast
+ * ::float8 (number real) y la fecha como Date/string; toSafeAmount y el check
+ * de fecha cubren cualquier valor corrupto.
+ */
+function formatDonationRow(r: Record<string, unknown>) {
+  const createdAtRaw = r.created_at;
+  const createdAt =
+    createdAtRaw instanceof Date && !Number.isNaN(createdAtRaw.getTime())
+      ? createdAtRaw.toISOString()
+      : typeof createdAtRaw === "string" && !Number.isNaN(new Date(createdAtRaw).getTime())
+        ? new Date(createdAtRaw).toISOString()
+        : null;
+  return {
+    id: r.id,
+    campaignId: r.campaign_id ?? null,
+    campaignTitle: r.campaign_title ?? null,
+    firstName: r.first_name ?? "",
+    lastName: r.last_name ?? "",
+    email: r.email ?? "",
+    phone: r.phone ?? null,
+    amount: toSafeAmount(r.amount),
+    paymentMethod: r.payment_method ?? "",
+    message: r.message ?? null,
+    anonymous: r.anonymous ?? false,
+    publicProof: r.public_proof ?? false,
+    receiptUrl: r.receipt_url ?? null,
+    receiptNote: r.receipt_note ?? null,
+    status: r.status ?? "pending",
+    adminNote: r.admin_note ?? null,
     createdAt,
   };
 }
