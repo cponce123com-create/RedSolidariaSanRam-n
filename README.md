@@ -96,7 +96,7 @@ flowchart TD
 ## 📦 Stack
 
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS · shadcn/ui · Framer Motion · react-leaflet · react-i18next · TanStack Query · recharts
-- **Backend:** Node.js · Express 5 · TypeScript · Helmet · express-session · Drizzle ORM · Pino · bcryptjs · otplib
+- **Backend:** Node.js · Express 5 · TypeScript · Helmet · express-session · Drizzle ORM · Pino · bcryptjs · TOTP propio (RFC 6238, node:crypto)
 - **Datos:** PostgreSQL 16 · drizzle-kit · pool `pg` · ledger hash-chained (transparencia verificable)
 - **Monorepo:** pnpm workspaces · orval (clientes generados desde OpenAPI) · Vitest · node:test
 
@@ -145,15 +145,15 @@ ADMIN_PASSWORD=redsolidaria2024
 - **Build:** `pnpm install --frozen-lockfile && pnpm run build` (definido en `render.yaml`; el build command del dashboard de Render debe coincidir)
 - **Start:** `node artifacts/api-server/dist/index.mjs`
 - El API sirve el frontend compilado + gzip/brotli + caché de 1 año para assets con hash
-- **Migraciones:** se aplican automáticamente al boot de la API (`lib/db/src/migrate.ts`, embebidas 001-007); no se usa `drizzle-kit push` en el deploy (en CI falla por falta de TTY y su `--force` borraría tablas como `drizzle_migrations`/`session`)
+- **Migraciones:** se aplican automáticamente al boot de la API (`lib/db/src/migrate.ts`, embebidas 001-007, incluyen índices para campañas y donaciones); no se usa `drizzle-kit push` en el deploy (en CI falla por falta de TTY y su `--force` borraría tablas como `drizzle_migrations`/`session`)
 
 ## 🧪 Testing
 
 ```bash
-# API server (node:test) — 71 tests
+# API server (node:test) — 87 tests
 pnpm --filter @workspace/api-server test
 
-# Frontend (vitest + node:test) — incluye i18n, login/2FA, ledger, donación
+# Frontend (vitest + node:test) — 26 tests (15 Vitest + 11 node:test): i18n, login/2FA, ledger, donación
 pnpm --filter @workspace/red-solidaria test
 
 # Typecheck de todo el workspace
@@ -180,6 +180,7 @@ pnpm typecheck
 | ✅ | Hardening: fechas/montos defensivos, CSP, hooks seguros |
 | 🔄 | Analytics implementation |
 | 🔄 | Service Worker para offline |
+| 🔄 | Observabilidad (Sentry o similar) |
 
 ## 🤝 Contribuir
 
