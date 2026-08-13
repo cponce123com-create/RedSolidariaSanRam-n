@@ -33,8 +33,11 @@ describe("Ledger Trust Pay (campaign-transparency)", () => {
       publicExpenseCount: 1,
       evidenceCount: 0,
       publicEvidenceCount: 0,
+      leftoverCount: 0,
+      publicLeftoverCount: 0,
       publicExpenses: [],
       publicEvidence: [],
+      publicLeftovers: [],
       recentMovements: [],
     };
   });

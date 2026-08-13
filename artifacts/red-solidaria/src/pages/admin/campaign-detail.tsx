@@ -18,7 +18,11 @@ import {
   useAdminCampaignEvidence,
   useCreateEvidence,
   useUpdateEvidence,
-  useDeleteEvidence
+  useDeleteEvidence,
+  useAdminCampaignLeftovers,
+  useCreateLeftover,
+  useUpdateLeftover,
+  useDeleteLeftover
 } from "@/hooks/use-phase3";
 
 import { Button } from "@/components/ui/button";
@@ -36,7 +40,7 @@ import * as z from "zod";
 import { 
   ArrowLeft, Save, Trash2, Image as ImageIcon, MessageSquarePlus, 
   Pause, Play, CheckCircle, Receipt, Camera, Eye, EyeOff, ShieldAlert,
-  FileText
+  FileText, PackageOpen
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -94,18 +98,27 @@ const evidenceSchema = z.object({
   isPublic: z.boolean().default(true),
 });
 
+const leftoverSchema = z.object({
+  item: z.string().min(3, "Ítem requerido"),
+  quantity: z.coerce.number().min(0, "La cantidad no puede ser negativa").default(1),
+  unit: z.string().optional(),
+  notes: z.string().optional(),
+  isPublic: z.boolean().default(true),
+});
+
 export default function AdminCampaignDetail() {
   const { id } = useParams();
   const campaignId = Number(id);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"info"|"gallery"|"updates"|"gastos"|"evidencias">("info");
+  const [activeTab, setActiveTab] = useState<"info"|"gallery"|"updates"|"gastos"|"evidencias"|"sobrantes">("info");
 
   const { data: campaign, isLoading } = useGetCampaign(campaignId);
   const { data: images } = useGetCampaignImages(campaignId);
   const { data: updates } = useGetCampaignUpdates(campaignId);
   const { data: expenses } = useAdminCampaignExpenses(campaignId);
   const { data: evidence } = useAdminCampaignEvidence(campaignId);
+  const { data: leftovers } = useAdminCampaignLeftovers(campaignId);
 
   const updateCampaign = useUpdateCampaign();
   const addImage = useAddCampaignImage();
@@ -121,6 +134,10 @@ export default function AdminCampaignDetail() {
   const createEvidence = useCreateEvidence(campaignId);
   const updateEvidence = useUpdateEvidence(campaignId);
   const deleteEvidence = useDeleteEvidence(campaignId);
+
+  const createLeftover = useCreateLeftover(campaignId);
+  const updateLeftover = useUpdateLeftover(campaignId);
+  const deleteLeftover = useDeleteLeftover(campaignId);
 
   const infoForm = useForm<z.infer<typeof infoSchema>>({
     resolver: zodResolver(infoSchema),
@@ -150,6 +167,11 @@ export default function AdminCampaignDetail() {
       title: "", description: "", mediaUrl: "", mediaType: "image", evidenceType: "actividad", 
       date: new Date().toISOString().split('T')[0], isPublic: true
     }
+  });
+
+  const leftoverForm = useForm<z.infer<typeof leftoverSchema>>({
+    resolver: zodResolver(leftoverSchema),
+    defaultValues: { item: "", quantity: 1, unit: "", notes: "", isPublic: true }
   });
 
   useEffect(() => {
@@ -232,6 +254,15 @@ export default function AdminCampaignDetail() {
     });
   };
 
+  const onLeftoverSubmit = (values: z.infer<typeof leftoverSchema>) => {
+    createLeftover.mutate(values, {
+      onSuccess: () => {
+        toast({ title: "Sobrante registrado" });
+        leftoverForm.reset({ item: "", quantity: 1, unit: "", notes: "", isPublic: true });
+      }
+    });
+  };
+
   if (isLoading || !campaign) return <div className="p-8 flex justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>;
 
   return (
@@ -277,7 +308,7 @@ export default function AdminCampaignDetail() {
 
       {/* Tabs */}
       <div className="flex overflow-x-auto gap-1 mb-8 border-b border-border hide-scrollbar">
-        {(["info", "gallery", "updates", "gastos", "evidencias"] as const).map(tab => (
+        {(["info", "gallery", "updates", "gastos", "evidencias", "sobrantes"] as const).map(tab => (
           <button
             key={tab}
             className={`pb-3 px-4 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center gap-2 ${activeTab === tab ? 'border-primary text-primary bg-primary/5 rounded-t-lg' : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-t-lg'}`}
@@ -289,6 +320,7 @@ export default function AdminCampaignDetail() {
             {tab === "updates" && <><MessageSquarePlus className="w-4 h-4"/> Novedades</>}
             {tab === "gastos" && <><Receipt className="w-4 h-4"/> Gastos (F3)</>}
             {tab === "evidencias" && <><Camera className="w-4 h-4"/> Evidencias (F3)</>}
+            {tab === "sobrantes" && <><PackageOpen className="w-4 h-4"/> Sobrantes</>}
           </button>
         ))}
       </div>
@@ -724,6 +756,98 @@ export default function AdminCampaignDetail() {
               <div className="col-span-full bg-card rounded-3xl border-2 border-dashed border-border p-12 text-center text-muted-foreground">
                 <Camera className="w-12 h-12 mx-auto mb-3 opacity-20" />
                 <p>No hay evidencias registradas.</p>
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+
+      {/* TAB: SOBRANTES */}
+      {activeTab === "sobrantes" && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm">
+            <h3 className="font-display font-bold text-xl mb-6">Registrar Sobrante</h3>
+            <Form {...leftoverForm}>
+              <form onSubmit={leftoverForm.handleSubmit(onLeftoverSubmit)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="md:col-span-6">
+                    <FormField control={leftoverForm.control} name="item" render={({ field }) => (
+                      <FormItem><FormLabel>Ítem sobrante</FormLabel><FormControl><Input placeholder="Ej. 2 cajas de panetón, S/ 50 en efectivo..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    )} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <FormField control={leftoverForm.control} name="quantity" render={({ field }) => (
+                      <FormItem><FormLabel>Cantidad</FormLabel><FormControl><Input type="number" step="any" min="0" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    )} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <FormField control={leftoverForm.control} name="unit" render={({ field }) => (
+                      <FormItem><FormLabel>Unidad</FormLabel><FormControl><Input placeholder="cajas, kg, S/..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    )} />
+                  </div>
+                </div>
+
+                <FormField control={leftoverForm.control} name="notes" render={({ field }) => (
+                  <FormItem><FormLabel>Destino / Notas</FormLabel><FormControl><Textarea placeholder="Ej. entregados a la comunidad, en custodia, donados..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                )} />
+
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-secondary/30 rounded-xl p-4 border border-border">
+                  <FormField control={leftoverForm.control} name="isPublic" render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 space-y-0">
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <div className="space-y-0.5"><FormLabel className="cursor-pointer">Sobrante Público</FormLabel><p className="text-xs text-muted-foreground">Visible para todos en el panel de transparencia</p></div>
+                    </FormItem>
+                  )} />
+                  <Button type="submit" disabled={createLeftover.isPending} className="rounded-xl px-8 shadow-md hover-elevate w-full md:w-auto">
+                    <Save className="w-4 h-4 mr-2" /> Guardar Sobrante
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </div>
+
+          <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden" data-testid="leftovers-table">
+            {leftovers && leftovers.length > 0 ? (
+              <Table>
+                <TableHeader className="bg-secondary/50">
+                  <TableRow>
+                    <TableHead>Cantidad</TableHead>
+                    <TableHead>Ítem</TableHead>
+                    <TableHead>Destino / Notas</TableHead>
+                    <TableHead className="text-center">Visibilidad</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leftovers.map(lo => (
+                    <TableRow key={lo.id}>
+                      <TableCell className="font-display font-bold text-primary whitespace-nowrap">
+                        {Number(lo.quantity).toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                        {lo.unit ? ` ${lo.unit}` : ""}
+                      </TableCell>
+                      <TableCell className="font-medium text-foreground">{lo.item}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{lo.notes || "-"}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2 text-xs">
+                          <Switch checked={lo.isPublic} onCheckedChange={(val) => updateLeftover.mutate({ id: lo.id, data: { isPublic: val }})} aria-label="Toggle visibility" />
+                          <span className="text-muted-foreground font-medium">{lo.isPublic ? 'Público' : 'Oculto'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm("¿Eliminar sobrante?")) deleteLeftover.mutate(lo.id) }}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="p-12 text-center text-muted-foreground">
+                <PackageOpen className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p>No hay sobrantes registrados. Cuando la campaña cierre, registra aquí los ítems o dinero que quedaron.</p>
               </div>
             )}
           </div>

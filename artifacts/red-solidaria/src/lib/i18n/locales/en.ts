@@ -220,7 +220,7 @@ export const en: TranslationSchema = {
     heroSubtitle:
       "We started by bringing smiles at Christmas. Today we are a network of volunteers committed to the well-being of children, families and animals in our community.",
     heroOurStory: "Our Story",
-    heroCardChristmasTitle: "Christmas Hot Chocolate",
+    heroCardChristmasTitle: "Chocofest 2025",
     heroCardChristmasSubtitle: "Goal at 141% · 500 kids",
     heroCardRaisedTitle: "S/ 2,818.5 raised",
     heroCardRaisedSubtitle: "this week, thank you!",
@@ -644,6 +644,13 @@ export const en: TranslationSchema = {
     evidenceEmptyTitle: "No evidence yet",
     evidenceEmptyDesc:
       "Impact photos and reports will appear here once the activities take place.",
+    leftoversTitle: "Leftovers",
+    leftoversSubtitle:
+      "Items or funds left after the event and their destination (delivered, donated or in custody).",
+    leftoversCount: "{{count}} leftovers",
+    leftoversEmptyTitle: "No leftovers registered",
+    leftoversEmptyDesc:
+      "When the campaign has leftovers (baskets, toys, groceries or funds), they will be published here with their quantity and destination.",
     donorsCount: "{{count}} donors",
     donorsEmptyTitle: "No public donors yet",
     donorsEmptyDesc:

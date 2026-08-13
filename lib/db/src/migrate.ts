@@ -108,6 +108,24 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_campaigns_location ON campaigns(latitude, longitude);
     `,
   },
+  {
+    name: "008_campaign_leftovers.sql",
+    sql: `
+      -- Sobrantes de campaña (ítems/dinero que quedaron tras el evento).
+      -- Se llenan desde el panel admin y se muestran en la transparencia.
+      CREATE TABLE IF NOT EXISTS campaign_leftovers (
+        id serial PRIMARY KEY,
+        campaign_id integer NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+        item text NOT NULL,
+        quantity real NOT NULL DEFAULT 1,
+        unit text,
+        notes text,
+        is_public boolean NOT NULL DEFAULT true,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_leftovers_campaign ON campaign_leftovers(campaign_id);
+    `,
+  },
 ];
 
 /**

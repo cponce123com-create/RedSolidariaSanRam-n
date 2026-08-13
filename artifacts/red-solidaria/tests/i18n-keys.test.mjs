@@ -69,6 +69,7 @@ test("i18n: sin cadenas vacías ni claves sin traducir en en", () => {
     "home.heroTitleWord2", // Solidaria (nombre propio)
     "home.heroTitleWord3", // San (nombre propio)
     "home.heroTitleWord4", // Ramón (nombre propio)
+    "home.heroCardChristmasTitle", // Chocofest 2025 (nombre propio de campaña)
     "home.campaignsLocation", // San Ramón · Chanchamayo (lugar propio)
     "nav.brand", // Red Solidaria (nombre propio)
     "nav.brandLocation", // San Ramón

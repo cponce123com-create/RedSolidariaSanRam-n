@@ -6,12 +6,14 @@ import {
   campaignExpensesTable,
   campaignEvidenceTable,
   campaignMovementsTable,
+  campaignLeftoversTable,
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { toSafeAmount } from "../lib/amount-format";
 import { toIsoSafe } from "../lib/date-format";
 import { formatExpense } from "./campaign-expenses";
 import { formatEvidence } from "./campaign-evidence";
+import { formatLeftover } from "./campaign-leftovers";
 
 const router = Router();
 
@@ -33,7 +35,7 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
 
-    const [donationStats, expenseStats, evidenceStats, publicExpenses, publicEvidence, recentMovements] =
+    const [donationStats, expenseStats, evidenceStats, publicExpenses, publicEvidence, recentMovements, leftoverStats, publicLeftovers] =
       await Promise.all([
         db.execute(sql`
           SELECT
@@ -84,6 +86,23 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
           .where(eq(campaignMovementsTable.campaignId, campaignId))
           .orderBy(desc(campaignMovementsTable.createdAt))
           .limit(10),
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int AS leftover_count,
+            COUNT(*) FILTER (WHERE is_public)::int AS public_leftover_count
+          FROM campaign_leftovers
+          WHERE campaign_id = ${campaignId}
+        `),
+        db
+          .select()
+          .from(campaignLeftoversTable)
+          .where(
+            and(
+              eq(campaignLeftoversTable.campaignId, campaignId),
+              eq(campaignLeftoversTable.isPublic, true),
+            ),
+          )
+          .orderBy(desc(campaignLeftoversTable.createdAt)),
       ]);
 
     const [donationRow] = donationStats.rows as [{ total_raised: number; donor_count: number }?];
@@ -91,6 +110,9 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       { total_spent: number; public_spent: number; expense_count: number; public_expense_count: number }?,
     ];
     const [evidenceRow] = evidenceStats.rows as [{ evidence_count: number; public_evidence_count: number }?];
+    const [leftoverRow] = leftoverStats.rows as [
+      { leftover_count: number; public_leftover_count: number }?,
+    ];
 
     const totalRaised = Number(donationRow?.total_raised ?? 0);
     const totalSpent = Number(expenseRow?.total_spent ?? 0);
@@ -112,8 +134,11 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       publicExpenseCount: expenseRow?.public_expense_count ?? 0,
       evidenceCount: evidenceRow?.evidence_count ?? 0,
       publicEvidenceCount: evidenceRow?.public_evidence_count ?? 0,
+      leftoverCount: leftoverRow?.leftover_count ?? 0,
+      publicLeftoverCount: leftoverRow?.public_leftover_count ?? 0,
       publicExpenses: publicExpenses.map(formatExpense),
       publicEvidence: publicEvidence.map(formatEvidence),
+      publicLeftovers: publicLeftovers.map(formatLeftover),
       recentMovements: recentMovements.map((m) => ({
         type: m.kind,
         description: m.description,

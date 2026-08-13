@@ -24,6 +24,14 @@ import {
   CHOCOLATADA_2024_IMAGES,
   CHOCOLATADA_2024_UPDATES,
 } from "./chocolatada-2024-data";
+import {
+  CHOCOLATADA_2025_CAMPAIGN,
+  CHOCOLATADA_2025_DONATIONS,
+  CHOCOLATADA_2025_EVIDENCE,
+  CHOCOLATADA_2025_EXPENSES,
+  CHOCOLATADA_2025_IMAGES,
+  CHOCOLATADA_2025_UPDATES,
+} from "./chocofest-2025-data";
 import { eq, isNull, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { hashPassword } from "../middleware/auth-utils";
@@ -39,6 +47,7 @@ const u = (id: string, w = 1200) =>
 
 const CAMPAIGN_IMAGES: Record<string, string> = {
   "Chocolatada Navideña 2024": u("photo-1512909006721-3d6018887383", 1600),
+  "Chocofest 2025": u("photo-1512909006721-3d6018887383", 1600),
   "Campaña Escolar 2025": u("photo-1503676260728-1c00da094a0b", 1600),
   "Rescate Animal San Ramón": u("photo-1548199973-03cce0bbc87b", 1600),
   "Techado para Familias": u("photo-1503387762-592deb58ef4e", 1600),
@@ -161,6 +170,7 @@ async function seedCampaigns() {
     logger.info("Seeding campaigns...");
     await db.insert(campaignsTable).values([
       CHOCOLATADA_2024_CAMPAIGN,
+      CHOCOLATADA_2025_CAMPAIGN,
       {
         title: "Campaña Escolar 2025",
         description: "Dotamos de útiles escolares y uniformes a familias de escasos recursos en comunidades rurales de Chanchamayo para que ningún niño deje de estudiar por falta de materiales.",
@@ -676,6 +686,7 @@ async function campaignIdByTitle(title: string): Promise<number | null> {
 
 async function seedCampaignMedia() {
   const chocolatada = await campaignIdByTitle("Chocolatada Navideña 2024");
+  const chocolatada2025 = await campaignIdByTitle("Chocofest 2025");
   const escolar = await campaignIdByTitle("Campaña Escolar 2025");
   const rescate = await campaignIdByTitle("Rescate Animal San Ramón");
 
@@ -699,6 +710,8 @@ async function seedCampaignMedia() {
       // donaciones, Google Sheets). La lista completa vive en
       // ./chocolatada-2024-data.ts (fuente única de verdad).
       ...CHOCOLATADA_2024_DONATIONS.map((d) => ({ ...d, campaignId: chocolatada })),
+      // Donaciones reales de Chocofest 2025. Fuente única: ./chocofest-2025-data.ts.
+      ...CHOCOLATADA_2025_DONATIONS.map((d) => ({ ...d, campaignId: chocolatada2025 })),
       { campaignId: escolar, firstName: "Pedro", lastName: "Alvarado", email: "pedro.alvarado@example.com", amount: 200, paymentMethod: "transfer", message: "Para que ningún niño deje el aula", anonymous: false, publicProof: true, status: "approved" },
       { campaignId: escolar, firstName: "Ana", lastName: "Torres", email: "ana.torres@example.com", amount: 80, paymentMethod: "yape", message: "Apoyando la educación rural", anonymous: false, publicProof: false, status: "approved" },
       { campaignId: escolar, firstName: "", lastName: "", email: "anonimo2@example.com", amount: 60, paymentMethod: "plin", message: null, anonymous: true, publicProof: false, status: "approved" },
@@ -716,6 +729,11 @@ async function seedCampaignMedia() {
     if (chocolatada) {
       updates.push(
         ...CHOCOLATADA_2024_UPDATES.map((u) => ({ campaignId: chocolatada, ...u })),
+      );
+    }
+    if (chocolatada2025) {
+      updates.push(
+        ...CHOCOLATADA_2025_UPDATES.map((u) => ({ campaignId: chocolatada2025, ...u })),
       );
     }
     if (escolar) {
@@ -739,6 +757,11 @@ async function seedCampaignMedia() {
     if (chocolatada) {
       images.push(
         ...CHOCOLATADA_2024_IMAGES.map((img) => ({ campaignId: chocolatada, ...img })),
+      );
+    }
+    if (chocolatada2025) {
+      images.push(
+        ...CHOCOLATADA_2025_IMAGES.map((img) => ({ campaignId: chocolatada2025, ...img })),
       );
     }
     if (rescate) {
@@ -773,6 +796,11 @@ async function seedCampaignMedia() {
         ...CHOCOLATADA_2024_EXPENSES.map((e) => ({ campaignId: chocolatada, ...e })),
       );
     }
+    if (chocolatada2025) {
+      expenses.push(
+        ...CHOCOLATADA_2025_EXPENSES.map((e) => ({ campaignId: chocolatada2025, ...e })),
+      );
+    }
     if (escolar) {
       expenses.push(
         { campaignId: escolar, description: "100 kits escolares (mochila + útiles)", category: "educación", amount: 1500, date: "2025-01-28", responsible: "Comisión Escolar", receiptUrl: RECEIPT_DEMO, isPublic: true },
@@ -804,6 +832,11 @@ async function seedCampaignMedia() {
     if (chocolatada) {
       evidence.push(
         ...CHOCOLATADA_2024_EVIDENCE.map((ev) => ({ campaignId: chocolatada, ...ev })),
+      );
+    }
+    if (chocolatada2025) {
+      evidence.push(
+        ...CHOCOLATADA_2025_EVIDENCE.map((ev) => ({ campaignId: chocolatada2025, ...ev })),
       );
     }
     if (escolar) {

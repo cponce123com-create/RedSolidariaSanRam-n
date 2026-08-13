@@ -24,7 +24,8 @@ import {
   Download,
   Calendar,
   Eye,
-  Users
+  Users,
+  PackageOpen
 } from "lucide-react";
 import { format } from "date-fns";
 import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
@@ -94,6 +95,10 @@ export default function CampaignTransparency() {
 
   const formatCurrency = (val: number | string | null | undefined) =>
     `S/ ${Number(val ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`;
+
+  // Cantidad legible: "2", "1.5" sin ceros a la derecha (ej. 1 → "1", 2.5 → "2.5").
+  const formatQuantity = (val: number | null | undefined) =>
+    Number(val ?? 0).toLocaleString("es-PE", { maximumFractionDigits: 2 });
 
   return (
     <div className="min-h-screen pt-24 pb-24 bg-[#FAF9F6]" data-testid="transparency-page">
@@ -382,6 +387,44 @@ export default function CampaignTransparency() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Sobrantes */}
+        <div className="mb-12" data-testid="transparency-leftovers">
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h2 className="text-3xl font-display font-bold flex items-center gap-3 text-foreground mb-2">
+                <PackageOpen className="w-8 h-8 text-primary" /> {t("campaignTransparency.leftoversTitle")}
+              </h2>
+              <p className="text-muted-foreground font-medium">{t("campaignTransparency.leftoversSubtitle")}</p>
+            </div>
+            {transparency.publicLeftoverCount > 0 && (
+              <Badge variant="secondary" className="px-4 py-1.5 text-sm">
+                {t("campaignTransparency.leftoversCount", { count: transparency.publicLeftoverCount })}
+              </Badge>
+            )}
+          </div>
+
+          {transparency.publicLeftovers.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {transparency.publicLeftovers.map((lo) => (
+                <div key={lo.id} className="bg-card rounded-3xl p-5 shadow-sm border border-border flex flex-col gap-2 hover-elevate">
+                  <span className="font-display font-bold text-3xl text-primary">
+                    {formatQuantity(lo.quantity)}
+                    {lo.unit ? ` ${lo.unit}` : ""}
+                  </span>
+                  <h3 className="font-semibold text-foreground">{lo.item}</h3>
+                  {lo.notes && <p className="text-sm text-muted-foreground">{lo.notes}</p>}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card rounded-3xl p-10 shadow-sm border border-border text-center">
+              <PackageOpen className="w-12 h-12 mx-auto text-primary/40 mb-4" />
+              <h3 className="text-xl font-bold text-foreground mb-1">{t("campaignTransparency.leftoversEmptyTitle")}</h3>
+              <p className="text-muted-foreground max-w-md mx-auto">{t("campaignTransparency.leftoversEmptyDesc")}</p>
+            </div>
+          )}
         </div>
 
         {/* Donors List */}

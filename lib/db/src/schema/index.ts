@@ -11,6 +11,7 @@ export * from "./campaign-images";
 export * from "./campaign-expenses";
 export * from "./campaign-evidence";
 export * from "./campaign-movements";
+export * from "./campaign-leftovers";
 export * from "./community-reports";
 export * from "./pets";
 export * from "./adoption-requests";

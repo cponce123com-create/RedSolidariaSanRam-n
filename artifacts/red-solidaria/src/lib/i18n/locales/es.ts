@@ -218,7 +218,7 @@ export const es = {
     heroSubtitle:
       "Empezamos llevando sonrisas en Navidad. Hoy somos una red de voluntarios comprometidos con el bienestar de niños, familias y animales en nuestra comunidad.",
     heroOurStory: "Nuestra Historia",
-    heroCardChristmasTitle: "Chocolatada Navideña",
+    heroCardChristmasTitle: "Chocofest 2025",
     heroCardChristmasSubtitle: "Meta al 141% · 500 niños",
     heroCardRaisedTitle: "S/ 2,818.5 recaudados",
     heroCardRaisedSubtitle: "esta semana, ¡gracias!",
@@ -642,6 +642,13 @@ export const es = {
     evidenceEmptyTitle: "Sin evidencias aún",
     evidenceEmptyDesc:
       "Las fotos y reportes de impacto aparecerán aquí una vez que se realicen las actividades.",
+    leftoversTitle: "Sobrantes",
+    leftoversSubtitle:
+      "Ítems o dinero que quedaron tras el evento y su destino (entregados, donados o en custodia).",
+    leftoversCount: "{{count}} sobrantes",
+    leftoversEmptyTitle: "Sin sobrantes registrados",
+    leftoversEmptyDesc:
+      "Cuando haya sobrantes de la campaña (canastas, juguetes, víveres o dinero), se publicarán aquí con su cantidad y destino.",
     donorsCount: "{{count}} donantes",
     donorsEmptyTitle: "Aún no hay donantes públicos",
     donorsEmptyDesc:

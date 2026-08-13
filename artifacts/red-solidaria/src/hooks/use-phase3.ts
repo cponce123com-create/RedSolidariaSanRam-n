@@ -16,8 +16,11 @@ export interface TransparencyData {
   publicExpenseCount: number;
   evidenceCount: number;
   publicEvidenceCount: number;
+  leftoverCount: number;
+  publicLeftoverCount: number;
   publicExpenses: Expense[];
   publicEvidence: Evidence[];
+  publicLeftovers: Leftover[];
   recentMovements: {
     type: "ingreso" | "gasto";
     description: string;
@@ -50,6 +53,18 @@ export interface Evidence {
   mediaType: string;
   evidenceType: string;
   date: string;
+  isPublic: boolean;
+  createdAt: string;
+}
+
+// Sobrantes de campaña: ítems/dinero que quedaron tras el evento.
+export interface Leftover {
+  id: number;
+  campaignId: number;
+  item: string;
+  quantity: number;
+  unit?: string | null;
+  notes?: string | null;
   isPublic: boolean;
   createdAt: string;
 }
@@ -228,6 +243,75 @@ export function useDeleteEvidence(campaignId: number) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "evidence"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+    },
+  });
+}
+
+// ─── Sobrantes de campaña ────────────────────────────────────────────────────
+
+// Hook admin: TODOS los sobrantes (públicos y privados) vía endpoint protegido.
+export function useAdminCampaignLeftovers(id: number) {
+  return useQuery<Leftover[]>({
+    queryKey: ["/api/admin/campaigns", id, "leftovers"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/campaigns/${id}/leftovers`);
+      if (!res.ok) throw new Error("Failed to fetch leftovers");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function useCreateLeftover(campaignId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<Leftover>) => {
+      const res = await fetch(`/api/campaigns/${campaignId}/leftovers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create leftover");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "leftovers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+    },
+  });
+}
+
+export function useUpdateLeftover(campaignId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Leftover> }) => {
+      const res = await fetch(`/api/campaigns/${campaignId}/leftovers/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update leftover");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "leftovers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+    },
+  });
+}
+
+export function useDeleteLeftover(campaignId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (leftoverId: number) => {
+      const res = await fetch(`/api/campaigns/${campaignId}/leftovers/${leftoverId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete leftover");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "leftovers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
     },
   });
