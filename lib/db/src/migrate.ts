@@ -126,6 +126,15 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       CREATE INDEX IF NOT EXISTS idx_leftovers_campaign ON campaign_leftovers(campaign_id);
     `,
   },
+  {
+    name: "009_volunteers_photo.sql",
+    sql: `
+      -- Foto del voluntario (subida opcional a Cloudinary desde el formulario
+      -- público de registro). Solo visibilidad admin; no se expone en
+      -- endpoints públicos.
+      ALTER TABLE volunteers ADD COLUMN IF NOT EXISTS photo text;
+    `,
+  },
 ];
 
 /**

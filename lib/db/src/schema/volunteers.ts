@@ -16,6 +16,9 @@ export const volunteersTable = pgTable("volunteers", {
   priorExperience: text("prior_experience"),
   status: text("status").notNull().default("pending"),
   adminNotes: text("admin_notes"),
+  // Foto del voluntario (subida opcional a Cloudinary desde el formulario
+  // público; solo se muestra en el panel admin).
+  photo: text("photo"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

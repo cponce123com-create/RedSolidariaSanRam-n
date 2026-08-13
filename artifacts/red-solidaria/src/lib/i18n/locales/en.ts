@@ -1002,6 +1002,9 @@ export const en: TranslationSchema = {
       "Tell us what motivates you, what you hope to contribute, and what you'd like to learn or experience with Red Solidaria...",
     sending: "Sending...",
     submit: "Apply as a volunteer",
+    sectionPhoto: "Your photo",
+    labelPhoto: "Profile photo (optional)",
+    photoHint: "Help us recognize you at our brigades and activities. JPG, PNG or WebP up to 8 MB.",
   },
   allies: {
     badge: "Support network",

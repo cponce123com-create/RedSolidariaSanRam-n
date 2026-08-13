@@ -64,6 +64,7 @@ function formatVolunteer(v: typeof volunteersTable.$inferSelect) {
     priorExperience: v.priorExperience,
     status: v.status,
     adminNotes: v.adminNotes,
+    photo: v.photo,
     createdAt: toIsoSafe(v.createdAt),
   };
 }

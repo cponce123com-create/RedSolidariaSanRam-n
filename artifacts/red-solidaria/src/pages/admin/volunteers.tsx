@@ -14,6 +14,7 @@ interface Volunteer {
   age: string | null; district: string | null; availability: string;
   skills: string | null; interests: string | null; motivation: string | null;
   priorExperience: string | null; status: string; adminNotes: string | null;
+  photo: string | null;
   createdAt: string;
 }
 
@@ -76,8 +77,12 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
     <div className="bg-card border border-border rounded-2xl overflow-hidden">
       <div className="p-4 sm:p-5">
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 font-bold text-primary">
-            {volunteer.name.charAt(0).toUpperCase()}
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 font-bold text-primary overflow-hidden">
+            {volunteer.photo ? (
+              <img src={volunteer.photo} alt={volunteer.name} className="w-full h-full object-cover" />
+            ) : (
+              volunteer.name.charAt(0).toUpperCase()
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 flex-wrap">

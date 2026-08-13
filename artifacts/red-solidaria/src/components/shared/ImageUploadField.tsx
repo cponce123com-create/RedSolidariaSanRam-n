@@ -10,15 +10,18 @@ interface ImageUploadFieldProps {
   value: string | null | undefined;
   onChange: (value: string) => void;
   label?: string;
+  // Endpoint de firma: admin por defecto; formularios públicos usan
+  // "/api/uploads/signature" (rate limitado por IP, sin sesión).
+  endpoint?: "/api/uploads/signature" | "/api/uploads/admin-signature";
 }
 
 /**
- * Campo de imagen con subida directa a Cloudinary (firma admin).
+ * Campo de imagen con subida directa a Cloudinary (firma admin o pública).
  * Muestra vista previa si ya hay una URL; permite pegar URL manualmente.
  * Traducido (react-i18next): se usa tanto en el panel admin como en
  * formularios públicos.
  */
-export function ImageUploadField({ value, onChange, label }: ImageUploadFieldProps) {
+export function ImageUploadField({ value, onChange, label, endpoint = "/api/uploads/admin-signature" }: ImageUploadFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
@@ -36,7 +39,7 @@ export function ImageUploadField({ value, onChange, label }: ImageUploadFieldPro
     }
     setUploading(true);
     try {
-      const result = await uploadImageToCloudinary(file, "/api/uploads/admin-signature");
+      const result = await uploadImageToCloudinary(file, endpoint);
       onChange(result.imageUrl);
       toast({ title: t("imageUpload.uploaded"), description: t("imageUpload.uploadedDescription") });
     } catch (err) {

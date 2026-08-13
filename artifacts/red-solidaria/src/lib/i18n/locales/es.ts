@@ -999,6 +999,9 @@ export const es = {
       "Cuéntanos qué te motiva, qué esperas aportar, y qué te gustaría aprender o vivir con Red Solidaria...",
     sending: "Enviando...",
     submit: "Postularme como voluntario/a",
+    sectionPhoto: "Tu foto",
+    labelPhoto: "Foto de perfil (opcional)",
+    photoHint: "Ayúdanos a reconocerte en nuestras brigadas y actividades. JPG, PNG o WebP hasta 8 MB.",
   },
   allies: {
     badge: "Red de apoyo",

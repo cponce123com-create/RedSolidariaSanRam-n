@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { ImageUploadField } from "@/components/shared/ImageUploadField";
 import {
   Heart, CheckCircle, ArrowLeft, Users, Clock, Star,
   MapPin, Phone, Mail, Briefcase, HandHeart
@@ -62,6 +63,7 @@ export default function Volunteer() {
     interests: z.string().optional(),
     motivation: z.string().min(20, t("volunteer.motivationMin")),
     priorExperience: z.string().optional(),
+    photo: z.string().optional(),
   });
   type FormValues = z.infer<typeof schema>;
 
@@ -69,7 +71,7 @@ export default function Volunteer() {
     resolver: zodResolver(schema),
     defaultValues: {
       name: "", email: "", phone: "", age: "", district: "",
-      availability: "", skills: "", interests: "", motivation: "", priorExperience: "",
+      availability: "", skills: "", interests: "", motivation: "", priorExperience: "", photo: "",
     },
   });
 
@@ -299,6 +301,23 @@ export default function Volunteer() {
                       <Textarea placeholder={t("volunteer.placeholderMotivation")} className="min-h-[110px] rounded-xl bg-secondary/30 resize-none" {...field} />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )} />
+              </section>
+
+              {/* Tu foto */}
+              <section>
+                <h3 className="font-bold text-base mb-4 flex items-center gap-2 text-muted-foreground uppercase tracking-wider text-xs">
+                  <span className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-xs font-bold">5</span>
+                  {t("volunteer.sectionPhoto")}
+                </h3>
+                <FormField control={form.control} name="photo" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("volunteer.labelPhoto")}</FormLabel>
+                    <FormControl>
+                      <ImageUploadField value={field.value} onChange={field.onChange} endpoint="/api/uploads/signature" />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">{t("volunteer.photoHint")}</p>
                   </FormItem>
                 )} />
               </section>

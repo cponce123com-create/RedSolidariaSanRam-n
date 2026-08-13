@@ -7,6 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "apply:chocolatada": "tsx ./src/apply-chocolatada-2024.ts",
     "apply:chocofest": "tsx ./src/apply-chocofest-2025.ts",
+    "seed:volunteers": "tsx ./src/seed-volunteers.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
