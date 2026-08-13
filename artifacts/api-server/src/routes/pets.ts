@@ -1,7 +1,9 @@
 import { Router } from "express";
+import { z } from "zod";
 import { db } from "@workspace/db";
 import { petsTable, insertPetSchema, publicInsertPetSchema, updatePetSchema, adoptionRequestsTable, insertAdoptionRequestSchema } from "@workspace/db/schema";
 import { eq, desc, and, or } from "drizzle-orm";
+import { adoptionLimiter } from "../middleware/rate-limit";
 
 const router = Router();
 
@@ -33,7 +35,7 @@ router.get("/pets/:id", async (req, res) => {
 });
 
 // ─── PUBLIC: Submit pet for adoption (requires review) ───────────────────────
-router.post("/pets/submit", async (req, res) => {
+router.post("/pets/submit", adoptionLimiter, async (req, res) => {
   const parsed = publicInsertPetSchema.safeParse({ ...req.body, status: "reviewing", submittedByPublic: true });
   if (!parsed.success) {
     return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
@@ -43,7 +45,7 @@ router.post("/pets/submit", async (req, res) => {
 });
 
 // ─── PUBLIC: Submit adoption request ─────────────────────────────────────────
-router.post("/pets/:id/adopt", async (req, res) => {
+router.post("/pets/:id/adopt", adoptionLimiter, async (req, res) => {
   const petId = Number(req.params.id);
   const [pet] = await db.select().from(petsTable).where(eq(petsTable.id, petId));
   if (!pet) return res.status(404).json({ error: "Mascota no encontrada" });
@@ -112,10 +114,21 @@ router.get("/admin/adoption-requests", async (req, res) => {
   return res.json(requests);
 });
 
+// Schema de actualización de solicitudes de adopción: status restringido a los
+// estados del flujo admin y adminNotes como texto opcional (anti mass-assignment).
+const updateAdoptionRequestSchema = z.object({
+  status: z.enum(["pending", "approved", "rejected", "in-process"]),
+  adminNotes: z.string().optional(),
+});
+
 // ─── ADMIN: Update adoption request status ────────────────────────────────────
 router.patch("/admin/adoption-requests/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { status, adminNotes } = req.body;
+  const parsed = updateAdoptionRequestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "validation_error", message: "Datos inválidos", details: parsed.error.issues });
+  }
+  const { status, adminNotes } = parsed.data;
   const [updated] = await db.update(adoptionRequestsTable).set({ status, adminNotes }).where(eq(adoptionRequestsTable.id, id)).returning();
   if (!updated) return res.status(404).json({ error: "Solicitud no encontrada" });
 

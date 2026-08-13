@@ -34,6 +34,13 @@ const loginSchema = z.object({
 // Inicializar superadmin con contraseña hasheada (solo para desarrollo)
 let superAdminHashedPassword: string | null = null;
 
+// Hash dummy precalculado al arrancar el módulo (NO por request): se compara
+// contra él cuando el flujo del login llegaría al 401 sin haber ejecutado un
+// compare real (usuario inexistente o inactivo). Así el tiempo de respuesta no
+// delata si un username existe en el sistema (anti enumeración por timing).
+// El resultado de esta comparación siempre se descarta.
+const dummyPasswordHash = await hashPassword("red-solidaria-dummy-timing");
+
 router.post("/admin/login", loginLimiter, async (req, res) => {
   try {
     const { username, password } = loginSchema.parse(req.body);
@@ -142,6 +149,15 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
           details: { reason: "invalid_password", source: "env_superadmin" },
         });
       }
+    }
+
+    // Anti enumeración por timing: los flujos que llegan al 401 sin haber
+    // ejecutado un compare real (usuario inexistente o inactivo — salvo el
+    // match con el superadmin, que ya comparó arriba) corren un compare contra
+    // el hash dummy precalculado; el resultado se descarta y la respuesta
+    // sigue siendo 401, pero el tiempo ya no distingue usernames válidos.
+    if ((!dbUser || !dbUser.active) && !(username === ADMIN_USERNAME && !dbUser)) {
+      await verifyPassword(password, dummyPasswordHash);
     }
 
     return res.status(401).json({ error: "unauthorized", message: "Usuario o contraseña incorrectos" });

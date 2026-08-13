@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { z } from "zod";
 import { db } from "@workspace/db";
 import { volunteersTable, insertVolunteerSchema } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -28,10 +29,21 @@ router.get("/admin/volunteers", async (req, res) => {
   return res.json(volunteers.map(formatVolunteer));
 });
 
+// Schema de actualización de voluntarios: status restringido a los estados del
+// flujo admin y adminNotes como texto opcional (anti mass-assignment).
+const updateVolunteerSchema = z.object({
+  status: z.enum(["pending", "reviewing", "approved", "contacted", "rejected"]),
+  adminNotes: z.string().optional(),
+});
+
 // ─── ADMIN: Update volunteer status ──────────────────────────────────────────
 router.patch("/admin/volunteers/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const { status, adminNotes } = req.body;
+  const parsed = updateVolunteerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "validation_error", message: "Datos inválidos", details: parsed.error.issues });
+  }
+  const { status, adminNotes } = parsed.data;
   const [updated] = await db.update(volunteersTable).set({ status, adminNotes }).where(eq(volunteersTable.id, id)).returning();
   if (!updated) return res.status(404).json({ error: "Voluntario no encontrado" });
   return res.json(formatVolunteer(updated));

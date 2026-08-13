@@ -1,12 +1,14 @@
 import { Router } from "express";
+import { z } from "zod";
 import { db } from "@workspace/db";
 import { communityReportsTable, insertCommunityReportSchema, updateCommunityReportSchema, campaignsTable } from "@workspace/db/schema";
 import { eq, desc, and } from "drizzle-orm";
+import { reportLimiter } from "../middleware/rate-limit";
 
 const router = Router();
 
 // ─── PUBLIC: Submit a community report ───────────────────────────────────────
-router.post("/reports", async (req, res) => {
+router.post("/reports", reportLimiter, async (req, res) => {
   const parsed = insertCommunityReportSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
@@ -70,13 +72,32 @@ router.patch("/admin/reports/:id", async (req, res) => {
   return res.json(updated);
 });
 
+// Schema mínimo para convertir un reporte en campaña: todos los campos son
+// opcionales porque caen al fallback (datos del reporte o valores por defecto),
+// pero con los TIPOS correctos para no insertar valores basura en campaignsTable.
+const convertReportSchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  goal: z.number().positive().optional(),
+  imageUrl: z.string().optional(),
+  category: z.string().optional(),
+});
+
 // ─── ADMIN: Convert report to campaign ───────────────────────────────────────
 router.post("/admin/reports/:id/convert", async (req, res) => {
   const id = Number(req.params.id);
+
+  // Validación de tipos antes de tocar la DB (fail-fast, mismo patrón safeParse
+  // que el resto de endpoints con schema Zod).
+  const parsed = convertReportSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "validation_error", message: "Datos inválidos", details: parsed.error.issues });
+  }
+
   const [report] = await db.select().from(communityReportsTable).where(eq(communityReportsTable.id, id));
   if (!report) return res.status(404).json({ error: "Reporte no encontrado" });
 
-  const { title, description, goal, imageUrl, category } = req.body;
+  const { title, description, goal, imageUrl, category } = parsed.data;
   const today = new Date().toISOString().split("T")[0];
 
   const [campaign] = await db.insert(campaignsTable).values({

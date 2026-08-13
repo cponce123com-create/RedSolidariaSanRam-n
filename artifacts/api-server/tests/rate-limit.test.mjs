@@ -55,3 +55,67 @@ test("rate-limit: adminActionLimiter bloquea con 429 tras el presupuesto mínimo
     server.close();
   }
 });
+
+// ── Limiters aplicados a rutas públicas (anti-spam) ──────────────────────────
+
+// Cada test importa el bundle de la ruta con un query único: los limiters
+// quedan inline en el bundle y así el contador de hits no se arrastra entre
+// tests del mismo proceso.
+async function freshRouter(routeFile, tag) {
+  const mod = await import(`./dist/routes/${routeFile}.mjs?${tag}=${Date.now()}-${Math.random()}`);
+  return mod.default;
+}
+
+async function countPostStatuses(base, path, count) {
+  const statuses = [];
+  for (let i = 0; i < count; i++) {
+    const res = await fetch(`${base}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    statuses.push(res.status);
+  }
+  return statuses;
+}
+
+function runLimiterCase(router, path, count) {
+  return async () => {
+    const express = (await import("express")).default;
+    const app = express();
+    app.use(express.json());
+    app.use("/api", router);
+    // Sin DB en tests: el error del handler no debe tumbar el test, solo suma
+    // al presupuesto del limiter (skipSuccessfulRequests: false → cuenta todo).
+    app.use((err, _req, res, _next) => res.status(500).json({ error: "test_server_error" }));
+
+    const server = app.listen(0);
+    await new Promise((resolve) => server.once("listening", resolve));
+    const { port } = server.address();
+    try {
+      const base = `http://127.0.0.1:${port}`;
+      const statuses = await countPostStatuses(base, path, count);
+      assert.equal(statuses[count - 1], 429);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+    }
+  };
+}
+
+test("reportLimiter: POST /api/reports bloquea con 429 tras 10 reportes", runLimiterCase(
+  await freshRouter("community-reports", "reportLimiter"),
+  "/api/reports",
+  11,
+));
+
+test("adoptionLimiter: POST /api/pets/submit bloquea con 429 tras 5 solicitudes", runLimiterCase(
+  await freshRouter("pets", "adoptionLimiterSubmit"),
+  "/api/pets/submit",
+  6,
+));
+
+test("adoptionLimiter: POST /api/pets/:id/adopt bloquea con 429 tras 5 solicitudes", runLimiterCase(
+  await freshRouter("pets", "adoptionLimiterAdopt"),
+  "/api/pets/1/adopt",
+  6,
+));
