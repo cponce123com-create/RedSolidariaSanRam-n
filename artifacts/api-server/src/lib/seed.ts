@@ -16,6 +16,14 @@ import {
   campaignEvidenceTable,
   adminUsersTable,
 } from "@workspace/db";
+import {
+  CHOCOLATADA_2024_CAMPAIGN,
+  CHOCOLATADA_2024_DONATIONS,
+  CHOCOLATADA_2024_EVIDENCE,
+  CHOCOLATADA_2024_EXPENSES,
+  CHOCOLATADA_2024_IMAGES,
+  CHOCOLATADA_2024_UPDATES,
+} from "./chocolatada-2024-data";
 import { eq, isNull, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import { hashPassword } from "../middleware/auth-utils";
@@ -152,20 +160,7 @@ async function seedCampaigns() {
   if (await isEmpty("campaigns")) {
     logger.info("Seeding campaigns...");
     await db.insert(campaignsTable).values([
-      {
-        title: "Chocolatada Navideña 2024",
-        description: "Llevamos chocolatada caliente y juguetes a más de 500 niños en los anexos más alejados de San Ramón durante las fiestas navideñas. Juntos podemos hacer que esta navidad sea especial para cada niño.",
-        goal: 5000,
-        raised: 3250,
-        status: "active",
-        featured: true,
-        category: "niñez",
-        startDate: "2024-11-01",
-        endDate: "2024-12-25",
-        latitude: -11.1229,
-        longitude: -75.3548,
-        imageUrl: CAMPAIGN_IMAGES["Chocolatada Navideña 2024"],
-      },
+      CHOCOLATADA_2024_CAMPAIGN,
       {
         title: "Campaña Escolar 2025",
         description: "Dotamos de útiles escolares y uniformes a familias de escasos recursos en comunidades rurales de Chanchamayo para que ningún niño deje de estudiar por falta de materiales.",
@@ -698,11 +693,12 @@ async function seedCampaignMedia() {
       anonymous: boolean;
       publicProof: boolean;
       status: "approved" | "pending";
+      createdAt?: Date;
     }> = [
-      { campaignId: chocolatada, firstName: "María", lastName: "Quispe", email: "maria.quispe@example.com", amount: 50, paymentMethod: "yape", message: "¡Por una navidad feliz para todos!", anonymous: false, publicProof: false, status: "approved" },
-      { campaignId: chocolatada, firstName: "Carlos", lastName: "Mendoza", email: "carlos.mendoza@example.com", amount: 120, paymentMethod: "transfer", message: "Gracias por su labor", anonymous: false, publicProof: false, status: "approved" },
-      { campaignId: chocolatada, firstName: "", lastName: "", email: "anonimo1@example.com", amount: 25, paymentMethod: "plin", message: null, anonymous: true, publicProof: false, status: "approved" },
-      { campaignId: chocolatada, firstName: "Lucía", lastName: "Rojas", email: "lucia.rojas@example.com", amount: 40, paymentMethod: "yape", message: "Fuerza, equipo ❤️", anonymous: false, publicProof: false, status: "pending" },
+      // Donaciones reales de la Chocolatada Navideña 2024 (informe en vivo de
+      // donaciones, Google Sheets). La lista completa vive en
+      // ./chocolatada-2024-data.ts (fuente única de verdad).
+      ...CHOCOLATADA_2024_DONATIONS.map((d) => ({ ...d, campaignId: chocolatada })),
       { campaignId: escolar, firstName: "Pedro", lastName: "Alvarado", email: "pedro.alvarado@example.com", amount: 200, paymentMethod: "transfer", message: "Para que ningún niño deje el aula", anonymous: false, publicProof: true, status: "approved" },
       { campaignId: escolar, firstName: "Ana", lastName: "Torres", email: "ana.torres@example.com", amount: 80, paymentMethod: "yape", message: "Apoyando la educación rural", anonymous: false, publicProof: false, status: "approved" },
       { campaignId: escolar, firstName: "", lastName: "", email: "anonimo2@example.com", amount: 60, paymentMethod: "plin", message: null, anonymous: true, publicProof: false, status: "approved" },
@@ -719,8 +715,7 @@ async function seedCampaignMedia() {
     const updates: Array<{ campaignId: number; title: string; content: string }> = [];
     if (chocolatada) {
       updates.push(
-        { campaignId: chocolatada, title: "¡Meta superada en 65%!", content: "Gracias a la solidaridad de la comunidad ya llevamos recaudado más de la mitad de la meta. Con los S/ 3,250 ya compramos 400 juguetes y el chocolate para las primeras 3 comunidades." },
-        { campaignId: chocolatada, title: "Cronograma de entregas confirmado", content: "Las entregas serán el 20, 21 y 22 de diciembre. Visitaremos El Palomar, Vista Alegre y San Pedro de Cochangas. ¡Invitamos a los voluntarios a sumarse a las brigadas!" },
+        ...CHOCOLATADA_2024_UPDATES.map((u) => ({ campaignId: chocolatada, ...u })),
       );
     }
     if (escolar) {
@@ -743,9 +738,7 @@ async function seedCampaignMedia() {
     const images: Array<{ campaignId: number; imageUrl: string; caption: string }> = [];
     if (chocolatada) {
       images.push(
-        { campaignId: chocolatada, imageUrl: u("photo-1543589077-47d81606c1bf", 1000), caption: "Juguetes donados por la comunidad" },
-        { campaignId: chocolatada, imageUrl: u("photo-1512909006721-3d6018887383", 1000), caption: "Decoración navideña en el almacén" },
-        { campaignId: chocolatada, imageUrl: u("photo-1482517967863-00e15c9b44be", 1000), caption: "Voluntarios preparando las entregas" },
+        ...CHOCOLATADA_2024_IMAGES.map((img) => ({ campaignId: chocolatada, ...img })),
       );
     }
     if (rescate) {
@@ -777,10 +770,7 @@ async function seedCampaignMedia() {
     }> = [];
     if (chocolatada) {
       expenses.push(
-        { campaignId: chocolatada, description: "Compra de 400 juguetes para niños", category: "materiales", amount: 1200, date: "2024-12-05", responsible: "Comisión Navidad", receiptUrl: RECEIPT_DEMO, isPublic: true },
-        { campaignId: chocolatada, description: "Chocolate, leche y panetones (500 raciones)", category: "alimentación", amount: 650, date: "2024-12-12", responsible: "Comisión Navidad", receiptUrl: null, isPublic: true },
-        { campaignId: chocolatada, description: "Transporte a anexos (2 brigadas)", category: "transporte", amount: 300, date: "2024-12-20", responsible: "Logística", receiptUrl: null, isPublic: true },
-        { campaignId: chocolatada, description: "Bolsa para regalos y decoración", category: "logística", amount: 120, date: "2024-12-18", responsible: "Comisión Navidad", receiptUrl: null, isPublic: true },
+        ...CHOCOLATADA_2024_EXPENSES.map((e) => ({ campaignId: chocolatada, ...e })),
       );
     }
     if (escolar) {
@@ -813,9 +803,7 @@ async function seedCampaignMedia() {
     }> = [];
     if (chocolatada) {
       evidence.push(
-        { campaignId: chocolatada, title: "Entrega de juguetes en Vista Alegre", description: "Los niños de Vista Alegre recibieron sus regalos en la chocolatada comunitaria.", mediaUrl: u("photo-1593113598332-cd288d649433", 1000), mediaType: "image", evidenceType: "activity", date: "2024-12-20", isPublic: true },
-        { campaignId: chocolatada, title: "Brigada de voluntarios en El Palomar", description: "45 voluntarios participaron en las entregas de fin de año.", mediaUrl: u("photo-1469571486292-0ba58a3f068b", 1000), mediaType: "image", evidenceType: "activity", date: "2024-12-21", isPublic: true },
-        { campaignId: chocolatada, title: "Compra de juguetes verificada", description: "Boleta de compra de los 400 juguetes entregados.", mediaUrl: u("photo-1554224155-6726b3ff858f", 1000), mediaType: "image", evidenceType: "purchase", date: "2024-12-05", isPublic: true },
+        ...CHOCOLATADA_2024_EVIDENCE.map((ev) => ({ campaignId: chocolatada, ...ev })),
       );
     }
     if (escolar) {

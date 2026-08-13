@@ -24,6 +24,7 @@ await build({
     "./src/lib/donor-format.ts",
     "./src/lib/amount-format.ts",
     "./src/lib/donation-validation.ts",
+    "./src/lib/chocolatada-2024-data.ts",
     "./src/lib/totp.ts",
     "./src/lib/two-factor-lockout.ts",
     "./src/lib/random-password.ts",
