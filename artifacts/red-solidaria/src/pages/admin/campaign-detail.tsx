@@ -435,7 +435,7 @@ export default function AdminCampaignDetail() {
             {images?.map(img => (
               <div key={img.id} className="group relative rounded-2xl overflow-hidden border border-border shadow-sm aspect-square bg-secondary">
                 <img src={img.imageUrl} alt={img.caption || ""} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3">
+                <div className="absolute inset-0 bg-black/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3">
                   <div className="flex justify-end">
                     <Button variant="destructive" size="icon" className="w-8 h-8 rounded-lg" onClick={() => deleteImage.mutate({ id: campaignId, imageId: img.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/images`] })})}>
                       <Trash2 className="w-4 h-4" />
@@ -745,7 +745,7 @@ export default function AdminCampaignDetail() {
                       <Switch checked={ev.isPublic} onCheckedChange={(val) => updateEvidence.mutate({ id: ev.id, data: { isPublic: val }})} aria-label="Toggle visibility" />
                       <span className="text-muted-foreground font-medium">{ev.isPublic ? 'Público' : 'Oculto'}</span>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm("¿Eliminar evidencia?")) deleteEvidence.mutate(ev.id) }}>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm("¿Eliminar evidencia?")) deleteEvidence.mutate(ev.id) }}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -836,7 +836,7 @@ export default function AdminCampaignDetail() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm("¿Eliminar sobrante?")) deleteLeftover.mutate(lo.id) }}>
+                        <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm("¿Eliminar sobrante?")) deleteLeftover.mutate(lo.id) }}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </TableCell>

@@ -35,7 +35,7 @@ export function HomeHero() {
         }}
       />
 
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 pb-16 sm:pt-20 sm:pb-24 lg:pt-24 lg:pb-28">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-16 sm:pt-28 sm:pb-24 lg:pt-32 lg:pb-28">
         <div className="grid gap-12 lg:grid-cols-12 lg:gap-10 items-center">
           {/* ── Texto ─────────────────────────────────────────────── */}
           <div className="lg:col-span-6 xl:col-span-6">

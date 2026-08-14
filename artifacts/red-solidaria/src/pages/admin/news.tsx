@@ -142,10 +142,10 @@ export default function AdminNews() {
                         <p className="text-xs text-muted-foreground mt-1">{new Date(item.publishedAt).toLocaleDateString("es-PE")}</p>
                       </div>
                       <div className="flex gap-2 shrink-0">
-                        <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0" onClick={() => setEditing(item)} aria-label={`Editar ${item.title}`}>
+                        <Button size="sm" variant="outline" className="rounded-lg h-10 w-10 p-0" onClick={() => setEditing(item)} aria-label={`Editar ${item.title}`}>
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                        <Button size="sm" variant="ghost" className="rounded-lg h-10 w-10 p-0 text-destructive hover:bg-destructive/10"
                           onClick={() => { if (confirm(`¿Eliminar "${item.title}"?`)) deleteNews.mutate(item.id); }} aria-label={`Eliminar ${item.title}`}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>

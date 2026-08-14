@@ -98,7 +98,7 @@ export default function AnimalWelfare() {
   const { t } = useTranslation();
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-10 sm:py-16">
+    <div className="max-w-6xl mx-auto px-4 pt-24 sm:pt-28 pb-10 sm:pb-16">
       {/* Hero */}
       <div className="mb-14">
         <div className="flex items-center gap-3 mb-4">

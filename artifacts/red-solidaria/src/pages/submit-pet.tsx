@@ -22,9 +22,9 @@ const BOOL_TOGGLE = (label: string, sub: string, key: string, form: any) => (
       role="switch"
       aria-checked={form.watch(key)}
       onClick={() => form.setValue(key, !form.watch(key))}
-      className={`relative w-10 h-5 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}
+      className={`relative w-12 h-7 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}
     >
-      <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-5" : "translate-x-0.5"}`} />
+      <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-6" : "translate-x-1"}`} />
     </button>
   </div>
 );
@@ -123,7 +123,7 @@ export default function SubmitPet() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
+    <div className="max-w-3xl mx-auto px-4 pt-24 sm:pt-28 pb-10 sm:pb-16">
       <Link href="/adopciones">
         <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" /> {t("submitPet.backToCatalog")}
@@ -187,7 +187,7 @@ export default function SubmitPet() {
               )} />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {/* Sex */}
               <FormField control={form.control} name="sex" render={({ field }) => (
                 <FormItem>

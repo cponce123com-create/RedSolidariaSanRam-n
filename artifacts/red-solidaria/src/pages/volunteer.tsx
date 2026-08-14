@@ -131,7 +131,7 @@ export default function Volunteer() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 sm:py-16">
+    <div className="max-w-5xl mx-auto px-4 pt-24 sm:pt-28 pb-10 sm:pb-16">
       <Link href="/como-ayudar">
         <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" /> {t("volunteer.backLink")}

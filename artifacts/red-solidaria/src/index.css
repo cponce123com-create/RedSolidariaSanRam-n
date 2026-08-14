@@ -103,6 +103,11 @@
   }
   body {
     @apply font-sans antialiased bg-background text-foreground selection:bg-primary/20 selection:text-primary transition-colors duration-300;
+    /* Evita el flash gris/azul al tocar enlaces y botones en móviles */
+    -webkit-tap-highlight-color: transparent;
+    /* Respeta el ajuste de tamaño de texto del navegador (accesibilidad) */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-display tracking-tight text-foreground;
@@ -155,10 +160,36 @@
   @apply bg-card/80 backdrop-blur-md border-b border-border/50 supports-[backdrop-filter]:bg-card/60;
 }
 
-.hover-elevate {
-  @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+/* Elevación al pasar el cursor SOLO en dispositivos con hover real:
+   en táctil el :hover se dispara con el primer tap y produce un "salto". */
+@media (hover: hover) {
+  .hover-elevate {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
 }
 
+/* Padding inferior para la barra del home indicator de iOS (con viewport-fit=cover) */
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Oculta la scrollbar nativa en carruseles horizontales (tabs del admin, etc.) */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Usuarios con prefers-reduced-motion: elimina animaciones y transiciones */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

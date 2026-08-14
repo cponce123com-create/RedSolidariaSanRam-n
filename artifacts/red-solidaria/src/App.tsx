@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MotionConfig } from "framer-motion";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTranslation } from "react-i18next";
@@ -73,7 +74,8 @@ function MainLayout({ children }: { children: ReactNode }) {
         {t("common.skipToContent")}
       </a>
       <Navbar />
-      <main id="main-content" className="flex-grow pb-16 md:pb-0">{children}</main>
+      {/* pb móvil: deja espacio para el bottom nav (52px+) + safe-area de iOS */}
+      <main id="main-content" className="flex-grow pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
       <Footer />
       <FloatingWhatsApp />
       <MobileBottomNav />
@@ -95,193 +97,195 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Suspense fallback={<PageLoader />}>
-            <Switch>
-              {/* Admin routes */}
-              <Route path="/admin/login" component={AdminLogin} />
-              <Route path="/admin/voluntarios">
-                <AdminLayout>
-                  <AdminVolunteers />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/aliados">
-                <AdminLayout>
-                  <AdminAllies />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/adopciones/nueva">
-                <AdminLayout>
-                  <AdminPetForm />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/adopciones/:id">
-                <AdminLayout>
-                  <AdminPetForm />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/adopciones">
-                <AdminLayout>
-                  <AdminAdoptions />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/campanas/:id">
-                <AdminLayout>
-                  <AdminCampaignDetail />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/campanas">
-                <AdminLayout>
-                  <AdminCampaigns />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/donaciones">
-                <AdminLayout>
-                  <AdminDonations />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/reportes/:id">
-                <AdminLayout>
-                  <AdminReportDetail />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/reportes">
-                <AdminLayout>
-                  <AdminReports />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/noticias">
-                <AdminLayout>
-                  <AdminNews />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/mensajes">
-                <AdminLayout>
-                  <AdminMessages />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/testimonios">
-                <AdminLayout>
-                  <AdminTestimonials />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/faq">
-                <AdminLayout>
-                  <AdminFaq />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/usuarios">
-                <AdminLayout>
-                  <AdminUsers />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin/configuracion">
-                <AdminLayout>
-                  <AdminSettings />
-                </AdminLayout>
-              </Route>
-              <Route path="/admin">
-                <AdminLayout>
-                  <AdminDashboard />
-                </AdminLayout>
-              </Route>
+        <MotionConfig reducedMotion="user">
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Suspense fallback={<PageLoader />}>
+              <Switch>
+                {/* Admin routes */}
+                <Route path="/admin/login" component={AdminLogin} />
+                <Route path="/admin/voluntarios">
+                  <AdminLayout>
+                    <AdminVolunteers />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/aliados">
+                  <AdminLayout>
+                    <AdminAllies />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/adopciones/nueva">
+                  <AdminLayout>
+                    <AdminPetForm />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/adopciones/:id">
+                  <AdminLayout>
+                    <AdminPetForm />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/adopciones">
+                  <AdminLayout>
+                    <AdminAdoptions />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/campanas/:id">
+                  <AdminLayout>
+                    <AdminCampaignDetail />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/campanas">
+                  <AdminLayout>
+                    <AdminCampaigns />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/donaciones">
+                  <AdminLayout>
+                    <AdminDonations />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/reportes/:id">
+                  <AdminLayout>
+                    <AdminReportDetail />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/reportes">
+                  <AdminLayout>
+                    <AdminReports />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/noticias">
+                  <AdminLayout>
+                    <AdminNews />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/mensajes">
+                  <AdminLayout>
+                    <AdminMessages />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/testimonios">
+                  <AdminLayout>
+                    <AdminTestimonials />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/faq">
+                  <AdminLayout>
+                    <AdminFaq />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/usuarios">
+                  <AdminLayout>
+                    <AdminUsers />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/configuracion">
+                  <AdminLayout>
+                    <AdminSettings />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin">
+                  <AdminLayout>
+                    <AdminDashboard />
+                  </AdminLayout>
+                </Route>
 
-              {/* Public routes */}
-              <Route path="/campanas/:id/transparencia">
-                <MainLayout>
-                  <CampaignTransparency />
-                </MainLayout>
-              </Route>
-              <Route path="/transparencia">
-                <MainLayout>
-                  <Transparency />
-                </MainLayout>
-              </Route>
-              <Route path="/campanas/:id">
-                <MainLayout>
-                  <CampaignDetail />
-                </MainLayout>
-              </Route>
-              <Route path="/campanas">
-                <MainLayout>
-                  <Campaigns />
-                </MainLayout>
-              </Route>
-              <Route path="/casos-urgentes">
-                <MainLayout>
-                  <UrgentCases />
-                </MainLayout>
-              </Route>
-              <Route path="/reportar">
-                <MainLayout>
-                  <ReportForm />
-                </MainLayout>
-              </Route>
-              <Route path="/adopciones/:id">
-                <MainLayout>
-                  <PetDetail />
-                </MainLayout>
-              </Route>
-              <Route path="/adopciones">
-                <MainLayout>
-                  <Adoptions />
-                </MainLayout>
-              </Route>
-              <Route path="/publicar-mascota">
-                <MainLayout>
-                  <SubmitPet />
-                </MainLayout>
-              </Route>
-              <Route path="/ayuda-animal">
-                <MainLayout>
-                  <AnimalWelfare />
-                </MainLayout>
-              </Route>
-              <Route path="/voluntariado">
-                <MainLayout>
-                  <Volunteer />
-                </MainLayout>
-              </Route>
-              <Route path="/como-ayudar">
-                <MainLayout>
-                  <HowToHelp />
-                </MainLayout>
-              </Route>
-              <Route path="/aliados">
-                <MainLayout>
-                  <Allies />
-                </MainLayout>
-              </Route>
-              <Route path="/nosotros">
-                <MainLayout>
-                  <About />
-                </MainLayout>
-              </Route>
-              <Route path="/noticias">
-                <MainLayout>
-                  <News />
-                </MainLayout>
-              </Route>
-              <Route path="/contacto">
-                <MainLayout>
-                  <Contact />
-                </MainLayout>
-              </Route>
-              <Route path="/catalogo">
-                <MainLayout>
-                  <StockCatalog />
-                </MainLayout>
-              </Route>
-              <Route path="/">
-                <MainLayout>
-                  <Home />
-                </MainLayout>
-              </Route>
-              <Route component={NotFound} />
-            </Switch>
-          </Suspense>
-        </WouterRouter>
-        <Toaster />
+                {/* Public routes */}
+                <Route path="/campanas/:id/transparencia">
+                  <MainLayout>
+                    <CampaignTransparency />
+                  </MainLayout>
+                </Route>
+                <Route path="/transparencia">
+                  <MainLayout>
+                    <Transparency />
+                  </MainLayout>
+                </Route>
+                <Route path="/campanas/:id">
+                  <MainLayout>
+                    <CampaignDetail />
+                  </MainLayout>
+                </Route>
+                <Route path="/campanas">
+                  <MainLayout>
+                    <Campaigns />
+                  </MainLayout>
+                </Route>
+                <Route path="/casos-urgentes">
+                  <MainLayout>
+                    <UrgentCases />
+                  </MainLayout>
+                </Route>
+                <Route path="/reportar">
+                  <MainLayout>
+                    <ReportForm />
+                  </MainLayout>
+                </Route>
+                <Route path="/adopciones/:id">
+                  <MainLayout>
+                    <PetDetail />
+                  </MainLayout>
+                </Route>
+                <Route path="/adopciones">
+                  <MainLayout>
+                    <Adoptions />
+                  </MainLayout>
+                </Route>
+                <Route path="/publicar-mascota">
+                  <MainLayout>
+                    <SubmitPet />
+                  </MainLayout>
+                </Route>
+                <Route path="/ayuda-animal">
+                  <MainLayout>
+                    <AnimalWelfare />
+                  </MainLayout>
+                </Route>
+                <Route path="/voluntariado">
+                  <MainLayout>
+                    <Volunteer />
+                  </MainLayout>
+                </Route>
+                <Route path="/como-ayudar">
+                  <MainLayout>
+                    <HowToHelp />
+                  </MainLayout>
+                </Route>
+                <Route path="/aliados">
+                  <MainLayout>
+                    <Allies />
+                  </MainLayout>
+                </Route>
+                <Route path="/nosotros">
+                  <MainLayout>
+                    <About />
+                  </MainLayout>
+                </Route>
+                <Route path="/noticias">
+                  <MainLayout>
+                    <News />
+                  </MainLayout>
+                </Route>
+                <Route path="/contacto">
+                  <MainLayout>
+                    <Contact />
+                  </MainLayout>
+                </Route>
+                <Route path="/catalogo">
+                  <MainLayout>
+                    <StockCatalog />
+                  </MainLayout>
+                </Route>
+                <Route path="/">
+                  <MainLayout>
+                    <Home />
+                  </MainLayout>
+                </Route>
+                <Route component={NotFound} />
+              </Switch>
+            </Suspense>
+          </WouterRouter>
+          <Toaster />
+        </MotionConfig>
       </TooltipProvider>
     </QueryClientProvider>
   );

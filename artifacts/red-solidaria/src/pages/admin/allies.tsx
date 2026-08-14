@@ -91,8 +91,8 @@ function AllyForm({ ally, onSave, onCancel }: { ally?: Ally; onSave: () => void;
     <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
       <p className="text-sm font-medium">{label}</p>
       <button type="button" onClick={() => form.setValue(key, !form.watch(key) as any)}
-        className={`relative w-10 h-5 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}>
-        <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-5" : "translate-x-0.5"}`} />
+        className={`relative w-12 h-7 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}>
+        <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-6" : "translate-x-1"}`} />
       </button>
     </div>
   );
@@ -282,17 +282,17 @@ export default function AdminAllies() {
                         </div>
                       </div>
                       <div className="flex gap-2 shrink-0">
-                        <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0"
+                        <Button size="sm" variant="outline" className="rounded-lg h-10 w-10 p-0"
                           onClick={() => toggleActive.mutate({ id: ally.id, active: !ally.active })}
                           title={ally.active ? "Ocultar" : "Mostrar"}
                           aria-label={ally.active ? `Ocultar ${ally.name}` : `Mostrar ${ally.name}`}>
                           {ally.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                         </Button>
-                        <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0"
+                        <Button size="sm" variant="outline" className="rounded-lg h-10 w-10 p-0"
                           onClick={() => setEditingAlly(ally)} aria-label={`Editar ${ally.name}`}>
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
-                        <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                        <Button size="sm" variant="ghost" className="rounded-lg h-10 w-10 p-0 text-destructive hover:bg-destructive/10"
                           onClick={() => { if (confirm(`¿Eliminar aliado "${ally.name}"?`)) deleteAlly.mutate(ally.id); }} aria-label={`Eliminar ${ally.name}`}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>

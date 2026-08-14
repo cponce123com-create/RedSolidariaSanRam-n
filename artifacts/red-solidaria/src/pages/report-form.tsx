@@ -128,7 +128,7 @@ export default function ReportForm() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10 sm:py-16">
+    <div className="max-w-3xl mx-auto px-4 pt-24 sm:pt-28 pb-10 sm:pb-16">
       {/* Header */}
       <div className="mb-10">
         <Link href="/casos-urgentes">

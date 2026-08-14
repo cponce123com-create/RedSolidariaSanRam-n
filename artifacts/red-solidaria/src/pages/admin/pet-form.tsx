@@ -40,8 +40,8 @@ const BOOL_FIELD = (label: string, key: keyof FormValues, form: any) => (
   <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
     <p className="text-sm font-medium">{label}</p>
     <button type="button" onClick={() => form.setValue(key, !form.watch(key))}
-      className={`relative w-10 h-5 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}>
-      <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-5" : "translate-x-0.5"}`} />
+      className={`relative w-12 h-7 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}>
+      <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-6" : "translate-x-1"}`} />
     </button>
   </div>
 );

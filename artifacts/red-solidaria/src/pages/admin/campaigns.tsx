@@ -211,7 +211,7 @@ export default function AdminCampaigns() {
                           <Edit className="w-3.5 h-3.5 mr-1.5" /> Editar
                         </Button>
                       </Link>
-                      <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg text-destructive border-destructive/20 hover:bg-destructive/10" onClick={() => handleDelete(c.id)}>
+                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-lg text-destructive border-destructive/20 hover:bg-destructive/10" onClick={() => handleDelete(c.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>

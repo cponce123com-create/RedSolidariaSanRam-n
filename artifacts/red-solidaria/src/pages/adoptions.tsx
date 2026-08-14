@@ -186,7 +186,7 @@ export default function Adoptions() {
   const urgentCount = pets.filter(p => p.urgent).length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-10 sm:py-16">
+    <div className="max-w-7xl mx-auto px-4 pt-24 sm:pt-28 pb-10 sm:pb-16">
       {/* Header */}
       <div className="mb-10">
         <div className="flex items-center gap-3 mb-4">
@@ -202,7 +202,7 @@ export default function Adoptions() {
               {t("adoptions.subtitle")}
             </p>
           </div>
-          <div className="flex gap-3 shrink-0">
+          <div className="flex flex-wrap gap-3 shrink-0">
             <Link href="/publicar-mascota">
               <Button variant="outline" className="rounded-2xl border-amber-200 text-amber-700 hover:bg-amber-50">
                 <Plus className="w-4 h-4 mr-2" /> {t("adoptions.publishPet")}
@@ -242,7 +242,7 @@ export default function Adoptions() {
           )}
         </Button>
         {/* Quick filters */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[
             { key: "urgent", value: "true", labelKey: "adoptions.filterUrgent" },
             { key: "vaccinated", value: "true", labelKey: "adoptions.filterVaccinated" },

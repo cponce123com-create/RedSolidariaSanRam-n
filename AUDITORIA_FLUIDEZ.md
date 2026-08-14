@@ -115,3 +115,38 @@ Nuevo helper `src/lib/image-url.ts` (`optimizeImageUrl`) que añade `f_auto,q_au
 - `vite.config.ts` — split de vendor conservador (`vendor-react`, `vendor-ui`).
 - `src/components/shared/CampaignCard.tsx`, `src/pages/adoptions.tsx`, `news.tsx`, `urgent-cases.tsx`, `pet-detail.tsx`, `allies.tsx`, `campaign-transparency.tsx`, `campaign-detail.tsx`, `home.tsx` — lazy loading + `optimizeImageUrl` + `React.memo`.
 - `tests/vitest/image-url.test.ts` — tests del helper (nuevo).
+
+---
+
+## 6. Optimización de la versión móvil (14 de agosto de 2026)
+
+**Alcance:** auditoría móvil específica (navegación, responsive, touch targets, safe-areas, rendimiento táctil) y correcciones aplicadas en 25 archivos. La auditoría detectó 30 hallazgos (H1–H30); a continuación los aplicados y los descartados con su motivo.
+
+### 6.1 Correcciones aplicadas ✅
+
+| Área | Cambio | Hallazgos |
+|---|---|---|
+| Safe-areas iOS | `viewport-fit=cover` en `index.html` + `env(safe-area-inset-bottom)` en bottom nav, `main` (`pb-[calc(3.5rem+env(...))]`) y WhatsApp flotante | H7, H21, H8 |
+| Navegación móvil | Bottom nav 6 → **5 items** (el 6º DONAR duplicaba `/campanas` y robaba ancho en 320px); touch target ≥52px; menú hamburguesa sin enlaces duplicados (CTAs repetidos eliminados); `LanguageSwitcher` oculto en <sm (el header desbordaba en 320px) | H2, H3, H4, H6 |
+| Padding bajo header fijo | `pt-24 sm:pt-28` en 10 páginas que quedaban ocultas bajo el header de 80px (`allies`, `animal-welfare`, `how-to-help`, `urgent-cases`, `report-form`, `volunteer`, `adoptions`, `pet-detail`, `submit-pet`, `HomeHero`) | H1 |
+| Touch targets | Botones admin `h-8 w-8` → `h-10 w-10` (16); switches `w-10 h-5` → `w-12 h-7` (8); flechas de carrusel `w-9 h-9` → `w-11 h-11`; grid sexo/edad/tamaño apilado en móvil | H17, H18, H29, H9 |
+| Funcionalidad táctil | Borrado de imagen de galería del admin ya **siempre visible en táctil** (`opacity-100 sm:opacity-0 sm:group-hover:opacity-100`); antes era solo-hover → inutilizable en móvil | H13 |
+| `prefers-reduced-motion` | `MotionConfig reducedMotion="user"` en `App.tsx` + media query global en `index.css`; `hover-elevate` solo en `@media (hover: hover)` (evita el "salto" en el primer tap) | H23, H25, H28 |
+| Diálogos móviles | `DialogContent` con margen lateral (`w-[calc(100%-2rem)]`) y `max-h-[85dvh] overflow-y-auto` | H12 |
+| CSS utilitario | `-webkit-tap-highlight-color: transparent`, `text-size-adjust: 100%`, `.hide-scrollbar` definido (la clase ya se usaba en tabs del admin) | H19, H23 |
+| Responsive 320px | CTAs y quick-filters de `/adopciones` con `flex-wrap` | H10, H11 |
+
+### 6.2 Recomendaciones NO implementadas (decisión documentada)
+
+| # | Recomendación | Motivo |
+|---|---|---|
+| 1 | Botones base del sistema < 44px (`button.tsx`: default 36px, sm 32px, icon 36px) | Cambio sistémico que altera el look de cientos de instancias; requiere decisión de diseño. Se subieron los casos móviles críticos (admin, carrusel, bottom nav). |
+| 2 | Sticky table header + indicador de scroll horizontal en tablas admin | Las tablas ya scrollean (`ui/table.tsx` con `overflow-auto`); sticky añade riesgo visual sin beneficio claro. |
+| 3 | Recorte de pesos de fuentes Google (9 → 4) | La carga ya es no-bloqueante (`media="print"` + onload); el recorte es una optimización marginal. |
+| 4 | Manifest/PWA | Fuera de alcance (recomendación de infraestructura). |
+| 5 | Overlays hover-only decorativos en `campaign-transparency` (ojo) y `admin/report-detail` (enlace externo) | Decorativos sobre elementos ya clicables; no bloquean funcionalidad. |
+
+### 6.3 Validación
+
+- `pnpm typecheck` OK · `pnpm build` OK (entry 285.96 kB / gzip 84.53 kB) · `pnpm test` **33/33** (11 node + 22 vitest).
+- 25 archivos modificados (19 públicos/core + 8 admin — 2 en ambos listados).

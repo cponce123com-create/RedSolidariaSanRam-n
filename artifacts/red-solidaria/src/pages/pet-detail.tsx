@@ -133,7 +133,7 @@ export default function PetDetail() {
   const healthInfo = HEALTH_LABELS[pet.healthStatus] || { labelKey: "", color: "text-foreground" };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 sm:py-16">
+    <div className="max-w-5xl mx-auto px-4 pt-24 sm:pt-28 pb-10 sm:pb-16">
       {/* Back nav */}
       <Link href="/adopciones">
         <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
@@ -171,11 +171,11 @@ export default function PetDetail() {
                 {photos.length > 1 && (
                   <>
                     <button onClick={() => setPhotoIdx(i => (i - 1 + photos.length) % photos.length)}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/90 rounded-full flex items-center justify-center shadow-md hover:bg-card transition-colors">
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 bg-card/90 rounded-full flex items-center justify-center shadow-md hover:bg-card transition-colors">
                       <ChevronLeft className="w-5 h-5" />
                     </button>
                     <button onClick={() => setPhotoIdx(i => (i + 1) % photos.length)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-card/90 rounded-full flex items-center justify-center shadow-md hover:bg-card transition-colors">
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 bg-card/90 rounded-full flex items-center justify-center shadow-md hover:bg-card transition-colors">
                       <ChevronRight className="w-5 h-5" />
                     </button>
                     <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
@@ -401,15 +401,15 @@ export default function PetDetail() {
                       <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
                         <p className="text-sm font-medium">{t("petDetail.formHasYard")}</p>
                         <button type="button" role="switch" aria-checked={form.watch("hasYard")} onClick={() => form.setValue("hasYard", !form.watch("hasYard"))}
-                          className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("hasYard") ? "bg-primary" : "bg-border"}`}>
-                          <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("hasYard") ? "translate-x-5" : "translate-x-0.5"}`} />
+                          className={`relative w-12 h-7 rounded-full transition-colors ${form.watch("hasYard") ? "bg-primary" : "bg-border"}`}>
+                          <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch("hasYard") ? "translate-x-6" : "translate-x-1"}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
                         <p className="text-sm font-medium">{t("petDetail.formPetExperience")}</p>
                         <button type="button" role="switch" aria-checked={form.watch("hasPetExperience")} onClick={() => form.setValue("hasPetExperience", !form.watch("hasPetExperience"))}
-                          className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("hasPetExperience") ? "bg-primary" : "bg-border"}`}>
-                          <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("hasPetExperience") ? "translate-x-5" : "translate-x-0.5"}`} />
+                          className={`relative w-12 h-7 rounded-full transition-colors ${form.watch("hasPetExperience") ? "bg-primary" : "bg-border"}`}>
+                          <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch("hasPetExperience") ? "translate-x-6" : "translate-x-1"}`} />
                         </button>
                       </div>
                     </div>
@@ -439,8 +439,8 @@ export default function PetDetail() {
                         <p className="text-xs text-muted-foreground">{t("petDetail.formFollowUpHint")}</p>
                       </div>
                       <button type="button" role="switch" aria-checked={form.watch("acceptsFollowUp")} onClick={() => form.setValue("acceptsFollowUp", !form.watch("acceptsFollowUp"))}
-                        className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("acceptsFollowUp") ? "bg-primary" : "bg-border"}`}>
-                        <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("acceptsFollowUp") ? "translate-x-5" : "translate-x-0.5"}`} />
+                        className={`relative w-12 h-7 rounded-full transition-colors ${form.watch("acceptsFollowUp") ? "bg-primary" : "bg-border"}`}>
+                        <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch("acceptsFollowUp") ? "translate-x-6" : "translate-x-1"}`} />
                       </button>
                     </div>
 

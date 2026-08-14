@@ -85,8 +85,8 @@ function FaqForm({ item, onSave, onCancel }: { item?: FaqItem; onSave: () => voi
           <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
             <p className="text-sm font-medium">Activa (visible en web)</p>
             <button type="button" onClick={() => form.setValue("active", !form.watch("active"))}
-              className={`relative w-10 h-5 rounded-full transition-colors ${form.watch("active") ? "bg-primary" : "bg-border"}`}>
-              <span className={`absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform ${form.watch("active") ? "translate-x-5" : "translate-x-0.5"}`} />
+              className={`relative w-12 h-7 rounded-full transition-colors ${form.watch("active") ? "bg-primary" : "bg-border"}`}>
+              <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch("active") ? "translate-x-6" : "translate-x-1"}`} />
             </button>
           </div>
           <div className="flex gap-3">
@@ -184,16 +184,16 @@ export default function AdminFaq() {
                       <p className="text-sm text-muted-foreground leading-relaxed">{f.answer}</p>
                     </div>
                     <div className="flex gap-1.5 shrink-0">
-                      <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0"
+                      <Button size="sm" variant="outline" className="rounded-lg h-10 w-10 p-0"
                         onClick={() => toggleActive.mutate({ id: f.id, active: !f.active })}
                         title={f.active ? "Ocultar" : "Mostrar"}
                         aria-label={f.active ? `Ocultar pregunta ${f.question}` : `Mostrar pregunta ${f.question}`}>
                         {f.active ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                       </Button>
-                      <Button size="sm" variant="outline" className="rounded-lg h-8 w-8 p-0" onClick={() => setEditing(f)} aria-label={`Editar pregunta ${f.question}`}>
+                      <Button size="sm" variant="outline" className="rounded-lg h-10 w-10 p-0" onClick={() => setEditing(f)} aria-label={`Editar pregunta ${f.question}`}>
                         <Edit2 className="w-3.5 h-3.5" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="rounded-lg h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
+                      <Button size="sm" variant="ghost" className="rounded-lg h-10 w-10 p-0 text-destructive hover:bg-destructive/10"
                         onClick={() => { if (confirm("¿Eliminar esta pregunta?")) deleteItem.mutate(f.id); }} aria-label={`Eliminar pregunta ${f.question}`}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>

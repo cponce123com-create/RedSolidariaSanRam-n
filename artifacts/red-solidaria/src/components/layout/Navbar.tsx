@@ -198,8 +198,10 @@ export function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Idioma */}
-            <LanguageSwitcher />
+            {/* Idioma — solo ≥sm: en móvil vive dentro del menú hamburguesa */}
+            <div className="hidden sm:block">
+              <LanguageSwitcher />
+            </div>
 
             {/* Toggle claro/oscuro */}
             <Button
@@ -225,7 +227,7 @@ export function Navbar() {
 
             {/* DONAR — siempre visible (también en móvil) */}
             <Link href="/campanas">
-              <Button className="rounded-full gap-2 font-semibold shadow-lg shadow-primary/25 hover-elevate text-sm px-4 h-9">
+              <Button className="rounded-full gap-2 font-semibold shadow-lg shadow-primary/25 hover-elevate text-sm px-3 sm:px-4 h-9">
                 <Heart className="w-4 h-4" />
                 {t("nav.donate")}
               </Button>
@@ -272,7 +274,7 @@ export function Navbar() {
                 </Link>
               </div>
 
-              {ALL_LINKS.map((link) => {
+              {ALL_LINKS.filter((l) => l.href !== "/reportar" && l.href !== "/como-ayudar").map((link) => {
                 const Icon = link.icon;
                 return (
                   <Link
@@ -299,12 +301,6 @@ export function Navbar() {
               })}
 
               <div className="border-t border-border mt-2 pt-2 space-y-2">
-                <Link href="/reportar" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full rounded-xl gap-2 font-semibold border-orange-300 text-orange-700 hover:bg-orange-50">
-                    <AlertTriangle className="w-4 h-4" />
-                    {t("nav.reportCase")}
-                  </Button>
-                </Link>
                 <Link href="/campanas" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button className="w-full rounded-xl gap-2 font-semibold">
                     <Heart className="w-4 h-4" />

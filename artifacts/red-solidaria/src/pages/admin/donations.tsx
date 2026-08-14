@@ -410,7 +410,7 @@ export default function AdminDonations() {
                       <Button 
                         size="icon" 
                         variant="outline" 
-                        className="h-8 w-8 text-accent border-accent/20 hover:bg-accent/10 hover:text-accent rounded-lg"
+                        className="h-10 w-10 text-accent border-accent/20 hover:bg-accent/10 hover:text-accent rounded-lg"
                         disabled={d.status === 'approved' || updateStatus.isPending}
                         onClick={() => handleApprove(d.id)}
                         title="Aprobar"
@@ -421,7 +421,7 @@ export default function AdminDonations() {
                       <Button 
                         size="icon" 
                         variant="outline" 
-                        className="h-8 w-8 text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive rounded-lg"
+                        className="h-10 w-10 text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive rounded-lg"
                         disabled={d.status === 'rejected' || updateStatus.isPending}
                         onClick={() => setRejectDialogId(d.id)}
                         title="Rechazar"
