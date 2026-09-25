@@ -66,3 +66,9 @@ pnpm audit --prod                                     # 0 vulnerabilidades
 s embebidas 001-007 (`lib/db/src/migrate.ts`) corren al boot
 - Matar postgres: `pkill -9 -x postgres` (NUNCA `-f`: la URL de la DB contiene "postgres" y mataría el propio shell)
 - El sandbox mata procesos en background al terminar cada comando: el E2E debe ir completo en un solo comando
+
+## Registro — Auditoría IV (25/09/2026)
+
+- CI remota confirmada rota por dos causas (pnpm v9 vs packageManager v10; Lighthouse apunta a redsolidariasanramon.org que no resuelve — la app vive en redsolidariasanram-n.onrender.com).
+- Fix pnpm publicado como rama `ci/pnpm-v10-fix` (no fusionable con PAT sin scope `workflow`).
+- Verificado: 172/172 tests, audit --prod 0 vulnerabilidades, build OK.
