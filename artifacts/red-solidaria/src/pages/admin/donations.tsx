@@ -335,8 +335,9 @@ export default function AdminDonations() {
             {isLoading ? (
               <TableRow><TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Cargando donaciones...</TableCell></TableRow>
             ) : filteredDonations.length > 0 ? (
-              filteredDonations.map(d => (
-                <TableRow key={d.id}>
+              filteredDonations.map((d, i) => (
+                // Fallback indexado: donaciones stale sin id no deben producir key={undefined}
+                <TableRow key={d.id ?? `stale-${i}`}>
                   <TableCell className="text-sm whitespace-nowrap text-muted-foreground">
                     {formatDate(d.createdAt)}
                   </TableCell>

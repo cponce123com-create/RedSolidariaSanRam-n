@@ -1,4 +1,3 @@
-```
 # Dependencies
 node_modules/
 
@@ -6,13 +5,12 @@ node_modules/
 build/
 dist/
 *.tsbuildinfo
-*.js
 
 # Environment
 .env
 .env.local
-.idx/
 .env.*
+.idx/
 
 # Editors
 .vscode/
@@ -52,9 +50,3 @@ Thumbs.db
 .pytest_cache/
 target/
 .gradle/
-```
-# Build outputs (corregido: los bloques ``` impedían que las reglas se aplicaran)
-node_modules/
-dist/
-build/
-*.tsbuildinfo
