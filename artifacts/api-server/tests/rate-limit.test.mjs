@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+// Los bundles de rutas traen @workspace/db inline, que exige DATABASE_URL al
+// importarse y abre un pool pg real. Al hacer fetch a un handler que consulta
+// la DB (sin servidor escuchando), el fallo de conexión llega DESENCADENADO
+// tras terminar el test y el runner lo cuenta como unchase exception que
+// hace fallar rate-limit.test.mjs. Con una URL inválida pero sintácticamente
+// correcta, pg falla rápido en la resolución de host y dentro del ciclo de
+// vida del test (el error lo traga el errorHandler de cada caso).
+process.env.DATABASE_URL ??= "postgresql://test:test@127.0.0.1:1/test";
+
 // Regresión: si un keyGenerator volviera a usar req.ip sin ipKeyGenerator,
 // express-rate-limit v8 lanza ERR_ERL_KEY_GEN_IPV6 al importar el módulo.
 test("rate-limit: los limiters cargan sin lanzar ValidationError de IPv6", async () => {

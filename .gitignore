@@ -53,3 +53,8 @@ Thumbs.db
 target/
 .gradle/
 ```
+# Build outputs (corregido: los bloques ``` impedían que las reglas se aplicaran)
+node_modules/
+dist/
+build/
+*.tsbuildinfo

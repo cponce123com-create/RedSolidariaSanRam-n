@@ -1,11 +1,13 @@
 # Roadmap y Estado — Red Solidaria San Ramón
 
-> Última actualización: 2026-08-11 · HEAD: `ab83e90` (Fases 3, 4 y 5 implementadas localmente, sin commitear)
+> Última actualización: 2026-09-25 · HEAD: `2dec29d` (optimización móvil) + mantenimiento de auditoría
 
 ## 🏁 Historial reciente (commits en `origin/main`)
 
 | Commit | Contenido |
 |---|---|
+| `2dec29d` | feat(mobile): optimización de la versión móvil |
+| (mantenimiento 25/09) | Fix test `rate-limit` (default `DATABASE_URL` de prueba), override `qs@^6.16.0` (0 vulns prod), `.gitignore` funcional y `node_modules/`+`dist/` fuera del índice, defaults `PORT`/`BASE_PATH` en mockup-sandbox para `pnpm -r build`, contadores de tests actualizados en README |
 | `ab83e90` | Docs: roadmap y estado del proyecto — pendientes para continuar |
 | `baae82a` | Rediseño frontend **fase 2**: mapa de campañas (leaflet lazy, migración 007 lat/lng, toggle Grilla/Mapa, campos en admin) |
 | `ce59a27` | Rediseño frontend **fase 1**: dark mode (paleta `.dark`, toggle, anti-FOUC), `EmptyState`, skeletons con tokens |

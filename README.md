@@ -150,10 +150,10 @@ ADMIN_PASSWORD=genera-una-contraseña-segura
 ## 🧪 Testing
 
 ```bash
-# API server (node:test) — 87 tests
+# API server (node:test) — 139 tests
 pnpm --filter @workspace/api-server test
 
-# Frontend (vitest + node:test) — 26 tests (15 Vitest + 11 node:test): i18n, login/2FA, ledger, donación
+# Frontend (vitest + node:test) — 33 tests (22 Vitest + 11 node:test): i18n, login/2FA, ledger, donación
 pnpm --filter @workspace/red-solidaria test
 
 # Typecheck de todo el workspace

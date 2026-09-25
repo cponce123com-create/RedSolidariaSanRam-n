@@ -45,7 +45,7 @@ overrides:
   # Parches de seguridad para transits de express/express-rate-limit:
   # los rangos semver de los padres no alcanzan las versiones parcheadas
   # (qs DoS, body-parser DoS, path-to-regexp DoS/ReDoS, ip-address SSRF/XSS).
-  qs: ^6.15.2
+  qs: ^6.16.0
   body-parser: ^2.3.0
   path-to-regexp: ^8.4.0
   ip-address: ^10.3.1
