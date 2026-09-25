@@ -279,6 +279,10 @@ export interface AdminLoginInput {
 export interface AdminUser {
   id: number;
   username: string;
+  /** Nombre visible del admin (null para el superadmin de archivo, id 0). */
+  name?: string | null;
+  /** Rol operativo; ver enum AdminRole del OpenAPI spec. */
+  role: "superadmin" | "administrador" | "moderador";
 }
 
 export interface AdminLoginResponse {

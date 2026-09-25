@@ -99,7 +99,7 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
     clearFailedAttempts(user.id);
     await db.update(adminUsersTable).set({ lastLoginAt: new Date() }).where(eq(adminUsersTable.id, user.id));
 
-    (req.session as any).adminUser = {
+    req.session.adminUser = {
       id: user.id,
       username: user.username,
       name: user.name,
@@ -129,7 +129,8 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
 
 // ─── POST /admin/2fa/setup — genera un secreto para el usuario logueado ───────
 router.post("/admin/2fa/setup", requireAdmin, adminActionLimiter, async (req, res) => {
-  const admin = (req.session as any).adminUser;
+  const admin = req.session.adminUser;
+  if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
   try {
     const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, admin.id));
     if (!user) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
@@ -165,7 +166,8 @@ router.post("/admin/2fa/verify", requireAdmin, adminActionLimiter, async (req, r
   const parsed = codeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "validation_error", message: "Código de 6 dígitos requerido" });
   const { code } = parsed.data;
-  const admin = (req.session as any).adminUser;
+  const admin = req.session.adminUser;
+  if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
 
   try {
     const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, admin.id));
@@ -213,7 +215,8 @@ router.post("/admin/2fa/disable", requireAdmin, adminActionLimiter, async (req, 
   const parsed = codeSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "validation_error", message: "Código de 6 dígitos requerido" });
   const { code } = parsed.data;
-  const admin = (req.session as any).adminUser;
+  const admin = req.session.adminUser;
+  if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
 
   try {
     const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, admin.id));
@@ -258,7 +261,7 @@ router.post("/admin/2fa/disable", requireAdmin, adminActionLimiter, async (req, 
 
 // ─── POST /admin/users/:id/2fa/reset — escape hatch: superadmin desactiva 2FA ─
 router.post("/admin/users/:id/2fa/reset", requireAdmin, adminActionLimiter, async (req, res) => {
-  const admin = (req.session as any).adminUser;
+  const admin = req.session.adminUser;
   const isSuper = admin && (admin.role === "superadmin" || admin.id === 0);
   if (!isSuper) return res.status(403).json({ error: "Solo superadmin" });
 
@@ -295,7 +298,8 @@ router.post("/admin/users/:id/2fa/reset", requireAdmin, adminActionLimiter, asyn
 // ─── GET /admin/2fa/status — estado de 2FA del usuario logueado ──────────────
 // (nunca expone el secreto)
 router.get("/admin/2fa/status", requireAdmin, async (_req, res) => {
-  const admin = (_req.session as any).adminUser;
+  const admin = _req.session.adminUser;
+  if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
   try {
     const [user] = await db
       .select({ twoFactorEnabled: adminUsersTable.twoFactorEnabled })

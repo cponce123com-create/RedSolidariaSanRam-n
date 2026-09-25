@@ -79,7 +79,7 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
           .set({ lastLoginAt: new Date() })
           .where(eq(adminUsersTable.id, dbUser.id));
         
-        (req.session as any).adminUser = {
+        req.session.adminUser = {
           id: dbUser.id,
           username: dbUser.username,
           name: dbUser.name,
@@ -123,7 +123,7 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       
       if (isValid) {
         const user = { id: 0, username, name: "Superadmin", role: "superadmin" };
-        (req.session as any).adminUser = user;
+        req.session.adminUser = user;
         
         // Audit log
         await logAuditAction({
@@ -168,7 +168,7 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
 });
 
 router.post("/admin/logout", async (req, res) => {
-  const adminUser = (req.session as any).adminUser;
+  const adminUser = req.session.adminUser;
   
   // Audit log para logout
   if (adminUser) {
@@ -183,14 +183,14 @@ router.post("/admin/logout", async (req, res) => {
     });
   }
   
-  (req.session as any).adminUser = null;
+  req.session.adminUser = null;
   req.session.destroy(() => {
     res.json({ success: true, message: "Sesión cerrada" });
   });
 });
 
 router.get("/admin/me", (req, res) => {
-  const adminUser = (req.session as any).adminUser;
+  const adminUser = req.session.adminUser;
   if (!adminUser) return res.status(401).json({ error: "unauthorized", message: "No autenticado" });
   return res.json(adminUser);
 });

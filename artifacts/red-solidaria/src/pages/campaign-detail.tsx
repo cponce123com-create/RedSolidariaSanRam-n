@@ -61,8 +61,9 @@ export default function CampaignDetail() {
           text: t("campaignDetail.shareText", { title: campaign.title }),
           url: window.location.href,
         });
-      } catch (err) {
-        console.log("Error sharing", err);
+      } catch {
+        // El usuario canceló el diálogo nativo de compartir (AbortError) o
+        // falló; no es un error accionable ni debe quedar en la consola.
       }
     } else {
       navigator.clipboard.writeText(window.location.href);

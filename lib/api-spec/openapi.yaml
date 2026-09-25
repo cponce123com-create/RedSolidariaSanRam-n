@@ -1342,6 +1342,10 @@ components:
           $ref: "#/components/schemas/AdminUser"
       required: [success, message]
 
+    AdminRole:
+      type: string
+      enum: [superadmin, administrador, moderador]
+
     AdminUser:
       type: object
       properties:
@@ -1349,7 +1353,12 @@ components:
           type: integer
         username:
           type: string
-      required: [id, username]
+        name:
+          type: string
+          nullable: true
+        role:
+          $ref: "#/components/schemas/AdminRole"
+      required: [id, username, role]
 
     SuccessResponse:
       type: object

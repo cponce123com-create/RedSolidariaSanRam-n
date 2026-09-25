@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Target, FileText, LogOut, MessageSquare, DollarSign, Menu, X,
   AlertTriangle, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck, Settings
 } from "lucide-react";
-import { useAdminLogout, useGetAdminMe } from "@workspace/api-client-react";
+import { useAdminLogout, useGetAdminMe, type AdminUser } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -27,10 +27,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     logoutMutation.mutate(undefined, { onSuccess: () => setLocation("/admin/login") });
   };
 
-  const isSuperAdmin = (user as any).role === "superadmin" || (user as any).id === 0;
-  const isModerator = (user as any).role === "moderador";
+  // El superadmin de respaldo por env var no vive en DB y usa id 0.
+  const isSuperAdmin = user.role === "superadmin" || user.id === 0;
+  const isModerator = user.role === "moderador";
 
-  const navGroups = [
+  // Propiedades visuales/opcionales del ítem de navegación (sin index signature,
+  // ya que los literales de cada grupo infieren formas distintas).
+  type NavItem = { href: string; icon: React.ComponentType<{ className?: string }>; label: string } & {
+    exact?: boolean; highlight?: boolean; animal?: boolean; system?: boolean;
+  };
+
+  const navGroups: { label: string; items: NavItem[] }[] = [
     {
       label: "General",
       items: [
@@ -75,17 +82,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-1.5">{group.label}</p>
           <div className="space-y-0.5">
             {group.items.map((item) => {
-              const isActive = (item as any).exact ? location === item.href || location === "" : location.startsWith(item.href);
+              const isActive = item.exact ? location === item.href || location === "" : location.startsWith(item.href);
               return (
                 <Link key={item.href} href={item.href} onClick={onNavigate}>
                   <span className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors cursor-pointer ${
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
-                      : (item as any).highlight && !isActive
+                      : item.highlight && !isActive
                       ? "text-orange-700 hover:bg-orange-50 hover:text-orange-800"
-                      : (item as any).animal && !isActive
+                      : item.animal && !isActive
                       ? "text-amber-700 hover:bg-amber-50 hover:text-amber-800"
-                      : (item as any).system && !isActive
+                      : item.system && !isActive
                       ? "text-purple-700 hover:bg-purple-50 hover:text-purple-800"
                       : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                   }`}>
@@ -135,8 +142,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {renderNav(() => setMobileNavOpen(false))}
             <div className="p-4 border-t border-border">
               <div className="mb-3 px-3">
-                <p className="text-sm font-semibold text-foreground">{(user as any).name || user?.username}</p>
-                <p className="text-xs text-muted-foreground capitalize">{(user as any).role || "admin"}</p>
+                <p className="text-sm font-semibold text-foreground">{user.name || user.username}</p>
+                <p className="text-xs text-muted-foreground capitalize">{user.role || "admin"}</p>
               </div>
               <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl h-10 text-sm" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-3" /> Cerrar Sesión
@@ -160,8 +167,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {renderNav()}
         <div className="p-4 border-t border-border">
           <div className="mb-3 px-3">
-            <p className="text-sm font-semibold text-foreground">{(user as any).name || user?.username}</p>
-            <p className="text-xs text-muted-foreground capitalize">{(user as any).role || "admin"}</p>
+            <p className="text-sm font-semibold text-foreground">{user.name || user.username}</p>
+            <p className="text-xs text-muted-foreground capitalize">{user.role || "admin"}</p>
           </div>
           <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl h-10 text-sm" onClick={handleLogout}>
             <LogOut className="w-4 h-4 mr-3" /> Cerrar Sesión

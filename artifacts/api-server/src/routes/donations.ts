@@ -269,7 +269,7 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
     }
 
     // Auditoría: quién aprobó/rechazó y con qué nota
-    const admin = (req.session as any).adminUser;
+    const admin = req.session.adminUser;
     await logAuditAction({
       userId: admin?.id ?? null,
       username: admin?.username ?? null,

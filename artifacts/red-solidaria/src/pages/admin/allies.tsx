@@ -90,7 +90,7 @@ function AllyForm({ ally, onSave, onCancel }: { ally?: Ally; onSave: () => void;
   const BOOL_TOGGLE = (label: string, key: keyof AllyFormValues) => (
     <div className="flex items-center justify-between bg-secondary/40 rounded-xl p-3">
       <p className="text-sm font-medium">{label}</p>
-      <button type="button" onClick={() => form.setValue(key, !form.watch(key) as any)}
+      <button type="button" onClick={() => form.setValue(key, !form.watch(key))}
         className={`relative w-12 h-7 rounded-full transition-colors ${form.watch(key) ? "bg-primary" : "bg-border"}`}>
         <span className={`absolute top-1 w-5 h-5 bg-card rounded-full shadow transition-transform ${form.watch(key) ? "translate-x-6" : "translate-x-1"}`} />
       </button>

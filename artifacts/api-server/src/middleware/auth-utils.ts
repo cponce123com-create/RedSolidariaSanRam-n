@@ -3,16 +3,21 @@ import { db, auditLogsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 
 // Augmentación de tipos para la sesión de admin (express-session)
+/**
+ * Forma canónica del usuario admin guardado en la sesión.
+ * `role` es `string` (no el enum estricto) para tolerar roles legados que
+ * aún existan en filas antiguas sin romper el login.
+ */
+export type SessionAdminUser = {
+  id: number;
+  username: string;
+  name: string | null;
+  role: string;
+};
+
 declare module "express-session" {
   interface SessionData {
-    adminUser?:
-      | {
-          id: number;
-          username: string;
-          name: string | null;
-          role: string;
-        }
-      | null;
+    adminUser?: SessionAdminUser | null;
   }
 }
 

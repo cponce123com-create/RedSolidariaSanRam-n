@@ -5,8 +5,15 @@
  * Red Solidaria San Ramón API
  * OpenAPI spec version: 0.2.0
  */
+import { z } from "zod";
 
-export interface AdminUser {
-  id: number;
-  username: string;
-}
+export const AdminRoleSchema = z.enum(["superadmin", "administrador", "moderador"]);
+export type AdminRole = z.infer<typeof AdminRoleSchema>;
+
+export const AdminUserSchema = z.object({
+  id: z.number(),
+  username: z.string(),
+  name: z.string().nullable(),
+  role: AdminRoleSchema,
+});
+export type AdminUser = z.infer<typeof AdminUserSchema>;

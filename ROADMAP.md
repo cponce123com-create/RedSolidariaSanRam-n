@@ -1,6 +1,6 @@
 # Roadmap y Estado — Red Solidaria San Ramón
 
-> Última actualización: 2026-09-25 · HEAD: `2dec29d` (optimización móvil) + mantenimiento de auditoría
+> Última actualización: 2026-09-25 (auditoría integral) · HEAD: `ca509ec` + mantenimiento II
 
 ## 🏁 Historial reciente (commits en `origin/main`)
 
@@ -8,6 +8,7 @@
 |---|---|
 | `2dec29d` | feat(mobile): optimización de la versión móvil |
 | (mantenimiento 25/09) | Fix test `rate-limit` (default `DATABASE_URL` de prueba), override `qs@^6.16.0` (0 vulns prod), `.gitignore` funcional y `node_modules/`+`dist/` fuera del índice, defaults `PORT`/`BASE_PATH` en mockup-sandbox para `pnpm -r build`, contadores de tests actualizados en README |
+| (mantenimiento II 25/09) | Alineación de versiones CI/toolchain (`packageManager: pnpm@10`, `ci.yml`: pnpm action v9→v10; se verificó que pnpm 9 rechaza el lockfile con `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`), smoke test E2E del bundle de producción servido sin DB (SPA + `/api/health` + CSP ok), eliminación del último `console.log` en frontend, contador de tests API corregido en ROADMAP (65→139) |
 | `ab83e90` | Docs: roadmap y estado del proyecto — pendientes para continuar |
 | `baae82a` | Rediseño frontend **fase 2**: mapa de campañas (leaflet lazy, migración 007 lat/lng, toggle Grilla/Mapa, campos en admin) |
 | `ce59a27` | Rediseño frontend **fase 1**: dark mode (paleta `.dark`, toggle, anti-FOUC), `EmptyState`, skeletons con tokens |
@@ -52,7 +53,7 @@
 ```bash
 export PATH="/home/user/.global_modules/bin:$PATH"   # el PATH del sandbox no expande ~
 pnpm typecheck
-pnpm --filter @workspace/api-server test              # 65 tests (node:test + esbuild harness)
+pnpm --filter @workspace/api-server test              # 139 tests (node:test + esbuild harness)
 pnpm --filter @workspace/api-server run build
 pnpm --filter @workspace/red-solidaria run build
 pnpm audit --prod                                     # 0 vulnerabilidades
