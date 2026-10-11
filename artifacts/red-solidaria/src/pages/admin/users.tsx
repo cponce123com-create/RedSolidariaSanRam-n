@@ -28,7 +28,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 const userSchema = z.object({
   username: z.string().min(3, "Mínimo 3 caracteres"),
-  password: z.string().min(6, "Mínimo 6 caracteres"),
+  password: z.string().min(12, "Mínimo 12 caracteres"),
   name: z.string().min(2, "Nombre requerido"),
   email: z.string().email("Email inválido").optional().or(z.literal("")),
   role: z.string().min(1),
