@@ -24,7 +24,7 @@ export const adminUsersTable = pgTable("admin_users", {
 export const insertAdminUserSchema = createInsertSchema(adminUsersTable)
   .omit({ id: true, createdAt: true, lastLoginAt: true, passwordChangedAt: true, twoFactorSecret: true, twoFactorEnabled: true })
   .extend({
-    password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+    password: z.string().min(12, "La contraseña debe tener al menos 12 caracteres"),
   });
 
 export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
