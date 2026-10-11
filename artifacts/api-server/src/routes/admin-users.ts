@@ -97,8 +97,8 @@ router.patch("/admin/users/:id", async (req, res) => {
 
   // Si se cambia la contraseña, hashearla y actualizar timestamp
   if (password) {
-    if (typeof password !== "string" || password.length < 6) {
-      return res.status(400).json({ error: "La contraseña debe tener al menos 6 caracteres" });
+    if (typeof password !== "string" || password.length < 12) {
+      return res.status(400).json({ error: "La contraseña debe tener al menos 12 caracteres" });
     }
     updateData.password = await hashPassword(password);
     updateData.passwordChangedAt = new Date();

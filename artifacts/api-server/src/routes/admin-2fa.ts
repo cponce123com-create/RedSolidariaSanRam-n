@@ -6,6 +6,7 @@ import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter, loginLimiter } from "../middleware/rate-limit";
 import { logAuditAction } from "../middleware/auth-utils";
 import { buildOtpauthUri, generateSecret, verifyTOTP } from "../lib/totp";
+import { establishAdminSession } from "../lib/session-security";
 import {
   clearFailedAttempts,
   getLockoutRemainingMs,
@@ -99,12 +100,12 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
     clearFailedAttempts(user.id);
     await db.update(adminUsersTable).set({ lastLoginAt: new Date() }).where(eq(adminUsersTable.id, user.id));
 
-    req.session.adminUser = {
+    await establishAdminSession(req, {
       id: user.id,
       username: user.username,
       name: user.name,
       role: user.role,
-    };
+    });
 
     await logAuditAction({
       userId: user.id,

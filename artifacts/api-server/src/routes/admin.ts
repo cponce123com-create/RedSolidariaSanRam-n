@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword, logAuditAction } from "../middleware/auth
 import { loginLimiter } from "../middleware/rate-limit";
 import { logger } from "../lib/logger";
 import { generateRandomPassword } from "../lib/random-password";
+import { establishAdminSession } from "../lib/session-security";
 
 const router: IRouter = Router();
 
@@ -79,12 +80,12 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
           .set({ lastLoginAt: new Date() })
           .where(eq(adminUsersTable.id, dbUser.id));
         
-        req.session.adminUser = {
+        await establishAdminSession(req, {
           id: dbUser.id,
           username: dbUser.username,
           name: dbUser.name,
           role: dbUser.role,
-        };
+        });
         
         // Audit log
         await logAuditAction({
@@ -123,7 +124,7 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       
       if (isValid) {
         const user = { id: 0, username, name: "Superadmin", role: "superadmin" };
-        req.session.adminUser = user;
+        await establishAdminSession(req, user);
         
         // Audit log
         await logAuditAction({
