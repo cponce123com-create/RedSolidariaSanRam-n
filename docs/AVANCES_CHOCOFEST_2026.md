@@ -201,21 +201,20 @@ Datos **aportados y confirmados por el responsable** (no inventados):
 | id | **7** |
 | Título | `ChocoFest 2026` |
 | Meta | **S/ 3000** |
-| Fecha de inicio | **2026-12-20** |
-| Fecha de fin | *(sin definir — no se inventa; editable desde el admin)* |
+| Fecha de inicio | **2026-10-13** (desde hoy) |
+| Fecha de fin | **2026-12-20** |
 | `status` / `featured` | `active` / `true` |
 | Categoría | `niñez` |
 | `raised` | `0` (se calcula de las donaciones aprobadas) |
 | Descripción | Provisional y editable desde el panel |
 
 - **Protagonismo:** `settings.protagonist_campaign_id = 7` (identificador estable).
-- **Verificado en BD:** campaña #7 activa, meta 3000, `2026-12-20`, sin duplicados (1 sola coincidencia);
+- **Verificado en BD:** campaña #7 activa, meta 3000, `2026-10-13 → 2026-12-20`, sin duplicados (1 sola coincidencia);
   el ajuste `protagonist_campaign_id = 7` existe con etiqueta y grupo `home`.
-- **Efecto esperado en la portada:** el bloque protagonista se renderiza (estado `active` y sin fecha de fin),
+- **Efecto esperado en la portada:** el bloque protagonista se renderiza (estado `active` y fin 2026-12-20, futuro),
   la campaña **no** se duplica en el listado y aparece **primera** en `/campanas`.
 
 **PENDIENTE:**
-- Confirmar la **fecha de fin** de la campaña (hoy sin definir).
 - `slug` estable para la URL permanente `/campanas/chocofest-2026` (hoy resuelve por título: requiere migración).
 - Consistencia `goal`/`raised` (`real` → `numeric`) y `CHECK` de estados (DB-06/DB-08).
 
