@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { formatSafeDate } from "@/lib/i18n/date";
 import { Plus, Trash2, Edit, Star, Search } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { ProtagonistToggle } from "@/components/admin/ProtagonistToggle";
 
 const formSchema = z.object({
   title: z.string().min(3),
@@ -206,6 +207,7 @@ export default function AdminCampaigns() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <ProtagonistToggle campaignId={c.id} />
                       <Link href={`/admin/campanas/${c.id}`}>
                         <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-medium">
                           <Edit className="w-3.5 h-3.5 mr-1.5" /> Editar

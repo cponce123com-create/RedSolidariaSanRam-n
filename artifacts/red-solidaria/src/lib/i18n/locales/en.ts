@@ -28,6 +28,8 @@ export const en: TranslationSchema = {
     logoAlt: "Red Solidaria logo",
     brand: "Red Solidaria",
     brandLocation: "San Ramón",
+    adminAccess: "Admin access",
+    adminPanel: "Admin panel",
   },
   common: {
     loading: "Loading...",
@@ -296,6 +298,14 @@ export const en: TranslationSchema = {
     campaignsSectionSubtitle:
       "Every campaign is a real story from our community. Your contribution, however small, brings it closer to a happy ending.",
     campaignsLocation: "San Ramón · Chanchamayo",
+    protagonistBadge: "Featured campaign",
+    protagonistGoalLabel: "Goal",
+    protagonistRaisedLabel: "Raised",
+    protagonistGoalPending: "Goal to be defined",
+    protagonistProgress: "{{percent}}% of the goal",
+    protagonistCtaCollaborate: "Contribute",
+    protagonistCtaLearn: "Learn about the campaign",
+    protagonistCtaVolunteer: "Volunteer",
     campaignsEmptyTitle: "No active campaigns yet",
     campaignsEmptyDesc:
       "We will publish new campaigns soon. Meanwhile, you can help in other ways.",
@@ -1256,5 +1266,11 @@ export const en: TranslationSchema = {
     checkGallery: "Photo gallery",
     checkTimeline: "Schedule / updates",
     checkTransparency: "Financial transparency",
+  },
+  adminCampaigns: {
+    protagonistSet: "Make protagonist",
+    protagonistRemove: "Remove protagonist",
+    protagonistUpdated: "Protagonist campaign updated",
+    protagonistError: "Could not update the protagonist campaign",
   },
 };

@@ -14,6 +14,7 @@ import {
   LifeBuoy,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { AdminAccessLink } from "./AdminAccessLink";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -213,6 +214,10 @@ export function Navbar() {
               <LanguageSwitcher />
             </div>
 
+            {/* Acceso al panel de administración (escritorio; en móvil vive
+                dentro del menú hamburguesa). Reutiliza la sesión existente. */}
+            <AdminAccessLink />
+
             {/* Toggle claro/oscuro */}
             <Button
               variant="ghost"
@@ -311,6 +316,10 @@ export function Navbar() {
               })}
 
               <div className="border-t border-border mt-2 pt-2 space-y-2">
+                <AdminAccessLink
+                  variant="menu-item"
+                  onNavigate={() => setIsMobileMenuOpen(false)}
+                />
                 <Link href="/campanas" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button className="w-full rounded-xl gap-2 font-semibold">
                     <Heart className="w-4 h-4" />

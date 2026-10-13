@@ -159,6 +159,45 @@
 
 ---
 
+## FASE 4 · Corrección del frontend (acceso admin + protagonismo ChocoFest 2026)
+
+**ESTADO:** ✅ Implementado · ✅ Probado
+
+**PROBLEMA 1 — falta un acceso visible al administrador (sin login paralelo):**
+- `src/components/layout/AdminAccessLink.tsx` **(nuevo)**: reutiliza la **sesión existente** (`GET /api/admin/me`).
+  Visitante → `/admin/login`; administrador autenticado → `/admin`. Icono discreto en escritorio (≥lg) y fila
+  en el menú móvil, con `aria-label`, `title` y anillo de foco (`focus-visible`).
+- `src/lib/admin-access.ts` **(nuevo)**: `resolveAdminTarget()` puro y testeable.
+- `Navbar.tsx`: enlace en la zona de acciones (escritorio) y en la sección inferior del menú móvil.
+- i18n es/en: `nav.adminAccess`, `nav.adminPanel`.
+
+**PROBLEMA 2 — ChocoFest 2026 como campaña protagonista de la portada:**
+- **Identificador ESTABLE:** `settings.protagonist_campaign_id` guarda el **id** de la campaña, nunca el título.
+  Al ser una única clave, solo puede haber **una** campaña protagonista a la vez.
+- `src/lib/chocofest.ts`: `PROTAGONIST_SETTING_KEY`, `parseProtagonistId`, `resolveProtagonist`,
+  `prioritizeCampaign`, `excludeCampaign` (funciones puras, sin red).
+- `src/components/home/ProtagonistCampaignSection.tsx` **(nuevo)**: bloque destacado navideño, ligero y responsive
+  (nombre, descripción, imagen, meta y progreso **solo con datos reales**; si no hay meta muestra «Meta por
+  definir») + accesos directos a **colaborar**, **conocer la campaña** y **voluntariado**.
+- `src/pages/home.tsx`: el bloque se renderiza justo después del hero → ChocoFest 2026 aparece **primero**.
+- `ActiveCampaignsSection.tsx`: **excluye** la protagonista (no se duplica) y mantiene visibles las demás.
+- `src/pages/campaigns.tsx`: la protagonista se muestra **primero**, respetando el filtro de estado.
+- `src/components/admin/ProtagonistToggle.tsx` **(nuevo)**, integrado en `/admin/campanas`: fija o quita el
+  protagonismo.
+- API: `PUT /api/admin/protagonist-campaign` (superadmin) con validación de entrada y *upsert*; **404** si la
+  campaña no existe.
+- **Restauración automática:** si la campaña no existe, no está publicada, no está activa o ya terminó, el bloque
+  **no se renderiza** y la portada general se mantiene, sin cifras inventadas.
+
+**PRUEBAS:** `tests/protagonist.test.mjs` (**20 pruebas**) · typecheck frontend ✅ · node **36/36** ✅ ·
+vitest **22/22** ✅ · build Vite ✅ · typecheck backend ✅ · backend **155/155** ✅ · build backend ✅.
+
+**PENDIENTE:**
+- `slug` estable para la URL permanente `/campanas/chocofest-2026` (hoy resuelve por título: requiere migración).
+- Consistencia `goal`/`raised` (`real` → `numeric`) y `CHECK` de estados (DB-06/DB-08).
+
+---
+
 ## Estado global de las unidades de trabajo
 
 | UW | Descripción | Estado |

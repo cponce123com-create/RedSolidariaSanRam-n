@@ -31,6 +31,83 @@ interface CampaignLike {
 }
 
 /**
+ * Clave de `settings` que guarda el **id** de la campaña protagonista de la
+ * portada. Es un identificador ESTABLE (id numérico), no una coincidencia de
+ * título: renombrar la campaña no rompe el protagonismo.
+ *
+ * Un único valor ⇒ solo puede haber una campaña protagonista a la vez.
+ */
+export const PROTAGONIST_SETTING_KEY = "protagonist_campaign_id";
+
+/**
+ * Convierte el valor de `settings` en un id utilizable.
+ * Devuelve `null` si está vacío, no es un entero o es <= 0; en ese caso la
+ * portada general se mantiene.
+ */
+export function parseProtagonistId(
+  value: string | number | null | undefined,
+): number | null {
+  if (value === null || value === undefined) return null;
+  const raw = typeof value === "number" ? String(value) : value.trim();
+  if (raw === "") return null;
+  const id = Number(raw);
+  if (!Number.isInteger(id) || id <= 0) return null;
+  return id;
+}
+
+interface ProtagonistCandidate {
+  status?: string | null;
+  endDate?: string | null;
+}
+
+/**
+ * Decide si una campaña puede ocupar el bloque protagonista de la portada.
+ *
+ * Devuelve `null` (⇒ se restaura la portada general) cuando:
+ *  - la campaña no existe o no se ha publicado;
+ *  - su estado no es `active`;
+ *  - ya terminó (fecha de fin anterior a hoy).
+ *
+ * Función pura: la fecha de referencia se inyecta para poder testearla.
+ */
+export function resolveProtagonist<T extends ProtagonistCandidate>(
+  campaign: T | undefined | null,
+  today: Date,
+): T | null {
+  if (!campaign) return null;
+  if ((campaign.status ?? "") !== "active") return null;
+
+  const end = campaign.endDate;
+  if (end) {
+    const endDay = String(end).slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(endDay) && endDay < today.toISOString().slice(0, 10)) {
+      return null;
+    }
+  }
+  return campaign;
+}
+
+/** Mueve la campaña protagonista al primer lugar sin duplicar ni perder ninguna. */
+export function prioritizeCampaign<T extends { id?: number | null }>(
+  campaigns: readonly T[],
+  protagonistId: number | null,
+): T[] {
+  if (protagonistId === null) return [...campaigns];
+  const protagonist = campaigns.find((c) => c.id === protagonistId);
+  if (!protagonist) return [...campaigns];
+  return [protagonist, ...campaigns.filter((c) => c.id !== protagonistId)];
+}
+
+/** Quita la campaña protagonista de una lista (evita repetirla en la portada). */
+export function excludeCampaign<T extends { id?: number | null }>(
+  campaigns: readonly T[],
+  protagonistId: number | null,
+): T[] {
+  if (protagonistId === null) return [...campaigns];
+  return campaigns.filter((c) => c.id !== protagonistId);
+}
+
+/**
  * Encuentra la campaña ChocoFest 2026 dentro de una lista de campañas públicas.
  * Coincidencia exacta por título; si no, heurística por "chocofest" + "2026".
  * Función pura y testeable.

@@ -8,22 +8,27 @@ import { CampaignCard } from "@/components/shared/CampaignCard";
 import { Skeleton } from "@/lib/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionContainer, SectionHeading } from "./SectionHeading";
+import { useProtagonistId } from "./ProtagonistCampaignSection";
+import { excludeCampaign } from "@/lib/chocofest";
 
 /**
  * "Personas que hoy necesitan de nosotros" — campañas reales del sistema.
  * Prioriza destacadas; si no hay, muestra las primeras activas.
+ *
+ * La campaña protagonista se excluye: ya tiene su propio bloque destacado en la
+ * portada, así no aparece dos veces. Las demás campañas siguen visibles.
  */
 export function ActiveCampaignsSection() {
   const { t } = useTranslation();
+  const protagonistId = useProtagonistId();
 
   const featured = useGetCampaigns({ featured: true, status: "active" });
   const active = useGetCampaigns({ status: "active" });
 
   const loading = featured.isLoading || active.isLoading;
-  const campaigns =
-    featured.data && featured.data.length > 0
-      ? featured.data.slice(0, 3)
-      : (active.data ?? []).slice(0, 3);
+  const featuredRest = excludeCampaign(featured.data ?? [], protagonistId);
+  const activeRest = excludeCampaign(active.data ?? [], protagonistId);
+  const campaigns = (featuredRest.length > 0 ? featuredRest : activeRest).slice(0, 3);
 
   return (
     <SectionContainer className="bg-background">

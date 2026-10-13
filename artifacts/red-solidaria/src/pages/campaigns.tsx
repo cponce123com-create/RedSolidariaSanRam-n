@@ -8,6 +8,8 @@ import { Package, Map as MapIcon, LayoutGrid } from "lucide-react";
 import { isUrgent, mostUrgentCampaign } from "@/lib/campaign-urgency";
 import { useTranslation } from "react-i18next";
 import SEO from "@/components/shared/SEO";
+import { prioritizeCampaign } from "@/lib/chocofest";
+import { useProtagonistId } from "@/components/home/ProtagonistCampaignSection";
 
 // Leaflet se carga solo al usar el mapa (chunk separado ~150 KB)
 const CampaignMap = lazy(() => import("@/components/shared/CampaignMap"));
@@ -17,8 +19,14 @@ export default function Campaigns() {
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const [view, setView] = useState<"grid" | "map">("grid");
   
+  const protagonistId = useProtagonistId();
+
   // Using generated hook from Orval
   const { data: campaigns, isLoading } = useGetCampaigns({ status: filter === "all" ? undefined : filter });
+
+  // La campaña protagonista se muestra primero, respetando el filtro de estado
+  // (si el filtro no la incluye, el orden no cambia).
+  const orderedCampaigns = prioritizeCampaign(campaigns ?? [], protagonistId);
 
   // Fase 3 (modo emergencia): la campaña activa que cierra más pronto se
   // destaca con un banner y countdown por encima de la grilla/mapa.
@@ -100,11 +108,11 @@ export default function Campaigns() {
             </div>
           ) : view === "map" ? (
             <Suspense fallback={<div className="h-[520px] bg-muted animate-pulse rounded-3xl" />}>
-              <CampaignMap campaigns={campaigns ?? []} />
+              <CampaignMap campaigns={orderedCampaigns} />
             </Suspense>
-          ) : campaigns && campaigns.length > 0 ? (
+          ) : orderedCampaigns.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {campaigns.map(campaign => (
+              {orderedCampaigns.map(campaign => (
                 <CampaignCard key={campaign.id} campaign={campaign} />
               ))}
             </div>

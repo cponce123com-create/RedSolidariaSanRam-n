@@ -8,6 +8,7 @@ import { TransparencySection } from "@/components/home/TransparencySection";
 import { StorySection } from "@/components/home/StorySection";
 import { VolunteerSection } from "@/components/home/VolunteerSection";
 import { FinalCtaSection } from "@/components/home/FinalCtaSection";
+import { ProtagonistCampaignSection } from "@/components/home/ProtagonistCampaignSection";
 
 // Secciones con datos pesados (mapa/Leaflet y listados) → lazy para no inflar
 // el bundle principal del home.
@@ -45,6 +46,10 @@ export default function Home() {
       <SEO title={t("seo.siteName")} description={t("seo.defaultDescription")} />
 
       <HomeHero />
+      {/* Campaña protagonista (ChocoFest 2026): solo si está configurada,
+          publicada y activa. Si no, no renderiza nada y la portada general
+          se mantiene igual. */}
+      <ProtagonistCampaignSection />
       <HowToHelpSection />
       <ActiveCampaignsSection />
       <Suspense fallback={null}>

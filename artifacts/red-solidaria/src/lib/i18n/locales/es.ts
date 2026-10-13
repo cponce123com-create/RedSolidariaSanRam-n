@@ -26,6 +26,8 @@ export const es = {
     logoAlt: "Logo de Red Solidaria",
     brand: "Red Solidaria",
     brandLocation: "San Ramón",
+    adminAccess: "Acceso administrador",
+    adminPanel: "Panel de administración",
   },
   common: {
     loading: "Cargando...",
@@ -294,6 +296,14 @@ export const es = {
     campaignsSectionSubtitle:
       "Cada campaña es una historia real de nuestra comunidad. Tu aporte, por pequeño que sea, la acerca a un final feliz.",
     campaignsLocation: "San Ramón · Chanchamayo",
+    protagonistBadge: "Campaña protagonista",
+    protagonistGoalLabel: "Meta",
+    protagonistRaisedLabel: "Recaudado",
+    protagonistGoalPending: "Meta por definir",
+    protagonistProgress: "{{percent}}% de la meta",
+    protagonistCtaCollaborate: "Colaborar",
+    protagonistCtaLearn: "Conocer la campaña",
+    protagonistCtaVolunteer: "Voluntariado",
     campaignsEmptyTitle: "Aún no hay campañas activas",
     campaignsEmptyDesc:
       "Pronto publicaremos nuevas campañas. Mientras tanto, puedes ayudar de otras formas.",
@@ -1252,6 +1262,12 @@ export const es = {
     checkGallery: "Galería de fotografías",
     checkTimeline: "Cronograma / actualizaciones",
     checkTransparency: "Transparencia financiera",
+  },
+  adminCampaigns: {
+    protagonistSet: "Hacer protagonista",
+    protagonistRemove: "Quitar protagonismo",
+    protagonistUpdated: "Campaña protagonista actualizada",
+    protagonistError: "No se pudo actualizar la campaña protagonista",
   },
 };
 
