@@ -114,12 +114,33 @@
 **CONTENIDO:** provisional y marcado («Contenido en preparación»); estado «en preparación» si la campaña no existe.
 **RIESGO PENDIENTE:** datos reales (lema, fechas, metas, localidades, fotos) y panel admin específico (C4-C8).
 
+## FASE 3 · Bloque D — Diseño, calidad y documentación
+
+**ESTADO:** 🟡 Parcial (calidad + docs; queda a11y avanzada y consolidación `ui`/sandbox)
+**ARCHIVOS MODIFICADOS:**
+- `artifacts/red-solidaria/vite.config.ts` — INF-03: retiradas `react-redux`/`use-sync-external-store` de `optimizeDeps.include` (no instaladas).
+- `artifacts/red-solidaria/src/components/layout/Navbar.tsx` — FE-06: `aria-label` correcto (`nav.mainMenu`).
+- `artifacts/red-solidaria/src/pages/report-form.tsx` — FE-06: toggle con `role="switch"`/`aria-checked`/`aria-label`.
+- `artifacts/red-solidaria/src/lib/i18n/locales/{es,en}.ts` — clave `nav.mainMenu`.
+- Imágenes: `about.tsx` + 9 archivos del panel admin — FE-08 (`loading="lazy"`/`decoding="async"`).
+- **Documentos nuevos:** `docs/ARQUITECTURA_ACTUALIZADA.md`, `docs/MIGRACIONES_Y_RESPALDOS.md`, `docs/DESPLIEGUE_RENDER.md`.
+
+**ERRORES CORREGIDOS:** INF-03, FE-08; FE-06 parcial.
+**PRUEBAS:** typecheck frontend ✅ · node **16/16** ✅ · vitest **22/22** ✅ · build Vite ✅ EXIT=0.
+**PENDIENTE:** FE-06 (radiogroups), FE-07 (consolidar `ui` con el sandbox), FE-09 (SEO en más páginas), FE-10..15.
+
 ---
 
 ## Estado global de las unidades de trabajo
 
 | UW | Descripción | Estado |
 |---|---|---|
+| D1 | INF-03 `optimizeDeps` | ✅ Implementado · ✅ Probado |
+| D2 | FE-06 accesibilidad | 🟡 Parcial (Navbar + toggle) |
+| D3 | FE-08 `loading="lazy"` | ✅ Implementado · ✅ Probado |
+| D4 | Docs obligatorios restantes | ✅ Creados (arquitectura, migraciones, Render) |
+| D5 | FE-07 consolidación `ui`/sandbox | ⏳ Pendiente |
+| D6 | FE-09 SEO en más páginas | ⏳ Pendiente |
 | A1 | Fix ledger `asc`→`desc` + test | ✅ Implementado · ✅ Probado |
 | A2 | Quitar `drizzle-kit push` de `post-merge.sh` | ✅ Implementado · ✅ Probado |
 | A3 | FK del ledger a `RESTRICT` + borrado lógico | ⏳ Pendiente (migración autorizada) |

@@ -164,6 +164,32 @@ fechas, metas de beneficiarios ni cifras de recaudación.
 **Pendiente:** panel admin específico de ChocoFest 2026, donaciones en especie/inventario, localidades beneficiadas y
 galería con datos reales (requieren datos del organizador y CRUD).
 
+---
+
+## 9. Fase 3 · Bloque D — Calidad y documentación
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 27 | Typecheck frontend | `pnpm --filter @workspace/red-solidaria typecheck` | ✅ EXIT=0 |
+| 28 | Pruebas frontend (node) | `pnpm --filter @workspace/red-solidaria test` | ✅ **16/16** |
+| 29 | Pruebas frontend (vitest) | idem | ✅ **22/22** (7 archivos) |
+| 30 | Build de producción (Vite) | `pnpm --filter @workspace/red-solidaria build` | ✅ EXIT=0 — **sin** avisos «Failed to resolve dependency» |
+
+**Cambios:**
+- **INF-03:** retiradas `react-redux` y `use-sync-external-store` de `optimizeDeps.include` (no instaladas).
+- **FE-06 (parcial):** `Navbar` con `aria-label` correcto (`nav.mainMenu`, nueva clave es/en); toggle de anonimato de
+  `report-form.tsx` con `role="switch"`/`aria-checked`/`aria-label`.
+- **FE-08:** `loading="lazy"` + `decoding="async"` en `about.tsx` y 9 vistas del panel admin. **Recuento real:**
+  35 `<img>` / 14 lazy (el dato previo «33/13» era impreciso). Heroes y logo **no** son lazy a propósito (LCP).
+
+**Documentos creados (entregables obligatorios):**
+- `docs/ARQUITECTURA_ACTUALIZADA.md`
+- `docs/MIGRACIONES_Y_RESPALDOS.md` (plan, **nada ejecutado**)
+- `docs/DESPLIEGUE_RENDER.md`
+
+**Pendiente:** FE-06 (radiogroups), FE-07 (consolidar `ui` con el sandbox), FE-09 (SEO en más páginas), FE-10..15.
+
+
 
 
 

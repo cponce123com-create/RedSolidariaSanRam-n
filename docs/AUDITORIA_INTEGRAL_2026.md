@@ -367,16 +367,21 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 #### FE-05 — Validación de cliente no replicada en backend · MEDIO · CONFIRMADO
 - **Ubicación:** `pages/volunteer.tsx:56-68` vs `volunteers.ts:25`; `pages/report-form.tsx:50-62` vs `community-reports.ts:25`
 
-#### FE-06 — Accesibilidad: etiquetas/roles incorrectos · MEDIO · CONFIRMADO
-- **Ubicación:** `Navbar.tsx` (`aria-label` con texto «skipToContent»); `report-form.tsx` (toggle sin `role="switch"`/`aria-checked`); `volunteer.tsx`/`report-form.tsx` (grupos de opciones sin `radiogroup`)
+#### FE-06 — Accesibilidad: etiquetas/roles incorrectos · MEDIO · 🟡 **PARCIAL** (Fase 3 · Bloque D)
+- **Ubicación original:** `Navbar.tsx` (`aria-label` con texto «skipToContent»); `report-form.tsx` (toggle sin `role="switch"`/`aria-checked`).
+- **Corregido:** el `nav` de escritorio usa la nueva clave `nav.mainMenu` (es/en); el toggle de anonimato de `report-form.tsx` ahora tiene `role="switch"`, `aria-checked` y `aria-label`.
+- **Pendiente:** grupos de opciones sin `radiogroup` en `volunteer.tsx`/`report-form.tsx`; auditoría a11y completa.
 
 #### FE-07 — Duplicación total de `components/ui` con el sandbox · MEDIO · CONFIRMADO
 - **Ubicación:** `red-solidaria/src/components/ui` (55 archivos) ≡ `mockup-sandbox/src/components/ui` (55 archivos, copias idénticas)
 - **Impacto:** el build raíz compila el sandbox innecesariamente (ver INF-06) y hay riesgo de *drift*.
 - **Solución:** excluir el sandbox del build o extraer `ui` a un paquete compartido.
 
-#### FE-08 — Imágenes sin `loading="lazy"` · MEDIO · CONFIRMADO
-- **Ubicación:** 33 `<img>`, solo 13 con lazy; faltan en `campaign-detail`, `HomeHero`, `DonationModal`, `ImageUploadField`, `Navbar` y listas admin.
+#### FE-08 — Imágenes sin `loading="lazy"` · MEDIO · ✅ **CORREGIDO** (Fase 3 · Bloque D)
+- **Recuento real (verificado):** 35 `<img>` y 14 con `loading="lazy"`; el conteo previo («33, solo 13») era impreciso porque los `<img>` multilínea llevan el atributo en otra línea.
+- **Corregido:** se añadió `loading="lazy"` + `decoding="async"` a las imágenes **por debajo del pliegue**: `about.tsx`, `ImageUploadField`/`DonationModal` (previas) y las listas del panel admin (`campaign-detail`, `adoptions`, `volunteers`, `reports`, `report-detail`, `news`, `testimonials`, `allies`, `donations`).
+- **Intencionalmente NO lazy:** las imágenes *hero* (`HomeHero`, `campaign-detail`, `chocofest-2026`) y el logo del `Navbar` — están sobre el pliegue y el lazy perjudicaría el LCP.
+- **Prueba:** typecheck EXIT=0 · node 16/16 · vitest 22/22 · build Vite EXIT=0.
 
 #### FE-09 — `SEO.tsx` usado solo en 5 páginas · MEDIO · CONFIRMADO
 - **Ubicación:** `shared/SEO.tsx`; `hreflang` es/en a la misma URL; `BASE_URL` hardcodeado; sin JSON-LD.
@@ -410,10 +415,11 @@ de `render.yaml:9`.
 - **Solución aplicada:** nuevo `/readyz` que ejecuta `SELECT 1` con timeout de 2 s y devuelve **503** si la DB no responde; `/healthz` sigue siendo liveness puro.
 - **Prueba:** `tests/health-readyz.test.mjs` — `/healthz` 200 y `/readyz` 503 sin DB (verificado, 143/143 en la suite).
 
-#### INF-03 — `optimizeDeps.include` con dependencias no instaladas · ALTO · CONFIRMADO
-- **Ubicación:** `artifacts/red-solidaria/vite.config.ts` (incluye `react-redux` y `use-sync-external-store`, ausentes en `artifacts/red-solidaria/package.json`; el comentario asume `recharts 3` pero el instalado es `^2.15.2`)
-- **Impacto:** build aislado de Render puede fallar al pre-bundlear o quedar inerte (reintroduciendo el bug histórico `Cannot set properties of undefined (setting 'Children')`).
-- **Solución:** declarar o eliminar las deps y reconciliar el comentario. **Prueba:** `pnpm run build` desde lockfile limpio.
+#### INF-03 — `optimizeDeps.include` con dependencias no instaladas · ALTO · ✅ **CORREGIDO** (Fase 3 · Bloque D)
+- **Ubicación:** `artifacts/red-solidaria/vite.config.ts` (incluía `react-redux` y `use-sync-external-store`, ausentes en `package.json`; el comentario asumía `recharts 3` pero el instalado es `^2.15.2`).
+- **Impacto:** Vite avisaba «Failed to resolve dependency» en cada arranque; en un entorno limpio el pre-bundle podía fallar.
+- **Solución aplicada:** se eliminaron ambas entradas de `optimizeDeps.include` y se documentó que la interop de React se resuelve con `resolve.alias` + `dedupe` (una sola copia de React).
+- **Prueba:** `pnpm --filter @workspace/red-solidaria build` EXIT=0 sin avisos de resolución; typecheck y tests en verde.
 
 #### INF-04 — El build raíz compila el sandbox innecesariamente · MEDIO · CONFIRMADO
 - **Ubicación:** `package.json` (root) `build: pnpm run typecheck && pnpm -r --if-present run build`; consumido por `render.yaml:8`
