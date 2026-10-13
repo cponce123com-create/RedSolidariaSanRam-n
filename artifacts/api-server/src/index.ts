@@ -18,8 +18,16 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-// Arrancar el servidor primero y seedear en paralelo: el servicio responde
-// aunque la DB esté lenta o el seed falle (evita downtime durante deploys).
+// Aplicar migraciones ANTES de escuchar (hallazgo INF-01): si el esquema no se
+// puede preparar, el arranque debe fallar de forma explícita (Render reinicia
+// el deploy) en vez de atender tráfico contra un esquema desactualizado.
+try {
+  await runMigrations();
+} catch (err) {
+  logger.error({ err }, "Failed to run database migrations");
+  process.exit(1);
+}
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -32,10 +40,7 @@ app.listen(port, (err) => {
 // Ledger Trust Pay: ancla el root hash global al arranque y cada 24h.
 startLedgerAnchorJob();
 
+// El seed no bloquea el arranque: el servicio responde aunque el seed falle.
 seedIfEmpty().catch((err) => {
   logger.error({ err }, "Failed to seed database, starting server anyway");
-});
-
-runMigrations().catch((err: unknown) => {
-  logger.error({ err }, "Failed to run database migrations");
 });

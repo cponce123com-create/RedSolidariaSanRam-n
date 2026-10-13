@@ -45,6 +45,7 @@ await build({
     "./src/routes/campaign-expenses.ts",
     "./src/routes/campaign-leftovers.ts",
     "./src/routes/campaign-transparency.ts",
+    "./src/routes/health.ts",
   ],
   bundle: true,
   platform: "node",
