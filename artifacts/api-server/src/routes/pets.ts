@@ -129,17 +129,28 @@ router.patch("/admin/adoption-requests/:id", async (req, res) => {
     return res.status(400).json({ error: "validation_error", message: "Datos inválidos", details: parsed.error.issues });
   }
   const { status, adminNotes } = parsed.data;
-  const [updated] = await db.update(adoptionRequestsTable).set({ status, adminNotes }).where(eq(adoptionRequestsTable.id, id)).returning();
-  if (!updated) return res.status(404).json({ error: "Solicitud no encontrada" });
+  // Transaccional (hallazgo API-04): el estado de la solicitud y el de la
+  // mascota deben cambiar juntos.
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(adoptionRequestsTable)
+      .set({ status, adminNotes })
+      .where(eq(adoptionRequestsTable.id, id))
+      .returning();
+    if (!row) return null;
 
-  // If approved, mark pet as "adopted"
-  if (status === "approved") {
-    await db.update(petsTable).set({ status: "adopted", updatedAt: new Date() }).where(eq(petsTable.id, updated.petId));
-  }
-  // If in-process, mark pet as "in-process"
-  if (status === "in-process") {
-    await db.update(petsTable).set({ status: "in-process", updatedAt: new Date() }).where(eq(petsTable.id, updated.petId));
-  }
+    // If approved, mark pet as "adopted"
+    if (status === "approved") {
+      await tx.update(petsTable).set({ status: "adopted", updatedAt: new Date() }).where(eq(petsTable.id, row.petId));
+    }
+    // If in-process, mark pet as "in-process"
+    if (status === "in-process") {
+      await tx.update(petsTable).set({ status: "in-process", updatedAt: new Date() }).where(eq(petsTable.id, row.petId));
+    }
+    return row;
+  });
+
+  if (!updated) return res.status(404).json({ error: "Solicitud no encontrada" });
   return res.json(updated);
 });
 

@@ -100,23 +100,29 @@ router.post("/admin/reports/:id/convert", async (req, res) => {
   const { title, description, goal, imageUrl, category } = parsed.data;
   const today = new Date().toISOString().split("T")[0];
 
-  const [campaign] = await db.insert(campaignsTable).values({
-    title: title || report.title,
-    description: description || report.description,
-    imageUrl: imageUrl || (report.photos?.[0] ?? null),
-    goal: goal || 1000,
-    raised: 0,
-    status: "active",
-    featured: false,
-    category: category || "general",
-    startDate: today,
-  }).returning();
+  // Transaccional (hallazgo API-03): si falla el update del reporte, no debe
+  // quedar una campaña huérfana creada a medias.
+  const { campaign, updated } = await db.transaction(async (tx) => {
+    const [createdCampaign] = await tx.insert(campaignsTable).values({
+      title: title || report.title,
+      description: description || report.description,
+      imageUrl: imageUrl || (report.photos?.[0] ?? null),
+      goal: goal || 1000,
+      raised: 0,
+      status: "active",
+      featured: false,
+      category: category || "general",
+      startDate: today,
+    }).returning();
 
-  const [updated] = await db
-    .update(communityReportsTable)
-    .set({ status: "converted", campaignId: campaign.id, updatedAt: new Date() })
-    .where(eq(communityReportsTable.id, id))
-    .returning();
+    const [updatedReport] = await tx
+      .update(communityReportsTable)
+      .set({ status: "converted", campaignId: createdCampaign.id, updatedAt: new Date() })
+      .where(eq(communityReportsTable.id, id))
+      .returning();
+
+    return { campaign: createdCampaign, updated: updatedReport };
+  });
 
   return res.status(201).json({ campaign, report: updated });
 });

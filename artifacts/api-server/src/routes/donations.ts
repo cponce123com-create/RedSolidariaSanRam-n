@@ -11,6 +11,7 @@ import { logAuditAction } from "../middleware/auth-utils";
 import { appendMovement } from "../lib/ledger";
 import { toSafeAmount } from "../lib/amount-format";
 import {
+  approvalRequiresProof,
   donationInputSchema,
   isAllowedTransition,
   isValidProofUrl,
@@ -27,12 +28,23 @@ import {
 
 // Errores de negocio con mensaje claro para el panel admin (400 en vez del
 // 400 genérico de validación).
-class DonationTransitionError extends Error {
+class DonationBusinessError extends Error {}
+
+class DonationTransitionError extends DonationBusinessError {
   constructor(from: string, to: string) {
     super(
       `No se puede cambiar la donación de ${from} a ${to}. Las donaciones aprobadas quedan registradas en el ledger de transparencia.`,
     );
     this.name = "DonationTransitionError";
+  }
+}
+
+// Hallazgo API-05: una donación digital (Yape/Plin/transferencia) no debe
+// aprobarse sin comprobante; sin evidencia no consta que el dinero llegó.
+class DonationProofRequiredError extends DonationBusinessError {
+  constructor(method: string) {
+    super(`Esta donación (${method}) requiere un comprobante antes de aprobarse.`);
+    this.name = "DonationProofRequiredError";
   }
 }
 
@@ -80,42 +92,48 @@ router.post("/donations", donationLimiter, async (req, res) => {
       });
     }
 
+    // Transaccional (hallazgo API-02): la donación, su comprobante y el campo
+    // legacy receiptUrl se escriben juntos o no se escriben.
     // Valores explícitos: `status` lo fija el servidor (el cliente no puede
     // spoofearlo) y los booleanos sin valor caen a su default de la DB.
-    const [donation] = await db
-      .insert(donationsTable)
-      .values({
-        campaignId: data.campaignId ?? null,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        phone: data.phone ?? null,
-        amount: data.amount,
-        paymentMethod: data.paymentMethod,
-        message: data.message ?? null,
-        anonymous: data.anonymous ?? false,
-        publicProof: data.publicProof ?? false,
-        receiptNote: data.receiptNote ?? null,
-        status: "pending",
-      })
-      .returning();
+    const donation = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(donationsTable)
+        .values({
+          campaignId: data.campaignId ?? null,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          email: data.email,
+          phone: data.phone ?? null,
+          amount: data.amount,
+          paymentMethod: data.paymentMethod,
+          message: data.message ?? null,
+          anonymous: data.anonymous ?? false,
+          publicProof: data.publicProof ?? false,
+          receiptNote: data.receiptNote ?? null,
+          status: "pending",
+        })
+        .returning();
 
-    if (proofUrl) {
-      await db.insert(donationProofsTable).values({
-        donationId: donation.id,
-        imageUrl: proofUrl,
-        publicId: proofPublicId,
-        mimeType:
-          typeof req.body?.proofMimeType === "string"
-            ? req.body.proofMimeType
-            : null,
-      });
-      // Mantener compatibilidad con el campo legacy de la donación
-      await db
-        .update(donationsTable)
-        .set({ receiptUrl: proofUrl })
-        .where(eq(donationsTable.id, donation.id));
-    }
+      if (proofUrl) {
+        await tx.insert(donationProofsTable).values({
+          donationId: row.id,
+          imageUrl: proofUrl,
+          publicId: proofPublicId,
+          mimeType:
+            typeof req.body?.proofMimeType === "string"
+              ? req.body.proofMimeType
+              : null,
+        });
+        // Mantener compatibilidad con el campo legacy de la donación
+        await tx
+          .update(donationsTable)
+          .set({ receiptUrl: proofUrl })
+          .where(eq(donationsTable.id, row.id));
+      }
+
+      return row;
+    });
 
     return res.status(201).json(await formatDonation(donation));
   } catch (err) {
@@ -241,6 +259,22 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
         throw new DonationTransitionError(existing.status, status);
       }
 
+      // Hallazgo API-05: no aprobar una donación digital sin comprobante.
+      if (
+        status === "approved" &&
+        existing.status !== "approved" &&
+        approvalRequiresProof(existing.paymentMethod)
+      ) {
+        const [proof] = await tx
+          .select({ id: donationProofsTable.id })
+          .from(donationProofsTable)
+          .where(eq(donationProofsTable.donationId, id))
+          .limit(1);
+        if (!proof && !existing.receiptUrl) {
+          throw new DonationProofRequiredError(existing.paymentMethod);
+        }
+      }
+
       const [updated] = await tx
         .update(donationsTable)
         .set({ status, adminNote: adminNote || null })
@@ -289,7 +323,7 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
     return res.json(await formatDonation(donation));
   } catch (err) {
     req.log.error({ err }, "Failed to update donation");
-    if (err instanceof DonationTransitionError) {
+    if (err instanceof DonationBusinessError) {
       return res
         .status(400)
         .json({ error: "validation_error", message: err.message });
