@@ -215,6 +215,29 @@ galería con datos reales (requieren datos del organizador y CRUD).
 **Nota:** DEP-01 era especialmente relevante porque permitía falsificar la IP y **eludir el rate-limit y el lockout
 por IP** (SEC-02/SEC-03/SEC-04) si `trust proxy` estaba activo.
 
+---
+
+## 11. Fase 3 · C7 — Panel admin de ChocoFest 2026
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 36 | Typecheck frontend | `pnpm --filter @workspace/red-solidaria typecheck` | ✅ EXIT=0 |
+| 37 | Pruebas frontend (node) | `pnpm --filter @workspace/red-solidaria test` | ✅ **16/16** |
+| 38 | Pruebas frontend (vitest) | idem | ✅ **22/22** (7 archivos) |
+| 39 | Build de producción (Vite) | `pnpm --filter @workspace/red-solidaria build` | ✅ EXIT=0 (chunks `chocofest-2026-*.js` y `chocofest-*.js`) |
+
+**Implementado:**
+- `src/pages/admin/chocofest.tsx` (nuevo) en la ruta **`/admin/chocofest`** + ítem en el nav del admin.
+- **Sin campaña:** creación guiada — el admin introduce **meta y fechas** (título/descripción provisionales editables);
+  **no se inventan fechas**. Invalida la caché de campañas al crear.
+- **Con campaña:** KPIs (recaudado/meta/progreso, nº de donaciones, fechas), **accesos rápidos** a edición de campaña,
+  donaciones, voluntarios, aliados, transparencia y página pública, y **checklist** del estado de las secciones públicas.
+- i18n es/en: bloque `adminChocofest` (~33 claves) con paridad verificada.
+
+**Nota:** el panel **no duplica** el CRUD existente (campañas, donaciones, galería, gastos ya viven en el admin);
+actúa como **hub** de la campaña y evita inventar datos al crear.
+
+
 
 
 

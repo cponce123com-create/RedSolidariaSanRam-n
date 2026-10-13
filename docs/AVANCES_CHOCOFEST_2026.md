@@ -177,6 +177,6 @@
 | C4 | Donaciones monetarias (estados) | 🟡 Reutiliza el flujo existente; falta vista específica |
 | C5 | Donaciones en especie + inventario | ⏳ Pendiente (sección placeholder) |
 | C6 | Voluntariado y planificación | 🟡 Enlaza a `/voluntariado`; falta planificación por localidades |
-| C7 | Panel admin específico de ChocoFest | ⏳ Pendiente |
+| C7 | Panel admin específico de ChocoFest | ✅ Implementado · ✅ Probado |
 | C8 | Transparencia pública | 🟡 Reutiliza el panel existente por campaña |
 | D | Diseño, calidad y docs restantes | ⏳ Pendiente |

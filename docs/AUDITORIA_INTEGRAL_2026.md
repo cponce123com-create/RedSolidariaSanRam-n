@@ -344,9 +344,11 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
   título); i18n es/en (bloque `chocofest`, paridad verificada); test `tests/chocofest.test.mjs`.
 - **Contenido:** **provisional y marcado** («Contenido en preparación»); si la campaña 2026 no existe en la BD, la URL
   muestra un estado «en preparación» (no se inventan cifras ni fechas).
-- **Pendiente:** panel admin específico de ChocoFest 2026, donaciones en especie/inventario, localidades y galería con
-  datos reales (requieren datos del organizador y CRUD).
-- **Prueba:** typecheck frontend EXIT=0 · node 16/16 · vitest 22/22 · build Vite EXIT=0 (chunk `chocofest-2026-*.js`).
+- **Panel admin (C7, añadido):** `src/pages/admin/chocofest.tsx` en `/admin/chocofest` — estado de la campaña, KPIs,
+  accesos rápidos a los módulos existentes, checklist de secciones y **creación guiada** (el admin define meta y fechas;
+  no se inventan datos). Enlace en el nav del admin.
+- **Pendiente:** donaciones en especie/inventario (C5), localidades beneficiadas y galería con datos reales.
+- **Prueba:** typecheck frontend EXIT=0 · node 16/16 · vitest 22/22 · build Vite EXIT=0 (chunks `chocofest-2026-*.js` y `chocofest-*.js`).
 
 #### FE-02 — El backend no valida `amount`/`paymentMethod` en `POST /donations` · ALTO · ❌ **REFUTADO** (Fase 2 · A6)
 - **Ubicación:** `shared/DonationModal.tsx:57-75`; `routes/donations.ts` (`POST /donations`)
