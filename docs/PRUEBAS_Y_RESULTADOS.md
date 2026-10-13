@@ -237,6 +237,31 @@ por IP** (SEC-02/SEC-03/SEC-04) si `trust proxy` estaba activo.
 **Nota:** el panel **no duplica** el CRUD existente (campañas, donaciones, galería, gastos ya viven en el admin);
 actúa como **hub** de la campaña y evita inventar datos al crear.
 
+---
+
+## 12. Fase 3 · Bloque F — Accesibilidad, SEO y build
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 40 | Typecheck frontend | `pnpm --filter @workspace/red-solidaria typecheck` | ✅ EXIT=0 |
+| 41 | Pruebas frontend (node) | `pnpm --filter @workspace/red-solidaria test` | ✅ **16/16** |
+| 42 | Pruebas frontend (vitest) | idem | ✅ **22/22** (7 archivos) |
+| 43 | Build de producción (Vite) | `pnpm --filter @workspace/red-solidaria build` | ✅ EXIT=0 |
+| 44 | Build del root (sin sandbox) | `pnpm run build` | ✅ EXIT=0 — 0 apariciones de `mockup-sandbox` |
+
+**Cambios:**
+- **FE-06 (a11y):** `role="radiogroup"`/`role="radio"`+`aria-checked` en los grupos de selección única
+  (`volunteer.tsx` disponibilidad; `report-form.tsx` tipo y urgencia); `role="group"`+`aria-pressed` en el grupo
+  múltiple de intereses; toggle con `role="switch"`; `aria-label` correcto en el `Navbar`.
+- **FE-09 (SEO):** añadido `<SEO>` a `transparency.tsx`, `adoptions.tsx` y `volunteer.tsx` (ahora 9 páginas con SEO).
+- **FE-12:** sustituido el hack `innerHTML` del `Navbar` (inyectaba un SVG como string) por un **fallback React**
+  (SVG de corazón siempre presente; la imagen se oculta si falla).
+- **INF-04:** `build`/`typecheck` del root ya no compilan `mockup-sandbox`.
+
+**Pendiente:** FE-09 completo (`BASE_URL` hardcodeado, `hreflang`, JSON-LD) y FE-10/FE-11 (zod duplicado, formulario
+admin de donaciones sin RHF/Zod).
+
+
 
 
 

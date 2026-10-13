@@ -369,10 +369,14 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 #### FE-05 — Validación de cliente no replicada en backend · MEDIO · CONFIRMADO
 - **Ubicación:** `pages/volunteer.tsx:56-68` vs `volunteers.ts:25`; `pages/report-form.tsx:50-62` vs `community-reports.ts:25`
 
-#### FE-06 — Accesibilidad: etiquetas/roles incorrectos · MEDIO · 🟡 **PARCIAL** (Fase 3 · Bloque D)
-- **Ubicación original:** `Navbar.tsx` (`aria-label` con texto «skipToContent»); `report-form.tsx` (toggle sin `role="switch"`/`aria-checked`).
-- **Corregido:** el `nav` de escritorio usa la nueva clave `nav.mainMenu` (es/en); el toggle de anonimato de `report-form.tsx` ahora tiene `role="switch"`, `aria-checked` y `aria-label`.
-- **Pendiente:** grupos de opciones sin `radiogroup` en `volunteer.tsx`/`report-form.tsx`; auditoría a11y completa.
+#### FE-06 — Accesibilidad: etiquetas/roles incorrectos · MEDIO · ✅ **CORREGIDO** (Fase 3 · Bloques D y F)
+- **Corregido:**
+  - `Navbar`: `aria-label` del nav de escritorio ahora usa `nav.mainMenu` (antes `common.skipToContent`).
+  - `report-form.tsx`: el toggle de anonimato tiene `role="switch"` + `aria-checked` + `aria-label`.
+  - Grupos de selección única con `role="radiogroup"` + `role="radio"`/`aria-checked`: disponibilidad (`volunteer.tsx`) y tipo de caso + urgencia (`report-form.tsx`).
+  - Grupo de selección múltiple (intereses, `volunteer.tsx`) con `role="group"` + `aria-pressed`.
+- **Pendiente (menor):** auditoría a11y completa (contraste, foco, teclado) y `axe`/Lighthouse.
+- **Prueba:** typecheck EXIT=0 · node 16/16 · vitest 22/22 · build Vite EXIT=0.
 
 #### FE-07 — Duplicación de `components/ui` con el sandbox · MEDIO · 🟡 **MITIGADO** (Fase 3 · Bloque D/F)
 - **Verificación correcta:** ambos directorios tienen 55 archivos, pero **NO son idénticos**: 7 difieren
@@ -392,13 +396,15 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Intencionalmente NO lazy:** las imágenes *hero* (`HomeHero`, `campaign-detail`, `chocofest-2026`) y el logo del `Navbar` — están sobre el pliegue y el lazy perjudicaría el LCP.
 - **Prueba:** typecheck EXIT=0 · node 16/16 · vitest 22/22 · build Vite EXIT=0.
 
-#### FE-09 — `SEO.tsx` usado solo en 5 páginas · MEDIO · CONFIRMADO
-- **Ubicación:** `shared/SEO.tsx`; `hreflang` es/en a la misma URL; `BASE_URL` hardcodeado; sin JSON-LD.
+#### FE-09 — `SEO.tsx` usado solo en 5 páginas · MEDIO · 🟡 **PARCIAL** (Fase 3 · Bloque F)
+- **Ubicación:** `shared/SEO.tsx`.
+- **Corregido:** añadido `<SEO>` a `transparency.tsx`, `adoptions.tsx` y `volunteer.tsx` → **9 páginas** con SEO.
+- **Pendiente:** `BASE_URL` hardcodeado, `hreflang` es/en apuntando a la misma URL y datos estructurados (JSON-LD).
 
 #### FE-10 a FE-15 — BAJO
-- `pnpm-workspace.yaml:30`: `zod` 3.25.76 en cliente vs `zod/v4` en `lib/db` (FE-10).
-- `pages/admin/donations.tsx`: formulario admin sin RHF/Zod (FE-11).
-- `Navbar.tsx`: `innerHTML` con SVG inline en `onError` (FE-12).
+- `pnpm-workspace.yaml:30`: `zod` 3.25.76 en cliente vs `zod/v4` en `lib/db` (FE-10). *Pendiente.*
+- `pages/admin/donations.tsx`: formulario admin sin RHF/Zod (FE-11). *Pendiente.*
+- `Navbar.tsx`: `innerHTML` con SVG inline en `onError` (FE-12). ✅ **CORREGIDO** (Fase 3 · Bloque F): fallback React (SVG de corazón siempre presente; la imagen se oculta si falla).
 - Responsive correcto (breakpoints y bottom nav coherentes) — sin hallazgo (FE-13).
 - `image-url.ts`/`cloudinary-upload.ts`/`vite.config.ts`: optimizeImageUrl en 10 archivos; split vendor + gzip/brotli OK (FE-14).
 - i18n es/en con persistencia `rs_lang` y `<html lang>` OK (FE-15).

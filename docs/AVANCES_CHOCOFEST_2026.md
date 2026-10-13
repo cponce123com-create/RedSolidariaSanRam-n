@@ -144,6 +144,21 @@
 
 ---
 
+## FASE 3 · Bloque F — Accesibilidad, SEO y build
+
+**ESTADO:** ✅ Implementado · ✅ Probado (FE-09 parcial)
+**ARCHIVOS MODIFICADOS:**
+- `src/components/layout/Navbar.tsx` — FE-12: fallback React en lugar de `innerHTML`.
+- `src/pages/volunteer.tsx` — FE-06 (radiogroup disponibilidad, group intereses) + FE-09 (SEO).
+- `src/pages/report-form.tsx` — FE-06 (radiogroup tipo y urgencia).
+- `src/pages/transparency.tsx` y `src/pages/adoptions.tsx` — FE-09 (SEO).
+- `package.json` (root) — INF-04: build/typecheck sin el sandbox.
+
+**ERRORES CORREGIDOS:** FE-06, FE-12, INF-04; FE-09 parcial.
+**PRUEBAS:** typecheck ✅ · node **16/16** ✅ · vitest **22/22** ✅ · build Vite ✅ · build root ✅ (0 sandbox).
+
+---
+
 ## Estado global de las unidades de trabajo
 
 | UW | Descripción | Estado |
@@ -152,12 +167,13 @@
 | E2 | DEP-02 `compression` | ✅ Implementado · ✅ Probado |
 | E3 | DEP-03 `ip-address` | ✅ Implementado · ✅ Probado |
 | D1 | INF-03 `optimizeDeps` | ✅ Implementado · ✅ Probado |
-| D2 | FE-06 accesibilidad | 🟡 Parcial (Navbar + toggle) |
+| D2 | FE-06 accesibilidad | ✅ Implementado · ✅ Probado |
 | D3 | FE-08 `loading="lazy"` | ✅ Implementado · ✅ Probado |
 | D4 | Docs obligatorios restantes | ✅ Creados (arquitectura, migraciones, Render) |
 | D5 | FE-07 consolidación `ui`/sandbox | 🟡 Mitigado (excluido del build + aviso; drift ya existía) |
 | F1 | INF-04 build sin el sandbox | ✅ Implementado · ✅ Probado |
-| D6 | FE-09 SEO en más páginas | ⏳ Pendiente |
+| F2 | FE-12 Navbar sin `innerHTML` | ✅ Implementado · ✅ Probado |
+| D6 | FE-09 SEO en más páginas | 🟡 Parcial (9 páginas; falta JSON-LD/hreflang) |
 | A1 | Fix ledger `asc`→`desc` + test | ✅ Implementado · ✅ Probado |
 | A2 | Quitar `drizzle-kit push` de `post-merge.sh` | ✅ Implementado · ✅ Probado |
 | A3 | FK del ledger a `RESTRICT` + borrado lógico | ⏳ Pendiente (migración autorizada) |
