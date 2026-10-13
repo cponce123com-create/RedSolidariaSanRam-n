@@ -44,11 +44,16 @@ onlyBuiltDependencies:
 overrides:
   # Parches de seguridad para transits de express/express-rate-limit:
   # los rangos semver de los padres no alcanzan las versiones parcheadas
-  # (qs DoS, body-parser DoS, path-to-regexp DoS/ReDoS, ip-address SSRF/XSS).
+  # (qs DoS, body-parser DoS, path-to-regexp DoS/ReDoS, ip-address SSRF/XSS,
+  # proxy-addr IP spoofing).
   qs: ^6.16.0
   body-parser: ^2.3.0
   path-to-regexp: ^8.4.0
-  ip-address: ^10.3.1
+  # DEP-03: >=10.7.1 corrige la clasificación de subredes/IP (SSRF/trust-boundary).
+  ip-address: ^10.7.1
+  # DEP-01 (CRÍTICO): >=2.0.8 corrige el IP spoofing vía IPv4-mapeado-en-IPv6,
+  # que permitía eludir el rate-limit y el lockout por IP.
+  proxy-addr: ^2.0.8
   # Fuerza una única versión de React en todo el monorepo: evita el error de
   # runtime "Cannot set properties of undefined (setting 'Children')" cuando
   # una dependencia arrastra una segunda copia de React.
