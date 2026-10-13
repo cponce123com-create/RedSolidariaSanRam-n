@@ -151,24 +151,31 @@ Las rutas bajo `/admin` sin `requireAdmin` en su propio archivo quedan cubiertas
 - **Prueba:** `artifacts/api-server/tests/ledger-chain.test.mjs` (nuevo) — usa un cliente simulado que respeta la dirección del `orderBy`; con el fix `verifyChain` de 3 movimientos = válido. **Control negativo verificado**: con `asc` la prueba falla (2/2). Suite backend: **141/141**.
 - **Riesgo residual:** los ledgers ya escritos con la cadena rota **no** se corrigen solos; requieren *re-hash*/re-anclaje (autorización + plan en `docs/MIGRACIONES_Y_RESPALDOS.md`).
 
-#### API-02 — `POST /donations` sin transacción · MEDIO · CONFIRMADO
-- **Ubicación:** `artifacts/api-server/src/routes/donations.ts:86,104,115`
+#### API-02 — `POST /donations` sin transacción · MEDIO · ✅ **CORREGIDO** (Fase 2 · A8)
+- **Ubicación:** `artifacts/api-server/src/routes/donations.ts` (handler `POST /donations`)
 - **Descripción:** insert de donación + insert de comprobante + update `receiptUrl` sin `db.transaction`.
-- **Impacto:** fallo intermedio deja donación sin comprobante.
-- **Solución:** envolver en `db.transaction`.
+- **Impacto:** fallo intermedio dejaba donación sin comprobante.
+- **Solución aplicada:** las tres escrituras se envuelven en `db.transaction`.
+- **Prueba:** typecheck + suite (143/143). *Pendiente:* prueba de integración con DB forzando fallo intermedio.
 
-#### API-03 — `POST /admin/reports/:id/convert` sin transacción · MEDIO · CONFIRMADO
-- **Ubicación:** `artifacts/api-server/src/routes/community-reports.ts:103,116`
-- **Impacto:** campaña huérfana si falla la segunda escritura. **Solución:** `db.transaction`.
+#### API-03 — `POST /admin/reports/:id/convert` sin transacción · MEDIO · ✅ **CORREGIDO** (Fase 2 · A8)
+- **Ubicación:** `artifacts/api-server/src/routes/community-reports.ts` (handler de conversión)
+- **Impacto:** campaña huérfana si falla la segunda escritura.
+- **Solución aplicada:** creación de campaña + update del reporte dentro de `db.transaction`.
+- **Prueba:** typecheck + suite (143/143).
 
-#### API-04 — `PATCH /admin/adoption-requests/:id` sin transacción · MEDIO · CONFIRMADO
-- **Ubicación:** `artifacts/api-server/src/routes/pets.ts:132,137,141`
+#### API-04 — `PATCH /admin/adoption-requests/:id` sin transacción · MEDIO · ✅ **CORREGIDO** (Fase 2 · A8)
+- **Ubicación:** `artifacts/api-server/src/routes/pets.ts` (handler de actualización de solicitud)
+- **Impacto:** la solicitud y el estado de la mascota podían quedar desincronizados.
+- **Solución aplicada:** ambos updates dentro de `db.transaction`; si la solicitud no existe, la transacción devuelve `null` → 404.
+- **Prueba:** typecheck + suite (143/143).
 
-#### API-05 — Aprobación de donación digital sin exigir comprobante · MEDIO · RIESGO POTENCIAL
-- **Ubicación:** `artifacts/api-server/src/lib/donation-validation.ts:63`; `routes/donations.ts:221`
-- **Descripción:** `approvalRequiresProof` existe y está testeada pero **no se invoca** en `PUT /donations/:id`.
-- **Impacto:** se aprueba (y entra al ledger) un ingreso sin evidencia.
-- **Solución:** exigir fila en `donation_proofs` al pasar a `approved`. **Prueba:** aprobar `yape` sin proof ⇒ 400.
+#### API-05 — Aprobación de donación digital sin exigir comprobante · MEDIO · ✅ **CORREGIDO** (Fase 2 · A7)
+- **Ubicación:** `artifacts/api-server/src/lib/donation-validation.ts` (`approvalRequiresProof`); `routes/donations.ts` (`PUT /donations/:id`)
+- **Descripción:** `approvalRequiresProof` existía y estaba testeada pero **no se invocaba** en `PUT /donations/:id`.
+- **Impacto:** se aprobaba (y entraba al ledger) un ingreso sin evidencia.
+- **Solución aplicada:** dentro de la transacción, al aprobar una donación digital se exige fila en `donation_proofs` o `receiptUrl`; si falta, se lanza `DonationProofRequiredError` → 400. El `catch` ahora captura la clase base `DonationBusinessError`.
+- **Prueba:** typecheck + suite (143/143); `approvalRequiresProof` cubierto por `donation-validation.test.mjs`. *Pendiente:* prueba HTTP con DB (aprobar `yape` sin comprobante ⇒ 400).
 
 #### API-06 — `catch → 400 validation_error` enmascara errores 500 · BAJO · CONFIRMADO
 - **Ubicación:** `routes/campaigns.ts:146,153`, `news.ts`, `testimonials.ts:44,60`, `donations.ts:121,290`, `contact.ts:15`, `campaign-expenses.ts:88,111`, `campaign-evidence.ts`, `campaign-leftovers.ts`
@@ -331,10 +338,12 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Descripción:** no hay ruta, datos, i18n ni transparencia para 2026. **Bloquea la Fase 3.**
 - **Solución:** implementar `/campanas/chocofest-2026` + datos + i18n + transparencia (Fase 3).
 
-#### FE-02 — El backend no valida `amount`/`paymentMethod` en `POST /donations` · ALTO · CONFIRMADO
-- **Ubicación:** `shared/DonationModal.tsx:57-75` (cliente valida `min(5)`+enum) vs `lib/db/src/schema/donations.ts:26` (`insertDonationSchema` sin validar monto ni método)
-- **Impacto:** `POST /api/donations {amount:-10, paymentMethod:"x"}` es aceptado. **Solución:** replicar Zod en backend.
-- **Prueba:** `POST` con monto negativo ⇒ 400.
+#### FE-02 — El backend no valida `amount`/`paymentMethod` en `POST /donations` · ALTO · ❌ **REFUTADO** (Fase 2 · A6)
+- **Ubicación:** `shared/DonationModal.tsx:57-75`; `routes/donations.ts` (`POST /donations`)
+- **Hallazgo original:** se reportó que el backend usaba `insertDonationSchema` (drizzle-zod), que no validaba monto ni método.
+- **Verificación (refutación):** el handler usa **`donationInputSchema`** de `lib/donation-validation.ts` (monto mínimo 5, máx. 2 decimales, `paymentMethod` enum, email, longitudes). `insertDonationSchema` no se usa en la ruta.
+- **Evidencia:** `tests/donations-auth.test.mjs` verifica que `POST /api/donations` responde **400** ante monto negativo, cero, >2 decimales, email inválido y método inválido (pruebas HTTP en verde).
+- **Conclusión:** no requiere corrección; **no se modificó código**. El comentario de `donation-validation.ts` documenta que este schema reemplazó al de drizzle-zod.
 
 #### FE-03 — Gate admin de cliente solo redirige ante 401 (sin gate de rol) · MEDIO · CONFIRMADO
 - **Ubicación:** `pages/admin/layout.tsx:20-31,39-77`

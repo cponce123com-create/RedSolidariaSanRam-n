@@ -95,3 +95,25 @@ simulado que emula el `orderBy`/`limit`/`for update` de Drizzle y respeta la dir
 
 **Nota:** el `/readyz` se prueba sin base de datos real (no hay PostgreSQL en el entorno): el intento de conexión falla y el endpoint devuelve 503, que es exactamente el comportamiento esperado ante una DB caída.
 
+---
+
+## 6. Fase 2 · A6 / A7 / A8 — Validación e integridad financiera
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 16 | Typecheck backend | `pnpm --filter @workspace/api-server typecheck` | ✅ EXIT=0 |
+| 17 | Suite backend | `pnpm --filter @workspace/api-server test` | ✅ **143/143** |
+| 18 | Build de producción | `pnpm --filter @workspace/api-server build` | ✅ EXIT=0 |
+
+**Cambios:**
+- **A6 (FE-02):** **REFUTADO** — el backend **ya** validaba `amount`/`paymentMethod` mediante `donationInputSchema`
+  (`lib/donation-validation.ts`), no `insertDonationSchema`. Existen pruebas HTTP (`donations-auth.test.mjs`) que
+  rechazan monto negativo, cero, >2 decimales, email inválido y método inválido. **No se modificó código.**
+- **A7 (API-05):** `PUT /donations/:id` ahora exige comprobante (fila en `donation_proofs` o `receiptUrl`) al aprobar
+  donaciones digitales (`approvalRequiresProof`). Nuevo `DonationProofRequiredError` → 400.
+- **A8 (API-02/03/04):** transacciones en `POST /donations`, `POST /admin/reports/:id/convert` y `PATCH /admin/adoption-requests/:id`.
+
+**Pendiente:** prueba de integración de A7/A8 con PostgreSQL real (no disponible en el entorno). Hoy se valida la
+compilación/tipos y que las rutas siguen montadas y respondiendo.
+
+

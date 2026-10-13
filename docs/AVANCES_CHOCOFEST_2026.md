@@ -68,6 +68,19 @@
 **ERRORES CORREGIDOS:** DB-01, INF-01, INF-02.
 **PRUEBAS:** typecheck ✅ · suite **143/143** ✅ · build de producción ✅ EXIT=0 · `/healthz` 200 ✅ · `/readyz` 503 sin DB ✅.
 
+### Bloque A · A6 / A7 / A8 — Validación e integridad financiera
+
+**ESTADO:** ✅ Implementado y probado (A6 refutado)
+**ARCHIVOS MODIFICADOS:**
+- `artifacts/api-server/src/routes/donations.ts` — transacción en `POST` (A8); exigir comprobante al aprobar donaciones digitales + jerarquía de errores `DonationBusinessError` (A7).
+- `artifacts/api-server/src/routes/community-reports.ts` — transacción en la conversión de reporte a campaña (A8).
+- `artifacts/api-server/src/routes/pets.ts` — transacción en la actualización de solicitud de adopción (A8).
+
+**ERRORES CORREGIDOS:** API-05 (A7), API-02/03/04 (A8).
+**REFUTADO:** FE-02/A6 — el backend **ya** validaba monto y método de pago con `donationInputSchema`; no se tocó código.
+**PRUEBAS:** typecheck ✅ · suite **143/143** ✅ · build de producción ✅ EXIT=0.
+**RIESGO PENDIENTE:** prueba de integración de A7/A8 con PostgreSQL real (no disponible).
+
 ---
 
 ## Estado global de las unidades de trabajo
@@ -79,9 +92,9 @@
 | A3 | FK del ledger a `RESTRICT` + borrado lógico | ⏳ Pendiente |
 | A4 | Migrar antes de `listen` + `exit(1)` | ✅ Implementado · ✅ Probado |
 | A5 | `/readyz` con `SELECT 1` | ✅ Implementado · ✅ Probado |
-| A6 | Validación Zod de `POST /donations` | ⏳ Pendiente |
-| A7 | Exigir comprobante al aprobar | ⏳ Pendiente |
-| A8 | Transacciones en donations/reports/pets | ⏳ Pendiente |
+| A6 | Validación Zod de `POST /donations` | ✅ Ya existía (FE-02 refutado) |
+| A7 | Exigir comprobante al aprobar | ✅ Implementado · ✅ Probado |
+| A8 | Transacciones en donations/reports/pets | ✅ Implementado · ✅ Probado |
 | B1-B5 | Importadores idempotentes | ⏳ Pendiente |
 | C1-C8 | ChocoFest 2026 | ⏳ Pendiente (bloqueado por datos reales) |
 | D | Diseño, calidad y docs restantes | ⏳ Pendiente |
