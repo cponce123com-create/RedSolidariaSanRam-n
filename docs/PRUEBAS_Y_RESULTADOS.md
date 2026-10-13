@@ -116,4 +116,28 @@ simulado que emula el `orderBy`/`limit`/`for update` de Drizzle y respeta la dir
 **Pendiente:** prueba de integración de A7/A8 con PostgreSQL real (no disponible en el entorno). Hoy se valida la
 compilación/tipos y que las rutas siguen montadas y respondiendo.
 
+---
+
+## 7. Fase 2 · Bloque B — Importadores idempotentes
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 19 | Typecheck backend | `pnpm --filter @workspace/api-server typecheck` | ✅ EXIT=0 |
+| 20 | Typecheck scripts | `pnpm --filter @workspace/scripts typecheck` | ✅ EXIT=0 |
+| 21 | Suite backend | `pnpm --filter @workspace/api-server test` | ✅ **151/151** (antes 143) |
+| 22 | Reconciliación (8 pruebas) | `node --test tests/donation-reconcile.test.mjs` | ✅ 8/8 |
+
+**Cambios:**
+- **Nuevo módulo puro** `artifacts/api-server/src/lib/donation-reconcile.ts` (`donationKey`, `planDonationInsert`):
+  diff **multiconjunto** por clave natural (insensible a `number`/`string` y `Date`/ISO).
+- **B1 (IMP-01/IMP-03):** `apply-chocofest-2025.ts` y `apply-chocolatada-2024.ts` ya **no hacen `DELETE`**; reconcilian
+  por clave natural y unifican la idempotencia **por campaña**.
+- **B2 (IMP-02):** todo el importador corre dentro de `db.transaction`.
+- **B3 (IMP-06):** la actualización de campaña excluye `featured`/`status`/`raised`.
+
+**Pendiente (requiere autorización de migración):** IMP-04 — columna `source`/`dedupKey` con índice único en `donations`.
+**No ejecutado:** los importadores no se han corrido contra una BD real (no hay PostgreSQL en el entorno); la lógica de
+reconciliación se prueba de forma pura y exhaustiva.
+
+
 

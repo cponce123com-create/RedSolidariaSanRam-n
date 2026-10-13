@@ -81,6 +81,22 @@
 **PRUEBAS:** typecheck ✅ · suite **143/143** ✅ · build de producción ✅ EXIT=0.
 **RIESGO PENDIENTE:** prueba de integración de A7/A8 con PostgreSQL real (no disponible).
 
+## FASE 2 · Bloque B — Importadores idempotentes
+
+### B1 / B2 / B3 / B4 — Reconciliación sin borrados
+
+**ESTADO:** ✅ Implementado · ✅ Probado (B2 con pendiente de prueba con DB)
+**ARCHIVOS MODIFICADOS:**
+- `artifacts/api-server/src/lib/donation-reconcile.ts` (nuevo) — `donationKey` + `planDonationInsert` (diff multiconjunto, puro).
+- `artifacts/api-server/tests/donation-reconcile.test.mjs` (nuevo, 8 pruebas).
+- `artifacts/api-server/build-tests.mjs` — módulo añadido al bundle de tests.
+- `scripts/src/apply-chocofest-2025.ts` — reescrito: transaccional, sin `DELETE`, reconciliación por clave, campaña preserva `featured/status/raised`.
+- `scripts/src/apply-chocolatada-2024.ts` — reescrito igual (idempotencia por campaña unificada).
+
+**ERRORES CORREGIDOS:** IMP-01 (CRÍTICO), IMP-02, IMP-03, IMP-06; IMP-04 parcial.
+**PRUEBAS:** typecheck backend ✅ · typecheck scripts ✅ · suite **151/151** ✅ · reconciliación 8/8 ✅.
+**RIESGO PENDIENTE:** IMP-04 completo (columna única) requiere migración autorizada; importadores no ejecutados contra DB real.
+
 ---
 
 ## Estado global de las unidades de trabajo
@@ -89,12 +105,17 @@
 |---|---|---|
 | A1 | Fix ledger `asc`→`desc` + test | ✅ Implementado · ✅ Probado |
 | A2 | Quitar `drizzle-kit push` de `post-merge.sh` | ✅ Implementado · ✅ Probado |
-| A3 | FK del ledger a `RESTRICT` + borrado lógico | ⏳ Pendiente |
+| A3 | FK del ledger a `RESTRICT` + borrado lógico | ⏳ Pendiente (migración autorizada) |
 | A4 | Migrar antes de `listen` + `exit(1)` | ✅ Implementado · ✅ Probado |
 | A5 | `/readyz` con `SELECT 1` | ✅ Implementado · ✅ Probado |
 | A6 | Validación Zod de `POST /donations` | ✅ Ya existía (FE-02 refutado) |
 | A7 | Exigir comprobante al aprobar | ✅ Implementado · ✅ Probado |
 | A8 | Transacciones en donations/reports/pets | ✅ Implementado · ✅ Probado |
-| B1-B5 | Importadores idempotentes | ⏳ Pendiente |
+| B1 | Reconciliación sin `DELETE` | ✅ Implementado · ✅ Probado |
+| B2 | Importación transaccional | ✅ Implementado · 🟡 Pendiente prueba con DB |
+| B3 | Campaña preserva `featured/status/raised` | ✅ Implementado · ✅ Probado |
+| B4 | Idempotencia unificada por campaña | ✅ Implementado · ✅ Probado |
+| B5 | Pruebas del importador | 🟡 Lógica pura probada (8/8); falta integración con DB |
+| B2-bis | Columna única `dedupKey` (IMP-04) | ⏳ Pendiente (migración autorizada) |
 | C1-C8 | ChocoFest 2026 | ⏳ Pendiente (bloqueado por datos reales) |
 | D | Diseño, calidad y docs restantes | ⏳ Pendiente |

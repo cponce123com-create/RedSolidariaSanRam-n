@@ -284,36 +284,40 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 3. Reaplicación manual: `scripts/src/apply-chocofest-2025.ts` (busca campaña por título → `UPDATE` → **`DELETE` de donaciones (`:80`) → `INSERT` (`:81`)**) y `scripts/src/apply-chocolatada-2024.ts` (idéntico, `:72-75`).
 4. «Campaña protagonista»: no existe flag. Se deriva de `featured && active` con `createdAt desc` (`campaigns.ts:14-50`, `ActiveCampaignsSection.tsx:19-25`); el total del hero suma **todas** las donaciones aprobadas sin filtrar campaña (`donations.ts:128-142`).
 
-#### IMP-01 — `DELETE + INSERT` que destruye registros auditados · **CRÍTICO** · CONFIRMADO
-- **Ubicación:** `scripts/src/apply-chocofest-2025.ts:80-83`; `scripts/src/apply-chocolatada-2024.ts:72-75`
+#### IMP-01 — `DELETE + INSERT` que destruye registros auditados · **CRÍTICO** · ✅ **CORREGIDO** (Fase 2 · B1)
+- **Ubicación:** `scripts/src/apply-chocofest-2025.ts`; `scripts/src/apply-chocolatada-2024.ts`
 - **Descripción:** «reemplazo de la fuente de verdad» implementado borrando la colección entera.
 - **Causa raíz:** reconciliación destructiva en lugar de *upsert*/diff por clave natural.
-- **Impacto:** elimina donaciones reales creadas vía `POST /donations` (incluidas aprobadas/auditadas); reasigna IDs serial e invalida `campaign_movements.source_id`; en cascada borra `donation_proofs` (DB-02/IMP-08).
-- **Solución:** reconciliación idempotente (`ON CONFLICT DO UPDATE/NOTHING`), deprecando solo filas `source='seed'`, todo en transacción.
-- **Prueba:** insertar una donación real, ejecutar el importador y verificar que permanece sin duplicarse.
+- **Impacto:** eliminaba donaciones reales creadas vía `POST /donations` (incluidas aprobadas/auditadas); reasignaba IDs serial e invalidaba `campaign_movements.source_id`; en cascada borraba `donation_proofs`.
+- **Solución aplicada:** los importadores **ya no borran**. Reconciliar por clave natural (`donationKey`) insertando solo las donaciones ausentes; las existentes (reales o sembradas) se preservan intactas. Diff multiconjunto.
+- **Prueba:** `tests/donation-reconcile.test.mjs` (8 pruebas) — incluye «no borra ni reemplaza donaciones reales» y «re-ejecución idempotente».
 
-#### IMP-02 — Importaciones no transaccionales · ALTO · CONFIRMADO
-- **Ubicación:** `scripts/src/apply-chocofest-2025.ts`, `apply-chocolatada-2024.ts`, `seed.ts` (sin `db.transaction`). Únicos usos de transacción: `donations.ts:229`, `campaign-expenses.ts:70`.
-- **Impacto:** el `DELETE` se confirma de inmediato; si el `INSERT` falla, la campaña queda vacía (pérdida total).
-- **Solución:** envolver delete+insert+update en `db.transaction`. **Prueba:** forzar fallo del `INSERT` y verificar rollback.
+#### IMP-02 — Importaciones no transaccionales · ALTO · ✅ **CORREGIDO** (Fase 2 · B2)
+- **Ubicación:** `scripts/src/apply-chocofest-2025.ts`, `apply-chocolatada-2024.ts`
+- **Impacto:** el `DELETE` se confirmaba de inmediato; si el `INSERT` fallaba, la campaña quedaba vacía.
+- **Solución aplicada:** todo el importador corre dentro de `db.transaction` (las migraciones se aplican antes, fuera de la transacción). Ya no hay `DELETE`, así que un fallo no destruye nada.
+- **Prueba:** typecheck + suite (151/151). *Pendiente:* prueba con DB forzando fallo.
 
-#### IMP-03 — Idempotencia inconsistente (por tabla global vs por campaña) · ALTO · CONFIRMADO
-- **Ubicación:** `apply-chocolatada-2024.ts:34,82-106` (`tableEmpty`, global) vs `apply-chocofest-2025.ts:40,90-131` (`campaignHasRows`, por campaña); `seed.ts:103,169,694`
-- **Impacto:** re-ejecuciones producen contenido faltante o duplicado. **Solución:** unificar con clave natural + `onConflictDoNothing`.
+#### IMP-03 — Idempotencia inconsistente (por tabla global vs por campaña) · ALTO · ✅ **CORREGIDO** (Fase 2 · B1)
+- **Ubicación:** `apply-chocolatada-2024.ts` (`tableEmpty`, global) → unificado
+- **Impacto:** re-ejecuciones producían contenido faltante o duplicado.
+- **Solución aplicada:** ambos scripts usan el mismo criterio **por campaña** (`campaignHasRows`) para el contenido de transparencia, y la reconciliación por clave natural para donaciones.
 
-#### IMP-04 — Sin clave natural ni upsert · ALTO · CONFIRMADO
-- **Ubicación:** `lib/db/src/schema/donations.ts:6-24` (sin `unique`); 0 ocurrencias de `onConflict` en el repo.
-- **Solución:** columna `source`/`dedupKey` única + `INSERT … ON CONFLICT DO NOTHING`.
+#### IMP-04 — Sin clave natural ni upsert · ALTO · 🟡 **PARCIAL** (Fase 2 · B1)
+- **Ubicación:** `lib/db/src/schema/donations.ts` (sin `unique`)
+- **Solución aplicada:** la idempotencia se resuelve con `donationKey` calculada en código (`lib/donation-reconcile.ts`), sin cambios de esquema.
+- **Pendiente (requiere autorización de migración):** añadir columna `source`/`dedupKey` con índice único para garantizar la unicidad a nivel de BD y permitir `ON CONFLICT`. Hoy la garantía es de aplicación (los importadores son manuales y poco frecuentes).
 
 #### IMP-05 — Mezcla de campañas y ambigüedad de «campaña actual» · MEDIO · CONFIRMADO
 - **Ubicación:** `chocolatada-2024-data.ts:165-169` (`status:"active"`, `featured:true`, `endDate:"2024-12-25"`); `chocofest-2025-data.ts:173-177`; consumo en `ActiveCampaignsSection.tsx:19-25`, `HomeHero.tsx:18-21`
 - **Impacto:** en 2026 sigue en portada una campaña terminada en 2024; el total global mezcla años.
-- **Solución:** derivar `status` de `endDate`; campo `isCurrent`/ventana anual.
+- **Nota (verificado):** los arrays de donaciones de 2024 y 2025 son **idénticos** (ver «Notas de verificación»).
+- **Solución:** derivar `status` de `endDate`; campo `isCurrent`/ventana anual. *Pendiente.*
 
-#### IMP-06 — `UPDATE` ciego sobrescribe ediciones del panel admin · MEDIO · CONFIRMADO
-- **Ubicación:** `apply-chocofest-2025.ts:63-67`; `apply-chocolatada-2024.ts:55-59`
-- **Descripción:** `db.update(campaignsTable).set({ ...CAMPAIGN })` reescribe `goal`/`featured`/`raised`/`description`, revirtiendo ediciones humanas.
-- **Solución:** actualizar solo campos derivados; excluir `featured`/`status`/`raised` del `set`.
+#### IMP-06 — `UPDATE` ciego sobrescribe ediciones del panel admin · MEDIO · ✅ **CORREGIDO** (Fase 2 · B3)
+- **Ubicación:** `apply-chocofest-2025.ts`; `apply-chocolatada-2024.ts`
+- **Descripción:** `db.update(campaignsTable).set({ ...CAMPAIGN })` reescribía `featured`/`status`/`raised`, revirtiendo ediciones humanas.
+- **Solución aplicada:** la actualización de campaña **excluye** `featured`, `status` y `raised` (destructuring); solo actualiza campos de contenido.
 
 #### IMP-07 — El `DELETE` propaga a comprobantes y deja el ledger huérfano · MEDIO · CONFIRMADO/POTENCIAL
 - **Ubicación:** `lib/db/drizzle/0000_*.sql:290` (`donation_proofs … ON DELETE cascade`); `migrate.ts:66-84`; `lib/ledger.ts:34-40`
@@ -473,12 +477,19 @@ de `render.yaml:9`.
 `ledger.ts:101-108` (API-01), `index.ts:25-45` (INF-01), `campaigns.ts:10-16` (DB-06/monetarios),
 `donations.ts:8,20,26` (DB-04/08, FE-02), `build.mjs:17-22` (sin hallazgo crítico).
 
-**Hallazgo REFUTADO (corrección de la investigación delegada):**
-se reportó que los datasets `chocolatada-2024-data.ts` y `chocofest-2025-data.ts` eran **idénticos** (duplicación total,
-104 donaciones). La verificación con `diff` de montos/nombres/métodos muestra **diferencias**: **NO son idénticos**.
-Lo que sí es real y queda registrado:
-- `chocolatada-2024-data.ts:18` usa `new Date(Date.UTC(2025, 11, day, 12))` ⇒ las donaciones rotuladas «2024» llevan **fechas de diciembre de 2025** (DB-06).
-- La campaña «2024» queda `status:"active"` y `featured:true` con `endDate:"2024-12-25"` (IMP-05).
+**Corrección de una verificación previa (integridad del documento):**
+en una revisión inicial este documento **refutó por error** el hallazgo delegado de que los datasets
+`chocolatada-2024-data.ts` y `chocofest-2025-data.ts` eran idénticos. Aquella comprobación usó un `grep` sobre
+literales `amount:`/`name:` que **no existen** en los datos (se construyen con los helpers `cash()`/`kind()`), por lo
+que el resultado no era válido.
+
+**Verificación correcta** (`diff` de los arrays completos, 71 líneas cada uno): los arrays de donaciones son
+**IDÉNTICOS** salvo el nombre de la constante (`CHOCOLATADA_2024_DONATIONS` vs `CHOCOLATADA_2025_DONATIONS`), y ambos
+declaran `CASH_TOTAL = 2818.5`. **El hallazgo delegado era correcto.**
+
+**Implicación (agrava IMP-01):** la campaña «2024» contiene en realidad **los mismos datos que la de 2025** (probable
+error de copia al crear el archivo), y además con **fechas de diciembre de 2025** por el helper `iso`
+(`chocolatada-2024-data.ts:18`). Ver IMP-01 / DB-06 / IMP-05.
 El test `chocolatada-2024-data.test.mjs` asertaba el mes `2025-12`, **codificando** ese comportamiento erróneo (IMP-09).
 
 **Riesgo potencial (no confirmable sin BD real):** cuantía exacta de filas afectadas, existencia de datos 2024 reales,
