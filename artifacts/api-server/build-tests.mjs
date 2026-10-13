@@ -32,6 +32,7 @@ await build({
     "./src/lib/csp.ts",
     "./src/lib/ledger.ts",
     "./src/lib/donation-reconcile.ts",
+    "./src/lib/pg-errors.ts",
     "./src/routes/stats.ts",
     "./src/routes/sitemap.ts",
     "./src/routes/campaign-movements.ts",

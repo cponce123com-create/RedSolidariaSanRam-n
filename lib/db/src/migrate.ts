@@ -135,6 +135,24 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ALTER TABLE volunteers ADD COLUMN IF NOT EXISTS photo text;
     `,
   },
+  {
+    name: "010_low_risk.sql",
+    sql: `
+      -- DB-07: índices por campaign_id en las tablas de contenido. Las vistas
+      -- del panel admin filtran por campaña y solo existía la primary key.
+      CREATE INDEX IF NOT EXISTS idx_expenses_campaign ON campaign_expenses(campaign_id);
+      CREATE INDEX IF NOT EXISTS idx_evidence_campaign ON campaign_evidence(campaign_id);
+      CREATE INDEX IF NOT EXISTS idx_updates_campaign ON campaign_updates(campaign_id);
+      CREATE INDEX IF NOT EXISTS idx_images_campaign ON campaign_images(campaign_id);
+
+      -- A3 / DB-02: el ledger es un registro de auditoría y no debe poder
+      -- borrarse en cascada al eliminar una campaña. RESTRICT obliga a
+      -- resolver el historial antes de eliminar.
+      ALTER TABLE campaign_movements DROP CONSTRAINT IF EXISTS campaign_movements_campaign_id_fkey;
+      ALTER TABLE campaign_movements ADD CONSTRAINT campaign_movements_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT;
+    `,
+  },
 ];
 
 /**

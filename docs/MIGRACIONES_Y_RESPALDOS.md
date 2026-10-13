@@ -104,8 +104,20 @@ Los conteos coinciden con producción (6 campañas, 70 donaciones, 5 movimientos
 | **A3 / DB-02** — FK del ledger a `ON DELETE RESTRICT` | ✅ Aplicado; borrar una campaña con ledger **falla** (protección efectiva) |
 | **DB-09** — re-hash del ledger | ✅ 3 filas corregidas (#3, #4, #5); re-verificación → **cadena válida, 0 cambios pendientes** |
 
-**Artefacto listo para autorizar:** `docs/migraciones/010_low_risk.sql` (DB-07 + A3).
-Deliberadamente **no** se añadió a `lib/db/src/migrate.ts`: incluirlo haría que el próximo despliegue lo aplicara solo.
+**✅ APLICADO EN PRODUCCIÓN (2026-10-13)** con **respaldo previo** (`/tmp/backup-prod/`: `schema.sql`, `data.sql`,
+`ledger-before.json`) y autorización explícita del responsable:
+
+| Paso | Resultado |
+|---|---|
+| `docs/migraciones/010_low_risk.sql` | ✅ Aplicada y **registrada** en `drizzle_migrations` (10 filas) |
+| Índices DB-07 | ✅ 4/4 presentes |
+| FK del ledger | ✅ `ON DELETE RESTRICT` |
+| **DB-09** re-hash | ✅ 3 movimientos corregidos (#3, #4, #5) |
+| **Cadena del ledger** | ✅ **VÁLIDA** (antes: rota en #3) |
+
+- `010_low_risk.sql` ya está en `lib/db/src/migrate.ts`; el migrador la omite porque está registrada.
+- **Seguimiento en código:** `DELETE /admin/campaigns/:id` responde **409** (no 500) si la FK del ledger lo bloquea,
+  vía `artifacts/api-server/src/lib/pg-errors.ts` + test `tests/pg-errors.test.mjs`.
 
 **Pendiente de ensayo:**
 - **IMP-04** — la clave natural tiene **1 duplicado real** que bloquea el índice único (requiere decisión sobre el duplicado).

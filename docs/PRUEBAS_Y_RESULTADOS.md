@@ -291,6 +291,32 @@ admin de donaciones sin RHF/Zod).
 **Conclusión operativa:** las migraciones **NO** deben ejecutarse sobre esta base sin **respaldo verificado** y autorización
 explícita; el duplicado y el ledger roto requieren tratamiento de datos (no solo DDL).
 
+---
+
+## 14. Aplicación en producción (autorizada) — 2026-10-13
+
+**Respaldo previo:** `/tmp/backup-prod/` (`schema.sql`, `data.sql` con 22 tablas/213 filas, `ledger-before.json`
+con los hashes anteriores). Autorización explícita del responsable.
+
+| Comprobación | Comando / método | Resultado |
+|---|---|---|
+| Estado previo | verificación en solo lectura | ❌ cadena rota en #3 · 0/4 índices · FK en `CASCADE` |
+| Aplicación | `010_low_risk.sql` + re-hash (transaccional) | ✅ aplicado |
+| Índices DB-07 | consulta a `pg_indexes` | ✅ **4/4** |
+| FK del ledger | `pg_get_constraintdef` | ✅ `ON DELETE RESTRICT` |
+| **Cadena del ledger** | re-cálculo completo | ✅ **VÁLIDA** |
+| `drizzle_migrations` | `select name` | ✅ **10** filas (última `010_low_risk.sql`) |
+| Typecheck backend | `pnpm --filter @workspace/api-server typecheck` | ✅ EXIT=0 |
+| Suite backend | `pnpm --filter @workspace/api-server test` | ✅ **155/155** |
+| Build backend | `pnpm --filter @workspace/api-server build` | ✅ EXIT=0 |
+
+**No aplicado (requiere código, no solo DDL):**
+- **IMP-04** — añadir `dedup_key` sin que la app lo escriba dejaría el índice único **inerte**.
+- **DB-05** — `campaigns` no tiene columna `slug`; requiere columna + backfill + funcionalidad.
+- **DB-06** — `real`→`numeric` **rompe el contrato de la API** (`numeric` se serializa como *string*); exige ajustar
+  la capa de consulta y el frontend primero.
+- **DB-08** — `CHECK` de estados: pendiente de ensayo.
+
 
 
 

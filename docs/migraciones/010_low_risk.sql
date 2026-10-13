@@ -21,6 +21,6 @@ CREATE INDEX IF NOT EXISTS idx_updates_campaign ON campaign_updates(campaign_id)
 CREATE INDEX IF NOT EXISTS idx_images_campaign ON campaign_images(campaign_id);
 
 -- A3 / DB-02: el ledger no debe borrarse en cascada
-ALTER TABLE campaign_movements DROP CONSTRAINT campaign_movements_campaign_id_fkey;
+ALTER TABLE campaign_movements DROP CONSTRAINT IF EXISTS campaign_movements_campaign_id_fkey;
 ALTER TABLE campaign_movements ADD CONSTRAINT campaign_movements_campaign_id_fkey
   FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT;

@@ -11,6 +11,7 @@ import { adminActionLimiter } from "../middleware/rate-limit";
 import { toIsoSafe } from "../lib/date-format";
 import { formatPublicDonor } from "../lib/donor-format";
 import { toSafeAmount } from "../lib/amount-format";
+import { isForeignKeyViolation } from "../lib/pg-errors";
 
 const router: IRouter = Router();
 
@@ -172,10 +173,20 @@ router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, re
   try {
     const id = Number(req.params.id);
     await db.delete(campaignsTable).where(eq(campaignsTable.id, id));
-    res.status(204).send();
+    return res.status(204).send();
   } catch (err) {
+    // La FK del ledger es ON DELETE RESTRICT (migración 010): una campaña con
+    // movimientos registrados no puede eliminarse sin destruir el historial de
+    // auditoría. Se responde 409 con un mensaje accionable en vez de un 500.
+    if (isForeignKeyViolation(err)) {
+      req.log.warn({ err }, "Campaign delete blocked by ledger FK");
+      return res.status(409).json({
+        error: "conflict",
+        message: "La campaña tiene movimientos registrados en el ledger y no puede eliminarse",
+      });
+    }
     req.log.error({ err }, "Failed to delete campaign");
-    res.status(500).json({ error: "server_error", message: "Failed to delete campaign" });
+    return res.status(500).json({ error: "server_error", message: "Failed to delete campaign" });
   }
 });
 
