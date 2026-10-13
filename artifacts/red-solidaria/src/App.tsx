@@ -37,6 +37,7 @@ const StockCatalog = lazy(() => import("./pages/stock-catalog"));
 const AdminLogin = lazy(() => import("./pages/admin/login"));
 const AdminLayout = lazy(() => import("./pages/admin/layout"));
 const AdminCampaigns = lazy(() => import("./pages/admin/campaigns"));
+const AdminChocofest = lazy(() => import("./pages/admin/chocofest"));
 const AdminCampaignDetail = lazy(() => import("./pages/admin/campaign-detail"));
 const AdminDonations = lazy(() => import("./pages/admin/donations"));
 const AdminReports = lazy(() => import("./pages/admin/reports"));
@@ -127,6 +128,11 @@ function App() {
                 <Route path="/admin/adopciones">
                   <AdminLayout>
                     <AdminAdoptions />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/chocofest">
+                  <AdminLayout>
+                    <AdminChocofest />
                   </AdminLayout>
                 </Route>
                 <Route path="/admin/campanas/:id">
