@@ -79,7 +79,7 @@ function VolunteerRow({ volunteer }: { volunteer: Volunteer }) {
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 font-bold text-primary overflow-hidden">
             {volunteer.photo ? (
-              <img src={volunteer.photo} alt={volunteer.name} className="w-full h-full object-cover" />
+              <img src={volunteer.photo} alt={volunteer.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
             ) : (
               volunteer.name.charAt(0).toUpperCase()
             )}

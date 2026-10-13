@@ -187,11 +187,13 @@ export default defineConfig(async ({ mode }) => ({
       "react-dom",
       "wouter",
       "@tanstack/react-query",
-      // react-redux (vía recharts 3 en la raíz) + su shim de useSyncExternalStore:
-      // se pre-bundlean contra el react único del alias para evitar la interop
-      // CJS/ESM rota ("Cannot set properties of undefined (setting 'Children')").
-      "react-redux",
-      "use-sync-external-store",
+      // NOTA (hallazgo INF-03): NO incluir "react-redux" ni
+      // "use-sync-external-store". No están instalados en este paquete
+      // (recharts 2 no los usa) y Vite avisa "Failed to resolve dependency" en
+      // cada arranque; en un entorno limpio el pre-bundle podría fallar.
+      // La interop CJS/ESM de React se resuelve con `resolve.alias` + `dedupe`
+      // (una sola copia de React), que es lo que evita el error histórico
+      // "Cannot set properties of undefined (setting 'Children')".
     ],
   },
 }));

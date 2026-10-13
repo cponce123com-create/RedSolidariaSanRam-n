@@ -22,6 +22,7 @@ export const en: TranslationSchema = {
     wantToHelp: "I want to help",
     openMenu: "Open menu",
     closeMenu: "Close menu",
+    mainMenu: "Main menu",
     lightMode: "Switch to light mode",
     darkMode: "Switch to dark mode",
     logoAlt: "Red Solidaria logo",

@@ -194,7 +194,7 @@ export default function AdminReports() {
                   {/* Photo thumbnail */}
                   <div className="shrink-0 w-16 h-16 rounded-xl overflow-hidden bg-secondary flex items-center justify-center">
                     {report.photos?.[0] ? (
-                      <img src={report.photos[0]} alt="" className="w-full h-full object-cover" />
+                      <img src={report.photos[0]} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     ) : (
                       <TypeIcon className="w-7 h-7 text-muted-foreground" />
                     )}

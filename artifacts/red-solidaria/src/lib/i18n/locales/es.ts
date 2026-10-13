@@ -20,6 +20,7 @@ export const es = {
     wantToHelp: "Quiero ayudar",
     openMenu: "Abrir menú",
     closeMenu: "Cerrar menú",
+    mainMenu: "Menú principal",
     lightMode: "Activar modo claro",
     darkMode: "Activar modo oscuro",
     logoAlt: "Logo de Red Solidaria",

@@ -434,7 +434,7 @@ export default function AdminCampaignDetail() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {images?.map(img => (
               <div key={img.id} className="group relative rounded-2xl overflow-hidden border border-border shadow-sm aspect-square bg-secondary">
-                <img src={img.imageUrl} alt={img.caption || ""} className="w-full h-full object-cover" />
+                <img src={img.imageUrl} alt={img.caption || ""} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/50 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3">
                   <div className="flex justify-end">
                     <Button variant="destructive" size="icon" className="w-8 h-8 rounded-lg" onClick={() => deleteImage.mutate({ id: campaignId, imageId: img.id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/images`] })})}>

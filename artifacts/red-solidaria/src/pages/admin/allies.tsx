@@ -258,7 +258,7 @@ export default function AdminAllies() {
                 <div className="bg-card border border-border rounded-2xl p-4 flex items-start gap-4">
                   <div className="w-14 h-14 rounded-xl bg-secondary flex items-center justify-center overflow-hidden shrink-0">
                     {ally.logo ? (
-                      <img src={ally.logo} alt={ally.name} className="w-full h-full object-contain p-1" />
+                      <img src={ally.logo} alt={ally.name} loading="lazy" decoding="async" className="w-full h-full object-contain p-1" />
                     ) : (
                       <Building2 className="w-7 h-7 text-muted-foreground opacity-30" />
                     )}

@@ -132,7 +132,7 @@ export default function AdminNews() {
               ) : (
                 <div className="bg-card border border-border rounded-2xl p-5 flex gap-4">
                   {item.imageUrl && (
-                    <img src={item.imageUrl} alt={item.title} className="w-20 h-16 object-cover rounded-xl shrink-0" />
+                    <img src={item.imageUrl} alt={item.title} loading="lazy" decoding="async" className="w-20 h-16 object-cover rounded-xl shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">

@@ -178,7 +178,7 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-0.5" aria-label={t("common.skipToContent")}>
+          <nav className="hidden lg:flex items-center gap-0.5" aria-label={t("nav.mainMenu")}>
             {DIRECT_LINKS.map((link) => (
               <Link
                 key={link.href}

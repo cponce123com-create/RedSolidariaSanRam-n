@@ -53,6 +53,8 @@ export default function About() {
             <img 
               src="https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=800&q=80" 
               alt={t("about.volunteersAlt")} 
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           </motion.div>

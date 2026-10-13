@@ -281,6 +281,9 @@ export default function ReportForm() {
               </div>
               <button
                 type="button"
+                role="switch"
+                aria-checked={isAnonymous}
+                aria-label={t("reportForm.anonToggleTitle")}
                 onClick={() => form.setValue("isAnonymous", !isAnonymous)}
                 className={`relative w-12 h-6 rounded-full transition-colors ${isAnonymous ? "bg-primary" : "bg-border"}`}
               >

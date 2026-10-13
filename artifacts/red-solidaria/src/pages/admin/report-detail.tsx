@@ -191,7 +191,7 @@ export default function AdminReportDetail() {
               <div className="grid grid-cols-2 gap-3">
                 {report.photos.map((photo, i) => (
                   <a key={i} href={photo} target="_blank" rel="noopener noreferrer" className="aspect-video bg-secondary rounded-2xl overflow-hidden block group relative">
-                    <img src={photo} alt={`Foto ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <img src={photo} alt={`Foto ${i + 1}`} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                       <ExternalLink className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>

@@ -123,7 +123,7 @@ export default function AdminTestimonials() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {t.avatarUrl ? (
-                        <img src={t.avatarUrl} alt={t.name} className="w-10 h-10 rounded-full object-cover" />
+                        <img src={t.avatarUrl} alt={t.name} loading="lazy" decoding="async" className="w-10 h-10 rounded-full object-cover" />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                           <User className="w-5 h-5 text-primary" />

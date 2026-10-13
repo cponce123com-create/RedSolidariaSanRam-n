@@ -148,7 +148,7 @@ export default function AdminAdoptions() {
               <div key={pet.id} className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
                 <div className="aspect-video bg-secondary relative overflow-hidden">
                   {photo ? (
-                    <img src={photo} alt={pet.name} className="w-full h-full object-cover" />
+                    <img src={photo} alt={pet.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center"><SpeciesIcon className="w-16 h-16 text-muted-foreground opacity-20" /></div>
                   )}

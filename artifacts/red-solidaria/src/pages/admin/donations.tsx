@@ -313,7 +313,7 @@ export default function AdminDonations() {
       {/* Image Preview Dialog */}
       <Dialog open={!!receiptImage} onOpenChange={() => setReceiptImage(null)}>
         <DialogContent className="max-w-2xl bg-transparent border-none shadow-none">
-          {receiptImage && <img src={receiptImage} alt="Comprobante" className="w-full rounded-2xl" />}
+          {receiptImage && <img src={receiptImage} alt="Comprobante" loading="lazy" decoding="async" className="w-full rounded-2xl" />}
         </DialogContent>
       </Dialog>
 
