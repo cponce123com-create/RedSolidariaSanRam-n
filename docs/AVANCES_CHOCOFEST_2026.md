@@ -155,7 +155,8 @@
 | D2 | FE-06 accesibilidad | 🟡 Parcial (Navbar + toggle) |
 | D3 | FE-08 `loading="lazy"` | ✅ Implementado · ✅ Probado |
 | D4 | Docs obligatorios restantes | ✅ Creados (arquitectura, migraciones, Render) |
-| D5 | FE-07 consolidación `ui`/sandbox | ⏳ Pendiente |
+| D5 | FE-07 consolidación `ui`/sandbox | 🟡 Mitigado (excluido del build + aviso; drift ya existía) |
+| F1 | INF-04 build sin el sandbox | ✅ Implementado · ✅ Probado |
 | D6 | FE-09 SEO en más páginas | ⏳ Pendiente |
 | A1 | Fix ledger `asc`→`desc` + test | ✅ Implementado · ✅ Probado |
 | A2 | Quitar `drizzle-kit push` de `post-merge.sh` | ✅ Implementado · ✅ Probado |

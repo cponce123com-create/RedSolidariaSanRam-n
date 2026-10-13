@@ -374,10 +374,17 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Corregido:** el `nav` de escritorio usa la nueva clave `nav.mainMenu` (es/en); el toggle de anonimato de `report-form.tsx` ahora tiene `role="switch"`, `aria-checked` y `aria-label`.
 - **Pendiente:** grupos de opciones sin `radiogroup` en `volunteer.tsx`/`report-form.tsx`; auditoría a11y completa.
 
-#### FE-07 — Duplicación total de `components/ui` con el sandbox · MEDIO · CONFIRMADO
-- **Ubicación:** `red-solidaria/src/components/ui` (55 archivos) ≡ `mockup-sandbox/src/components/ui` (55 archivos, copias idénticas)
-- **Impacto:** el build raíz compila el sandbox innecesariamente (ver INF-06) y hay riesgo de *drift*.
-- **Solución:** excluir el sandbox del build o extraer `ui` a un paquete compartido.
+#### FE-07 — Duplicación de `components/ui` con el sandbox · MEDIO · 🟡 **MITIGADO** (Fase 3 · Bloque D/F)
+- **Verificación correcta:** ambos directorios tienen 55 archivos, pero **NO son idénticos**: 7 difieren
+  (`badge`, `button`, `chart`, `dialog`, `input-group`, `sidebar`, `skeleton`). El *drift* **ya ocurrió**
+  (el hallazgo delegado decía «copias idénticas»; era impreciso).
+- **Impacto real:** el sandbox se compilaba en el build raíz (→ INF-04) y existía riesgo de confusión/drift.
+- **Mitigación aplicada:**
+  1. **INF-04:** `build` y `typecheck` del root ahora filtran `api-server`, `red-solidaria`, `lib/**` y `scripts`
+     → el sandbox **no** se compila (verificado: 0 apariciones en el build).
+  2. **Aviso explícito:** `artifacts/mockup-sandbox/src/components/ui/README.md` documenta que es una copia de
+     trabajo, que la copia de producto es `red-solidaria/...` y que ya hay drift.
+- **Pendiente (opcional):** extraer `ui` a un paquete compartido `lib/ui` (refactor amplio, requiere revisar imports).
 
 #### FE-08 — Imágenes sin `loading="lazy"` · MEDIO · ✅ **CORREGIDO** (Fase 3 · Bloque D)
 - **Recuento real (verificado):** 35 `<img>` y 14 con `loading="lazy"`; el conteo previo («33, solo 13») era impreciso porque los `<img>` multilínea llevan el atributo en otra línea.
