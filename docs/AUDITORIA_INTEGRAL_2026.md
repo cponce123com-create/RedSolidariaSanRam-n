@@ -212,13 +212,13 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 | `campaign_leftovers.quantity` | `real` (float4) | **flotante** | `campaign-leftovers.ts:12` |
 | `stats.float_value` | `real` (float4) | flotante | `stats.ts:9` |
 
-#### DB-01 — `post-merge.sh` ejecuta `drizzle-kit push` (DDL destructivo) · **CRÍTICO** · CONFIRMADO
+#### DB-01 — `post-merge.sh` ejecutaba `drizzle-kit push` (DDL destructivo) · **CRÍTICO** · ✅ **CORREGIDO** (Fase 2 · A2)
 - **Ubicación:** `scripts/post-merge.sh:4` (`pnpm --filter db push`); `lib/db/package.json`; `.replit` (`[postMerge]`)
-- **Descripción:** cada post-merge aplica `drizzle-kit push`, que hace *diff* y ejecuta DDL, incluido `DROP` de objetos fuera del esquema.
+- **Descripción:** cada post-merge aplicaba `drizzle-kit push`, que hace *diff* y ejecuta DDL, incluido `DROP` de objetos fuera del esquema.
 - **Causa raíz:** despliegue basado en *push* en lugar de migraciones versionadas.
 - **Impacto:** pérdida de datos (tablas `session`, `drizzle_migrations`, FK de `campaign_leftovers`), bloqueos/downtime.
-- **Solución:** migraciones versionadas no interactivas; retirar `push --force`.
-- **Prueba:** `drizzle-kit push` (dry-run) contra un clon de producción capturando el SQL propuesto.
+- **Solución aplicada:** se eliminó `pnpm --filter db push` de `scripts/post-merge.sh`; las migraciones versionadas se aplican con el migrador de `@workspace/db` (`lib/db/src/migrate.ts`) al arrancar el servidor (ver A4).
+- **Prueba:** inspección del script (ya no contiene `push`). *Pendiente:* verificar el estado de `drizzle_migrations` en producción (requiere acceso a la BD).
 
 #### DB-02 — El ledger `campaign_movements` se elimina en CASCADE · **CRÍTICO** · CONFIRMADO
 - **Ubicación:** `lib/db/src/schema/campaign-movements.ts:12-14` (`onDelete: "cascade"`); `routes/campaigns.ts:180-189` (`DELETE /campaigns/:id`)
@@ -377,17 +377,19 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 **Verificado sin hallazgo:** `build.mjs:17-22` genera `dist/index.mjs`, que **coincide** con el `startCommand`
 de `render.yaml:9`.
 
-#### INF-01 — Migraciones DDL automáticas no bloqueantes en el arranque · ALTO · CONFIRMADO
+#### INF-01 — Migraciones DDL automáticas no bloqueantes en el arranque · ALTO · ✅ **CORREGIDO** (Fase 2 · A4)
 - **Ubicación:** `artifacts/api-server/src/index.ts:25-45` (verificado)
-- **Descripción:** `app.listen()` se ejecuta **antes** de `runMigrations()`/`seedIfEmpty()`; ambos son *fire-and-forget* que solo loguean el error.
-- **Impacto:** DDL automático en producción (drift/bloqueos) y ventana sirviendo contra un esquema antiguo si la migración falla; el fallo no detiene el servicio.
-- **Solución:** migrar antes de `listen` y `process.exit(1)` si falla. **Prueba:** forzar fallo y verificar que no queda escuchando.
+- **Descripción:** `app.listen()` se ejecutaba **antes** de `runMigrations()`/`seedIfEmpty()`; ambos eran *fire-and-forget* que solo logueaban el error.
+- **Impacto:** DDL automático en producción (drift/bloqueos) y ventana sirviendo contra un esquema antiguo si la migración falla; el fallo no detenía el servicio.
+- **Solución aplicada:** `runMigrations()` se ejecuta **antes** de `app.listen()` (top-level await) y `process.exit(1)` si falla. El seed permanece no bloqueante, pero después de migrar.
+- **Prueba:** typecheck EXIT=0 y build de producción EXIT=0 (el bundle esbuild empaqueta el top-level await). *Pendiente:* prueba con DB real forzando fallo de migración.
 
-#### INF-02 — Health check no verifica la base de datos · ALTO · CONFIRMADO
-- **Ubicación:** `artifacts/api-server/src/routes/health.ts:6-9`; `render.yaml:10` (`healthCheckPath: /api/healthz`)
-- **Descripción:** `/healthz` devuelve `{status:'ok'}` fijo.
-- **Impacto:** deploy marcado «healthy» con la BD caída; enmascara INF-01.
-- **Solución:** `/readyz` con `SELECT 1` y timeout. **Prueba:** BD caída ⇒ 503.
+#### INF-02 — Health check no verifica la base de datos · ALTO · ✅ **CORREGIDO** (Fase 2 · A5)
+- **Ubicación:** `artifacts/api-server/src/routes/health.ts`; `render.yaml:10` (`healthCheckPath: /api/healthz`)
+- **Descripción:** `/healthz` devolvía `{status:'ok'}` fijo, sin comprobar la DB.
+- **Impacto:** deploy marcado «healthy» con la BD caída; enmascaraba INF-01.
+- **Solución aplicada:** nuevo `/readyz` que ejecuta `SELECT 1` con timeout de 2 s y devuelve **503** si la DB no responde; `/healthz` sigue siendo liveness puro.
+- **Prueba:** `tests/health-readyz.test.mjs` — `/healthz` 200 y `/readyz` 503 sin DB (verificado, 143/143 en la suite).
 
 #### INF-03 — `optimizeDeps.include` con dependencias no instaladas · ALTO · CONFIRMADO
 - **Ubicación:** `artifacts/red-solidaria/vite.config.ts` (incluye `react-redux` y `use-sync-external-store`, ausentes en `artifacts/red-solidaria/package.json`; el comentario asume `recharts 3` pero el instalado es `^2.15.2`)

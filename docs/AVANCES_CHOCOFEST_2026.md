@@ -53,7 +53,20 @@
 **RIESGOS PENDIENTES:**
 - Los movimientos ya escritos con la cadena rota **no se corrigen solos**: un ledger existente con ≥3 asientos seguirá reportando `verified:false` hasta un *re-hash*/re-anclaje (requiere autorización y plan en `docs/MIGRACIONES_Y_RESPALDOS.md`).
 
-**SIGUIENTE PASO:** A2 (retirar `drizzle-kit push` de `post-merge.sh`), A4 (migrar antes de `listen`), A5 (`/readyz` con `SELECT 1`), A6 (validación Zod de `POST /donations`).
+**SIGUIENTE PASO:** A6 (validación Zod de `POST /donations`), A7 (exigir comprobante), A8 (transacciones).
+
+### Bloque A · A2 / A4 / A5 — Infraestructura y arranque
+
+**ESTADO:** ✅ Implementado y probado
+**ARCHIVOS MODIFICADOS:**
+- `scripts/post-merge.sh` — eliminado `pnpm --filter db push` (destructivo).
+- `artifacts/api-server/src/index.ts` — `runMigrations()` **antes** de `app.listen()`; `process.exit(1)` si falla.
+- `artifacts/api-server/src/routes/health.ts` — nuevo `/readyz` con `SELECT 1` + timeout (503 si la DB no responde).
+- `artifacts/api-server/build-tests.mjs` — `health.ts` añadido al bundle de tests.
+- `artifacts/api-server/tests/health-readyz.test.mjs` (nuevo).
+
+**ERRORES CORREGIDOS:** DB-01, INF-01, INF-02.
+**PRUEBAS:** typecheck ✅ · suite **143/143** ✅ · build de producción ✅ EXIT=0 · `/healthz` 200 ✅ · `/readyz` 503 sin DB ✅.
 
 ---
 
@@ -62,10 +75,10 @@
 | UW | Descripción | Estado |
 |---|---|---|
 | A1 | Fix ledger `asc`→`desc` + test | ✅ Implementado · ✅ Probado |
-| A2 | Quitar `drizzle-kit push` de `post-merge.sh` | ⏳ Pendiente |
+| A2 | Quitar `drizzle-kit push` de `post-merge.sh` | ✅ Implementado · ✅ Probado |
 | A3 | FK del ledger a `RESTRICT` + borrado lógico | ⏳ Pendiente |
-| A4 | Migrar antes de `listen` + `exit(1)` | ⏳ Pendiente |
-| A5 | `/readyz` con `SELECT 1` | ⏳ Pendiente |
+| A4 | Migrar antes de `listen` + `exit(1)` | ✅ Implementado · ✅ Probado |
+| A5 | `/readyz` con `SELECT 1` | ✅ Implementado · ✅ Probado |
 | A6 | Validación Zod de `POST /donations` | ⏳ Pendiente |
 | A7 | Exigir comprobante al aprobar | ⏳ Pendiente |
 | A8 | Transacciones en donations/reports/pets | ⏳ Pendiente |

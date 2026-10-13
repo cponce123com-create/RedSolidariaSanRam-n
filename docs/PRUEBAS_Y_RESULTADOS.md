@@ -74,4 +74,24 @@ tests (`build-tests.mjs`) y se ejecutó la prueba: **falló** (2/2). Tras `git s
 simulado que emula el `orderBy`/`limit`/`for update` de Drizzle y respeta la dirección del orden.
 
 **Riesgo pendiente:** un ledger existente con ≥3 asientos ya escritos con la cadena rota seguirá dando
-`verified:false`; su corrección requiere *re-hash*/re-anclaje con autorización (ver `docs/MIGRACIONES_Y_RESPALDOS.md`).
+`verified:false`; su corrección requiere *re-hash*/re-anclaje con autorización (ver `docs/MIGRACIONES_Y_RESPALDAS.md`).
+
+---
+
+## 5. Fase 2 · A2 / A4 / A5 — Infraestructura y arranque
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 11 | Typecheck backend | `pnpm --filter @workspace/api-server typecheck` | ✅ EXIT=0 |
+| 12 | Suite backend | `pnpm --filter @workspace/api-server test` | ✅ **143/143** (antes 141) |
+| 13 | Build de producción | `pnpm --filter @workspace/api-server build` | ✅ EXIT=0 (`dist/index.mjs`, 2.6 MB) |
+| 14 | `/healthz` liveness | `node --test tests/health-readyz.test.mjs` | ✅ 200 `{status:ok}` |
+| 15 | `/readyz` sin DB | `node --test tests/health-readyz.test.mjs` | ✅ 503 `{status:unavailable}` |
+
+**Cambios:**
+- **A2 (DB-01):** `scripts/post-merge.sh` ya no ejecuta `drizzle-kit push` (era destructivo). Migraciones versionadas al arrancar.
+- **A4 (INF-01):** `src/index.ts` aplica `runMigrations()` **antes** de `app.listen()` y hace `process.exit(1)` si falla (top-level await, validado por typecheck y por el bundle esbuild).
+- **A5 (INF-02):** `src/routes/health.ts` añade `/readyz` con `SELECT 1` y timeout de 2 s → 503 si la DB no responde; `/healthz` sigue siendo liveness.
+
+**Nota:** el `/readyz` se prueba sin base de datos real (no hay PostgreSQL en el entorno): el intento de conexión falla y el endpoint devuelve 503, que es exactamente el comportamiento esperado ante una DB caída.
+
