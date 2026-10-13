@@ -440,7 +440,8 @@ de `render.yaml:9`.
 
 ### 3.7 Dependencias (DEP)
 
-`pnpm audit --prod` reporta **6 vulnerabilidades**: 1 CRÍTICA, 1 ALTA, 4 MODERADAS.
+`pnpm audit --prod` detectó **6 vulnerabilidades** (1 CRÍTICA, 1 ALTA, 4 MODERADAS). **Todas están corregidas**
+(Fase 3 · Bloque E) y el audit queda **limpio** (`No known vulnerabilities found`).
 
 #### DEP-01 — `proxy-addr` con IP spoofing vía IPv6 mapeado · **CRÍTICO** · ✅ **CORREGIDO** (Fase 3 · Bloque E)
 - **Ubicación:** transitiva de Express en `artifacts/api-server` (`proxy-addr`); fix `>=2.0.8`.
