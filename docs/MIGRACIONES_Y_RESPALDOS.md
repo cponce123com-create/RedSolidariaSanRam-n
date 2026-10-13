@@ -89,3 +89,25 @@
 
 **Checklist por migración:** ☐ respaldo ☐ ensayo en clon ☐ SQL de reversión probado ☐ conciliación
 ☐ sin pérdida de datos ☐ documentado ☐ autorizado.
+
+---
+
+## 10. Ensayo en réplica local (2026-10) — RESULTADOS
+
+Se montó una **réplica local** con los datos reales, **sin tocar producción**: PostgreSQL 17.7 (store de Nix),
+esquema extraído de los **catálogos** y datos exportados en **solo lectura** (22 tablas, 213 filas).
+Los conteos coinciden con producción (6 campañas, 70 donaciones, 5 movimientos, 23 gastos, 6 mascotas, 7 reportes).
+
+| Cambio ensayado | Resultado |
+|---|---|
+| **DB-07** — 4 índices por `campaign_id` | ✅ Creados; 0 errores |
+| **A3 / DB-02** — FK del ledger a `ON DELETE RESTRICT` | ✅ Aplicado; borrar una campaña con ledger **falla** (protección efectiva) |
+| **DB-09** — re-hash del ledger | ✅ 3 filas corregidas (#3, #4, #5); re-verificación → **cadena válida, 0 cambios pendientes** |
+
+**Artefacto listo para autorizar:** `docs/migraciones/010_low_risk.sql` (DB-07 + A3).
+Deliberadamente **no** se añadió a `lib/db/src/migrate.ts`: incluirlo haría que el próximo despliegue lo aplicara solo.
+
+**Pendiente de ensayo:**
+- **IMP-04** — la clave natural tiene **1 duplicado real** que bloquea el índice único (requiere decisión sobre el duplicado).
+- **DB-05 / DB-06 / DB-08** — unicidad, tipos `text`→`date` y `real`→`numeric`: **cambian el contrato de la API**
+  (`numeric` se serializa como string), así que exigen ajuste en la capa de consulta antes de migrar.
