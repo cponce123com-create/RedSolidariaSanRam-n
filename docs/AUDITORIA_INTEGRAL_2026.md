@@ -442,22 +442,22 @@ de `render.yaml:9`.
 
 `pnpm audit --prod` reporta **6 vulnerabilidades**: 1 CRÍTICA, 1 ALTA, 4 MODERADAS.
 
-#### DEP-01 — `proxy-addr` con IP spoofing vía IPv6 mapeado · **CRÍTICO** · CONFIRMADO
+#### DEP-01 — `proxy-addr` con IP spoofing vía IPv6 mapeado · **CRÍTICO** · ✅ **CORREGIDO** (Fase 3 · Bloque E)
 - **Ubicación:** transitiva de Express en `artifacts/api-server` (`proxy-addr`); fix `>=2.0.8`.
-- **Descripción:** el subnet de confianza se evalúa mal para IPv4 mapeado en IPv6.
-- **Impacto:** si `trust proxy` está activo, un cliente puede falsificar su IP y **eludir el rate limiting y el lockout por IP** (SEC-02/SEC-03/SEC-04), debilitando la protección de login/2FA.
-- **Solución:** actualizar `proxy-addr` a `>=2.0.8` (vía bump de Express) y revisar `app.set('trust proxy', …)`.
-- **Prueba:** `pnpm audit --prod` sin el advisory; test de rate-limit con `X-Forwarded-For` falsificado.
+- **Impacto:** si `trust proxy` está activo, un cliente podía falsificar su IP y **eludir el rate limiting y el lockout por IP**.
+- **Solución aplicada:** override `proxy-addr: ^2.0.8` en `pnpm-workspace.yaml` → instalado **2.0.8**.
+- **Prueba:** `pnpm audit --prod` → *No known vulnerabilities found*; suite backend 151/151.
 
-#### DEP-02 — `compression` con DoS por fuga de memoria · ALTO · CONFIRMADO
+#### DEP-02 — `compression` con DoS por fuga de memoria · ALTO · ✅ **CORREGIDO** (Fase 3 · Bloque E)
 - **Ubicación:** `artifacts/api-server` (`compression`); fix `>=1.8.2`.
-- **Impacto:** cierre prematuro de respuesta ⇒ fuga de memoria ⇒ agotamiento del proceso.
-- **Solución:** actualizar a `>=1.8.2`.
+- **Solución aplicada:** dependencia subida a `^1.8.2` → instalado **1.8.2**.
+- **Prueba:** `pnpm audit --prod` limpio; build y suite en verde.
 
-#### DEP-03 — `ip-address` (4 advisories: SSRF / trust-boundary) · MEDIO · CONFIRMADO
+#### DEP-03 — `ip-address` (4 advisories: SSRF / trust-boundary) · MEDIO · ✅ **CORREGIDO** (Fase 3 · Bloque E)
 - **Ubicación:** `artifacts/api-server > express-rate-limit > ip-address`; fix `>=10.7.1`.
-- **Impacto:** clasificación de subredes/IP incorrecta ⇒ bypass de allowlist/trust-boundary en el rate limiter.
-- **Solución:** actualizar `express-rate-limit` (o `ip-address` vía `pnpm.overrides`).
+- **Nota:** ya existía un override `ip-address: ^10.3.1`, pero resolvía a **10.4.0** (por debajo del fix).
+- **Solución aplicada:** override subido a `^10.7.1` → instalado **10.7.4**.
+- **Prueba:** `pnpm audit --prod` limpio.
 
 ---
 

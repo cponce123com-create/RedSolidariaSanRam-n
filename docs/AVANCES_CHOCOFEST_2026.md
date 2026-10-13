@@ -131,10 +131,26 @@
 
 ---
 
+## FASE 3 · Bloque E — Dependencias vulnerables
+
+**ESTADO:** ✅ Implementado · ✅ Probado
+**ARCHIVOS MODIFICADOS:**
+- `pnpm-workspace.yaml` — overrides `proxy-addr: ^2.0.8` y `ip-address: ^10.7.1`.
+- `artifacts/api-server/package.json` — `compression: ^1.8.2`.
+- `pnpm-lock.yaml` — actualizado (`pnpm install`).
+
+**ERRORES CORREGIDOS:** DEP-01 (CRÍTICO), DEP-02 (ALTO), DEP-03 (MEDIO ×4).
+**PRUEBAS:** `pnpm audit --prod` → **sin vulnerabilidades** ✅ · typecheck ✅ · backend **151/151** ✅ · build API ✅.
+
+---
+
 ## Estado global de las unidades de trabajo
 
 | UW | Descripción | Estado |
 |---|---|---|
+| E1 | DEP-01 `proxy-addr` | ✅ Implementado · ✅ Probado |
+| E2 | DEP-02 `compression` | ✅ Implementado · ✅ Probado |
+| E3 | DEP-03 `ip-address` | ✅ Implementado · ✅ Probado |
 | D1 | INF-03 `optimizeDeps` | ✅ Implementado · ✅ Probado |
 | D2 | FE-06 accesibilidad | 🟡 Parcial (Navbar + toggle) |
 | D3 | FE-08 `loading="lazy"` | ✅ Implementado · ✅ Probado |

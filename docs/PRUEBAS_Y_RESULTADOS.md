@@ -189,6 +189,33 @@ galería con datos reales (requieren datos del organizador y CRUD).
 
 **Pendiente:** FE-06 (radiogroups), FE-07 (consolidar `ui` con el sandbox), FE-09 (SEO en más páginas), FE-10..15.
 
+---
+
+## 10. Fase 3 · Bloque E — Dependencias vulnerables (DEP-01/02/03)
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 31 | Instalación con overrides nuevos | `pnpm install` | ✅ EXIT=0 (+4 −3 paquetes) |
+| 32 | **Auditoría de dependencias** | `pnpm audit --prod` | ✅ **No known vulnerabilities found** |
+| 33 | Typecheck (root, 4 paquetes) | `pnpm run typecheck` | ✅ EXIT=0 |
+| 34 | Suite backend | `pnpm --filter @workspace/api-server test` | ✅ **151/151** |
+| 35 | Build de producción (API) | `pnpm --filter @workspace/api-server build` | ✅ EXIT=0 |
+
+**Versiones resultantes (antes → después):**
+
+| Paquete | Antes | Después | Fix mínimo |
+|---|---|---|---|
+| `proxy-addr` (DEP-01, CRÍTICO) | 2.0.7 | **2.0.8** | `>=2.0.8` |
+| `compression` (DEP-02, ALTO) | 1.8.1 | **1.8.2** | `>=1.8.2` |
+| `ip-address` (DEP-03, MEDIO ×4) | 10.4.0 | **10.7.4** | `>=10.7.1` |
+
+**Cambios:** overrides en `pnpm-workspace.yaml` (`proxy-addr: ^2.0.8`, `ip-address: ^10.7.1`) y
+`compression: ^1.8.2` en `artifacts/api-server/package.json`.
+
+**Nota:** DEP-01 era especialmente relevante porque permitía falsificar la IP y **eludir el rate-limit y el lockout
+por IP** (SEC-02/SEC-03/SEC-04) si `trust proxy` estaba activo.
+
+
 
 
 
