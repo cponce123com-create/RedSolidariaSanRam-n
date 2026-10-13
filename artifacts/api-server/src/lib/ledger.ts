@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { db, campaignMovementsTable, campaignsTable } from "@workspace/db";
-import { asc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 
 /**
  * Ledger hash-chained de movimientos (patrón Trust Pay).
@@ -102,7 +102,7 @@ export async function appendMovement(
     .select({ hash: campaignMovementsTable.hash })
     .from(campaignMovementsTable)
     .where(eq(campaignMovementsTable.campaignId, campaignId))
-    .orderBy(asc(campaignMovementsTable.id))
+    .orderBy(desc(campaignMovementsTable.id))
     .limit(1)
     .for("update");
   const prevHash = last?.hash ?? GENESIS_PREV;
