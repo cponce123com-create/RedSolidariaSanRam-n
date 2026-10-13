@@ -520,8 +520,13 @@ error de copia al crear el archivo), y además con **fechas de diciembre de 2025
 (`chocolatada-2024-data.ts:18`). Ver IMP-01 / DB-06 / IMP-05.
 El test `chocolatada-2024-data.test.mjs` asertaba el mes `2025-12`, **codificando** ese comportamiento erróneo (IMP-09).
 
-**Riesgo potencial (no confirmable sin BD real):** cuantía exacta de filas afectadas, existencia de datos 2024 reales,
-estado de `drizzle_migrations` en producción.
+**Verificado contra la base de datos real (solo lectura, 2026-10; sin DDL):**
+- **API-01 CONFIRMADO y activo:** la cadena del ledger está **rota en el movimiento #3** (5 movimientos en total).
+- **IMP-04:** existe **1 duplicado** por clave natural (bloquearía el índice único).
+- **DB-02:** FK de `campaign_movements` = **CASCADE**.
+- **DB-06:** `campaigns.start_date/end_date` = `text`; `goal`/`raised`/`quantity`/`float_value` = `real`. Los `amount` ya son `numeric(12,2)`.
+- **DB-07:** las tablas de contenido no tienen índice por `campaign_id`.
+- **drizzle_migrations** existe con 9 filas (001-009). **0** donaciones huérfanas. Detalle en `docs/PRUEBAS_Y_RESULTADOS.md` §13.
 
 ---
 

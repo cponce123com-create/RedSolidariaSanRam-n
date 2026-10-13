@@ -261,6 +261,37 @@ actúa como **hub** de la campaña y evita inventar datos al crear.
 **Pendiente:** FE-09 completo (`BASE_URL` hardcodeado, `hreflang`, JSON-LD) y FE-10/FE-11 (zod duplicado, formulario
 admin de donaciones sin RHF/Zod).
 
+---
+
+## 13. Verificación contra la base de datos real (SOLO LECTURA)
+
+> Conexión autorizada por el responsable. **No se ejecutó ningún DDL ni modificación de datos.** Sin datos personales.
+
+**Entorno:** PostgreSQL **18.6** (Neon), base `neondb`, 24 tablas.
+
+| Comprobación | Resultado |
+|---|---|
+| Campañas | 6 (`Chocolatada 2024`, `Campaña Escolar 2025`, `Rescate Animal`, `Techado`, `Brigada Médica`, `Chocofest 2025`) |
+| Donaciones | **70** (67 aprobadas = S/ 6 120,84 · 3 pendientes = S/ 55) |
+| Ledger `campaign_movements` | **5 filas** |
+| Gastos / evidencias / actualizaciones / imágenes | 23 / 13 / 7 / 9 |
+| `donation_proofs` | **0** |
+| Voluntarios / aliados / admins | 0 / 6 / 2 |
+| `drizzle_migrations` | Existe con **9 filas** (001-009) — estructura propia (`name`, `applied_at`) |
+
+**Hallazgos confirmados en producción:**
+1. **API-01 (CRÍTICO) — CONFIRMADO y ACTIVO:** la cadena del ledger está **ROTA en el movimiento #3** (`prevOK=false`, `hashOK=false` desde #3), exactamente como predijo la auditoría. El arreglo A1 evita nuevos rompimientos; **los 3 movimientos ya escritos siguen inválidos** (requiere re-hash/backfill → DB-09, con autorización).
+2. **IMP-04:** existe **1 duplicado** por clave natural (S/ 20,00, `cash`, 2025-12-12; ids 40 y 43) → el índice único **fallaría** si se aplicara sin resolverlo antes.
+3. **DB-02:** FK de `campaign_movements.campaign_id` = **CASCADE** (`confdeltype='c'`); `campaign_leftovers.campaign_id` también CASCADE.
+4. **DB-06:** `campaigns.start_date`/`end_date` son **`text`**; `campaigns.goal`/`raised` y `campaign_leftovers.quantity` y `stats.float_value` son **`real`** (float4). `donations.amount`, `campaign_expenses.amount` y `campaign_movements.amount` ya son `numeric(12,2)` (migración 006).
+5. **DB-07:** `campaign_expenses/evidence/updates/images` **solo** tienen su `pkey` (sin índice por `campaign_id`).
+6. **Integridad referencial:** **0** donaciones huérfanas.
+7. **C1:** aún **no existe** la campaña «ChocoFest 2026» → aplica la creación guiada del panel C7.
+
+**Conclusión operativa:** las migraciones **NO** deben ejecutarse sobre esta base sin **respaldo verificado** y autorización
+explícita; el duplicado y el ledger roto requieren tratamiento de datos (no solo DDL).
+
+
 
 
 
