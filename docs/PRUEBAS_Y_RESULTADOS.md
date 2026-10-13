@@ -139,5 +139,31 @@ compilación/tipos y que las rutas siguen montadas y respondiendo.
 **No ejecutado:** los importadores no se han corrido contra una BD real (no hay PostgreSQL en el entorno); la lógica de
 reconciliación se prueba de forma pura y exhaustiva.
 
+---
+
+## 8. Fase 3 · Bloque C — Página pública ChocoFest 2026
+
+| # | Comprobación | Comando | Resultado |
+|---|---|---|---|
+| 23 | Typecheck frontend | `pnpm --filter @workspace/red-solidaria typecheck` | ✅ EXIT=0 |
+| 24 | Pruebas frontend (node) | `pnpm --filter @workspace/red-solidaria test` | ✅ **16/16** |
+| 25 | Pruebas frontend (vitest) | idem | ✅ **22/22** (7 archivos) |
+| 26 | Build de producción (Vite) | `pnpm --filter @workspace/red-solidaria build` | ✅ EXIT=0 — chunk `chocofest-2026-*.js` (+br/gz) |
+
+**Implementado:**
+- `src/pages/chocofest-2026.tsx` — página pública con las **13 secciones** del prompt.
+- `src/lib/chocofest.ts` — constantes (`CHOCOFEST_2026`, `CHOCOFEST_2026_PATH`) + `findChocofest2026` (pura).
+- Ruta `/campanas/chocofest-2026` **antes** de `/campanas/:id` (wouter resuelve por orden).
+- i18n es/en: bloque `chocofest` (~38 claves) con paridad verificada por el test existente.
+- `tests/chocofest.test.mjs` (5 pruebas) + `build-tests.mjs` actualizado.
+
+**Contenido provisional (NO son datos oficiales):** lema, meta y textos van marcados con el aviso «Contenido en
+preparación»; si la campaña 2026 no existe en la BD, la URL muestra un estado «en preparación». No se inventaron
+fechas, metas de beneficiarios ni cifras de recaudación.
+
+**Pendiente:** panel admin específico de ChocoFest 2026, donaciones en especie/inventario, localidades beneficiadas y
+galería con datos reales (requieren datos del organizador y CRUD).
+
+
 
 

@@ -97,6 +97,23 @@
 **PRUEBAS:** typecheck backend ✅ · typecheck scripts ✅ · suite **151/151** ✅ · reconciliación 8/8 ✅.
 **RIESGO PENDIENTE:** IMP-04 completo (columna única) requiere migración autorizada; importadores no ejecutados contra DB real.
 
+## FASE 3 · Bloque C — ChocoFest 2026
+
+### C1 / C2 / C3 — Página pública `/campanas/chocofest-2026`
+
+**ESTADO:** 🟡 Parcial (página pública + i18n completas; falta admin específico y módulos de datos)
+**ARCHIVOS MODIFICADOS:**
+- `artifacts/red-solidaria/src/pages/chocofest-2026.tsx` (nuevo) — 13 secciones.
+- `artifacts/red-solidaria/src/lib/chocofest.ts` (nuevo) — constantes + `findChocofest2026`.
+- `artifacts/red-solidaria/src/App.tsx` — ruta antes de `/campanas/:id` + import lazy.
+- `artifacts/red-solidaria/src/lib/i18n/locales/es.ts` y `en.ts` — bloque `chocofest`.
+- `artifacts/red-solidaria/tests/chocofest.test.mjs` (nuevo) y `build-tests.mjs`.
+- `artifacts/red-solidaria/tests/i18n-keys.test.mjs` — `chocofest.metaTitle` en `LEGIT_SHARED`.
+
+**PRUEBAS:** typecheck ✅ · node **16/16** ✅ · vitest **22/22** ✅ · build Vite ✅ EXIT=0 (chunk `chocofest-2026-*.js`).
+**CONTENIDO:** provisional y marcado («Contenido en preparación»); estado «en preparación» si la campaña no existe.
+**RIESGO PENDIENTE:** datos reales (lema, fechas, metas, localidades, fotos) y panel admin específico (C4-C8).
+
 ---
 
 ## Estado global de las unidades de trabajo
@@ -117,5 +134,12 @@
 | B4 | Idempotencia unificada por campaña | ✅ Implementado · ✅ Probado |
 | B5 | Pruebas del importador | 🟡 Lógica pura probada (8/8); falta integración con DB |
 | B2-bis | Columna única `dedupKey` (IMP-04) | ⏳ Pendiente (migración autorizada) |
-| C1-C8 | ChocoFest 2026 | ⏳ Pendiente (bloqueado por datos reales) |
+| C1 | Datos/metadatos editables de 2026 | 🟡 Reutiliza `campaigns` + admin de campañas |
+| C2 | Página pública con 13 secciones | ✅ Implementado · ✅ Probado |
+| C3 | i18n es/en de ChocoFest 2026 | ✅ Implementado · ✅ Probado |
+| C4 | Donaciones monetarias (estados) | 🟡 Reutiliza el flujo existente; falta vista específica |
+| C5 | Donaciones en especie + inventario | ⏳ Pendiente (sección placeholder) |
+| C6 | Voluntariado y planificación | 🟡 Enlaza a `/voluntariado`; falta planificación por localidades |
+| C7 | Panel admin específico de ChocoFest | ⏳ Pendiente |
+| C8 | Transparencia pública | 🟡 Reutiliza el panel existente por campaña |
 | D | Diseño, calidad y docs restantes | ⏳ Pendiente |

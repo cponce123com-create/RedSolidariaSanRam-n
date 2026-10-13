@@ -337,10 +337,16 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 
 ### 3.5 Frontend (FE)
 
-#### FE-01 — No existe ninguna página/componente de ChocoFest 2026 · ALTO (FALTA) · CONFIRMADO
-- **Ubicación:** `artifacts/red-solidaria/src/**` (grep `2026` = 0 en contenido); solo `i18n/locales/es.ts:221` y `en.ts:223` mencionan «Chocofest 2025»
-- **Descripción:** no hay ruta, datos, i18n ni transparencia para 2026. **Bloquea la Fase 3.**
-- **Solución:** implementar `/campanas/chocofest-2026` + datos + i18n + transparencia (Fase 3).
+#### FE-01 — No existe ninguna página/componente de ChocoFest 2026 · ALTO (FALTA) · 🟡 **PARCIAL** (Fase 3 · Bloque C)
+- **Ubicación original:** `artifacts/red-solidaria/src/**` (no había ruta ni contenido de 2026).
+- **Implementado:** página pública `src/pages/chocofest-2026.tsx` con las **13 secciones** del prompt; ruta permanente
+  `/campanas/chocofest-2026` registrada **antes** de `/campanas/:id`; `src/lib/chocofest.ts` (constantes + resolución por
+  título); i18n es/en (bloque `chocofest`, paridad verificada); test `tests/chocofest.test.mjs`.
+- **Contenido:** **provisional y marcado** («Contenido en preparación»); si la campaña 2026 no existe en la BD, la URL
+  muestra un estado «en preparación» (no se inventan cifras ni fechas).
+- **Pendiente:** panel admin específico de ChocoFest 2026, donaciones en especie/inventario, localidades y galería con
+  datos reales (requieren datos del organizador y CRUD).
+- **Prueba:** typecheck frontend EXIT=0 · node 16/16 · vitest 22/22 · build Vite EXIT=0 (chunk `chocofest-2026-*.js`).
 
 #### FE-02 — El backend no valida `amount`/`paymentMethod` en `POST /donations` · ALTO · ❌ **REFUTADO** (Fase 2 · A6)
 - **Ubicación:** `shared/DonationModal.tsx:57-75`; `routes/donations.ts` (`POST /donations`)
