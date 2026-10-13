@@ -9,6 +9,7 @@ rmSync("tests/dist", { recursive: true, force: true });
 await build({
   entryPoints: [
     "./src/lib/campaign-urgency.ts",
+    "./src/lib/chocofest.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",
   ],

@@ -1164,6 +1164,57 @@ export const es = {
     submit: "Enviar reporte",
     consent: "Al enviar, aceptas que nuestro equipo contacte contigo para verificar la información.",
   },
+  chocofest: {
+    metaTitle: "ChocoFest 2026",
+    metaDescription:
+      "Campaña navideña de chocolatada de Red Solidaria San Ramón (Chanchamayo, Junín, Perú).",
+    organizer: "Organiza: Red Solidaria San Ramón",
+    location: "Localidades beneficiadas",
+    provisionalBadge: "Contenido en preparación",
+    provisionalNotice:
+      "Esta campaña está en preparación. Los textos y metas mostrados son provisionales y se completarán desde el panel de administración; no representan cifras ni fechas oficiales.",
+    provisionalMottoLabel: "Lema provisional",
+    preparingTitle: "Campaña en preparación",
+    preparingText:
+      "Aún no se ha publicado el contenido de ChocoFest 2026. Se habilitará desde el panel de administración.",
+    backToCampaigns: "Ver todas las campañas",
+    ctaDonate: "Donar ahora",
+    ctaVolunteer: "Quiero ser voluntario",
+    ctaAllies: "Quiero ser aliado",
+    ctaTransparency: "Ver panel de transparencia",
+    sectionPresentation: "La campaña",
+    sectionGoal: "Objetivo y metas",
+    sectionProgress: "Avance de recaudación",
+    sectionMoney: "Donaciones monetarias",
+    sectionInKind: "Donaciones en especie",
+    sectionVolunteers: "Voluntariado",
+    sectionAllies: "Aliados y patrocinadores",
+    sectionTimeline: "Cronograma de actividades",
+    sectionLocalities: "Localidades beneficiadas",
+    sectionGallery: "Galería de fotografías",
+    sectionTransparency: "Transparencia financiera",
+    sectionResults: "Resultados y cierre",
+    goalLabel: "Meta",
+    raisedLabel: "Recaudado",
+    progressLabel: "{{progress}}% de la meta",
+    donorsCount: "{{count}} donaciones confirmadas",
+    emptyMoney: "Aún no hay donaciones monetarias confirmadas para esta campaña.",
+    emptyInKind: "Aún no se han registrado donaciones en especie.",
+    emptyTimeline: "El cronograma de actividades se publicará próximamente.",
+    emptyLocalities: "Las localidades beneficiadas se publicarán próximamente.",
+    emptyGallery: "Las fotografías se publicarán durante y al cierre de la jornada.",
+    emptyResults: "Los resultados se publicarán al cierre de la campaña.",
+    emptyAllies: "Los aliados y patrocinadores se publicarán próximamente.",
+    emptyVolunteers: "La convocatoria de voluntariado se publicará próximamente.",
+    volunteersText:
+      "Súmate al equipo que reparte chocolatada, panetones y alegría en San Ramón.",
+    alliesText: "Empresas y personas que hacen posible esta campaña.",
+    transparencyText:
+      "Cada sol recaudado y gastado queda registrado públicamente en el panel de transparencia.",
+    inKindNote:
+      "La valorización estimada de productos es informativa y no se suma al dinero recaudado.",
+    resultsNote: "Las cifras de cierre se publican solo cuando están verificadas.",
+  },
 };
 
 export type TranslationSchema = typeof es;

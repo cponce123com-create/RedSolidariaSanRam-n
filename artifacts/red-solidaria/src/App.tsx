@@ -17,6 +17,7 @@ const About = lazy(() => import("./pages/about"));
 const Campaigns = lazy(() => import("./pages/campaigns"));
 const CampaignDetail = lazy(() => import("./pages/campaign-detail"));
 const CampaignTransparency = lazy(() => import("./pages/campaign-transparency"));
+const Chocofest2026 = lazy(() => import("./pages/chocofest-2026"));
 const Transparency = lazy(() => import("./pages/transparency"));
 const News = lazy(() => import("./pages/news"));
 const Contact = lazy(() => import("./pages/contact"));
@@ -190,6 +191,14 @@ function App() {
                 </Route>
 
                 {/* Public routes */}
+                {/* Ruta específica ANTES de /campanas/:id: wouter resuelve por
+                    orden, así que sin esto "chocofest-2026" se interpretaría
+                    como el id de una campaña. */}
+                <Route path="/campanas/chocofest-2026">
+                  <MainLayout>
+                    <Chocofest2026 />
+                  </MainLayout>
+                </Route>
                 <Route path="/campanas/:id/transparencia">
                   <MainLayout>
                     <CampaignTransparency />
