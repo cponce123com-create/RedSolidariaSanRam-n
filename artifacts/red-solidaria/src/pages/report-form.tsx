@@ -169,11 +169,13 @@ export default function ReportForm() {
             <FormField control={form.control} name="type" render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-base font-semibold">{t("reportForm.typeQuestion")}</FormLabel>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+                <div role="radiogroup" aria-label={t("reportForm.typeQuestion")} className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
                   {CASE_TYPES.map(({ value, labelKey, icon: Icon }) => (
                     <button
                       key={value}
                       type="button"
+                      role="radio"
+                      aria-checked={field.value === value}
                       onClick={() => field.onChange(value)}
                       className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 text-sm font-medium transition-all ${
                         field.value === value
@@ -193,11 +195,13 @@ export default function ReportForm() {
             <FormField control={form.control} name="urgency" render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-base font-semibold">{t("reportForm.urgencyLabel")}</FormLabel>
-                <div className="grid grid-cols-2 gap-3 mt-2">
+                <div role="radiogroup" aria-label={t("reportForm.urgencyLabel")} className="grid grid-cols-2 gap-3 mt-2">
                   {URGENCY_LEVELS.map(({ value, labelKey, color }) => (
                     <button
                       key={value}
                       type="button"
+                      role="radio"
+                      aria-checked={field.value === value}
                       onClick={() => field.onChange(value)}
                       className={`px-4 py-3 rounded-2xl border-2 text-sm font-semibold text-left transition-all ${
                         field.value === value

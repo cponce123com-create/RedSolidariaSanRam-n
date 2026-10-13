@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { ImageUploadField } from "@/components/shared/ImageUploadField";
+import SEO from "@/components/shared/SEO";
 import {
   Heart, CheckCircle, ArrowLeft, Users, Clock, Star,
   MapPin, Phone, Mail, Briefcase, HandHeart
@@ -132,6 +133,7 @@ export default function Volunteer() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 pt-24 sm:pt-28 pb-10 sm:pb-16">
+      <SEO title={t("nav.wantToHelp")} description={t("seo.defaultDescription")} />
       <Link href="/como-ayudar">
         <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
           <ArrowLeft className="w-4 h-4" /> {t("volunteer.backLink")}
@@ -240,9 +242,9 @@ export default function Volunteer() {
                 <FormField control={form.control} name="availability" render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("volunteer.availabilityQuestion")}</FormLabel>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                    <div role="radiogroup" aria-label={t("volunteer.availabilityQuestion")} className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                       {AVAILABILITY_OPTIONS.map(opt => (
-                        <button key={opt.value} type="button" onClick={() => field.onChange(opt.value)}
+                        <button key={opt.value} type="button" role="radio" aria-checked={field.value === opt.value} onClick={() => field.onChange(opt.value)}
                           className={`px-4 py-3 rounded-xl text-sm text-left border-2 font-medium transition-all ${field.value === opt.value ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary/30 text-muted-foreground hover:border-primary/30"}`}>
                           {t(opt.labelKey)}
                         </button>
@@ -262,9 +264,9 @@ export default function Volunteer() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm font-medium mb-3">{t("volunteer.interestsQuestion")}</p>
-                    <div className="flex flex-wrap gap-2">
+                    <div role="group" aria-label={t("volunteer.interestsQuestion")} className="flex flex-wrap gap-2">
                       {INTEREST_OPTIONS.map(opt => (
-                        <button key={opt.value} type="button" onClick={() => toggleInterest(opt.value)}
+                        <button key={opt.value} type="button" aria-pressed={selectedInterests.includes(opt.value)} onClick={() => toggleInterest(opt.value)}
                           className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${selectedInterests.includes(opt.value) ? "bg-primary text-white border-primary shadow-sm" : "border-border text-muted-foreground hover:border-primary/40 bg-secondary/30"}`}>
                           {t(opt.labelKey)}
                         </button>

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Progress } from "@/components/ui/progress";
 import { Shield, Target, TrendingUp, Users, Receipt, ArrowRight, Heart } from "lucide-react";
+import SEO from "@/components/shared/SEO";
 
 interface CampaignSummary {
   id: number;
@@ -53,6 +54,7 @@ export default function Transparency() {
 
   return (
     <div className="min-h-screen pt-24 pb-24 bg-[#FAF9F6]">
+      <SEO title={t("nav.transparency")} description={t("seo.defaultDescription")} />
       <div className="max-w-5xl mx-auto px-4 sm:px-6">
         {/* Hero */}
         <div className="text-center mb-12">
