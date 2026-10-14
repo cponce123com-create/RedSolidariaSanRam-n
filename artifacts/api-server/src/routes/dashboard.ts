@@ -8,13 +8,49 @@ import {
 import { eq, gte, sql, desc, count, sum } from "drizzle-orm";
 import { toSafeAmount } from "../lib/amount-format";
 import { campaignFunding } from "../lib/funding";
+import {
+  describeDashboardFilters,
+  parseDashboardFilters,
+} from "../lib/dashboard-filters";
 
 const router = Router();
 
 router.get("/admin/dashboard", async (req, res) => {
+  // Fase 6 (V7-5): filtros por campaña, estado y rango de fechas. TODAS las
+  // cifras de campaña salen de la MISMA consulta filtrada: nunca de mezclas
+  // hechas a mano en la interfaz.
+  const parsed = parseDashboardFilters(req.query);
+  if ("error" in parsed) {
+    return res.status(400).json({ error: "validation_error", message: parsed.error });
+  }
+  const filters = parsed.filters;
+
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sixMonthsAgo = new Date(now.getTime() - 6 * 30 * 24 * 60 * 60 * 1000);
+
+  // ─── Fragmentos condicionales ───────────────────────────────────────────────
+  // Drizzle interpola vacío cuando el filtro no aplica. Al filtrar por estado se
+  // une con `campaigns` porque el fondo general (donación sin campaña) no tiene
+  // estado: si se pide «campañas activas», el fondo general no pertenece ahí.
+  const donationJoin = filters.status
+    ? sql` JOIN campaigns c ON c.id = d.campaign_id`
+    : sql``;
+  const donationCampaignWhere =
+    filters.campaignId != null ? sql` AND d.campaign_id = ${filters.campaignId}` : sql``;
+  const donationDateWhere = sql`${
+    filters.from ? sql` AND d.created_at >= ${filters.from}` : sql``
+  }${filters.to ? sql` AND d.created_at <= ${filters.to}` : sql``}`;
+  const expenseJoin = filters.status
+    ? sql` JOIN campaigns c ON c.id = e.campaign_id`
+    : sql``;
+  const expenseCampaignWhere =
+    filters.campaignId != null ? sql` AND e.campaign_id = ${filters.campaignId}` : sql``;
+  // `campaign_expenses.date` es texto ISO (YYYY-MM-DD): la comparación
+  // lexicográfica equivale a la cronológica.
+  const expenseDateWhere = sql`${
+    filters.from ? sql` AND e.date >= ${filters.from.slice(0, 10)}` : sql``
+  }${filters.to ? sql` AND e.date <= ${filters.to.slice(0, 10)}` : sql``}`;
 
   const [
     campaignStats,
@@ -40,23 +76,44 @@ router.get("/admin/dashboard", async (req, res) => {
         COUNT(*) FILTER (WHERE status = 'active')::int AS active,
         COUNT(*) FILTER (WHERE status IN ('completed', 'inactive'))::int AS completed
       FROM campaigns
+      WHERE 1 = 1
+        ${filters.status ? sql`AND status = ${filters.status}` : sql``}
+        ${filters.campaignId != null ? sql`AND id = ${filters.campaignId}` : sql``}
     `),
-    // Recaudación global conciliada (Fase 3.1): el verificado es la suma de
-    // donaciones confirmadas; el histórico solo cuenta para campañas que no
-    // tienen ninguna donación registrada, así un importe nunca se duplica.
+    // Recaudación conciliada (Fase 3.1) respetando los filtros: el verificado es
+    // la suma de donaciones confirmadas en el ámbito pedido; el histórico solo
+    // cuenta para campañas sin donaciones registradas, así no se duplica.
     db.execute(sql`
       SELECT
-        COALESCE((SELECT SUM(amount) FROM donations WHERE status IN ('approved','reconciled')), 0)::float8 AS verified,
+        COALESCE((
+          SELECT SUM(d.amount) FROM donations d
+          ${donationJoin}
+          WHERE d.status IN ('approved','reconciled')
+            ${donationCampaignWhere}
+            ${donationDateWhere}
+        ), 0)::float8 AS verified,
         COALESCE((
           SELECT SUM(c.raised) FROM campaigns c
           WHERE c.raised > 0
+            ${filters.status ? sql`AND c.status = ${filters.status}` : sql``}
+            ${filters.campaignId != null ? sql`AND c.id = ${filters.campaignId}` : sql``}
             AND NOT EXISTS (
               SELECT 1 FROM donations d
               WHERE d.campaign_id = c.id AND d.status IN ('approved','reconciled')
             )
         ), 0)::float8 AS historical
     `),
-    db.execute(sql`SELECT COALESCE(SUM(amount), 0)::float8 AS total_spent FROM campaign_expenses`),
+    db.execute(sql`
+      SELECT COALESCE(SUM(e.amount), 0)::float8 AS total_spent
+      FROM campaign_expenses e
+      ${expenseJoin}
+      WHERE 1 = 1
+        ${expenseCampaignWhere}
+        ${expenseDateWhere}
+    `),
+    // Los indicadores que no dependen de campaña (mascotas, reportes,
+    // adopciones, voluntarios) se muestran SIEMPRE globales y el panel los
+    // marca como tales: no se pueden atribuir a una campaña ni a un rango.
     db.execute(sql`SELECT COUNT(*) FILTER (WHERE status = 'available')::int AS available FROM pets`),
     db.select({ count: count() }).from(communityReportsTable).where(eq(communityReportsTable.status, "pending")),
     db.select({ count: count() }).from(adoptionRequestsTable).where(eq(adoptionRequestsTable.status, "pending")),
@@ -65,12 +122,15 @@ router.get("/admin/dashboard", async (req, res) => {
     db.select().from(donationsTable).orderBy(desc(donationsTable.createdAt)).limit(8),
     db.execute(sql`
       SELECT
-        TO_CHAR(created_at, 'YYYY-MM') AS month,
-        SUM(amount)::float8 AS total,
+        TO_CHAR(d.created_at, 'YYYY-MM') AS month,
+        SUM(d.amount)::float8 AS total,
         COUNT(*)::int AS count
-      FROM donations
-      WHERE created_at >= ${sixMonthsAgo.toISOString()}
-      GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+      FROM donations d
+      ${donationJoin}
+      WHERE d.created_at >= ${sixMonthsAgo.toISOString()}
+        ${donationCampaignWhere}
+        ${donationDateWhere}
+      GROUP BY TO_CHAR(d.created_at, 'YYYY-MM')
       ORDER BY month ASC
     `),
     // Top de campañas con la MISMA regla de conciliación que el sitio público
@@ -84,18 +144,27 @@ router.get("/admin/dashboard", async (req, res) => {
           COALESCE(c.raised, 0)::float8 AS historical,
           c.goal,
           c.status,
-          COALESCE(SUM(d.amount) FILTER (WHERE d.status IN ('approved','reconciled')), 0)::float8 AS verified
+          COALESCE(SUM(d.amount) FILTER (WHERE d.status IN ('approved','reconciled')${
+            filters.from ? sql` AND d.created_at >= ${filters.from}` : sql``
+          }${filters.to ? sql` AND d.created_at <= ${filters.to}` : sql``}), 0)::float8 AS verified
         FROM campaigns c
         LEFT JOIN donations d ON d.campaign_id = c.id
+        WHERE 1 = 1
+          ${filters.status ? sql`AND c.status = ${filters.status}` : sql``}
+          ${filters.campaignId != null ? sql`AND c.id = ${filters.campaignId}` : sql``}
         GROUP BY c.id
       ) t
       ORDER BY (CASE WHEN t.verified > 0 THEN t.verified ELSE t.historical END) DESC
       LIMIT 5
     `),
     db.execute(sql`
-      SELECT category, SUM(amount)::float8 AS total, COUNT(*)::int AS count
-      FROM campaign_expenses
-      GROUP BY category
+      SELECT e.category, SUM(e.amount)::float8 AS total, COUNT(*)::int AS count
+      FROM campaign_expenses e
+      ${expenseJoin}
+      WHERE 1 = 1
+        ${expenseCampaignWhere}
+        ${expenseDateWhere}
+      GROUP BY e.category
       ORDER BY total DESC
     `),
     db.select({ count: count() }).from(volunteersTable).where(eq(volunteersTable.status, "pending")),
@@ -110,10 +179,21 @@ router.get("/admin/dashboard", async (req, res) => {
   // Misma regla de conciliación que el sitio público (Fase 3.1): suma de
   // donaciones confirmadas + histórico SOLO de las campañas sin donaciones
   // registradas. Nunca el máximo de dos cifras solapadas.
-  const funding = campaignFunding(donationRow?.historical, donationRow?.verified);
+  // Con un rango de fechas activo el importe histórico NO se cuenta: es un
+  // acumulado que no se puede atribuir a un periodo, así que sumarlo mostraría
+  // dinero de fuera del rango. Se publica solo la recaudación verificada.
+  const funding = campaignFunding(
+    filters.hasDateRange ? 0 : donationRow?.historical,
+    donationRow?.verified,
+  );
   const totalSpent = Number(expenseRow?.total_spent ?? 0);
 
   return res.json({
+    // Trazabilidad: se devuelve QUÉ filtros produjeron estas cifras.
+    filters: {
+      ...filters,
+      description: describeDashboardFilters(filters),
+    },
     summary: {
       totalCampaigns: campaignRow?.total ?? 0,
       activeCampaigns: campaignRow?.active ?? 0,

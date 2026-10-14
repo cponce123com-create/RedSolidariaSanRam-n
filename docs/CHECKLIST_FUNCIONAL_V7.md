@@ -3,7 +3,7 @@
 **Rama:** `feat/implementacion-integral-2026` · **Fecha:** 14 de octubre de 2026
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
-**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 318/318 ·
+**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 329/329 ·
 `red-solidaria` 143/143 node:test + 23/23 vitest · typecheck 0 en libs/API/frontend/scripts ·
 build de producción OK · `pnpm audit --prod` 0 vulnerabilidades).
 No se usan porcentajes de avance.
@@ -90,8 +90,8 @@ No se usan porcentajes de avance.
 | Indicadores reales y coherentes (campañas, recaudado, gastos, saldo, pendientes) | **IMPLEMENTADO Y PROBADO** | `routes/dashboard.ts`, `pages/admin/dashboard.tsx` | `funding.test.mjs` (regla) + typecheck; conteos por SQL con `FILTER` |
 | Top de campañas con la misma regla que el sitio público | **IMPLEMENTADO Y PROBADO** | `routes/dashboard.ts` | Misma función pura `campaignFunding` |
 | Alertas de integridad del libro en el panel | **IMPLEMENTADO Y PROBADO** | `pages/admin/ledger-audit.tsx` | Página `/admin/libro` con estado global y hallazgos |
-| Filtros por campaña, evento, estado y fechas | **PENDIENTE** | `routes/dashboard.ts` | V7-5 |
-| Navegación de cada tarjeta a su detalle | **PARCIAL** | `pages/admin/dashboard.tsx` | Algunas tarjetas navegan; falta completar |
+| Filtros por campaña, estado y fechas | **IMPLEMENTADO Y PROBADO** | `lib/dashboard-filters.ts`, `routes/dashboard.ts`, `pages/admin/dashboard.tsx` | `dashboard-filters.test.mjs` (11) + barra de filtros en el panel; el servidor recalcula todas las cifras de campaña con el mismo filtro |
+| Navegación de cada tarjeta a su detalle | **IMPLEMENTADO Y PROBADO** | `pages/admin/dashboard.tsx` | Las 8 tarjetas del KPI navegan (las financieras a `/admin/libro`) |
 
 ## 7. Comunicaciones y WhatsApp (Fase 7)
 
@@ -119,7 +119,7 @@ No se usan porcentajes de avance.
 
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
-| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **318/318** (incluye el barrido del gate y SEC-03) |
+| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **329/329** (incluye barrido del gate, SEC-03 y filtros del panel) |
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **143/143** + **23/23** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |

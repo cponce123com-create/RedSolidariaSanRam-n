@@ -324,3 +324,57 @@ artifacts/api-server/build-tests.mjs                     entry point del router 
   PostgreSQL/Redis si el despliegue escala horizontalmente.
 - **FE-03** (gate del panel por rol en el cliente): el API ya bloquea los datos, pero la
   interfaz no redirige a un usuario autenticado sin rol admin.
+
+---
+
+## 8. Incremento V7-5 — Filtros del panel administrativo (Fase 6) · CERRADO
+
+### 8.1 Qué faltaba
+
+El dashboard mostraba **siempre el acumulado global**: no se podía ver «el dinero de esta
+campaña» ni «lo recaudado en este trimestre» sin leer el total del sistema. Además, dos
+tarjetas financieras no llevaban a ningún detalle.
+
+### 8.2 Qué se implementó
+
+- `GET /admin/dashboard` acepta `campaignId`, `status`, `from` y `to`, normalizados por una
+  función pura (`lib/dashboard-filters.ts`, 11 pruebas): identificador positivo, estado de
+  campaña conocido, fechas ISO válidas y rango no invertido. Un filtro inválido devuelve
+  **400 con el motivo**, nunca se ignora en silencio.
+- **Semántica explícita** (un filtro ambiguo produce cifras que nadie puede conciliar):
+  filtrar por campaña o por estado deja fuera el **fondo general** (no pertenece a ninguna
+  campaña); el rango de fechas aplica a donaciones y a gastos (`campaign_expenses.date` es
+  texto ISO, así que la comparación lexicográfica equivale a la cronológica).
+- **El importe histórico no se cuenta con fechas activas**: es un acumulado que no se puede
+  atribuir a un periodo; con rango se publica solo la recaudación verificada del rango.
+- Todas las cifras de campaña se recalculan con el **mismo** filtro en el servidor:
+  contadores de campañas, recaudación conciliada, gastos, evolución mensual, top de campañas
+  y gastos por categoría. Los indicadores que no dependen de campaña (reportes, adopciones,
+  voluntarios, mascotas) siguen globales y **el panel lo dice en pantalla**.
+- La respuesta devuelve los filtros aplicados con una descripción legible
+  (`filters.description`), para que un tercero sepa sobre qué se calcularon las cifras.
+- **Panel**: barra de filtros (campaña, estado, desde, hasta, limpiar) con la descripción de
+  lo aplicado; las 8 tarjetas del KPI navegan a su información (las financieras a
+  `/admin/libro`).
+
+**Nota sobre «evento»:** en este sistema un evento solidario (ChocoFest) **es** una campaña,
+así que el filtro de campaña lo cubre sin duplicar el concepto.
+
+### 8.3 Archivos
+
+```
+artifacts/api-server/src/lib/dashboard-filters.ts       normalización y descripción de filtros
+artifacts/api-server/tests/dashboard-filters.test.mjs   11 pruebas
+artifacts/api-server/src/routes/dashboard.ts            filtros aplicados a todas las cifras de campaña
+artifacts/api-server/build-tests.mjs                    entry point del módulo
+artifacts/red-solidaria/src/pages/admin/dashboard.tsx   barra de filtros + navegación de tarjetas
+```
+
+### 8.4 Verificación
+
+- `api-server`: **329/329** (+11) · typecheck **0**.
+- `red-solidaria`: **143/143** + **23/23** · typecheck **0**.
+- Build de producción **OK**.
+- Casos cubiertos: sin filtros, parámetros desconocidos, `campaignId` inválido, estado
+  desconocido, fechas inválidas, rango invertido, un solo extremo del rango, parámetros
+  repetidos y descripción legible de lo aplicado.

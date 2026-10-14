@@ -350,3 +350,27 @@ frontend/scripts, build de producción **OK**.
 
 **Pendientes que siguen abiertos:** API-06 en el resto de routers, SEC-02/04 (estado en
 memoria) y FE-03 (gate del panel por rol en el cliente).
+
+---
+
+## 18. Apéndice — Incremento V7-5 (filtros del panel, Fase 6)
+
+**Completado:**
+
+- `GET /admin/dashboard` acepta `campaignId`, `status`, `from` y `to`. Una función pura
+  (`lib/dashboard-filters.ts`, 11 pruebas) los normaliza y un filtro inválido devuelve **400
+  con el motivo** en lugar de ignorarse.
+- Todas las cifras de campaña (contadores, recaudación conciliada, gastos, evolución mensual,
+  top de campañas y gastos por categoría) se recalculan con el **mismo** filtro en el
+  servidor. Los indicadores que no dependen de campaña siguen globales y el panel lo declara
+  en pantalla.
+- Con rango de fechas activo el **importe histórico no se cuenta** (no es atribuible a un
+  periodo): se publica solo la recaudación verificada del rango.
+- El panel incorpora la barra de filtros (campaña, estado, desde, hasta, limpiar) y las 8
+  tarjetas del KPI navegan a su información.
+
+**Contadores actualizados:** `api-server` **329/329** (+11), `red-solidaria` **143/143** +
+**23/23**, typecheck **0** en libs/API/frontend/scripts, build de producción **OK**.
+
+**Nota de alcance:** el filtro por «evento» queda cubierto por el filtro de campaña, porque
+un evento solidario (ChocoFest) es una campaña del sistema; no se duplica el concepto.

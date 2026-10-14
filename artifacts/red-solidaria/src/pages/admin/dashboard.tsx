@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "wouter";
+import { useGetCampaigns } from "@workspace/api-client-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
@@ -7,10 +9,21 @@ import {
 import {
   Target, DollarSign, TrendingDown, Wallet, AlertTriangle,
   Dog, Users, MessageSquare, Newspaper, ArrowRight, Clock,
-  CheckCircle, TrendingUp
+  CheckCircle, TrendingUp, Filter, X
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface DashboardData {
+  /** Fase 6: qué filtros produjeron estas cifras (los devuelve el API). */
+  filters?: {
+    campaignId: number | null;
+    status: string | null;
+    from: string | null;
+    to: string | null;
+    hasDateRange: boolean;
+    description: string;
+  };
   summary: {
     totalCampaigns: number; activeCampaigns: number; completedCampaigns: number;
     totalRaised: number; totalSpent: number; balance: number;
@@ -71,10 +84,39 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export default function AdminDashboard() {
+  // Fase 6 (V7-5): filtros del panel. El estado vive aquí y viaja como query
+  // string al API, que recalcula TODAS las cifras de campaña con el mismo
+  // filtro (nunca se recalculan a mano en la interfaz, que es como aparecen las
+  // incoherencias entre pantallas).
+  const [campaignId, setCampaignId] = useState("");
+  const [status, setStatus] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const filterParams = new URLSearchParams();
+  if (campaignId) filterParams.set("campaignId", campaignId);
+  if (status) filterParams.set("status", status);
+  if (from) filterParams.set("from", from);
+  if (to) filterParams.set("to", to);
+  const filterQuery = filterParams.toString();
+  const hasFilters = filterQuery.length > 0;
+
+  const clearFilters = () => {
+    setCampaignId("");
+    setStatus("");
+    setFrom("");
+    setTo("");
+  };
+
+  const { data: campaigns } = useGetCampaigns();
+
   const { data, isLoading, error } = useQuery<DashboardData>({
-    queryKey: ["/api/admin/dashboard"],
+    queryKey: ["/api/admin/dashboard", filterQuery],
     queryFn: async () => {
-      const res = await fetch("/api/admin/dashboard", { credentials: "include" });
+      const res = await fetch(
+        `/api/admin/dashboard${filterQuery ? `?${filterQuery}` : ""}`,
+        { credentials: "include" },
+      );
       if (!res.ok) throw new Error("Error");
       return res.json();
     },
@@ -106,6 +148,82 @@ export default function AdminDashboard() {
         <h1 className="text-3xl font-display font-black">Dashboard General</h1>
         <p className="text-muted-foreground mt-1">Vista operativa en tiempo real — actualizado cada minuto</p>
       </div>
+
+      {/* Filtros del panel (Fase 6): los aplica el SERVIDOR; la interfaz solo los
+          envía, así que las cifras de la pantalla siempre salen de una única
+          consulta filtrada. */}
+      <div className="flex flex-wrap items-end gap-3 bg-card border border-border rounded-2xl p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground h-10">
+          <Filter className="w-4 h-4" /> Filtros
+        </div>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Campaña
+          <select
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+            value={campaignId}
+            onChange={(e) => setCampaignId(e.target.value)}
+            data-testid="dashboard-filter-campaign"
+          >
+            <option value="">Todas</option>
+            {(campaigns ?? []).map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.title}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Estado
+          <select
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            data-testid="dashboard-filter-status"
+          >
+            <option value="">Todos</option>
+            {([["draft", "Borrador"], ["active", "Activa"], ["paused", "En pausa"], ["completed", "Finalizada"], ["archived", "Archivada"]] as const).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Desde
+          <Input
+            type="date"
+            className="h-10 rounded-xl w-[150px]"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            data-testid="dashboard-filter-from"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          Hasta
+          <Input
+            type="date"
+            className="h-10 rounded-xl w-[150px]"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            data-testid="dashboard-filter-to"
+          />
+        </label>
+        {hasFilters && (
+          <Button
+            variant="ghost"
+            className="gap-2 rounded-xl h-10"
+            onClick={clearFilters}
+            data-testid="dashboard-filter-clear"
+          >
+            <X className="w-4 h-4" /> Limpiar
+          </Button>
+        )}
+        <span className="text-xs text-muted-foreground ml-auto" data-testid="dashboard-filter-description">
+          {data.filters?.description}
+        </span>
+      </div>
+      {hasFilters && (
+        <p className="text-xs text-muted-foreground">
+          Las cifras de dinero y de campañas respetan el filtro. Reportes, adopciones, voluntarios y
+          mascotas son indicadores globales (no dependen de una campaña) y no cambian con el filtro.
+        </p>
+      )}
 
       {/* Alert banners for pending items */}
       {(summary.pendingReports > 0 || summary.pendingAdoptions > 0 || summary.pendingVolunteers > 0) && (
@@ -141,8 +259,8 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Target} label="Campañas activas" value={summary.activeCampaigns} sub={`${summary.completedCampaigns} finalizadas`} color="bg-primary" href="/admin/campanas" />
         <StatCard icon={TrendingUp} label="Total recaudado" value={`S/ ${summary.totalRaised.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} sub="Donaciones aprobadas" color="bg-green-500" href="/admin/donaciones" />
-        <StatCard icon={TrendingDown} label="Total gastado" value={`S/ ${summary.totalSpent.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} sub="Gastos registrados" color="bg-orange-500" />
-        <StatCard icon={Wallet} label="Saldo disponible" value={`S/ ${(summary.balance).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} sub={summary.balance >= 0 ? "Positivo" : "⚠️ Negativo"} color={summary.balance >= 0 ? "bg-emerald-600" : "bg-red-500"} />
+        <StatCard icon={TrendingDown} label="Total gastado" value={`S/ ${summary.totalSpent.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} sub="Gastos registrados" color="bg-orange-500" href="/admin/libro" />
+        <StatCard icon={Wallet} label="Saldo disponible" value={`S/ ${(summary.balance).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} sub={summary.balance >= 0 ? "Positivo" : "⚠️ Negativo"} color={summary.balance >= 0 ? "bg-emerald-600" : "bg-red-500"} href="/admin/libro" />
         <StatCard icon={AlertTriangle} label="Reportes pendientes" value={summary.pendingReports} sub="Sin atender" color="bg-red-500" href="/admin/reportes" />
         <StatCard icon={Dog} label="Mascotas disponibles" value={summary.availablePets} sub="En adopción" color="bg-amber-500" href="/admin/adopciones" />
         <StatCard icon={Users} label="Nuevos voluntarios" value={summary.newVolunteersThisMonth} sub="Últimos 30 días" color="bg-violet-500" href="/admin/voluntarios" />
