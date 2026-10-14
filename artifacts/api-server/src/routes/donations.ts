@@ -65,8 +65,16 @@ const router: IRouter = Router();
 // El donante puede adjuntar el comprobante (captura de Yape/transferencia)
 // subido previamente a Cloudinary.
 router.post("/donations", donationLimiter, async (req, res) => {
+  // La validación se resuelve ANTES del try (patrón del resto del API): un dato
+  // inválido es un 400 explícito y el catch queda reservado para fallos
+  // inesperados, que responden 500 en lugar de disfrazarse de validación.
+  const parsed = donationInputSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
+  }
+
   try {
-    const data = donationInputSchema.parse(req.body);
+    const data = parsed.data;
 
     // Campaña destino: debe existir y estar activa (fondo general = null).
     if (data.campaignId != null) {
@@ -196,8 +204,14 @@ router.post("/donations", donationLimiter, async (req, res) => {
 
     return res.status(201).json(await formatDonation(donation));
   } catch (err) {
+    // API-06: un fallo inesperado (base de datos caída, error de programación)
+    // NO es un error de validación del cliente. Devolver 400 aquí hacía que la
+    // interfaz dijera «datos inválidos» y que nadie viera una señal de 500.
     req.log.error({ err }, "Failed to create donation");
-    return res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
+    return res.status(500).json({
+      error: "server_error",
+      message: "No se pudo registrar la donación. Intenta nuevamente.",
+    });
   }
 });
 

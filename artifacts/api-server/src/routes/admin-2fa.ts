@@ -9,7 +9,9 @@ import { buildOtpauthUri, generateSecret, verifyTOTP } from "../lib/totp";
 import { establishAdminSession } from "../lib/session-security";
 import {
   clearFailedAttempts,
+  clearFailedAttemptsForUser,
   getLockoutRemainingMs,
+  lockoutKey,
   MAX_2FA_ATTEMPTS,
   registerFailedAttempt,
 } from "../lib/two-factor-lockout";
@@ -44,11 +46,16 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
   const { userId, code } = parsed.data;
 
   // Bloqueo anti fuerza bruta: el check va ANTES de tocar la DB (el body trae
-  // userId). El contador solo se incrementa con usuarios reales verificados en
-  // DB, así un atacante no puede ensuciar el store con userIds inexistentes.
-  const lockoutMs = getLockoutRemainingMs(userId);
+  // userId). La clave incluye el ORIGEN de la petición (SEC-03): sin él,
+  // cualquiera podía enviar códigos inválidos para un administrador desde
+  // cualquier parte y dejar esa cuenta sin poder entrar 15 minutos,
+  // repitiéndolo indefinidamente. El contador solo se incrementa con usuarios
+  // reales verificados en DB, así un atacante no puede ensuciar el store con
+  // userIds inexistentes.
+  const lockoutKeyForRequest = lockoutKey(ipOf(req), userId);
+  const lockoutMs = getLockoutRemainingMs(lockoutKeyForRequest);
   if (lockoutMs > 0) {
-    req.log?.warn({ userId }, "2FA login blocked: account temporarily locked");
+    req.log?.warn({ userId }, "2FA login blocked: origin temporarily locked");
     return res.status(429).json({
       error: "too_many_attempts",
       message: `Demasiados intentos fallidos de 2FA. Intenta de nuevo en ${Math.max(1, Math.ceil(lockoutMs / 60000))} minuto(s).`,
@@ -73,7 +80,7 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
         details: { reason: "invalid_totp" },
       });
 
-      const { locked, remainingMs } = registerFailedAttempt(user.id);
+      const { locked, remainingMs } = registerFailedAttempt(lockoutKeyForRequest);
       if (locked) {
         await logAuditAction({
           userId: user.id,
@@ -97,7 +104,8 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ error: "unauthorized", message: "Código incorrecto" });
     }
 
-    clearFailedAttempts(user.id);
+    // Verificación correcta: se limpia el contador de ESA clave (origen + cuenta).
+    clearFailedAttempts(lockoutKeyForRequest);
     await db.update(adminUsersTable).set({ lastLoginAt: new Date() }).where(eq(adminUsersTable.id, user.id));
 
     await establishAdminSession(req, {
@@ -240,8 +248,9 @@ router.post("/admin/2fa/disable", requireAdmin, adminActionLimiter, async (req, 
 
     await db.update(adminUsersTable).set({ twoFactorSecret: null, twoFactorEnabled: false }).where(eq(adminUsersTable.id, user.id));
 
-    // Al desactivar 2FA con código válido se reinicia el contador de lockout.
-    clearFailedAttempts(user.id);
+    // Al desactivar 2FA con código válido se reinicia el contador de lockout de
+    // la cuenta en TODOS los orígenes (la clave es compuesta).
+    clearFailedAttemptsForUser(user.id);
 
     await logAuditAction({
       userId: user.id,
@@ -275,8 +284,9 @@ router.post("/admin/users/:id/2fa/reset", requireAdmin, adminActionLimiter, asyn
       .returning({ id: adminUsersTable.id, username: adminUsersTable.username });
     if (!updated) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
 
-    // El escape hatch también desbloquea la cuenta (limpieza del lockout).
-    clearFailedAttempts(userId);
+    // El escape hatch también desbloquea la cuenta: como la clave es compuesta
+    // (origen + cuenta), hay que limpiar las entradas de todos los orígenes.
+    clearFailedAttemptsForUser(userId);
 
     await logAuditAction({
       userId: admin?.id ?? null,

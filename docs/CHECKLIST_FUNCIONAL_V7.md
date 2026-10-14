@@ -3,8 +3,9 @@
 **Rama:** `feat/implementacion-integral-2026` · **Fecha:** 14 de octubre de 2026
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
-**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 309/309 ·
-`red-solidaria` 143/143 node:test + 23/23 vitest · typecheck 0 · build OK · `audit --prod` 0).
+**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 318/318 ·
+`red-solidaria` 143/143 node:test + 23/23 vitest · typecheck 0 en libs/API/frontend/scripts ·
+build de producción OK · `pnpm audit --prod` 0 vulnerabilidades).
 No se usan porcentajes de avance.
 
 ---
@@ -19,10 +20,10 @@ No se usan porcentajes de avance.
 | 2FA (TOTP) con bloqueo | **IMPLEMENTADO Y PROBADO** | `lib/totp.ts`, `lib/two-factor-lockout.ts`, `routes/admin-2fa.ts` | `admin-2fa.test.mjs`, `totp.test.mjs`, `two-factor-lockout.test.mjs` |
 | Gate global de `/admin` + rate limit | **IMPLEMENTADO Y PROBADO** | `routes/index.ts`, `middleware/rate-limit.ts` | `rate-limit.test.mjs`, `supervisor-auth.test.mjs` |
 | Registro de acciones administrativas (auditoría) | **IMPLEMENTADO Y PROBADO** | `lib/audit.ts`, `routes/audit-logs.ts` | `audit.test.mjs`, `audit-logs-auth.test.mjs` |
-| Cookie de sesión `secure` / `trust proxy` (SEC-01) | **PENDIENTE** | `app.ts` | Planificado en V7-4 |
-| Lockout 2FA por cuenta (SEC-03) | **PENDIENTE** | `routes/admin-2fa.ts` | Planificado en V7-4 |
-| Rutas admin con gate propio (SEC-08) | **PENDIENTE** | `routes/volunteers.ts`, `allies.ts`, `faq.ts`, `pets.ts`, `community-reports.ts`, `dashboard.ts` | Planificado en V7-4 |
-| Errores de infraestructura no enmascarados como 400 (API-06) | **PENDIENTE** | `routes/*.ts` (patrón `catch → 400`) | Planificado en V7-4 |
+| Cookie de sesión `secure` / `trust proxy` (SEC-01) | **IMPLEMENTADO Y PROBADO** | `app.ts` | Ya estaba correcto (`app.set("trust proxy", 1)` + `secure` en producción); verificado por revisión, no requería cambio |
+| Bloqueo de 2FA por ORIGEN + cuenta (SEC-03) | **IMPLEMENTADO Y PROBADO** | `lib/two-factor-lockout.ts`, `routes/admin-2fa.ts` | `two-factor-lockout.test.mjs` (11): dos orígenes no comparten bloqueo, el escape hatch limpia todos los orígenes |
+| Gate único de `/admin` verificado por barrido (SEC-08) | **IMPLEMENTADO Y PROBADO** | `routes/index.ts`, `tests/admin-gate-sweep.test.mjs` | 22 rutas GET + 6 escrituras → 401 sin sesión; rutas públicas no bloqueadas; el login no lo intercepta el gate |
+| Errores de infraestructura no enmascarados como 400 (API-06) | **PARCIAL** | `routes/donations.ts` (hecho) | POST /donations: `safeParse` → 400 explícito y catch → 500; el resto de routers conserva el patrón antiguo (documentado) |
 | **Verificación del libro contable (cadena de hashes)** | **IMPLEMENTADO Y PROBADO** | `lib/ledger.ts`, `routes/campaign-movements.ts` | `ledger.test.mjs`, `ledger-chain.test.mjs`; endpoints públicos `/movements/verify` y `/ledger/root` |
 | **Informe administrativo de integridad del libro** | **IMPLEMENTADO Y PROBADO** | `lib/ledger-audit.ts`, `routes/ledger-audit.ts`, `pages/admin/ledger-audit.tsx` | `ledger-audit.test.mjs` (11) + `ledger-audit-auth.test.mjs` (2) + página `/admin/libro` |
 | Restricción real del libro en producción (`RESTRICT`) | **BLOQUEADO** | `docs/migraciones/010_low_risk.sql` | **B-1**: requiere autorización (hoy la API lo impide, la base no) |
@@ -118,7 +119,7 @@ No se usan porcentajes de avance.
 
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
-| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **309/309** |
+| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **318/318** (incluye el barrido del gate y SEC-03) |
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **143/143** + **23/23** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |

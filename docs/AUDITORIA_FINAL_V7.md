@@ -314,3 +314,39 @@ del contacto sigue privado.
    `docs/ROADMAP.md`) antes de considerar cerrada la Fase 9.
 7. **Abrir la decisión de negocio de certificados con QR** (B-3) y del programa de insignias
    (B-6) con las propuestas de `docs/PROGRAMA_V7.md` §3.
+
+---
+
+## 17. Apéndice — Incremento V7-4 (seguridad, posterior al cierre inicial)
+
+Este apéndice actualiza §9, §10 y §8 del informe con el incremento V7-4
+(`docs/PROGRAMA_V7.md` §7).
+
+**Corregido:**
+
+- **SEC-03 (media → corregida):** el contador de intentos fallidos de 2FA se indexaba solo por
+  `userId` (que viaja en el cuerpo del login), así que un tercero podía dejar sin acceso la
+  cuenta del superadmin durante 15 minutos, repetidamente. Ahora la clave es **origen +
+  cuenta**: frena la fuerza bruta sin bloquear al administrador legítimo, y el escape hatch
+  limpia la cuenta en todos los orígenes.
+
+**Verificado sin cambios necesarios:**
+
+- **SEC-01:** `app.set("trust proxy", 1)` y `cookie.secure` en producción ya estaban correctos.
+- **SEC-08:** el gate único de `/admin` queda **probado por barrido** (22 rutas GET + 6
+  escrituras → 401 sin sesión; públicas accesibles; `/admin/login` no interceptado). Se
+  prefirió la prueba de regresión a repartir gates redundantes por router.
+
+**Parcial:**
+
+- **API-06:** corregido en `POST /donations` (la ruta financiera): la validación se resuelve
+  con `safeParse` antes del `try` (400 explícito) y el `catch` responde 500 en lugar de
+  disfrazar un fallo de infraestructura de error de validación. El mismo patrón sigue en otros
+  routers y queda documentado como pendiente.
+
+**Contadores actualizados:** `api-server` **318/318** (+9: 5 de SEC-03 y 4 del barrido del
+gate), `red-solidaria` **143/143** + **23/23** (sin cambios), typecheck **0** en libs/API/
+frontend/scripts, build de producción **OK**.
+
+**Pendientes que siguen abiertos:** API-06 en el resto de routers, SEC-02/04 (estado en
+memoria) y FE-03 (gate del panel por rol en el cliente).

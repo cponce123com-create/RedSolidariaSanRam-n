@@ -243,3 +243,84 @@ artifacts/red-solidaria/src/pages/admin/layout.tsx        ítem de menú (solo a
 El informe lee el libro completo (es su naturaleza). Si el libro creciera mucho, la consulta
 se puede paginar por rango de `id` sin cambiar el contrato del informe; se documenta como
 mejora futura, no como bloqueo.
+
+---
+
+## 7. Incremento V7-4 — Seguridad e integridad de las operaciones (Fase 1.2 y 1.3) · CERRADO
+
+### 7.1 SEC-03 — Denegación de servicio sobre la cuenta del administrador (corregido)
+
+**El defecto:** el contador de intentos fallidos de 2FA se indexaba **solo por `userId`**, y
+ese `userId` viaja en el cuerpo de `POST /admin/2fa/login`. Cualquiera podía enviar 5 códigos
+inválidos para el superadmin (`userId: 1`) desde cualquier parte y dejar esa cuenta **sin poder
+entrar durante 15 minutos**, repitiéndolo indefinidamente. El check se hacía antes de tocar la
+base, así que ni siquiera hacía falta que el usuario existiera para intentarlo.
+
+**La corrección:** la clave del contador pasa a ser **origen + cuenta** (`lockoutKey(ip, userId)`),
+de modo que el bloqueo solo afecta al par origen+cuenta: frena la fuerza bruta sin dejar fuera
+al administrador legítimo. La rotación de IP sigue cubierta por el rate limit por IP del login
+(`loginLimiter`). Además:
+
+- el escape hatch de superadmin (`/admin/users/:id/2fa/reset`) limpia la cuenta en **todos**
+  los orígenes (`clearFailedAttemptsForUser`), que es lo que se espera de un desbloqueo;
+- desactivar 2FA con código válido también limpia todos los orígenes de esa cuenta;
+- el módulo documenta explícitamente por qué la clave es compuesta (para que nadie la
+  "simplifique" de vuelta a `userId`).
+
+### 7.2 SEC-01 — Cookie de sesión (ya estaba correcta, verificado)
+
+`app.ts` ya declara `app.set("trust proxy", 1)` (Render termina TLS en un proxy) y
+`cookie.secure` en producción, con `httpOnly`, `sameSite: "lax"`, `maxAge` de 24 h y
+`rolling: true`. **No requería cambio**: se verifica y se documenta en lugar de "arreglar" algo
+que ya estaba bien.
+
+### 7.3 SEC-08 — Gate de administración (verificado por barrido)
+
+El diseño es un **único punto de control**: `router.use("/admin", requireAdmin,
+adminActionLimiter)` montado antes de todos los routers. En lugar de repartir gates redundantes
+por router (que no aportan seguridad adicional y sí riesgo de incoherencia), se añade una
+**prueba de barrido** que monta el router real y comprueba que:
+
+- 22 rutas `GET /admin/*` y 6 escrituras (`POST`, `PUT`, `PATCH`, `DELETE`) responden **401**
+  sin sesión;
+- las rutas públicas (`/health`, `/campaigns`, `/settings`, `/stats`) **no** están bloqueadas;
+- `/admin/login` **no** es interceptado por el gate (si alguien montara un router antes del
+  gate, o añadiera una ruta administrativa en un router público, el barrido lo detecta).
+
+### 7.4 API-06 — Fallos de infraestructura disfrazados de error de validación (parcial)
+
+`POST /donations` usaba `donationInputSchema.parse()` dentro del `try` y el `catch` devolvía
+**400 «Invalid donation data»** para *cualquier* fallo: un dato inválido y una base de datos
+caída eran indistinguibles, la interfaz decía «datos inválidos» y el equipo no veía ninguna
+señal de 500. Ahora la validación se resuelve con `safeParse` **antes** del `try` (patrón del
+resto del API) y el `catch` responde **500** con un mensaje accionable.
+
+El mismo patrón existe en otros routers; se corrigió la ruta financiera (la más sensible) y el
+resto queda **documentado como pendiente** en el checklist, sin marcar como hecho.
+
+### 7.5 Archivos
+
+```
+artifacts/api-server/src/lib/two-factor-lockout.ts       clave compuesta + limpieza por cuenta
+artifacts/api-server/src/routes/admin-2fa.ts             check, registro, limpieza y escape hatch
+artifacts/api-server/src/routes/donations.ts             safeParse + 400 explícito, catch → 500
+artifacts/api-server/tests/two-factor-lockout.test.mjs   11 pruebas (+5: SEC-03)
+artifacts/api-server/tests/admin-2fa.test.mjs            registro del bloqueo con la clave compuesta
+artifacts/api-server/tests/admin-gate-sweep.test.mjs     barrido del gate (nuevo, 4 pruebas)
+artifacts/api-server/build-tests.mjs                     entry point del router raíz
+```
+
+### 7.6 Verificación
+
+- `api-server`: **318/318** (+9) · typecheck **0**.
+- `red-solidaria`: **143/143** + **23/23** (sin cambios: control de regresión).
+- Casos nuevos cubiertos: dos orígenes no comparten bloqueo, el escape hatch limpia todos los
+  orígenes, la clave tolera IP ausente, y el barrido de rutas admin públicas/privadas.
+
+### 7.7 Pendiente de este bloque
+
+- **API-06 en el resto de routers** (mismo patrón `catch → 400`), sin marcar como hecho.
+- **SEC-02/04** (rate limit y lockout en memoria): no se comparten entre instancias; mover a
+  PostgreSQL/Redis si el despliegue escala horizontalmente.
+- **FE-03** (gate del panel por rol en el cliente): el API ya bloquea los datos, pero la
+  interfaz no redirige a un usuario autenticado sin rol admin.

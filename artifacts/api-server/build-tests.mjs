@@ -47,6 +47,7 @@ await build({
     "./src/routes/volunteer-teams.ts",
     "./src/routes/audit-logs.ts",
     "./src/routes/ledger-audit.ts",
+    "./src/routes/index.ts",
     "./src/routes/reports.ts",
     "./src/routes/supervisor.ts",
     "./src/routes/stats.ts",
