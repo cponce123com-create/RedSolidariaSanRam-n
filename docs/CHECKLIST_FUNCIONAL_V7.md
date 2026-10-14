@@ -3,9 +3,9 @@
 **Rama:** `feat/implementacion-integral-2026` · **Fecha:** 14 de octubre de 2026
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
-**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 324/324 ·
+**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 335/335 ·
 `red-solidaria` 174/174 node:test + 33/33 vitest · typecheck 0 en libs/API/frontend/scripts ·
-build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 41/41 contra
+build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 48/48 contra
 PostgreSQL real**).
 Sin pruebas pendientes (`TODO`).
 No se usan porcentajes de avance.
@@ -82,7 +82,7 @@ No se usan porcentajes de avance.
 | Conciliación trazable (autor y fecha) | **IMPLEMENTADO Y PROBADO** | `routes/donations.ts`, `routes/donors.ts` | `donation-reconcile.test.mjs`, `confirmed-statuses.test.mjs` |
 | Anonimato y comprobante público opcional | **IMPLEMENTADO Y PROBADO** | `routes/campaigns.ts` (listado público) | `donors-auth.test.mjs` |
 | Consentimiento explícito y nombre colectivo del donante | **PENDIENTE** | `lib/db/src/schema/donors.ts` | Requiere esquema + interfaz (V7-6) |
-| **Certificados digitales con QR** | **BLOQUEADO** | — | **B-3**: decisión de negocio (tipos, vigencia, datos publicados) |
+| **Certificados digitales con QR** | **IMPLEMENTADO Y PROBADO** | `lib/db/src/schema/certificates.ts`, `lib/certificates.ts`, `routes/certificates.ts`, `pages/certificate.tsx`, `pages/admin/certificates.tsx` | Migración **024** + **11 pruebas puras** + **E2E del flujo completo** (emitir → consultar como el QR → revocar con motivo → 404; y 409 si se revoca dos veces). Solo se publica el nombre autorizado, el tipo, el título, la fecha y la campaña; el código lo genera el servidor con aleatoriedad criptográfica y la página se marca `noIndex` |
 | **Insignias y reconocimientos** | **BLOQUEADO** | — | **B-6**: definición del programa |
 | Aliados/auspiciadores con visibilidad pública | **IMPLEMENTADO Y PROBADO** | `routes/allies.ts`, `pages/allies.tsx`, `pages/admin/allies.tsx` | `allies-patch.test.mjs` |
 | Embajadores con código de referencia y métricas | **PENDIENTE** | — | Requiere modelo nuevo |
@@ -127,8 +127,8 @@ No se usan porcentajes de avance.
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **174/174** + **33/33** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
-| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–023) | Verificado contra **PostgreSQL 17.7 real**: 23 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
-| E2E con PostgreSQL real (flujo + esquema + restauración) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **41/41** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos) **+ 10 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido), disparadores de `updated_at` y **claves foráneas** (rechazo real de una referencia inexistente) **+ ensayo de respaldo y restauración** (la base se destruye y se restaura; datos idénticos y **cadena del libro verificada**) |
+| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–024) | Verificado contra **PostgreSQL 17.7 real**: 24 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
+| E2E con PostgreSQL real (flujo + esquema + restauración) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **48/48** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos y **certificados con QR**) **+ 10 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido), disparadores de `updated_at` y **claves foráneas** (rechazo real de una referencia inexistente) **+ ensayo de respaldo y restauración** (la base se destruye y se restaura; datos idénticos y **cadena del libro verificada**) |
 | Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (61 donaciones, 1 asiento, 22 claves, 23 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
 
 ## 10. Bloqueos que esperan decisión
@@ -137,7 +137,7 @@ No se usan porcentajes de avance.
 |---|---|---|
 | ~~B-1~~ | ~~Migración 010 (libro `CASCADE` → `RESTRICT`)~~ | ✅ **RESUELTO**: aplicada en producción el **2026-10-13** con respaldo previo y autorización explícita, y registrada en `drizzle_migrations` |
 | ~~B-2~~ | ~~Claves foráneas ausentes (DB-04)~~ | ✅ **RESUELTO** en V7-15: migración **023** con 11 claves `NOT VALID` y `ON DELETE` por caso (no exigió decidir sobre huérfanos históricos); verificado contra base real |
-| B-3 | Certificados con QR (5.2) | Definir tipos, vigencia, revocación y datos publicados |
+| ~~B-3~~ | ~~Certificados con QR (5.2)~~ | ✅ **RESUELTO** en V7-19: migración **024** + página pública `/certificados/:code` con QR + panel `/admin/certificados`; 11 pruebas puras y E2E del flujo completo. Revocar exige motivo y solo se publica lo autorizado |
 | B-4 | Mensajería automatizada de WhatsApp | Credenciales y proveedor oficial aprobado |
 | ~~B-5~~ | ~~Artefactos de migración obsoletos~~ | ✅ **RESUELTO** en V7-16: eliminados (2 SQL + `meta/`, 5 archivos) y la política queda escrita en `drizzle.config.ts`; verificado con typecheck 0 y **E2E COMPLETO: OK** |
 | B-6 | Insignias y embajadores (5.3/5.4) | Definición del programa (niveles, vigencia, qué se publica) |

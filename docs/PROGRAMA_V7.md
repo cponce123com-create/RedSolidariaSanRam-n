@@ -913,3 +913,55 @@ El código ya no crea esa campaña, pero **una base que ya la tenga** (producci�
 mostrando. En `docs/MIGRACIONES_Y_RESPALDOS.md` queda el procedimiento con sus reglas de
 seguridad: respaldo previo, informe antes de borrar y, sobre todo, **no tocar el ledger** (es
 append-only: borrar asientos rompería la cadena de hashes).
+
+---
+
+## 19. Incremento V7-19 — Certificados con QR (Fase 5.2 / B-3) · CERRADO
+
+### 19.1 Qué se implementó
+
+Un certificado **reconoce** a una persona o entidad y se comparte por enlace o QR. Decidido con
+la organización:
+
+- **Solo se publica lo autorizado**: nombre autorizado, tipo, título, fecha y campaña.
+  **Nunca** el importe ni datos de contacto: un certificado no es un recibo.
+- **Un certificado revocado deja de publicarse** (su enlace responde 404) y **revocar exige
+  motivo**, que queda guardado con su fecha: una revocación sin justificación no es trazable.
+- **El código público lo genera siempre el servidor**: 12 caracteres de un alfabeto sin
+  ambigüedades (ni `0/O/1/I/L` ni vocales, para poder dictarlo por teléfono) y con aleatoriedad
+  **criptográfica**. Se normaliza: mayúsculas, espacios y guiones dan el mismo código.
+- La página pública se marca **`noIndex`**: lleva el nombre de una persona, no debe aparecer en
+  buscadores; solo se llega por el enlace o el QR.
+
+### 19.2 Backend
+
+Migración **024** (aditiva, tabla nueva) + `lib/certificates.ts` (11 pruebas) +
+`routes/certificates.ts`:
+
+| Endpoint | Quién | Qué hace |
+|---|---|---|
+| `GET /api/certificates/:code` | público | es lo que abre el QR; 400 si el código no tiene forma válida, 404 si no existe **o está revocado** |
+| `GET /api/admin/certificates` | admin | listado con estado |
+| `POST /api/admin/certificates` | admin | emisión (el código lo genera el servidor, con reintento si chocara) |
+| `PATCH /api/admin/certificates/:id` | admin | corrección y revocación (motivo obligatorio) |
+
+`ON DELETE SET NULL` en la campaña: si la campaña desaparece, el certificado **se conserva**,
+porque reconoce a una persona y no es un dato de la campaña.
+
+### 19.3 Interfaz
+
+- **`/certificados/:code`** (pública): la tarjeta del certificado con su QR —se reutiliza
+  `qrcode.react`, que ya estaba en el proyecto para compartir campañas—, el código en texto para
+  poder dictarlo y los estados de carga y de «no disponible».
+- **`/admin/certificados`** (panel, entrada nueva en el menú): listado, emisión (avisando de que
+  el nombre es lo único que se publica) y revocación con motivo obligatorio (el botón no se
+  activa con menos de 5 caracteres).
+
+### 19.4 Verificación
+
+- `api-server` **335/335** (+11), `red-solidaria` **174/174** + **33/33**, typecheck **0** en
+  libs, API, frontend y scripts, build de producción **OK**.
+- **E2E contra PostgreSQL real (24 migraciones):** emite → consulta pública comprobando que
+  **no** expone id, estado ni motivo → un código con forma inválida responde 400 → revoca con
+  motivo → deja de publicarse (404) → no se puede revocar dos veces (409).
+  **E2E COMPLETO: OK.**

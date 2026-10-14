@@ -66,6 +66,13 @@ todo lo que queda bloqueado por decisiones de negocio o credenciales externas:
   verificado contra base real (rechaza `campaign_id=999999`) y el borrado de una mascota con
   solicitudes responde **409**.
 
+- **V7-19 / certificados con QR:** ✅ **IMPLEMENTADO Y PROBADO** — migración **024** (tabla
+  nueva, aditiva) + 11 pruebas puras + **E2E del flujo completo** (emitir → consultar como el QR
+  comprobando que no expone id, estado ni motivo → código con forma inválida 400 → revocar con
+  motivo → 404 al dejar de publicarse → 409 si se revoca dos veces). Solo se publica el nombre
+  autorizado, el tipo, el título, la fecha y la campaña: **nunca** importes ni contactos.
+  **Revocar exige motivo** y la página pública va marcada `noIndex`.
+
 - **V7-17 / datos históricos de 2024:** ✅ **RESUELTO en V7-18.** El bloque de donaciones de
   `chocolatada-2024-data.ts` era una **copia** del de `chocofest-2025-data.ts` (mismos donantes,
   importes y total S/. 2,818.5, y fechas de 2025 dentro del fichero de 2024). La organización
