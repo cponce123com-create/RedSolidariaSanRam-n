@@ -62,7 +62,11 @@ Correcciones:
 
 **3C-2 — cerrado:** **programa de actividades con responsables**, guardado como configuración del evento (`chocofest_2026_program`, sin migración) e interpretado por un parser puro y tolerante (`parseProgram`/`serializeProgram`): editable desde el panel y publicado en el cronograma de la página del evento; si aún no hay programa no se muestra nada.
 
-**3C-3 — pendiente:** regalos ligados a su donante y a la evidencia de entrega; composición de canastas y meta de preparadas/entregadas.
+**3C-3 — pendiente (diseño listo en `docs/ESTADO_IMPLEMENTACION.md` §6.6):**
+- *Meta de canastas y preparadas/entregadas*: **ya cubierto** por el modelo del 3A (categoría `canastas` con `targetQty`/`receivedQty`/`usedQty`).
+- *Composición por canasta*: migración 017 aditiva (`composition` en `campaign_leftovers`) + parser puro tolerante + función pura de **cobertura** (cuántas canastas completas se pueden armar y qué insumo limita).
+- *Regalos ligados a su donante y a la evidencia de entrega*: migración 017 aditiva (`donor_id`, `evidence_id` opcionales con `ON DELETE SET NULL`) reutilizando las listas de donantes y evidencias que ya existen.
+- *UI*: composición y selectores en la pestaña de bienes del panel; en la web, composición por canasta y «canastas preparables».
 
 **Regla de datos:** las metas y los textos del evento se cargan desde el panel cuando la organización los aprueba. No se introduce ninguna cifra ni texto inventado.
 

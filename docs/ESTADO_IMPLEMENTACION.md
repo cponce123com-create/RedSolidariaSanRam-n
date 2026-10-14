@@ -217,10 +217,17 @@ El «cronograma» de la página eran solo las novedades publicadas: no existía 
 
 **Verificación:** `api-server` **279/279** · `red-solidaria` **120/120** node:test (+8) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
 
-### 6.6 Lo que queda de la Fase 2
+### 6.6 Lo que queda de la Fase 2 (3C-3) — diseño listo para ejecutar
 
-1. **Regalos asociados a su donante y a la evidencia de entrega** (reutiliza `donations` en especie y `campaign_evidence`).
-2. **Composición de canastas** (productos por canasta) y meta de canastas preparadas/entregadas.
+**Ya cubierto por el modelo del 3A (verificado, sin trabajo pendiente):** la *meta de canastas* y el conteo de *preparadas/entregadas* se expresan con la fila de bien de categoría `canastas`: `targetQty` = meta de canastas, `receivedQty` = canastas preparadas, `usedQty` = canastas entregadas, y la web ya muestra el avance con `goalProgress` junto a Recibido / Usado / Disponible. No hace falta tabla nueva para eso.
+
+**Pendiente real (requiere migración aditiva + ruta + panel + web, como el 3B):**
+
+1. **Composición por canasta.** `ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS composition text;` (migración 017, aditiva y reversible). Una línea por producto: `producto | cantidad unidad`. Parser puro `parseComposition` con el mismo patrón tolerante que `parseProgram` (nunca lanza; ignora líneas vacías; recorta longitudes).
+2. **Cobertura de canastas.** Función pura `basketCoverage(composition, bienes)` que cruza la composición con el stock real (reutilizando `categoryKey`/`resolveStock`) y devuelve **cuántas canastas completas se pueden armar y qué insumo es el limitante**. Es la cifra que hoy no existe y la que evita prometer canastas que no se pueden llenar. Pruebas en `tests/basket-composition.test.mjs`.
+3. **Regalos ligados a su donante y a la evidencia de entrega.** `ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS donor_id integer;` y `... evidence_id integer;` (opcionales, `ON DELETE SET NULL`). El panel ofrece las listas de donantes (`/admin/donors`) y evidencias (`/admin/campaigns/:id/evidence`) que ya existen; la web solo muestra lo autorizado.
+4. **UI:** bloque de composición y selectores de donante/evidencia en la pestaña de bienes del panel; en la web, composición por canasta y «canastas preparables» dentro del grupo canastas.
+5. **Verificación:** mismo pipeline (`typecheck` en libs/API/frontend/scripts, suites de API y frontend, vitest, build) + migración aditiva reversible.
 
 **Dependencia de datos:** las cifras (metas de niños, raciones, juguetes, canastas y montos presupuestados) y los textos del evento los carga la organización desde el panel. No se ha introducido ninguna cifra ni texto inventado: mientras no existan, la interfaz muestra «sin meta definida» o no muestra la sección.
 
