@@ -55,6 +55,7 @@ import {
 } from "@/lib/inventory";
 import { basketCoverage, parseComposition } from "@/lib/baskets";
 import { isVideoEvidence, summarizeEvidence } from "@/lib/results";
+import { AlliesStrip } from "@/components/allies/AlliesStrip";
 
 /** Encabezado de sección homogéneo para toda la página. */
 function Section({
@@ -605,10 +606,11 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
               </Link>
             </Section>
 
-            {/* 8. Aliados y patrocinadores */}
+            {/* 8. Aliados y patrocinadores: reutiliza el módulo de aliados real
+                (mismo dato que /aliados), destacados primero. */}
             <Section id="aliados" icon={<Store className="w-5 h-5" />} title={t("chocofest.sectionAllies")}>
               <p className="text-muted-foreground mb-4">{t("chocofest.alliesText")}</p>
-              <EmptyBox text={t("chocofest.emptyAllies")} />
+              <AlliesStrip />
             </Section>
 
             {/* 9. Cronograma de actividades */}

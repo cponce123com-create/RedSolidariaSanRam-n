@@ -8,29 +8,11 @@ import {
   Building2, Star, Globe, ArrowRight, HandHeart, Users,
   Heart, Sparkles
 } from "lucide-react";
-
-interface Ally {
-  id: number; name: string; type: string; logo: string | null;
-  description: string | null; website: string | null;
-  featured: boolean; active: boolean;
-}
-
-// Los valores de texto son claves i18n: los etiquetados se traducen con t() en el render.
-const TYPE_LABELS: Record<string, string> = {
-  empresa: "allies.typeEmpresa",
-  emprendimiento: "allies.typeEmprendimiento",
-  institucion: "allies.typeInstitucion",
-  persona: "allies.typePersona",
-  ong: "allies.typeOng",
-};
-
-const TYPE_COLORS: Record<string, string> = {
-  empresa: "bg-blue-100 text-blue-700",
-  emprendimiento: "bg-green-100 text-green-700",
-  institucion: "bg-purple-100 text-purple-700",
-  persona: "bg-rose-100 text-rose-700",
-  ong: "bg-amber-100 text-amber-700",
-};
+import {
+  ALLY_TYPE_COLORS as TYPE_COLORS,
+  ALLY_TYPE_LABELS as TYPE_LABELS,
+  type Ally,
+} from "@/lib/allies";
 
 function AllyCard({ ally, featured = false }: { ally: Ally; featured?: boolean }) {
   const { t } = useTranslation();

@@ -26,6 +26,7 @@ await build({
     "./src/lib/admin-access.ts",
     "./src/lib/whatsapp.ts",
     "./src/lib/event-results.ts",
+    "./src/lib/allies.ts",
     "./src/lib/admin-session.ts",
     "./src/lib/structured-data.ts",
     "./src/lib/i18n/locales/es.ts",

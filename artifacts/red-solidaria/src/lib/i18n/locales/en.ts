@@ -1390,6 +1390,20 @@ export const en: TranslationSchema = {
     detailsObjectivesHint: "Published in the objectives section of the event page",
     detailsOrganizers: "Responsible team",
     detailsOrganizersHint: "Name of the team or people shown to the public",
+    resultsTitle: "Results accountability",
+    resultsNote:
+      "Data only the organization can declare. Money and goods figures are computed automatically from transparency and inventory; here you only declare what cannot be deduced.",
+    resultsBeneficiariesLabel: "Beneficiaries served",
+    resultsBeneficiariesPlaceholder: "e.g. 320",
+    resultsActivitiesLabel: "Activities carried out",
+    resultsActivitiesHint:
+      "One activity per line: time | title | person in charge (same format as the program).",
+    resultsSummaryLabel: "Accountability summary",
+    resultsLeftoversLabel: "Destination of remaining resources",
+    saveResults: "Save results",
+    savingResults: "Saving...",
+    resultsSaved: "Results saved",
+    resultsError: "Could not save the results",
   },
   adminCampaigns: {
     protagonistSet: "Make protagonist",

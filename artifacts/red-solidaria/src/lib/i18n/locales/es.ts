@@ -1387,6 +1387,20 @@ export const es = {
     detailsObjectivesHint: "Se publica en la sección de objetivos de la página del evento",
     detailsOrganizers: "Equipo responsable",
     detailsOrganizersHint: "Nombre del equipo o responsables que se muestra al público",
+    resultsTitle: "Rendición de resultados",
+    resultsNote:
+      "Datos que solo la organización puede declarar. Las cifras de dinero y de bienes se calculan solas desde la transparencia y el inventario; aquí solo se declara lo que no se puede deducir.",
+    resultsBeneficiariesLabel: "Beneficiarios atendidos",
+    resultsBeneficiariesPlaceholder: "Ej.: 320",
+    resultsActivitiesLabel: "Actividades realizadas",
+    resultsActivitiesHint:
+      "Una actividad por línea: hora | título | responsable (mismo formato que el programa).",
+    resultsSummaryLabel: "Resumen de la rendición",
+    resultsLeftoversLabel: "Destino de los recursos sobrantes",
+    saveResults: "Guardar rendición",
+    savingResults: "Guardando...",
+    resultsSaved: "Rendición guardada",
+    resultsError: "No se pudo guardar la rendición",
   },
   adminCampaigns: {
     protagonistSet: "Hacer protagonista",
