@@ -98,8 +98,27 @@ router.patch("/admin/pets/:id", async (req, res) => {
 
 // ─── ADMIN: Delete pet ────────────────────────────────────────────────────────
 router.delete("/admin/pets/:id", async (req, res) => {
-  await db.delete(petsTable).where(eq(petsTable.id, Number(req.params.id)));
-  return res.status(204).send();
+  const id = Number(req.params.id);
+  try {
+    // B-2: las solicitudes de adopción apuntan a la mascota (FK RESTRICT desde la
+    // migración 023). Borrarla con solicitudes dejaría a personas esperando una
+    // respuesta que ya nadie va a dar, así que se avisa en lugar de perderlas.
+    const requests = await db
+      .select({ id: adoptionRequestsTable.id })
+      .from(adoptionRequestsTable)
+      .where(eq(adoptionRequestsTable.petId, id));
+    if (requests.length > 0) {
+      return res.status(409).json({
+        error: "conflict",
+        message: `Esta mascota tiene ${requests.length} solicitud(es) de adopción. Resuélvelas antes de eliminarla.`,
+      });
+    }
+    await db.delete(petsTable).where(eq(petsTable.id, id));
+    return res.status(204).send();
+  } catch (err) {
+    req.log.error({ err }, "Failed to delete pet");
+    return res.status(500).json({ error: "server_error", message: "No se pudo eliminar la mascota." });
+  }
 });
 
 // ─── ADMIN: List adoption requests ───────────────────────────────────────────

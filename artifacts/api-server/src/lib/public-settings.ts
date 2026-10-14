@@ -28,6 +28,12 @@ export const PUBLIC_SETTING_KEYS = [
   "chocofest_2026_objectives",
   "chocofest_2026_organizers",
   "chocofest_2026_program",
+  // Rendición de resultados del evento (Fase 4.3): es información de rendición
+  // de cuentas, se publica a propósito.
+  "chocofest_2026_results_beneficiaries",
+  "chocofest_2026_results_activities",
+  "chocofest_2026_results_summary",
+  "chocofest_2026_results_leftovers_destination",
 ] as const;
 
 const PUBLIC_SETTING_SET: ReadonlySet<string> = new Set<string>(PUBLIC_SETTING_KEYS);

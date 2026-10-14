@@ -6,6 +6,18 @@ import { verifyChain } from "../lib/ledger";
 
 const router: IRouter = Router();
 
+// API-07: el `:id` de estas rutas se usaba tal cual (`Number(req.params.id)`),
+// así que un identificador no numérico llegaba a la consulta como NaN y
+// PostgreSQL devolvía un error de servidor (500). Un parámetro inválido es un
+// error del cliente: se corta una sola vez aquí para todas las rutas.
+router.param("id", (req, res, next, value) => {
+  const id = Number(value);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  return next();
+});
+
 // GET /campaigns/:id/movements — público: ledger hash-chained de la campaña.
 // Paginado (?limit= máx 200, ?offset=); el total va en X-Total-Count.
 // Se devuelve en orden de cadena (id ASC) para permitir verificación manual.

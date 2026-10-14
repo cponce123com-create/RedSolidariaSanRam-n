@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import SEO from "@/components/shared/SEO";
+import { buildSiteJsonLd } from "@/lib/structured-data";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HowToHelpSection } from "@/components/home/HowToHelpSection";
 import { ActiveCampaignsSection } from "@/components/home/ActiveCampaignsSection";
@@ -43,7 +44,14 @@ export default function Home() {
 
   return (
     <>
-      <SEO title={t("seo.siteName")} description={t("seo.defaultDescription")} />
+      <SEO
+        title={t("seo.siteName")}
+        description={t("seo.defaultDescription")}
+        jsonLd={buildSiteJsonLd({
+          siteName: t("seo.siteName"),
+          description: t("seo.defaultDescription"),
+        })}
+      />
 
       <HomeHero />
       {/* Campaña protagonista (ChocoFest 2026): solo si está configurada,

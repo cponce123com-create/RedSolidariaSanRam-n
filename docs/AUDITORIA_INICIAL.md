@@ -21,6 +21,8 @@ Este documento es el diagnóstico de la **Fase 0**. Las correcciones de la Fase 
 
 **Hallazgo de infraestructura (DB-03):** existen dos fuentes de verdad del esquema en conflicto. El migrador que **realmente** se aplica al arrancar es `lib/db/src/migrate.ts`; los archivos `lib/db/drizzle/0000_*.sql` y `0001_*.sql` son artefactos generados que **nunca se aplican**. Consecuencia: las cláusulas `ON DELETE` reales de la base no coinciden con el esquema Drizzle (p. ej. `campaign_movements` es `CASCADE` en el artefacto y `RESTRICT` en la base real, migración 010). Cualquier razonamiento sobre borrados debe partir de `migrate.ts`, no de `drizzle/`.
 
+> **✅ Resuelto en V7-16:** los artefactos y su carpeta `meta/` **se eliminaron del repositorio**, y `drizzle.config.ts` documenta que la única fuente de verdad es `lib/db/src/migrate.ts` (sin `generate`, y su salida no se commitea). Ya no hay dos esquemas en conflicto.
+
 ---
 
 ## 2. Inventario por funcionalidad

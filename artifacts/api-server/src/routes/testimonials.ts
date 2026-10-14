@@ -25,10 +25,14 @@ router.post("/testimonials", testimonialLimiter, async (req, res) => {
   try {
     const data = insertTestimonialSchema.parse(req.body);
     const [testimonial] = await db.insert(testimonialsTable).values(data).returning();
-    res.status(201).json(formatTestimonial(testimonial));
+    return res.status(201).json(formatTestimonial(testimonial));
   } catch (err) {
+    // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+    if (err instanceof Error && err.name === "ZodError") {
+      return res.status(400).json({ error: "validation_error", message: "Invalid testimonial data" });
+    }
     req.log.error({ err }, "Failed to create testimonial");
-    res.status(400).json({ error: "validation_error", message: "Invalid testimonial data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo guardar el testimonio." });
   }
 });
 
@@ -42,8 +46,12 @@ router.put("/testimonials/:id", requireAdmin, adminActionLimiter, async (req, re
     }
     return res.json(formatTestimonial(testimonial));
   } catch (err) {
+    // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+    if (err instanceof Error && err.name === "ZodError") {
+      return res.status(400).json({ error: "validation_error", message: "Invalid testimonial data" });
+    }
     req.log.error({ err }, "Failed to update testimonial");
-    return res.status(400).json({ error: "validation_error", message: "Invalid testimonial data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo actualizar el testimonio." });
   }
 });
 
@@ -51,10 +59,10 @@ router.delete("/testimonials/:id", requireAdmin, adminActionLimiter, async (req,
   try {
     const id = Number(req.params.id);
     await db.delete(testimonialsTable).where(eq(testimonialsTable.id, id));
-    res.status(204).send();
+    return res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete testimonial");
-    res.status(500).json({ error: "server_error", message: "Failed to delete testimonial" });
+    return res.status(500).json({ error: "server_error", message: "Failed to delete testimonial" });
   }
 });
 

@@ -120,7 +120,13 @@ test("POST /admin/users/1/2fa/reset con sesión admin → no 401 (rol se evalúa
 test("POST /admin/2fa/login con cuenta bloqueada → 429 (antes de tocar la DB)", async () => {
   lockout.resetLockoutStore();
   try {
-    for (let i = 0; i < lockout.MAX_2FA_ATTEMPTS; i++) lockout.registerFailedAttempt(99);
+    // La clave del bloqueo es ORIGEN + cuenta (SEC-03), así que se registran los
+    // fallos para los orígenes posibles del cliente de prueba (IPv4 o mapeada).
+    for (const ip of ["127.0.0.1", "::ffff:127.0.0.1", "::1"]) {
+      for (let i = 0; i < lockout.MAX_2FA_ATTEMPTS; i++) {
+        lockout.registerFailedAttempt(lockout.lockoutKey(ip, 99));
+      }
+    }
     const app = buildApp();
     await withServer(app, async (base) => {
       const res = await post(base, "/api/admin/2fa/login", { userId: 99, code: "123456" });

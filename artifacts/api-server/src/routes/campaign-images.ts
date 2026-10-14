@@ -30,10 +30,14 @@ router.post(
       const campaignId = Number(req.params.id);
       const data = insertCampaignImageSchema.parse({ ...req.body, campaignId });
       const [image] = await db.insert(campaignImagesTable).values(data).returning();
-      res.status(201).json(formatImage(image));
+      return res.status(201).json(formatImage(image));
     } catch (err) {
+      // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+      if (err instanceof Error && err.name === "ZodError") {
+        return res.status(400).json({ error: "validation_error", message: "Invalid image data" });
+      }
       req.log.error({ err }, "Failed to add campaign image");
-      res.status(400).json({ error: "validation_error", message: "Invalid image data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo guardar la imagen." });
     }
   },
 );

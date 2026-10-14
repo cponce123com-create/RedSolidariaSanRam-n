@@ -30,10 +30,14 @@ router.post(
       const campaignId = Number(req.params.id);
       const data = insertCampaignUpdateSchema.parse({ ...req.body, campaignId });
       const [update] = await db.insert(campaignUpdatesTable).values(data).returning();
-      res.status(201).json(formatUpdate(update));
+      return res.status(201).json(formatUpdate(update));
     } catch (err) {
+      // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+      if (err instanceof Error && err.name === "ZodError") {
+        return res.status(400).json({ error: "validation_error", message: "Invalid update data" });
+      }
       req.log.error({ err }, "Failed to create campaign update");
-      res.status(400).json({ error: "validation_error", message: "Invalid update data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo guardar la novedad." });
     }
   },
 );

@@ -66,10 +66,14 @@ router.post(
       const campaignId = Number(req.params.id);
       const data = insertCampaignEvidenceSchema.parse({ ...req.body, campaignId });
       const [ev] = await db.insert(campaignEvidenceTable).values(data).returning();
-      res.status(201).json(formatEvidence(ev));
+      return res.status(201).json(formatEvidence(ev));
     } catch (err) {
+      // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+      if (err instanceof Error && err.name === "ZodError") {
+        return res.status(400).json({ error: "validation_error", message: "Invalid evidence data" });
+      }
       req.log.error({ err }, "Failed to create campaign evidence");
-      res.status(400).json({ error: "validation_error", message: "Invalid evidence data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo guardar la evidencia." });
     }
   },
 );
@@ -91,8 +95,12 @@ router.put(
       if (!ev) return res.status(404).json({ error: "not_found", message: "Evidence not found" });
       return res.json(formatEvidence(ev));
     } catch (err) {
+      // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+      if (err instanceof Error && err.name === "ZodError") {
+        return res.status(400).json({ error: "validation_error", message: "Invalid evidence data" });
+      }
       req.log.error({ err }, "Failed to update campaign evidence");
-      return res.status(400).json({ error: "validation_error", message: "Invalid evidence data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo actualizar la evidencia." });
     }
   },
 );

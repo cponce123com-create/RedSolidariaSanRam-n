@@ -2,28 +2,85 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Target, FileText, LogOut, MessageSquare, DollarSign, Menu, X,
-  AlertTriangle, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck, Settings, Sparkles,
+  AlertTriangle,
+  Award, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck, Settings, Sparkles,
   HandHeart, FileSpreadsheet, ClipboardList, UsersRound, BookOpen
 } from "lucide-react";
 import { useAdminLogout, useGetAdminMe, type AdminUser } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
+import { resolvePanelGate } from "@/lib/admin-session";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const logoutMutation = useAdminLogout();
-  
-  const { data: user, isError, isLoading } = useGetAdminMe({
+
+  const { data: user, isError, error, isLoading, refetch } = useGetAdminMe({
     query: { queryKey: ["/api/admin/me"], retry: false }
   });
 
+  // FE-03/FE-04: la decisión del gate es una función pura y probada
+  // (`resolvePanelGate`). Solo un 401 manda al login: una caída del servidor o un
+  // rol sin permiso NO se disfrazan de «sesión expirada», y ningún caso deja la
+  // pantalla en blanco.
+  const gate = resolvePanelGate({ isLoading, error: isError ? error : null, user });
+  const redirectTo = gate.state === "unauthenticated" ? gate.redirectTo : null;
+
   useEffect(() => {
-    if (isError) setLocation("/admin/login");
-  }, [isError, setLocation]);
+    if (redirectTo) setLocation(redirectTo);
+  }, [redirectTo, setLocation]);
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
-  if (isError || !user) return null;
+  if (gate.state === "loading") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" aria-hidden />
+        <p className="text-sm">Cargando el panel…</p>
+      </div>
+    );
+  }
 
+  if (gate.state === "unauthenticated") return null;
+
+  if (gate.state === "forbidden") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-card border border-border rounded-2xl p-6 text-center">
+          <ShieldCheck className="w-8 h-8 mx-auto text-muted-foreground mb-3" aria-hidden />
+          <h1 className="font-display font-bold text-lg mb-2">Tu cuenta no tiene acceso al panel</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            {gate.role
+              ? `El rol «${gate.role}» no puede administrar el sitio. Pide a un superadmin que revise tu cuenta.`
+              : "Este rol no puede administrar el sitio. Pide a un superadmin que revise tu cuenta."}
+          </p>
+          <Link href="/">
+            <Button variant="outline" className="rounded-xl">Volver al sitio público</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (gate.state === "unavailable") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-card border border-border rounded-2xl p-6 text-center">
+          <AlertTriangle className="w-8 h-8 mx-auto text-amber-600 mb-3" aria-hidden />
+          <h1 className="font-display font-bold text-lg mb-2">No se pudo comprobar tu sesión</h1>
+          <p className="text-sm text-muted-foreground mb-4">
+            {gate.status
+              ? `El servidor respondió con un error (${gate.status}). `
+              : "No hubo respuesta del servidor. "}
+            Tu sesión puede seguir siendo válida; vuelve a intentarlo.
+          </p>
+          <Button onClick={() => void refetch()} className="rounded-xl">Reintentar</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // El gate ya garantizó que hay sesión con un rol válido: se lo decimos al
+  // compilador sin cambiar el comportamiento (esta rama no se alcanza).
+  if (!user) return null;
   const handleLogout = () => {
     logoutMutation.mutate(undefined, { onSuccess: () => setLocation("/admin/login") });
   };
@@ -57,6 +114,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               { href: "/admin/donantes", icon: HandHeart, label: "Donantes" },
               { href: "/admin/auditoria", icon: ShieldCheck, label: "Auditoría" },
               { href: "/admin/libro", icon: BookOpen, label: "Libro contable" },
+              { href: "/admin/certificados", icon: Award, label: "Certificados" },
               { href: "/admin/informes", icon: FileSpreadsheet, label: "Informes" },
               { href: "/admin/observaciones", icon: ClipboardList, label: "Observaciones" },
             ]),

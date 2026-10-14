@@ -422,6 +422,265 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    name: "020_event_results_settings.sql",
+    sql: `
+      -- Fase 4.3 (V7-8): rendición de resultados del evento. Los datos que solo
+      -- la organización puede declarar —beneficiarios atendidos, actividades
+      -- realizadas, resumen y destino de los sobrantes— pasan a ser configuración
+      -- editable y pública (es información de rendición de cuentas).
+      --
+      -- Mismo patrón que la 019: solo escribe si \`settings\` YA tiene contenido,
+      -- para no romper el seed de una base nueva. Idempotente.
+      INSERT INTO settings (key, value, label, "group")
+      SELECT v.key, v.value, v.label, v."group"
+      FROM (VALUES
+        ('chocofest_2026_results_beneficiaries', '', 'ChocoFest 2026: beneficiarios atendidos (agregado)', 'chocofest'),
+        ('chocofest_2026_results_activities', '', 'ChocoFest 2026: actividades realizadas (una por línea: hora | título | responsable)', 'chocofest'),
+        ('chocofest_2026_results_summary', '', 'ChocoFest 2026: resumen de la rendición de cuentas', 'chocofest'),
+        ('chocofest_2026_results_leftovers_destination', '', 'ChocoFest 2026: destino de los recursos sobrantes', 'chocofest')
+      ) AS v(key, value, label, "group")
+      WHERE EXISTS (SELECT 1 FROM settings)
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
+  {
+    name: "021_use_case_indexes.sql",
+    sql: `
+      -- DB-07 (V7-9): índices compuestos por CASO DE USO. Las migraciones 001 y
+      -- 012 ya cubrieron los índices simples por campaña; estos son los que
+      -- faltaban para las consultas que realmente hace el sistema, y son
+      -- ADITIVOS: solo crean índices, no tocan datos ni columnas.
+      --
+      -- 1) Solicitudes de adopción: se listan por mascota y el panel cuenta las
+      --    pendientes por estado (dashboard).
+      CREATE INDEX IF NOT EXISTS idx_adoption_requests_pet
+        ON adoption_requests (pet_id);
+      CREATE INDEX IF NOT EXISTS idx_adoption_requests_status
+        ON adoption_requests (status);
+
+      -- 2) Gastos de campaña: el panel de transparencia filtra por campaña y por
+      --    visibilidad pública (nunca se muestran gastos privados).
+      CREATE INDEX IF NOT EXISTS idx_expenses_campaign_public
+        ON campaign_expenses (campaign_id, is_public);
+
+      -- 3) Evidencias: mismo caso (campaña + visibilidad pública).
+      CREATE INDEX IF NOT EXISTS idx_evidence_campaign_public
+        ON campaign_evidence (campaign_id, is_public);
+
+      -- 4) Novedades de campaña: se listan por campaña en orden cronológico.
+      CREATE INDEX IF NOT EXISTS idx_updates_campaign_created
+        ON campaign_updates (campaign_id, created_at DESC);
+
+      -- 5) Donaciones: las cifras filtradas del panel (campaña + estado +
+      --    rango de fechas) y la recaudación verificada por campaña.
+      CREATE INDEX IF NOT EXISTS idx_donations_campaign_status_created
+        ON donations (campaign_id, status, created_at DESC);
+    `,
+  },
+  {
+    name: "022_status_checks_and_updated_at.sql",
+    sql: `
+      -- DB-08 + DB-10 (V7-12): integridad que la base debe garantizar por sí
+      -- misma, sin depender de que la aplicación se acuerde.
+      --
+      -- DB-08: los estados eran columnas de texto SIN restricción. Ahora cada
+      -- tabla declara sus valores válidos con un CHECK ... NOT VALID:
+      --   - NOT VALID significa que las filas YA existentes NO se revisan (una
+      --     migración no puede fallar por datos históricos), pero las escrituras
+      --     NUEVAS sí se comprueban desde este momento.
+      --   - Los valores son EXACTAMENTE los que aceptan los esquemas de la
+      --     aplicación (zod y las libs de ciclo de vida), no una lista inventada.
+      --   - Para endurecer más adelante, cuando los datos estén limpios:
+      --       SELECT status, count(*) FROM <tabla> GROUP BY status;   -- revisar
+      --       ALTER TABLE <tabla> VALIDATE CONSTRAINT <nombre>;       -- validar
+      --
+      -- \`campaigns\` incluye 'inactive' porque es un valor heredado que el panel
+      -- sigue contando como finalizada; excluirlo dejaría esas filas antiguas
+      -- imposibles de editar (cualquier UPDATE las revisa).
+
+      ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_status_check;
+      ALTER TABLE donations ADD CONSTRAINT donations_status_check
+        CHECK (status IN ('pending','approved','rejected','reconciled')) NOT VALID;
+
+      ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_status_check;
+      ALTER TABLE campaigns ADD CONSTRAINT campaigns_status_check
+        CHECK (status IN ('draft','active','paused','completed','archived','inactive')) NOT VALID;
+
+      ALTER TABLE pets DROP CONSTRAINT IF EXISTS pets_status_check;
+      ALTER TABLE pets ADD CONSTRAINT pets_status_check
+        CHECK (status IN ('available','adopted','in-process','reviewing','inactive')) NOT VALID;
+
+      ALTER TABLE volunteers DROP CONSTRAINT IF EXISTS volunteers_status_check;
+      ALTER TABLE volunteers ADD CONSTRAINT volunteers_status_check
+        CHECK (status IN ('pending','reviewing','approved','contacted','rejected')) NOT VALID;
+
+      ALTER TABLE adoption_requests DROP CONSTRAINT IF EXISTS adoption_requests_status_check;
+      ALTER TABLE adoption_requests ADD CONSTRAINT adoption_requests_status_check
+        CHECK (status IN ('pending','approved','rejected','in-process')) NOT VALID;
+
+      ALTER TABLE community_reports DROP CONSTRAINT IF EXISTS community_reports_status_check;
+      ALTER TABLE community_reports ADD CONSTRAINT community_reports_status_check
+        CHECK (status IN ('pending','reviewing','approved','rejected','converted','archived')) NOT VALID;
+
+      ALTER TABLE campaign_movements DROP CONSTRAINT IF EXISTS campaign_movements_kind_check;
+      ALTER TABLE campaign_movements ADD CONSTRAINT campaign_movements_kind_check
+        CHECK (kind IN ('ingreso','gasto')) NOT VALID;
+
+      -- DB-10: updated_at no se actualizaba solo. Con estos disparadores la base
+      -- lo mantiene aunque la aplicación lo olvide (varias rutas ya lo hacían a
+      -- mano; esto es la garantía, no una dependencia).
+      CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $fn$
+      BEGIN
+        NEW.updated_at = now();
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS trg_donors_updated_at ON donors;
+      CREATE TRIGGER trg_donors_updated_at BEFORE UPDATE ON donors
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_volunteer_teams_updated_at ON volunteer_teams;
+      CREATE TRIGGER trg_volunteer_teams_updated_at BEFORE UPDATE ON volunteer_teams
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_pets_updated_at ON pets;
+      CREATE TRIGGER trg_pets_updated_at BEFORE UPDATE ON pets
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_community_reports_updated_at ON community_reports;
+      CREATE TRIGGER trg_community_reports_updated_at BEFORE UPDATE ON community_reports
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_settings_updated_at ON settings;
+      CREATE TRIGGER trg_settings_updated_at BEFORE UPDATE ON settings
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_volunteers_updated_at ON volunteers;
+      CREATE TRIGGER trg_volunteers_updated_at BEFORE UPDATE ON volunteers
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    `,
+  },
+  {
+    name: "023_missing_foreign_keys.sql",
+    sql: `
+      -- DB-04 (B-2): referencias que eran columnas sueltas SIN clave foránea.
+      -- Nada impedía que una donación, un gasto o una evidencia apuntaran a una
+      -- campaña inexistente, ni que borrar una mascota dejara solicitudes de
+      -- adopción huérfanas.
+      --
+      -- NOT VALID, igual que las restricciones de estado (022): las filas YA
+      -- existentes no se revisan (en producción puede haber huérfanas y esta
+      -- migración no puede fallar ni borrar nada), y TODAS las escrituras nuevas
+      -- quedan comprobadas desde este momento. Para validarlas más adelante,
+      -- primero se miran los huérfanos y luego se valida:
+      --
+      --   SELECT count(*) FROM donations d
+      --     LEFT JOIN campaigns c ON c.id = d.campaign_id
+      --     WHERE d.campaign_id IS NOT NULL AND c.id IS NULL;
+      --   ALTER TABLE donations VALIDATE CONSTRAINT donations_campaign_id_fkey;
+      --
+      -- ON DELETE conservador: RESTRICT en todo lo que es historial (dinero,
+      -- gastos, evidencias, bienes, imágenes, novedades, presupuesto) para que la
+      -- base no borre nada en cascada por su cuenta, y SET NULL donde la fila debe
+      -- sobrevivir aunque desaparezca la referencia (una donación sin el donante
+      -- consolidado, un reporte ciudadano sin la campaña creada a partir de él).
+
+      ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_campaign_id_fkey;
+      ALTER TABLE donations ADD CONSTRAINT donations_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_donor_id_fkey;
+      ALTER TABLE donations ADD CONSTRAINT donations_donor_id_fkey
+        FOREIGN KEY (donor_id) REFERENCES donors(id) ON DELETE SET NULL NOT VALID;
+
+      ALTER TABLE campaign_expenses DROP CONSTRAINT IF EXISTS campaign_expenses_campaign_id_fkey;
+      ALTER TABLE campaign_expenses ADD CONSTRAINT campaign_expenses_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_evidence DROP CONSTRAINT IF EXISTS campaign_evidence_campaign_id_fkey;
+      ALTER TABLE campaign_evidence ADD CONSTRAINT campaign_evidence_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_images DROP CONSTRAINT IF EXISTS campaign_images_campaign_id_fkey;
+      ALTER TABLE campaign_images ADD CONSTRAINT campaign_images_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_updates DROP CONSTRAINT IF EXISTS campaign_updates_campaign_id_fkey;
+      ALTER TABLE campaign_updates ADD CONSTRAINT campaign_updates_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_leftovers DROP CONSTRAINT IF EXISTS campaign_leftovers_campaign_id_fkey;
+      ALTER TABLE campaign_leftovers ADD CONSTRAINT campaign_leftovers_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_leftovers DROP CONSTRAINT IF EXISTS campaign_leftovers_donor_id_fkey;
+      ALTER TABLE campaign_leftovers ADD CONSTRAINT campaign_leftovers_donor_id_fkey
+        FOREIGN KEY (donor_id) REFERENCES donors(id) ON DELETE SET NULL NOT VALID;
+
+      ALTER TABLE campaign_budgets DROP CONSTRAINT IF EXISTS campaign_budgets_campaign_id_fkey;
+      ALTER TABLE campaign_budgets ADD CONSTRAINT campaign_budgets_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      -- Un reporte ciudadano no debe desaparecer: si se borra la campaña creada a
+      -- partir de él, el vínculo se limpia y el reporte sigue existiendo.
+      ALTER TABLE community_reports DROP CONSTRAINT IF EXISTS community_reports_campaign_id_fkey;
+      ALTER TABLE community_reports ADD CONSTRAINT community_reports_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE SET NULL NOT VALID;
+
+      ALTER TABLE adoption_requests DROP CONSTRAINT IF EXISTS adoption_requests_pet_id_fkey;
+      ALTER TABLE adoption_requests ADD CONSTRAINT adoption_requests_pet_id_fkey
+        FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE RESTRICT NOT VALID;
+    `,
+  },
+  {
+    name: "024_certificates.sql",
+    sql: `
+      -- Certificados con QR (Fase 5.2 / B-3). ADITIVA: crea una tabla nueva, no
+      -- toca ninguna existente.
+      --
+      -- Un certificado RECONOCE a una persona o entidad y se publica en
+      -- /certificados/:code. Solo se publica lo que la organización autoriza:
+      -- nombre, tipo, título, fecha y campaña. **Nunca** importes ni datos de
+      -- contacto: un certificado no es un recibo.
+      --
+      -- El código público es aleatorio (12 caracteres de un alfabeto sin
+      -- caracteres ambiguos) y tiene índice único, así que no se puede enumerar
+      -- quién tiene certificado.
+      --
+      -- ON DELETE SET NULL en la campaña: si la campaña desaparece, el certificado
+      -- se conserva sin vínculo, porque reconoce a una persona y no es un dato
+      -- de la campaña.
+      CREATE TABLE IF NOT EXISTS certificates (
+        id serial PRIMARY KEY,
+        code text NOT NULL,
+        holder_name text NOT NULL,
+        type text NOT NULL DEFAULT 'donante',
+        title text NOT NULL,
+        description text,
+        campaign_id integer REFERENCES campaigns(id) ON DELETE SET NULL,
+        issued_at text NOT NULL,
+        status text NOT NULL DEFAULT 'issued',
+        revoked_at timestamp,
+        revocation_reason text,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_code ON certificates (code);
+      CREATE INDEX IF NOT EXISTS idx_certificates_status ON certificates (status);
+      CREATE INDEX IF NOT EXISTS idx_certificates_campaign ON certificates (campaign_id);
+
+      -- Mismos valores que los catálogos de la aplicación (lib/certificates.ts).
+      ALTER TABLE certificates DROP CONSTRAINT IF EXISTS certificates_type_check;
+      ALTER TABLE certificates ADD CONSTRAINT certificates_type_check
+        CHECK (type IN ('donante','voluntario','auspiciador','colaborador','reconocimiento')) NOT VALID;
+
+      ALTER TABLE certificates DROP CONSTRAINT IF EXISTS certificates_status_check;
+      ALTER TABLE certificates ADD CONSTRAINT certificates_status_check
+        CHECK (status IN ('issued','revoked')) NOT VALID;
+    `,
+  },
 ];
 
 /**

@@ -84,10 +84,15 @@ router.post(
         }
         return exp;
       });
-      res.status(201).json(formatExpense(expense));
+      return res.status(201).json(formatExpense(expense));
     } catch (err) {
+      // API-06: validación (Zod) → 400; cualquier otro fallo (incluido el asiento
+      // en el libro) → 500. Un fallo de infraestructura no es un dato mal enviado.
+      if (err instanceof Error && err.name === "ZodError") {
+        return res.status(400).json({ error: "validation_error", message: "Invalid expense data" });
+      }
       req.log.error({ err }, "Failed to create campaign expense");
-      res.status(400).json({ error: "validation_error", message: "Invalid expense data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo registrar el gasto." });
     }
   },
 );
@@ -109,8 +114,12 @@ router.put(
       if (!expense) return res.status(404).json({ error: "not_found", message: "Expense not found" });
       return res.json(formatExpense(expense));
     } catch (err) {
+      // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+      if (err instanceof Error && err.name === "ZodError") {
+        return res.status(400).json({ error: "validation_error", message: "Invalid expense data" });
+      }
       req.log.error({ err }, "Failed to update campaign expense");
-      return res.status(400).json({ error: "validation_error", message: "Invalid expense data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo actualizar el gasto." });
     }
   },
 );

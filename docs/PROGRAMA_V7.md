@@ -103,11 +103,11 @@ donaciones registradas (procedimiento documentado, sin doble conteo).
 
 | # | Bloqueo | Por qué necesita aprobación | Propuesta |
 |---|---|---|---|
-| B-1 | **Migración 010 sin aplicar** (`campaign_movements` de `ON DELETE CASCADE` a `RESTRICT`) | Es una alteración de restricción sobre la base de producción; el propio archivo `docs/migraciones/010_low_risk.sql` la dejó fuera de `migrate.ts` a propósito. Hoy la única defensa del libro contable es el conteo en la aplicación. | Añadirla a `migrate.ts` (idempotente: `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT`) tras confirmar que no hay movimientos huérfanos. Se puede ensayar antes en la réplica local. |
-| B-2 | **Claves foráneas ausentes (DB-04)** en `donations`, `campaign_expenses`, `campaign_evidence`, `campaign_images`, `campaign_updates`, `community_reports`, `campaign_leftovers` | Añadir FKs falla si ya existen huérfanos; hay que limpiarlos o dejarlos documentados. | Migración aditiva en dos pasos: informe de huérfanos → FK con `ON DELETE RESTRICT` (o `SET NULL` en las opcionales). Requiere decisión sobre los datos existentes. |
+| ~~B-1~~ | ~~**Migración 010 sin aplicar** (`campaign_movements` de `ON DELETE CASCADE` a `RESTRICT`)~~ | ✅ **RESUELTO**: aplicada en producción el **2026-10-13** con respaldo previo y autorización explícita, y registrada en `drizzle_migrations`. | La API responde **409** (no 500) si la FK del libro bloquea un borrado, vía `lib/pg-errors.ts`. |
+| ~~B-2~~ | ~~**Claves foráneas ausentes (DB-04)** en `donations`, `campaign_expenses`, `campaign_evidence`, `campaign_images`, `campaign_updates`, `community_reports`, `campaign_leftovers`~~ | ✅ **RESUELTO en V7-15**: migración **023** con 11 claves `NOT VALID` (no validan huérfanos históricos y sí todas las escrituras nuevas) y `ON DELETE` elegido caso por caso. | Verificado contra base real: **rechaza** una donación con `campaign_id=999999` y acepta las válidas; borrar una mascota con solicitudes → 409. |
 | B-3 | **Certificados con QR (Fase 5.2)** | Define datos personales publicados: nombre autorizado, tipo de reconocimiento, vigencia y revocación. | Propuesta: tabla `certificates` (identificador público aleatorio, nombre autorizado, campaña/evento, tipo, fecha, estado, motivo de revocación) + página pública `/certificados/:code` con datos mínimos + QR generado en el cliente (sin servicio externo). Pendiente: confirmar tipos de certificado y si el monto se incluye (recomendado: **no**). |
 | B-4 | **WhatsApp Business automatizado (Fase 7)** | Requiere credenciales y proveedor oficial (Cloud API) y consentimiento de contacto. | Implementar primero lo que no depende de credenciales: enlaces y mensajes configurables desde el panel, contacto por campaña/tipo. Dejar la mensajería automatizada tras la decisión y las credenciales. |
-| B-5 | **Artefactos de migración obsoletos** (`lib/db/drizzle/0000_*.sql`, `0001_*.sql`) | Son DDL generado que **nunca** se aplica y contradice a `migrate.ts` (el esquema ya declara `RESTRICT`): un `drizzle-kit push` accidental reintroduciría el CASCADE. | Eliminarlos del repositorio (o moverlos a `docs/legacy/`) y documentar que la única fuente es `lib/db/src/migrate.ts`. Requiere confirmación por ser borrado de archivos. |
+| ~~B-5~~ | ~~**Artefactos de migración obsoletos** (`lib/db/drizzle/0000_*.sql`, `0001_*.sql`)~~ | ✅ **RESUELTO en V7-16**: eliminados del repositorio (los 2 SQL + `meta/`, 5 archivos) tras comprobar que ni los scripts, ni el CI, ni el build los referencian. | La política queda escrita en `drizzle.config.ts`: la única fuente de verdad es `lib/db/src/migrate.ts`, no se usa `generate` y su salida no se commitea. Verificado: typecheck 0 y **E2E COMPLETO: OK** (28 tablas, 23 migraciones, 11/11 claves foráneas y la cadena del libro íntegra tras la restauración). |
 | B-6 | **Insignias/embajadores (Fase 5.3/5.4)** | Definición de programa (niveles, vigencia, qué se publica). | Requiere decisión de negocio antes de modelar. |
 
 ---
@@ -243,3 +243,725 @@ artifacts/red-solidaria/src/pages/admin/layout.tsx        ítem de menú (solo a
 El informe lee el libro completo (es su naturaleza). Si el libro creciera mucho, la consulta
 se puede paginar por rango de `id` sin cambiar el contrato del informe; se documenta como
 mejora futura, no como bloqueo.
+
+---
+
+## 7. Incremento V7-4 — Seguridad e integridad de las operaciones (Fase 1.2 y 1.3) · CERRADO
+
+### 7.1 SEC-03 — Denegación de servicio sobre la cuenta del administrador (corregido)
+
+**El defecto:** el contador de intentos fallidos de 2FA se indexaba **solo por `userId`**, y
+ese `userId` viaja en el cuerpo de `POST /admin/2fa/login`. Cualquiera podía enviar 5 códigos
+inválidos para el superadmin (`userId: 1`) desde cualquier parte y dejar esa cuenta **sin poder
+entrar durante 15 minutos**, repitiéndolo indefinidamente. El check se hacía antes de tocar la
+base, así que ni siquiera hacía falta que el usuario existiera para intentarlo.
+
+**La corrección:** la clave del contador pasa a ser **origen + cuenta** (`lockoutKey(ip, userId)`),
+de modo que el bloqueo solo afecta al par origen+cuenta: frena la fuerza bruta sin dejar fuera
+al administrador legítimo. La rotación de IP sigue cubierta por el rate limit por IP del login
+(`loginLimiter`). Además:
+
+- el escape hatch de superadmin (`/admin/users/:id/2fa/reset`) limpia la cuenta en **todos**
+  los orígenes (`clearFailedAttemptsForUser`), que es lo que se espera de un desbloqueo;
+- desactivar 2FA con código válido también limpia todos los orígenes de esa cuenta;
+- el módulo documenta explícitamente por qué la clave es compuesta (para que nadie la
+  "simplifique" de vuelta a `userId`).
+
+### 7.2 SEC-01 — Cookie de sesión (ya estaba correcta, verificado)
+
+`app.ts` ya declara `app.set("trust proxy", 1)` (Render termina TLS en un proxy) y
+`cookie.secure` en producción, con `httpOnly`, `sameSite: "lax"`, `maxAge` de 24 h y
+`rolling: true`. **No requería cambio**: se verifica y se documenta en lugar de "arreglar" algo
+que ya estaba bien.
+
+### 7.3 SEC-08 — Gate de administración (verificado por barrido)
+
+El diseño es un **único punto de control**: `router.use("/admin", requireAdmin,
+adminActionLimiter)` montado antes de todos los routers. En lugar de repartir gates redundantes
+por router (que no aportan seguridad adicional y sí riesgo de incoherencia), se añade una
+**prueba de barrido** que monta el router real y comprueba que:
+
+- 22 rutas `GET /admin/*` y 6 escrituras (`POST`, `PUT`, `PATCH`, `DELETE`) responden **401**
+  sin sesión;
+- las rutas públicas (`/health`, `/campaigns`, `/settings`, `/stats`) **no** están bloqueadas;
+- `/admin/login` **no** es interceptado por el gate (si alguien montara un router antes del
+  gate, o añadiera una ruta administrativa en un router público, el barrido lo detecta).
+
+### 7.4 API-06 — Fallos de infraestructura disfrazados de error de validación (parcial)
+
+`POST /donations` usaba `donationInputSchema.parse()` dentro del `try` y el `catch` devolvía
+**400 «Invalid donation data»** para *cualquier* fallo: un dato inválido y una base de datos
+caída eran indistinguibles, la interfaz decía «datos inválidos» y el equipo no veía ninguna
+señal de 500. Ahora la validación se resuelve con `safeParse` **antes** del `try` (patrón del
+resto del API) y el `catch` responde **500** con un mensaje accionable.
+
+El mismo patrón existe en otros routers; se corrigió la ruta financiera (la más sensible) y el
+resto queda **documentado como pendiente** en el checklist, sin marcar como hecho.
+
+### 7.5 Archivos
+
+```
+artifacts/api-server/src/lib/two-factor-lockout.ts       clave compuesta + limpieza por cuenta
+artifacts/api-server/src/routes/admin-2fa.ts             check, registro, limpieza y escape hatch
+artifacts/api-server/src/routes/donations.ts             safeParse + 400 explícito, catch → 500
+artifacts/api-server/tests/two-factor-lockout.test.mjs   11 pruebas (+5: SEC-03)
+artifacts/api-server/tests/admin-2fa.test.mjs            registro del bloqueo con la clave compuesta
+artifacts/api-server/tests/admin-gate-sweep.test.mjs     barrido del gate (nuevo, 4 pruebas)
+artifacts/api-server/build-tests.mjs                     entry point del router raíz
+```
+
+### 7.6 Verificación
+
+- `api-server`: **318/318** (+9) · typecheck **0**.
+- `red-solidaria`: **143/143** + **23/23** (sin cambios: control de regresión).
+- Casos nuevos cubiertos: dos orígenes no comparten bloqueo, el escape hatch limpia todos los
+  orígenes, la clave tolera IP ausente, y el barrido de rutas admin públicas/privadas.
+
+### 7.7 Pendiente de este bloque
+
+- **API-06 en el resto de routers** (mismo patrón `catch → 400`), sin marcar como hecho.
+- **SEC-02/04** (rate limit y lockout en memoria): no se comparten entre instancias; mover a
+  PostgreSQL/Redis si el despliegue escala horizontalmente.
+- **FE-03** (gate del panel por rol en el cliente): el API ya bloquea los datos, pero la
+  interfaz no redirige a un usuario autenticado sin rol admin.
+
+---
+
+## 8. Incremento V7-5 — Filtros del panel administrativo (Fase 6) · CERRADO
+
+### 8.1 Qué faltaba
+
+El dashboard mostraba **siempre el acumulado global**: no se podía ver «el dinero de esta
+campaña» ni «lo recaudado en este trimestre» sin leer el total del sistema. Además, dos
+tarjetas financieras no llevaban a ningún detalle.
+
+### 8.2 Qué se implementó
+
+- `GET /admin/dashboard` acepta `campaignId`, `status`, `from` y `to`, normalizados por una
+  función pura (`lib/dashboard-filters.ts`, 11 pruebas): identificador positivo, estado de
+  campaña conocido, fechas ISO válidas y rango no invertido. Un filtro inválido devuelve
+  **400 con el motivo**, nunca se ignora en silencio.
+- **Semántica explícita** (un filtro ambiguo produce cifras que nadie puede conciliar):
+  filtrar por campaña o por estado deja fuera el **fondo general** (no pertenece a ninguna
+  campaña); el rango de fechas aplica a donaciones y a gastos (`campaign_expenses.date` es
+  texto ISO, así que la comparación lexicográfica equivale a la cronológica).
+- **El importe histórico no se cuenta con fechas activas**: es un acumulado que no se puede
+  atribuir a un periodo; con rango se publica solo la recaudación verificada del rango.
+- Todas las cifras de campaña se recalculan con el **mismo** filtro en el servidor:
+  contadores de campañas, recaudación conciliada, gastos, evolución mensual, top de campañas
+  y gastos por categoría. Los indicadores que no dependen de campaña (reportes, adopciones,
+  voluntarios, mascotas) siguen globales y **el panel lo dice en pantalla**.
+- La respuesta devuelve los filtros aplicados con una descripción legible
+  (`filters.description`), para que un tercero sepa sobre qué se calcularon las cifras.
+- **Panel**: barra de filtros (campaña, estado, desde, hasta, limpiar) con la descripción de
+  lo aplicado; las 8 tarjetas del KPI navegan a su información (las financieras a
+  `/admin/libro`).
+
+**Nota sobre «evento»:** en este sistema un evento solidario (ChocoFest) **es** una campaña,
+así que el filtro de campaña lo cubre sin duplicar el concepto.
+
+### 8.3 Archivos
+
+```
+artifacts/api-server/src/lib/dashboard-filters.ts       normalización y descripción de filtros
+artifacts/api-server/tests/dashboard-filters.test.mjs   11 pruebas
+artifacts/api-server/src/routes/dashboard.ts            filtros aplicados a todas las cifras de campaña
+artifacts/api-server/build-tests.mjs                    entry point del módulo
+artifacts/red-solidaria/src/pages/admin/dashboard.tsx   barra de filtros + navegación de tarjetas
+```
+
+### 8.4 Verificación
+
+- `api-server`: **329/329** (+11) · typecheck **0**.
+- `red-solidaria`: **143/143** + **23/23** · typecheck **0**.
+- Build de producción **OK**.
+- Casos cubiertos: sin filtros, parámetros desconocidos, `campaignId` inválido, estado
+  desconocido, fechas inválidas, rango invertido, un solo extremo del rango, parámetros
+  repetidos y descripción legible de lo aplicado.
+
+---
+
+## 9. Incremento V7-7 — Verificación E2E con PostgreSQL real (Fase 2.4 y 9) · CERRADO
+
+### 9.1 Qué faltaba
+
+Toda la verificación del programa se hacía con funciones puras y pruebas de autorización
+contra un `DATABASE_URL` ficticio. **Nadie había ejecutado el sistema contra una base real**,
+así que ni las migraciones ni los flujos financieros de punta a punta estaban comprobados.
+
+### 9.2 Arnés implementado
+
+`artifacts/api-server/tests/e2e/run-e2e.sh` (todo en un solo comando, porque el entorno mata
+los procesos en segundo plano al terminar cada comando):
+
+1. crea un clúster **PostgreSQL 17.7** temporal (`initdb` + `pg_ctl` en un directorio de trabajo);
+2. aplica el schema base con `drizzle-kit push --force`;
+3. arranca el **API compilado**, de modo que el migrador embebido corre las migraciones;
+4. comprueba el esquema resultante con `psql`;
+5. ejecuta el flujo funcional completo por HTTP (`flow.mjs`, 38 comprobaciones);
+6. reinicia el API para demostrar que las migraciones son **idempotentes**;
+7. para PostgreSQL, mata el API y borra el directorio temporal.
+
+**No toca ninguna base real**: construye su propia `DATABASE_URL` y borra todo al terminar.
+
+### 9.3 Resultado de la ejecución completa
+
+| Comprobación | Resultado |
+|---|---|
+| Migraciones aplicadas | **19** (`001`–`019`) y **no se duplican** en el segundo arranque |
+| `donations.collaboration_type` | default `'dinero'::text` ✔ (migración 018 sobre base real) |
+| Claves de WhatsApp en `settings` | **5** ✔ (migración 019 + seed) |
+| FK del libro en una base creada con el esquema actual | `RESTRICT` ✔ (ver matiz en 9.5) |
+| Flujo funcional por HTTP | **38/38 en verde** |
+| Informe de integridad sobre datos reales | cadena **íntegra**; detecta **111 donaciones confirmadas sin asiento** (DB-09) y **1 asiento** (el del propio E2E) |
+
+Lo verificado de punta a punta: sesión y gate de rutas admin en rutas públicas · crear
+campaña como borrador · el borrador **no** es público (404) · publicar · donación pública de
+dinero · donación en especie sin monto ni método · rechazo de donación a campaña inexistente ·
+**comprobante obligatorio solo para dinero digital** (aprobar sin comprobante → 400; con
+comprobante → 200) · aprobar una donación en especie sin pago → 200 · **un asiento por dinero
+aprobado y ninguno por una especie con valor 0** · la cadena de hashes verifica · la ficha
+pública y el **panel de transparencia publican la MISMA cifra** (S/ 80, sin la especie) con
+desglose verificado/histórico y fecha de actualización · **borrado bloqueado (409)** con motivo
+accionable · archivar → fuera del listado público pero accesible por URL directa (política
+documentada) · **una campaña archivada no acepta donaciones (400)** · restaurar · informe de
+integridad · filtros del panel por campaña contra datos reales · filtro inválido → 400 con el
+motivo.
+
+### 9.4 Hallazgo nuevo, corregido en este incremento (API-07)
+
+El E2E descubrió que en el router del libro `Number(req.params.id)` se usaba **sin validar**:
+un identificador no numérico llegaba a la consulta como `NaN` y PostgreSQL devolvía **500**
+en lugar de un error de cliente. Corregido con un único `router.param("id", …)` que valida
+todas las rutas del router (400 «Identificador inválido») y con la comprobación
+correspondiente en el flujo E2E.
+
+### 9.5 Matiz importante sobre el bloqueo B-1
+
+El clúster temporal se crea con el esquema **actual** de Drizzle, que ya declara
+`ON DELETE RESTRICT`, así que en una base **nueva** el libro nace protegido. El `CASCADE`
+solo persiste en bases **creadas antes** del arreglo del esquema (producción). Es decir:
+la migración 010 sigue siendo necesaria para producción, pero **no** para despliegues nuevos.
+
+### 9.6 Cómo se ejecuta
+
+```bash
+bash artifacts/api-server/tests/e2e/run-e2e.sh
+```
+
+Requiere los binarios de PostgreSQL documentados en `docs/ROADMAP.md`. El script imprime
+cada comprobación con `ok`/`FAIL` y termina con `E2E COMPLETO: OK` o el número de fallos.
+
+---
+
+## 10. Incremento V7-8 — Rendición de resultados del evento (Fase 4.3) · CERRADO
+
+### 10.1 Qué faltaba
+
+El evento ya publicaba **dinero** (panel de transparencia), **bienes** (inventario con flujo
+recibido/entregado), **presupuesto**, **programa** y **evidencias**. Lo que no existía era el
+**informe de rendición** que lo reúne, ni los datos que solo la organización puede declarar:
+beneficiarios atendidos (dato agregado), actividades **realizadas**, resumen de la rendición y
+destino posterior de los recursos sobrantes.
+
+### 10.2 Qué se implementó
+
+- **Lógica pura** (`src/lib/event-results.ts`, 10 pruebas): `assembleEventResults` reúne el
+  informe con **cifras reales** y **datos declarados**:
+  - dinero: ingresos, gastos y saldo conciliados (los de la transparencia);
+  - bienes: recibidos, entregados y sobrantes con `resolveStock`, **la misma regla** que el
+    inventario público (una fila antigua sin flujo cuenta como recibida y no entregada);
+  - actividades: planificadas frente a realizadas, reutilizando `parseProgram` (mismo formato
+    que el programa, una actividad por línea);
+  - beneficiarios: entero declarado, o `null` si no se declaró (nunca un cero inventado);
+  - resumen y destino de los sobrantes;
+  - `hasAnything`: la sección no se muestra si no hay nada que rendir.
+  **Los bienes nunca se suman al dinero**: son rendiciones separadas y así se publican.
+- **4 claves públicas nuevas** (allowlist) + seed + **migración 020**, con el mismo patrón
+  idempotente de la 019 (solo escribe si `settings` ya tiene contenido, para no romper el seed
+  de una base nueva).
+- **Página pública del evento**: la sección «Resultados y cierre» incorpora el informe
+  (dinero, bienes, beneficiarios, actividades realizadas con el conteo frente al programa,
+  resumen y destino de sobrantes) y muestra **«aún no declarado por la organización»** donde no
+  hay dato, en lugar de un cero que parecería real.
+- **Editable desde el panel**: las claves viven en el grupo `chocofest`, así que aparecen en la
+  configuración con sus etiquetas sin tocar la interfaz del panel.
+
+### 10.3 Archivos
+
+```
+artifacts/red-solidaria/src/lib/event-results.ts            informe puro (cifras + declarado)
+artifacts/red-solidaria/tests/event-results.test.mjs        10 pruebas
+artifacts/red-solidaria/src/pages/chocofest-2026.tsx        informe dentro de «Resultados y cierre»
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts     13 etiquetas nuevas (es/en)
+artifacts/red-solidaria/build-tests.mjs                     entry point del módulo
+artifacts/api-server/src/lib/public-settings.ts             +4 claves públicas
+artifacts/api-server/src/lib/seed.ts                        claves sembradas (grupo chocofest)
+artifacts/api-server/tests/public-settings.test.mjs         contrato de la allowlist
+lib/db/src/migrate.ts                                       migración 020 (aditiva, idempotente)
+artifacts/api-server/tests/e2e/run-e2e.sh                   verifica las 4 claves en base real
+```
+
+### 10.4 Verificación
+
+- `red-solidaria`: **153/153** node:test (+10) + **23/23** vitest · typecheck **0**.
+- `api-server`: **329/329** · typecheck **0**.
+- **E2E contra PostgreSQL real: `E2E COMPLETO: OK`** con **20 migraciones** aplicadas y
+  **4 claves** de rendición de resultados presentes en la base tras el seed.
+- Casos cubiertos: flujo de bienes (con y sin flujo registrado, nunca por debajo de cero),
+  beneficiarios (declarado, con separadores de miles, inválido → `null`), informe completo,
+  informe vacío (`hasAnything: false`), saldo derivado y dinero sin transparencia cargada.
+
+### 10.5 Nota de diseño
+
+No se creó ninguna tabla nueva: el módulo reutiliza el patrón de configuración del evento y los
+datos que ya existen (transparencia, inventario, programa). Así el informe no puede
+desincronizarse de las cifras que el sitio ya publica, y el módulo es reutilizable para
+futuros eventos cambiando las claves.
+
+---
+
+## 11. Incremento V7-9 — Índices por caso de uso (DB-07) · CERRADO
+
+### 11.1 Qué faltaba
+
+La auditoría (DB-07) señalaba índices ausentes en columnas consultadas. Al revisarlo, las
+migraciones **001** y **012** ya habían cubierto los índices simples por campaña
+(`campaign_expenses`, `campaign_evidence`, `campaign_updates`, `campaign_images`,
+`campaign_leftovers`, `campaign_budgets`, `campaign_movements`), así que lo que faltaba de
+verdad eran los **compuestos por caso de uso** y `adoption_requests`.
+
+### 11.2 Qué se implementó
+
+**Migración 021 (aditiva: solo índices, no toca datos ni columnas)** con los índices que
+corresponden a consultas reales del sistema:
+
+| Índice | Consulta que sirve |
+|---|---|
+| `adoption_requests (pet_id)` | solicitudes de una mascota (auditoría DB-07) |
+| `adoption_requests (status)` | conteo de solicitudes pendientes del panel |
+| `campaign_expenses (campaign_id, is_public)` | gastos públicos de una campaña (transparencia) |
+| `campaign_evidence (campaign_id, is_public)` | evidencias públicas de una campaña |
+| `campaign_updates (campaign_id, created_at DESC)` | novedades de una campaña en orden |
+| `donations (campaign_id, status, created_at DESC)` | cifras filtradas del panel (campaña + estado + fechas) y recaudación verificada por campaña |
+
+### 11.3 Archivos
+
+```
+lib/db/src/migrate.ts                             migración 021 (índices, aditiva)
+artifacts/api-server/tests/e2e/run-e2e.sh         verifica los 6 índices en base real
+```
+
+### 11.4 Verificación
+
+- **E2E contra PostgreSQL real: `E2E COMPLETO: OK`** con **21 migraciones** aplicadas y
+  **6/6 índices** por caso de uso presentes (`pg_indexes`), más la idempotencia del segundo
+  arranque.
+- **Límite declarado con honestidad:** la prueba que proponía la auditoría era
+  `EXPLAIN ANALYZE` con volumen real. En una base recién creada y vacía PostgreSQL prefiere
+  un *seq scan*, así que el E2E comprueba la **existencia** de los índices y que corresponden
+  a las consultas identificadas, no el plan de ejecución. Medir el plan requiere datos de
+  producción o un juego de datos grande, y queda como verificación pendiente (no se marca como
+  hecha).
+
+---
+
+## 12. Incremento V7-10 — API-06 completo: ningún fallo del servidor disfrazado de 400 · CERRADO
+
+### 12.1 Qué estaba mal
+
+En **13 bloques `catch` de 9 routers** cualquier excepción se respondía como
+`400 "Invalid … data"`. Consecuencias reales:
+
+- una caída de la base o un error de programación parecía un **dato mal enviado** por el
+  usuario;
+- la interfaz mostraba «datos inválidos» donde debía decir «no se pudo guardar»;
+- **nadie veía una señal de 500**, así que un incidente de infraestructura era invisible en los
+  registros y en la monitorización.
+
+### 12.2 Qué se implementó
+
+En cada bloque, la validación se distingue del fallo inesperado:
+
+```ts
+} catch (err) {
+  if (err instanceof Error && err.name === "ZodError") {
+    return res.status(400).json({ error: "validation_error", message: "Invalid … data" });
+  }
+  req.log.error({ err }, "Failed to …");
+  return res.status(500).json({ error: "server_error", message: "No se pudo …" });
+}
+```
+
+Routers corregidos: `donations` (ya estaba), `news` (POST y PUT), `campaign-evidence` (POST y
+PUT), `campaign-expenses` (POST y PUT — ruta financiera, incluye el asiento en el libro),
+`testimonials` (POST y PUT), `admin` (login), `campaign-images`, `campaign-updates`,
+`contact` y `stats`.
+
+Además se hicieron **consistentes las salidas** de los handlers afectados (los que no
+devolvían explícitamente en el camino de éxito pasaron a hacerlo), porque el proyecto tiene
+`noImplicitReturns` activo y el compilador lo exige: **0 errores de tipo** tras el cambio.
+
+### 12.3 Verificación
+
+- `api-server`: **329/329** · typecheck **0** en libs, API, frontend y scripts.
+- **E2E contra PostgreSQL real: 41/41** (38 anteriores + 3 nuevas) con el servidor real:
+  un mensaje de contacto, un testimonio y una noticia **inválidos** responden
+  `400 validation_error` — es decir, el guard **no rompió la validación** que ya funcionaba.
+- **Límite declarado con honestidad:** la rama del **500** no tiene una prueba automatizada,
+  porque provocarla exigiría tumbar la base durante el E2E. Se verifica por revisión del código
+  y por el compilador; la rama que el cambio podía romper (la validación) sí está probada.
+
+### 12.4 Archivos
+
+```
+artifacts/api-server/src/routes/{donations,news,campaign-evidence,campaign-expenses,
+  testimonials,admin,campaign-images,campaign-updates,contact,stats}.ts   13 bloques
+artifacts/api-server/tests/e2e/flow.mjs                                    3 comprobaciones nuevas
+```
+
+---
+
+## 13. Incremento V7-11 — Gate del panel y estados de carga/error (Fase 8: FE-03 y FE-04) · CERRADO
+
+### 13.1 Qué estaba mal
+
+El gate del panel vivía disperso en el componente (`pages/admin/layout.tsx`) y tenía tres
+problemas reales:
+
+- **cualquier error** de `/api/admin/me` mandaba al login: una caída del servidor o un 500 se
+  presentaban como «sesión expirada», y el usuario perdía el contexto de lo que estaba haciendo;
+- **un rol sin permiso** no se trataba: se renderizaba la estructura del panel (el backend
+  bloqueaba los datos, pero la interfaz no explicaba nada);
+- el caso de error devolvía `null` → **pantalla en blanco**;
+- la carga era un texto suelto («Cargando...») sin ninguna señal visual.
+
+### 13.2 Qué se implementó
+
+- **Lógica pura** (`src/lib/admin-session.ts`, 12 pruebas): `resolvePanelGate` decide el estado
+  del panel — `loading`, `unauthenticated` (**solo un 401** manda al formulario de acceso),
+  `forbidden` (403 o rol desconocido), `unavailable` (500 o fallo de red: **no expulsa al
+  usuario** y ofrece reintentar) y `ready`. Se acompaña de `ADMIN_PANEL_ROLES` (los cuatro
+  roles que acepta la API), `normalizeRole`, `isAdminPanelRole` y `errorStatus`, que lee el
+  código HTTP sin depender de la clase de error (el cliente generado y el del panel tienen
+  `ApiError` distintos).
+- **El panel usa esa decisión**: esqueleto de carga con spinner; pantalla explicada para el rol
+  sin permiso (con el rol declarado y vuelta al sitio público); pantalla de error del servidor
+  con botón **Reintentar** que relanza la consulta; y con sesión válida, el panel de siempre.
+  Además, con datos ya cargados, un error posterior **no** expulsa al usuario.
+
+### 13.3 Verificación
+
+- `red-solidaria`: **165/165** node:test (+12) + **29/29** vitest (+6) · typecheck **0** ·
+  build de producción **OK**.
+- Las **6 pruebas de componente** (vitest + Testing Library) fijan el comportamiento: un 500
+  **no** manda al login y muestra «Reintentar»; un fallo de red tampoco; un rol `invitado`
+  muestra acceso denegado con su rol; la carga muestra el esqueleto; el 401 no muestra ni el
+  panel ni las pantallas de error; y con sesión válida el panel se renderiza.
+
+### 13.4 Archivos
+
+```
+artifacts/red-solidaria/src/lib/admin-session.ts                 decisión del gate (pura)
+artifacts/red-solidaria/tests/admin-session.test.mjs             12 pruebas
+artifacts/red-solidaria/tests/vitest/admin-layout-gate.test.tsx   6 pruebas de componente
+artifacts/red-solidaria/src/pages/admin/layout.tsx               usa el gate + estados
+artifacts/red-solidaria/build-tests.mjs                          entry point del módulo
+```
+
+---
+
+## 14. Incremento V7-12 — Integridad en la base: estados y `updated_at` (DB-08 y DB-10) · CERRADO
+
+### 14.1 Qué faltaba
+
+- **DB-08:** los `status` eran columnas de texto **sin ninguna restricción**. La aplicación
+  validaba, pero la base no: nada impedía guardar `'estado_invalido'` desde un script, una
+  migración manual o un error de programación.
+- **DB-10:** `updated_at` no se actualizaba solo; cada ruta tenía que acordarse de escribirlo.
+
+### 14.2 Qué se implementó (migración 022, aditiva)
+
+- **7 restricciones `CHECK ... NOT VALID`** con los valores que **ya** aceptan los esquemas de
+  la aplicación (contrastados con los `z.enum` y las libs de ciclo de vida, no inventados):
+
+  | Tabla | Valores aceptados |
+  |---|---|
+  | `donations.status` | pending, approved, rejected, reconciled |
+  | `campaigns.status` | draft, active, paused, completed, archived, **inactive** (heredado) |
+  | `pets.status` | available, adopted, in-process, reviewing, inactive |
+  | `volunteers.status` | pending, reviewing, approved, contacted, rejected |
+  | `adoption_requests.status` | pending, approved, rejected, in-process |
+  | `community_reports.status` | pending, reviewing, approved, rejected, converted, archived |
+  | `campaign_movements.kind` | ingreso, gasto |
+
+- **`NOT VALID` a propósito:** las filas existentes **no** se revisan (una migración no puede
+  fallar por datos históricos) y **las escrituras nuevas sí se comprueban** desde ya. Para
+  endurecer más adelante queda documentado en la propia migración:
+  `SELECT status, count(*) FROM <tabla> GROUP BY status;` y
+  `ALTER TABLE <tabla> VALIDATE CONSTRAINT <nombre>;`.
+- **6 disparadores `BEFORE UPDATE`** que mantienen `updated_at` (donors, volunteer_teams, pets,
+  community_reports, settings, volunteers): la base lo garantiza aunque la aplicación lo olvide.
+- `inactive` en `campaigns` se mantiene porque el panel lo cuenta como finalizada; excluirlo
+  dejaría esas filas antiguas **imposibles de editar** (cualquier UPDATE las revisa).
+
+### 14.3 Verificación (E2E contra PostgreSQL real)
+
+- **7/7 restricciones** presentes y **la base RECHAZA** `status='estado_invalido'` sobre una
+  campaña real (error con el nombre de la restricción), mientras **un estado válido se sigue
+  aceptando**.
+- **6/6 disparadores** y `updated_at` **se actualiza solo** al modificar una fila: se provoca el
+  UPDATE y se mide la frescura del valor.
+- 22 migraciones aplicadas e **idempotentes** en el segundo arranque; flujo HTTP **41/41**;
+  `api-server` **329/329**; typecheck **0**.
+
+### 14.4 Nota honesta de la verificación
+
+La propia prueba descubrió dos cosas del esquema real que la revisión no había visto
+(`campaigns` tiene `description` y `start_date` NOT NULL) y se cambió el enfoque a un `UPDATE`
+sobre una fila sembrada; además el seed del API es **asíncrono** respecto al arranque, así que
+el chequeo ahora **espera a que haya datos** antes de medir y falla si no los hay, en lugar de
+probar en vacío y dar un falso verde.
+
+---
+
+## 15. Incremento V7-13 — SEO: URL pública, `hreflang` honesto y datos estructurados (FE-09) · CERRADO
+
+### 15.1 Qué faltaba
+
+1. La URL pública estaba **fija en el código**: un dominio distinto generaba `canonical` y Open
+   Graph apuntando al dominio viejo.
+2. `hreflang="es"` y `hreflang="en"` apuntaban **a la misma URL** (el idioma se persiste en el
+   navegador), que es justo lo que un buscador interpreta como engañoso.
+3. No había **datos estructurados** (JSON-LD).
+4. Y al revisarlo apareció un cuarto problema: las etiquetas del `<head>` solo se **añadían o
+   actualizaban**, nunca se retiraban, así que los datos estructurados de una página se habrían
+   quedado pegados en la siguiente.
+
+### 15.2 Qué se implementó
+
+- **Lógica pura** (`src/lib/structured-data.ts`, 9 pruebas): `resolvePublicBaseUrl`
+  (configurable y sin barras finales), `absoluteUrl`, `buildOrganizationJsonLd` (ONG),
+  `buildWebsiteJsonLd`, `buildSiteJsonLd` y `serializeJsonLd`, que **escapa** `<`, `>` y `&`
+  para que un texto con `</script>` no pueda cerrar la etiqueta (además de U+2028/U+2029) y
+  devuelve JSON válido e idéntico al original.
+- **`SEO.tsx`**: URL pública desde `VITE_PUBLIC_URL` (por defecto, el despliegue actual);
+  `jsonLd` opcional que se **publica y se retira** al cambiar de página —el efecto depende del
+  texto ya serializado, así que no se reejecuta en cada render—; y `hreflang` honesto: solo
+  `x-default`, retirando los alternates de idioma que hubieran quedado de antes.
+- **Portada**: publica `NGO` + `WebSite` con el nombre y la descripción del idioma activo.
+- **Decisión deliberada y documentada:** ChocoFest 2026 **no** publica datos estructurados de
+  tipo `Event` porque sus fechas oficiales todavía no están definidas. Un `Event` sin
+  `startDate` no aporta resultados enriquecidos, y poner una fecha inventada sería peor que no
+  poner nada.
+
+### 15.3 Verificación
+
+- `red-solidaria`: **174/174** node:test (+9) + **33/33** vitest (+4) · typecheck **0** ·
+  build **OK**.
+- Las 4 pruebas de componente fijan el comportamiento real en `<head>`: el JSON-LD se publica,
+  se **retira** al pasar a una página sin datos estructurados, no quedan `hreflang` de idioma
+  apuntando a la misma URL y el canonical se actualiza entre páginas.
+- **Corrección durante la verificación:** la primera versión de `serializeJsonLd` usaba
+  `"\u003c"`, que en JavaScript es **el propio carácter** `<` y no la secuencia escapada, así
+  que el escape no hacía absolutamente nada. Lo detectó la prueba y se corrigió con
+  `String.raw`. Sin esa prueba, el «escape» habría sido cosmético.
+
+### 15.4 Archivos
+
+```
+artifacts/red-solidaria/src/lib/structured-data.ts                 builders + serialización segura
+artifacts/red-solidaria/tests/structured-data.test.mjs             9 pruebas
+artifacts/red-solidaria/src/components/shared/SEO.tsx              URL pública, jsonLd, hreflang
+artifacts/red-solidaria/tests/vitest/seo-structured-data.test.tsx   4 pruebas de componente
+artifacts/red-solidaria/src/pages/home.tsx                         NGO + WebSite en la portada
+artifacts/red-solidaria/build-tests.mjs                            entry point del módulo
+```
+
+---
+
+## 16. Incremento V7-14 — Respaldo y restauración probados de verdad (Fase 9) · CERRADO
+
+### 16.1 Qué faltaba
+
+El checklist declaraba «respaldo y recuperación documentados» como **IMPLEMENTADO SIN PRUEBA
+COMPLETA**: existía el procedimiento escrito, pero **nunca se había ejecutado una
+restauración**. Un respaldo que nunca se ha restaurado no es un respaldo, es una suposición.
+
+### 16.2 Qué se implementó
+
+Una sección nueva en el E2E (contra PostgreSQL real) que **ensaya el ciclo completo en frío**:
+
+1. se para el API;
+2. `pg_dump` de la base;
+3. se cuentan donaciones, asientos, configuración y migraciones;
+4. **se destruye la base** y se recrea vacía;
+5. se restaura **solo** desde el respaldo;
+6. se comparan los conteos;
+7. se arranca el API sobre la base restaurada;
+8. y se comprueba lo que de verdad importa: **la cadena de hashes del libro sigue verificando**
+   y las migraciones **no** se duplican.
+
+### 16.3 Verificación (salida real)
+
+```
+== 7. Ensayo de respaldo y restauración (docs/MIGRACIONES_Y_RESPALDOS.md) ==
+   antes: donaciones=113 · asientos=1 · configuración=22 · migraciones=22
+   respaldo creado: 114927 bytes
+   ok   - la base restaurada tiene los mismos datos (donaciones=113 · asientos=1 · configuración=22 · migraciones=22)
+   ok   - el API arranca sobre la base restaurada sin duplicar migraciones (22)
+   ok   - la cadena del libro sigue verificando tras la restauración
+E2E COMPLETO: OK
+```
+
+**Y el ensayo encontró un problema real de operación:** el primer intento usaba `dropdb`, que
+**falla si queda alguna conexión abierta** (el API recién parado deja conexiones del pool). Se
+cambió a `DROP DATABASE ... WITH (FORCE)`, que las cierra. Es exactamente el fallo que
+aparecería en un incidente real de madrugada, y ahora queda documentado en el propio arnés.
+
+### 16.4 Archivos
+
+```
+artifacts/api-server/tests/e2e/run-e2e.sh     sección 7: ensayo de respaldo y restauración
+docs/MIGRACIONES_Y_RESPALDOS.md               referencia al ensayo automatizado
+```
+
+---
+
+## 17. Incremento V7-15 — Claves foráneas ausentes (B-2 / DB-04) · CERRADO
+
+### 17.1 Qué estaba mal
+
+Referencias que eran **columnas sueltas sin clave foránea**: nada impedía que una donación, un
+gasto, una evidencia, una imagen, una novedad, un bien o un presupuesto apuntaran a una
+**campaña inexistente**; ni que borrar una mascota dejara **solicitudes de adopción huérfanas**.
+Peor: el borrado de mascotas no comprobaba nada, así que se podía eliminar una mascota con
+solicitudes y dejarlas colgando, con personas esperando una respuesta que ya nadie daría.
+
+### 17.2 Qué se implementó
+
+**Migración 023 (aditiva) con 11 claves foráneas `NOT VALID`.** El `NOT VALID` es justo lo que
+desbloquea B-2: **no** se validan las filas históricas (en producción puede haber huérfanas, y
+esta migración no puede fallar ni borrar nada) y **todas las escrituras nuevas quedan
+comprobadas** desde ya. Para endurecerlo más adelante, la propia migración documenta el orden
+correcto: contar huérfanos y después `VALIDATE CONSTRAINT`.
+
+**`ON DELETE` elegido caso por caso** (no un valor por defecto):
+
+| Referencia | Política | Por qué |
+|---|---|---|
+| donaciones → campaña | `RESTRICT` | dinero: la base nunca borra historial contable |
+| donaciones → donante | `SET NULL` | la donación sobrevive si el donante se consolida o se borra |
+| gastos, evidencias, imágenes, novedades, bienes, presupuesto → campaña | `RESTRICT` | historial: nada se borra en cascada por su cuenta |
+| bienes → donante | `SET NULL` | el bien sobrevive |
+| reportes ciudadanos → campaña | `SET NULL` | **el reporte no debe desaparecer**; solo se limpia el vínculo |
+| solicitudes de adopción → mascota | `RESTRICT` | no perder solicitudes de personas |
+
+**Y el borrado de mascotas ahora avisa:** si la mascota tiene solicitudes de adopción responde
+**409** indicando cuántas, en lugar de dejarlas huérfanas.
+
+### 17.3 Verificación (E2E contra PostgreSQL real)
+
+- **11/11 claves foráneas** presentes.
+- **La base RECHAZA** una donación apuntando a una campaña inexistente (error con el nombre de la
+  clave) y **acepta** las referencias válidas.
+- El flujo HTTP completo sigue en verde —prueba positiva de que las claves no rompen las
+  escrituras legítimas—, **23 migraciones** idempotentes y el ensayo de restauración sigue
+  pasando con la **cadena del libro íntegra**.
+
+### 17.4 Archivos
+
+```
+lib/db/src/migrate.ts                        migración 023 (11 claves foráneas, NOT VALID)
+artifacts/api-server/src/routes/pets.ts      borrado de mascota con solicitudes → 409
+artifacts/api-server/tests/e2e/run-e2e.sh    verificación (existencia + rechazo real de una referencia inválida)
+```
+
+---
+
+## 18. Incremento V7-18 — La campaña de referencia de 2024, fuera (cierra V7-17) · CERRADO
+
+### 18.1 La decisión
+
+La organización confirmó que **no existe** una campaña «Chocolatada Navideña 2024»: era material
+**de referencia**. La única campaña real es **ChocoFest 2025**. Por tanto el problema de V7-17 no
+se corrige: **se elimina**.
+
+### 18.2 Qué se hizo
+
+- **Eliminados**: `chocolatada-2024-data.ts` (el dataset con las donaciones copiadas de 2025), sus
+  dos pruebas (la de contrato y la de contaminación, que ya no tiene objeto) y el importador
+  `scripts/src/apply-chocolatada-2024.ts` (con su entrada en `package.json`).
+- **`seed.ts`**: quitadas las **9 referencias** (el bloque de imports, la entrada en
+  `CAMPAIGN_IMAGES`, la campaña en el insert, la búsqueda por título y los 5 bloques de
+  donaciones / novedades / galería / gastos / evidencias). **Cero referencias restantes** en
+  código, comprobado con `grep`.
+- La prueba `TODO` de V7-17 **desaparece con el dataset**, así que la suite vuelve a estar **sin
+  pendientes**.
+
+### 18.3 Verificación
+
+- `api-server`: **324/324**, **0 `TODO`**, 0 errores de tipo; libs y scripts, **0** errores.
+- **E2E COMPLETO: OK** contra PostgreSQL real, con un efecto visible en los datos: las donaciones
+  confirmadas sembradas pasan de **112 a 60**, y el hueco real de DB-09 (donaciones confirmadas
+  sin asiento) baja de **111 a 59**. Es decir: **el número anterior incluía las 52 donaciones
+  falsas**.
+
+### 18.4 Limpieza en bases ya existentes
+
+El código ya no crea esa campaña, pero **una base que ya la tenga** (producción) la seguirá
+mostrando. En `docs/MIGRACIONES_Y_RESPALDOS.md` queda el procedimiento con sus reglas de
+seguridad: respaldo previo, informe antes de borrar y, sobre todo, **no tocar el ledger** (es
+append-only: borrar asientos rompería la cadena de hashes).
+
+---
+
+## 19. Incremento V7-19 — Certificados con QR (Fase 5.2 / B-3) · CERRADO
+
+### 19.1 Qué se implementó
+
+Un certificado **reconoce** a una persona o entidad y se comparte por enlace o QR. Decidido con
+la organización:
+
+- **Solo se publica lo autorizado**: nombre autorizado, tipo, título, fecha y campaña.
+  **Nunca** el importe ni datos de contacto: un certificado no es un recibo.
+- **Un certificado revocado deja de publicarse** (su enlace responde 404) y **revocar exige
+  motivo**, que queda guardado con su fecha: una revocación sin justificación no es trazable.
+- **El código público lo genera siempre el servidor**: 12 caracteres de un alfabeto sin
+  ambigüedades (ni `0/O/1/I/L` ni vocales, para poder dictarlo por teléfono) y con aleatoriedad
+  **criptográfica**. Se normaliza: mayúsculas, espacios y guiones dan el mismo código.
+- La página pública se marca **`noIndex`**: lleva el nombre de una persona, no debe aparecer en
+  buscadores; solo se llega por el enlace o el QR.
+
+### 19.2 Backend
+
+Migración **024** (aditiva, tabla nueva) + `lib/certificates.ts` (11 pruebas) +
+`routes/certificates.ts`:
+
+| Endpoint | Quién | Qué hace |
+|---|---|---|
+| `GET /api/certificates/:code` | público | es lo que abre el QR; 400 si el código no tiene forma válida, 404 si no existe **o está revocado** |
+| `GET /api/admin/certificates` | admin | listado con estado |
+| `POST /api/admin/certificates` | admin | emisión (el código lo genera el servidor, con reintento si chocara) |
+| `PATCH /api/admin/certificates/:id` | admin | corrección y revocación (motivo obligatorio) |
+
+`ON DELETE SET NULL` en la campaña: si la campaña desaparece, el certificado **se conserva**,
+porque reconoce a una persona y no es un dato de la campaña.
+
+### 19.3 Interfaz
+
+- **`/certificados/:code`** (pública): la tarjeta del certificado con su QR —se reutiliza
+  `qrcode.react`, que ya estaba en el proyecto para compartir campañas—, el código en texto para
+  poder dictarlo y los estados de carga y de «no disponible».
+- **`/admin/certificados`** (panel, entrada nueva en el menú): listado, emisión (avisando de que
+  el nombre es lo único que se publica) y revocación con motivo obligatorio (el botón no se
+  activa con menos de 5 caracteres).
+
+### 19.4 Verificación
+
+- `api-server` **335/335** (+11), `red-solidaria` **174/174** + **33/33**, typecheck **0** en
+  libs, API, frontend y scripts, build de producción **OK**.
+- **E2E contra PostgreSQL real (24 migraciones):** emite → consulta pública comprobando que
+  **no** expone id, estado ni motivo → un código con forma inválida responde 400 → revoca con
+  motivo → deja de publicarse (404) → no se puede revocar dos veces (409).
+  **E2E COMPLETO: OK.**

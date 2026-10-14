@@ -3,8 +3,11 @@
 **Rama:** `feat/implementacion-integral-2026` · **Fecha:** 14 de octubre de 2026
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
-**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 309/309 ·
-`red-solidaria` 143/143 node:test + 23/23 vitest · typecheck 0 · build OK · `audit --prod` 0).
+**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 335/335 ·
+`red-solidaria` 174/174 node:test + 33/33 vitest · typecheck 0 en libs/API/frontend/scripts ·
+build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 48/48 contra
+PostgreSQL real**).
+Sin pruebas pendientes (`TODO`).
 No se usan porcentajes de avance.
 
 ---
@@ -19,15 +22,17 @@ No se usan porcentajes de avance.
 | 2FA (TOTP) con bloqueo | **IMPLEMENTADO Y PROBADO** | `lib/totp.ts`, `lib/two-factor-lockout.ts`, `routes/admin-2fa.ts` | `admin-2fa.test.mjs`, `totp.test.mjs`, `two-factor-lockout.test.mjs` |
 | Gate global de `/admin` + rate limit | **IMPLEMENTADO Y PROBADO** | `routes/index.ts`, `middleware/rate-limit.ts` | `rate-limit.test.mjs`, `supervisor-auth.test.mjs` |
 | Registro de acciones administrativas (auditoría) | **IMPLEMENTADO Y PROBADO** | `lib/audit.ts`, `routes/audit-logs.ts` | `audit.test.mjs`, `audit-logs-auth.test.mjs` |
-| Cookie de sesión `secure` / `trust proxy` (SEC-01) | **PENDIENTE** | `app.ts` | Planificado en V7-4 |
-| Lockout 2FA por cuenta (SEC-03) | **PENDIENTE** | `routes/admin-2fa.ts` | Planificado en V7-4 |
-| Rutas admin con gate propio (SEC-08) | **PENDIENTE** | `routes/volunteers.ts`, `allies.ts`, `faq.ts`, `pets.ts`, `community-reports.ts`, `dashboard.ts` | Planificado en V7-4 |
-| Errores de infraestructura no enmascarados como 400 (API-06) | **PENDIENTE** | `routes/*.ts` (patrón `catch → 400`) | Planificado en V7-4 |
+| Cookie de sesión `secure` / `trust proxy` (SEC-01) | **IMPLEMENTADO Y PROBADO** | `app.ts` | Ya estaba correcto (`app.set("trust proxy", 1)` + `secure` en producción); verificado por revisión, no requería cambio |
+| Bloqueo de 2FA por ORIGEN + cuenta (SEC-03) | **IMPLEMENTADO Y PROBADO** | `lib/two-factor-lockout.ts`, `routes/admin-2fa.ts` | `two-factor-lockout.test.mjs` (11): dos orígenes no comparten bloqueo, el escape hatch limpia todos los orígenes |
+| Gate único de `/admin` verificado por barrido (SEC-08) | **IMPLEMENTADO Y PROBADO** | `routes/index.ts`, `tests/admin-gate-sweep.test.mjs` | 22 rutas GET + 6 escrituras → 401 sin sesión; rutas públicas no bloqueadas; el login no lo intercepta el gate |
+| Errores de infraestructura no enmascarados como 400 (API-06) | **IMPLEMENTADO Y PROBADO** | 9 routers (`donations`, `news`, `campaign-evidence`, `campaign-expenses`, `testimonials`, `admin`, `campaign-images`, `campaign-updates`, `contact`, `stats`) | **13 bloques** corregidos: la validación (Zod) sigue siendo 400 y cualquier otro fallo pasa a 500. E2E: 3 cuerpos inválidos → `400 validation_error` contra el servidor real |
+| Estados validados por la propia base (DB-08) y `updated_at` automático (DB-10) | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (022) | E2E contra base real: **7/7** restricciones `CHECK ... NOT VALID`, la base **rechaza** un estado inválido y **acepta** los válidos; **6/6** disparadores y `updated_at` se actualiza solo |
 | **Verificación del libro contable (cadena de hashes)** | **IMPLEMENTADO Y PROBADO** | `lib/ledger.ts`, `routes/campaign-movements.ts` | `ledger.test.mjs`, `ledger-chain.test.mjs`; endpoints públicos `/movements/verify` y `/ledger/root` |
 | **Informe administrativo de integridad del libro** | **IMPLEMENTADO Y PROBADO** | `lib/ledger-audit.ts`, `routes/ledger-audit.ts`, `pages/admin/ledger-audit.tsx` | `ledger-audit.test.mjs` (11) + `ledger-audit-auth.test.mjs` (2) + página `/admin/libro` |
-| Restricción real del libro en producción (`RESTRICT`) | **BLOQUEADO** | `docs/migraciones/010_low_risk.sql` | **B-1**: requiere autorización (hoy la API lo impide, la base no) |
-| Claves foráneas ausentes (DB-04) | **BLOQUEADO** | esquemas de `lib/db/src/schema` | **B-2**: requiere decidir sobre datos huérfanos |
+| Restricción real del libro en producción (`RESTRICT`) | **IMPLEMENTADO Y PROBADO** | `docs/migraciones/010_low_risk.sql`, `lib/db/src/migrate.ts` | **Aplicada en producción el 2026-10-13** con respaldo previo y autorización explícita (registrada en `drizzle_migrations`); borrar una campaña con asientos responde 409 |
+| Claves foráneas ausentes (DB-04) | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (023), `routes/pets.ts` | **11/11** claves `NOT VALID` con `ON DELETE` por caso; E2E contra base real: **rechaza** una donación con `campaign_id=999999` y acepta las válidas; borrar una mascota con solicitudes → 409 |
 | Donaciones confirmadas sin asiento (DB-09) | **PARCIAL** | — | **Detectadas** por el informe de V7-3; la regularización es una decisión contable |
+| Campaña de referencia de 2024 | **IMPLEMENTADO Y PROBADO** | `lib/seed.ts`, `scripts/` | **RESUELTO en V7-18**: la organización confirmó que esa campaña no existe (era referencia); dataset, sus 2 pruebas e importador **eliminados** y las **9 referencias** del seed quitadas (0 restantes en código). Suite **324/324 sin `TODO`** y E2E OK: donaciones sembradas 112→60 y el hueco real de DB-09 es **59**, no 111 |
 
 ## 2. Integración admin ↔ frontend (Fase 2)
 
@@ -64,7 +69,7 @@ No se usan porcentajes de avance.
 | Composición y cobertura de canastas | **IMPLEMENTADO Y PROBADO** | `lib/baskets.ts` | `baskets.test.mjs` |
 | Vinculación bien ↔ donante ↔ evidencia | **IMPLEMENTADO Y PROBADO** | `routes/campaign-leftovers.ts` | `leftovers-auth.test.mjs` |
 | Colaboraciones en especie separadas de la recaudación monetaria | **IMPLEMENTADO Y PROBADO** | `lib/funding.ts`, `lib/donors-admin.ts` | `funding.test.mjs`, `donors-admin.test.mjs` |
-| **Rendición de resultados del evento (4.3)** | **PENDIENTE** | — | Sección nueva de resultados/balance final |
+| **Rendición de resultados del evento (4.3)** | **IMPLEMENTADO Y PROBADO** | `src/lib/event-results.ts`, `pages/chocofest-2026.tsx`, `migrate.ts` (020) | `event-results.test.mjs` (10) + E2E contra base real con las 4 claves de la migración 020 verificadas |
 | Patrocinios con estados de negociación | **PENDIENTE** | — | Relacionado con B-6 |
 
 ## 5. Donantes, voluntarios y auspiciadores (Fase 5)
@@ -77,7 +82,7 @@ No se usan porcentajes de avance.
 | Conciliación trazable (autor y fecha) | **IMPLEMENTADO Y PROBADO** | `routes/donations.ts`, `routes/donors.ts` | `donation-reconcile.test.mjs`, `confirmed-statuses.test.mjs` |
 | Anonimato y comprobante público opcional | **IMPLEMENTADO Y PROBADO** | `routes/campaigns.ts` (listado público) | `donors-auth.test.mjs` |
 | Consentimiento explícito y nombre colectivo del donante | **PENDIENTE** | `lib/db/src/schema/donors.ts` | Requiere esquema + interfaz (V7-6) |
-| **Certificados digitales con QR** | **BLOQUEADO** | — | **B-3**: decisión de negocio (tipos, vigencia, datos publicados) |
+| **Certificados digitales con QR** | **IMPLEMENTADO Y PROBADO** | `lib/db/src/schema/certificates.ts`, `lib/certificates.ts`, `routes/certificates.ts`, `pages/certificate.tsx`, `pages/admin/certificates.tsx` | Migración **024** + **11 pruebas puras** + **E2E del flujo completo** (emitir → consultar como el QR → revocar con motivo → 404; y 409 si se revoca dos veces). Solo se publica el nombre autorizado, el tipo, el título, la fecha y la campaña; el código lo genera el servidor con aleatoriedad criptográfica y la página se marca `noIndex` |
 | **Insignias y reconocimientos** | **BLOQUEADO** | — | **B-6**: definición del programa |
 | Aliados/auspiciadores con visibilidad pública | **IMPLEMENTADO Y PROBADO** | `routes/allies.ts`, `pages/allies.tsx`, `pages/admin/allies.tsx` | `allies-patch.test.mjs` |
 | Embajadores con código de referencia y métricas | **PENDIENTE** | — | Requiere modelo nuevo |
@@ -89,8 +94,8 @@ No se usan porcentajes de avance.
 | Indicadores reales y coherentes (campañas, recaudado, gastos, saldo, pendientes) | **IMPLEMENTADO Y PROBADO** | `routes/dashboard.ts`, `pages/admin/dashboard.tsx` | `funding.test.mjs` (regla) + typecheck; conteos por SQL con `FILTER` |
 | Top de campañas con la misma regla que el sitio público | **IMPLEMENTADO Y PROBADO** | `routes/dashboard.ts` | Misma función pura `campaignFunding` |
 | Alertas de integridad del libro en el panel | **IMPLEMENTADO Y PROBADO** | `pages/admin/ledger-audit.tsx` | Página `/admin/libro` con estado global y hallazgos |
-| Filtros por campaña, evento, estado y fechas | **PENDIENTE** | `routes/dashboard.ts` | V7-5 |
-| Navegación de cada tarjeta a su detalle | **PARCIAL** | `pages/admin/dashboard.tsx` | Algunas tarjetas navegan; falta completar |
+| Filtros por campaña, estado y fechas | **IMPLEMENTADO Y PROBADO** | `lib/dashboard-filters.ts`, `routes/dashboard.ts`, `pages/admin/dashboard.tsx` | `dashboard-filters.test.mjs` (11) + barra de filtros en el panel; el servidor recalcula todas las cifras de campaña con el mismo filtro |
+| Navegación de cada tarjeta a su detalle | **IMPLEMENTADO Y PROBADO** | `pages/admin/dashboard.tsx` | Las 8 tarjetas del KPI navegan (las financieras a `/admin/libro`) |
 
 ## 7. Comunicaciones y WhatsApp (Fase 7)
 
@@ -110,30 +115,29 @@ No se usan porcentajes de avance.
 | i18n es/en con paridad de claves | **IMPLEMENTADO Y PROBADO** | `lib/i18n/**` | `i18n-keys.test.mjs` |
 | Code splitting y carga diferida por ruta | **IMPLEMENTADO Y PROBADO** | `App.tsx`, `vite.config.ts` | Build con chunks por página (salida real del build) |
 | Imágenes con `loading="lazy"` | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `components/**` | Verificación por inspección (FE-08 del informe integral) |
-| Gate del panel por rol en el cliente (FE-03) | **PENDIENTE** | `pages/admin/layout.tsx` | V7-4 |
-| Estados de carga/vacío/error consistentes (FE-04) | **PARCIAL** | `lib/Skeleton.tsx`, `components/shared/EmptyState.tsx` | Usados en parte de las páginas |
-| SEO por página (FE-09) y zod unificado (FE-10) | **PARCIAL** | `components/shared/SEO.tsx` | Usado en un subconjunto de páginas |
+| Gate del panel por rol en el cliente (FE-03) | **IMPLEMENTADO Y PROBADO** | `lib/admin-session.ts`, `pages/admin/layout.tsx` | `admin-session.test.mjs` (12) + `vitest/admin-layout-gate.test.tsx` (6): solo el 401 redirige; un 500 o un fallo de red NO expulsan al login; un rol desconocido se explica en pantalla |
+| Estados de carga/vacío/error consistentes (FE-04) | **PARCIAL** | `lib/Skeleton.tsx`, `components/shared/EmptyState.tsx`, `pages/admin/layout.tsx` | El panel ya tiene carga, error de servidor (con «Reintentar») y permiso explicados y probados; el resto de páginas mantiene los estados existentes |
+| SEO por página (FE-09) y zod unificado (FE-10) | **PARCIAL** | `components/shared/SEO.tsx`, `lib/structured-data.ts` | **FE-09 hecho**: 9 páginas con SEO + URL pública configurable, `hreflang` honesto (solo `x-default`) y JSON-LD (`NGO`/`WebSite`) con retirada al cambiar de página; 13 pruebas (9 puras + 4 de componente). **FE-10 pendiente** (zod 3 en el cliente vs `zod/v4` en `lib/db`) |
 
 ## 9. Pruebas y despliegue (Fase 9)
 
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
-| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **309/309** |
-| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **143/143** + **23/23** |
+| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **335/335** (sin pendientes): incluye barrido del gate, SEC-03, filtros del panel, datasets históricos, claves foráneas y certificados |
+| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **174/174** + **33/33** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
-| Migraciones aditivas e idempotentes | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `lib/db/src/migrate.ts` (001–019) | Sin PostgreSQL real en este entorno; 018/019 verificadas por revisión y por el contrato de pruebas puras |
-| E2E con PostgreSQL real (borrado 204, 409 por dependencias, migraciones) | **PENDIENTE** | — | Procedimiento documentado; pendiente de ventana |
-| Lint automatizado | **PENDIENTE** | — | No hay script de lint en el proyecto |
-| Respaldo y recuperación documentados | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `docs/MIGRACIONES_Y_RESPALDOS.md` | Documentado; sin ensayo de restauración en este entorno |
+| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–024) | Verificado contra **PostgreSQL 17.7 real**: 24 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
+| E2E con PostgreSQL real (flujo + esquema + restauración) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **48/48** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos y **certificados con QR**) **+ 10 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido), disparadores de `updated_at` y **claves foráneas** (rechazo real de una referencia inexistente) **+ ensayo de respaldo y restauración** (la base se destruye y se restaura; datos idénticos y **cadena del libro verificada**) |
+| Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (61 donaciones, 1 asiento, 22 claves, 24 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
 
 ## 10. Bloqueos que esperan decisión
 
 | # | Bloqueo | Qué se necesita para desbloquearlo |
 |---|---|---|
-| B-1 | Migración 010 (libro `CASCADE` → `RESTRICT`) | Autorización para alterar la restricción en producción |
-| B-2 | Claves foráneas ausentes (DB-04) | Decisión sobre datos huérfanos existentes + autorización de la migración |
-| B-3 | Certificados con QR (5.2) | Definir tipos, vigencia, revocación y datos publicados |
+| ~~B-1~~ | ~~Migración 010 (libro `CASCADE` → `RESTRICT`)~~ | ✅ **RESUELTO**: aplicada en producción el **2026-10-13** con respaldo previo y autorización explícita, y registrada en `drizzle_migrations` |
+| ~~B-2~~ | ~~Claves foráneas ausentes (DB-04)~~ | ✅ **RESUELTO** en V7-15: migración **023** con 11 claves `NOT VALID` y `ON DELETE` por caso (no exigió decidir sobre huérfanos históricos); verificado contra base real |
+| ~~B-3~~ | ~~Certificados con QR (5.2)~~ | ✅ **RESUELTO** en V7-19: migración **024** + página pública `/certificados/:code` con QR + panel `/admin/certificados`; 11 pruebas puras y E2E del flujo completo. Revocar exige motivo y solo se publica lo autorizado |
 | B-4 | Mensajería automatizada de WhatsApp | Credenciales y proveedor oficial aprobado |
-| B-5 | Artefactos de migración obsoletos | Autorización para eliminarlos del repositorio |
+| ~~B-5~~ | ~~Artefactos de migración obsoletos~~ | ✅ **RESUELTO** en V7-16: eliminados (2 SQL + `meta/`, 5 archivos) y la política queda escrita en `drizzle.config.ts`; verificado con typecheck 0 y **E2E COMPLETO: OK** |
 | B-6 | Insignias y embajadores (5.3/5.4) | Definición del programa (niveles, vigencia, qué se publica) |

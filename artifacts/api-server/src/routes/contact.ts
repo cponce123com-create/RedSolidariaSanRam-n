@@ -11,10 +11,14 @@ router.post("/contact", contactLimiter, async (req, res) => {
   try {
     const data = insertContactMessageSchema.parse(req.body);
     const [message] = await db.insert(contactMessagesTable).values(data).returning();
-    res.status(201).json(formatMessage(message));
+    return res.status(201).json(formatMessage(message));
   } catch (err) {
+    // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+    if (err instanceof Error && err.name === "ZodError") {
+      return res.status(400).json({ error: "validation_error", message: "Invalid contact data" });
+    }
     req.log.error({ err }, "Failed to save contact message");
-    res.status(400).json({ error: "validation_error", message: "Invalid contact data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo enviar el mensaje." });
   }
 });
 

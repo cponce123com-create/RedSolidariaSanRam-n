@@ -237,6 +237,7 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Ubicación:** `drizzle.config.ts:8-13` (sin `out`); `lib/db/src/migrate.ts:14-143` (001-009 embebidas al arrancar); `lib/db/drizzle/0000_*.sql` y `0001_*.sql` (generadas, nunca aplicadas)
 - **Descripción:** `campaign_leftovers` está definida dos veces (0001 y `migrate.ts:110-127`); su FK existe en la BD pero no en el esquema ⇒ `push` la eliminaría. La documentación dice «001-007» cuando en realidad hay 009.
 - **Solución:** una única fuente de verdad; alinear esquema y migraciones.
+- **✅ RESUELTO en V7-16 (B-5):** los artefactos `lib/db/drizzle/0000_*.sql`, `0001_*.sql` y su carpeta `meta/` **se eliminaron** (5 archivos) tras verificar que ni los scripts, ni el CI, ni el build los referencian. La política queda escrita en `drizzle.config.ts`: la única fuente de verdad es **`lib/db/src/migrate.ts`**, no se usa `drizzle-kit generate` y su salida no debe commitearse. Con esto desaparece también la definición duplicada de `campaign_leftovers` y la referencia a `0000_*.sql:290` que citaba IMP-07. Verificado: typecheck 0 y **E2E COMPLETO: OK**.
 - **Prueba:** `push` dry-run contra una BD creada por `migrate.ts`.
 
 #### DB-04 — FK ausentes en `campaign_id`/`pet_id` → huérfanos y mezcla · ALTO · CONFIRMADO
@@ -244,6 +245,7 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Descripción:** las referencias a campaña/mascota son columnas sueltas sin `.references()`.
 - **Impacto:** filas huérfanas y agregaciones contaminadas al borrar campañas/mascotas (agravado por DB-02).
 - **Solución:** añadir FK con `onDelete` explícito. **Prueba:** insertar `donations.campaign_id=999999` ⇒ rechazo.
+- **✅ CORREGIDO en V7-15 (migración 023):** 11 claves foráneas añadidas con **`NOT VALID`** (no validan las filas históricas y sí **todas** las escrituras nuevas) y `ON DELETE` elegido caso por caso: `RESTRICT` para todo lo que es historial (dinero, gastos, evidencias, imágenes, novedades, bienes, presupuesto) y `SET NULL` donde la fila debe sobrevivir (donación sin el donante consolidado, bien sin su donante y **reporte ciudadano** si se borra la campaña creada a partir de él). **Verificado contra PostgreSQL real: la base rechaza una donación con `campaign_id=999999`** —exactamente la prueba que pedía este hallazgo— y acepta las referencias válidas. Además, `DELETE /admin/pets/:id` responde **409** si la mascota tiene solicitudes de adopción, en lugar de dejarlas huérfanas.
 
 #### DB-05 — `campaigns.title` sin `UNIQUE`; los seeds resuelven por título · MEDIO · CONFIRMADO
 - **Ubicación:** `campaigns.ts:7`; `scripts/src/apply-chocofest-2025.ts:57-73`; `apply-chocolatada-2024.ts:49-62`; `seed.ts:690-691`
@@ -400,6 +402,7 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Ubicación:** `shared/SEO.tsx`.
 - **Corregido:** añadido `<SEO>` a `transparency.tsx`, `adoptions.tsx` y `volunteer.tsx` → **9 páginas** con SEO.
 - **Pendiente:** `BASE_URL` hardcodeado, `hreflang` es/en apuntando a la misma URL y datos estructurados (JSON-LD).
+- **Corregido en V7-13:** `BASE_URL` configurable (`VITE_PUBLIC_URL`, con el despliegue actual por defecto); `hreflang` honesto (solo `x-default`, sin alternates de idioma apuntando a la misma URL); datos estructurados JSON-LD (`NGO` + `WebSite` en la portada) con serialización que **no se puede cerrar con `</script>`** y que **se retira** al cambiar de página; 9 pruebas puras + 4 de componente. **Pendiente deliberado:** el `Event` de ChocoFest 2026 no se publica porque sus fechas oficiales no están definidas (no se inventan datos).
 
 #### FE-10 a FE-15 — BAJO
 - `pnpm-workspace.yaml:30`: `zod` 3.25.76 en cliente vs `zod/v4` en `lib/db` (FE-10). *Pendiente.*

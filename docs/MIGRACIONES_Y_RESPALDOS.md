@@ -56,6 +56,12 @@
 - **Cambio:** `ADD CONSTRAINT … CHECK (status IN (…))` tras **auditar valores existentes**.
 - **Riesgo:** medio (valores fuera de catálogo) → informe previo y normalización.
 - **Reversión:** `DROP CONSTRAINT`.
+- **✅ APLICADO en V7-12 (migración 022)** con el patrón **`NOT VALID`**: no revisa las filas
+  históricas (por eso no puede fallar ni exigir limpieza previa) y **sí** comprueba todas las
+  escrituras nuevas. Los valores de cada tabla se tomaron de los esquemas de la aplicación, no
+  de una lista inventada. Para endurecerlo cuando los datos estén limpios:
+  `SELECT status, count(*) FROM <tabla> GROUP BY status;` y
+  `ALTER TABLE <tabla> VALIDATE CONSTRAINT <nombre>;`.
 
 ## 6. DB-07 — Índices faltantes
 
@@ -121,5 +127,99 @@ Los conteos coinciden con producción (6 campañas, 70 donaciones, 5 movimientos
 
 **Pendiente de ensayo:**
 - **IMP-04** — la clave natural tiene **1 duplicado real** que bloquea el índice único (requiere decisión sobre el duplicado).
-- **DB-05 / DB-06 / DB-08** — unicidad, tipos `text`→`date` y `real`→`numeric`: **cambian el contrato de la API**
-  (`numeric` se serializa como string), así que exigen ajuste en la capa de consulta antes de migrar.
+- **DB-05 / DB-06** — unicidad de campaña y tipos `text`→`date` / `real`→`numeric`: **cambian el contrato de la API**.
+- **DB-08** — ✅ **YA NO PENDIENTE**: aplicado en la **migración 022** (V7-12) con `CHECK … NOT VALID`
+  en las 7 tablas con estado, sin exigir limpieza previa de datos históricos.
+
+---
+
+## 11. Ensayo automatizado de respaldo y restauración (2026-10-14) — RESULTADOS
+
+El checklist tenía el respaldo como **documentado pero sin probar**. Ahora se ensaya de verdad en
+cada ejecución del E2E (`artifacts/api-server/tests/e2e/run-e2e.sh`, sección 7), **contra una base
+PostgreSQL real y sin tocar producción**:
+
+1. se para el API;
+2. `pg_dump` de la base;
+3. se cuentan donaciones, asientos, configuración y migraciones;
+4. **se destruye la base** (`DROP DATABASE … WITH (FORCE)`) y se recrea vacía;
+5. se restaura **solo** desde el respaldo;
+6. se comparan los conteos;
+7. el API arranca sobre la base restaurada (no debe volver a migrar);
+8. y se comprueba lo importante: **la cadena de hashes del libro sigue verificando**.
+
+**Resultado real:**
+
+```
+   antes: donaciones=113 · asientos=1 · configuración=22 · migraciones=22
+   respaldo creado: 114927 bytes
+   ok   - la base restaurada tiene los mismos datos
+   ok   - el API arranca sobre la base restaurada sin duplicar migraciones (22)
+   ok   - la cadena del libro sigue verificando tras la restauración
+```
+
+**Aprendizaje operativo:** el primer intento usaba `dropdb`, que **falla si queda alguna conexión
+abierta** (el API recién parado deja conexiones del pool). Se usa
+`DROP DATABASE … WITH (FORCE)`, que las cierra. Es el fallo que aparecería en una recuperación
+real, y queda documentado aquí y en el propio arnés.
+
+**Nota sobre DB-05 / DB-06 (del ensayo anterior):** los cambios de tipo (`text`→`date`,
+`real`→`numeric`) **cambian el contrato de la API** —`numeric` se serializa como string— así que
+exigen ajuste en la capa de consulta antes de migrar.
+
+---
+
+## 12. Eliminar de una base existente la campaña de referencia de 2024 (V7-18)
+
+El código ya **no** crea la campaña «Chocolatada Navideña 2024» (era material de referencia, no
+una campaña real; ver V7-17/V7-18), pero una base que ya la tenga —**producción**— la seguirá
+mostrando. Procedimiento, en este orden y con estas reglas:
+
+1. **Respaldo completo antes de nada** (`pg_dump -Fc`) y, si se puede, ensayo en el clon.
+2. **Informe primero** (no borra nada): cuántas filas dependen de esa campaña.
+
+```sql
+-- 1) Localizar la campaña (por título).
+SELECT id, title, status, featured FROM campaigns WHERE title = 'Chocolatada Navideña 2024';
+
+-- 2) Informe de dependencias (sustituir :id por el id anterior).
+SELECT 'donations'      AS tabla, count(*) FROM donations          WHERE campaign_id = :id
+UNION ALL SELECT 'movements',  count(*) FROM campaign_movements   WHERE campaign_id = :id
+UNION ALL SELECT 'expenses',   count(*) FROM campaign_expenses    WHERE campaign_id = :id
+UNION ALL SELECT 'evidence',   count(*) FROM campaign_evidence    WHERE campaign_id = :id
+UNION ALL SELECT 'images',     count(*) FROM campaign_images      WHERE campaign_id = :id
+UNION ALL SELECT 'updates',    count(*) FROM campaign_updates     WHERE campaign_id = :id
+UNION ALL SELECT 'leftovers',  count(*) FROM campaign_leftovers   WHERE campaign_id = :id
+UNION ALL SELECT 'budgets',    count(*) FROM campaign_budgets     WHERE campaign_id = :id
+UNION ALL SELECT 'reports',    count(*) FROM community_reports    WHERE campaign_id = :id;
+```
+
+3. **REGLA CRÍTICA: no tocar el ledger.** Si el informe devuelve `movements > 0`, **PARAR** y
+   consultar: el libro es *append-only* y borrar asientos **rompería la cadena de hashes**. Esos
+   movimientos se regularizan con un asiento compensatorio, nunca borrando.
+   (En el caso de 2024 no debería haberlos: esas donaciones se sembraron **sin** asiento, que es
+   precisamente el hueco DB-09.)
+4. **Borrar en una transacción**, hijos primero (las claves foráneas son `RESTRICT`), y la
+   campaña al final. Los `community_reports` que apunten a ella se quedan con el vínculo a
+   `NULL` solos (`ON DELETE SET NULL`), así que **no** se pierden.
+
+```sql
+BEGIN;
+DELETE FROM donation_proofs
+ WHERE donation_id IN (SELECT id FROM donations WHERE campaign_id = :id);
+DELETE FROM donations          WHERE campaign_id = :id;
+DELETE FROM campaign_expenses  WHERE campaign_id = :id;
+DELETE FROM campaign_evidence  WHERE campaign_id = :id;
+DELETE FROM campaign_images    WHERE campaign_id = :id;
+DELETE FROM campaign_updates   WHERE campaign_id = :id;
+DELETE FROM campaign_leftovers WHERE campaign_id = :id;
+DELETE FROM campaign_budgets   WHERE campaign_id = :id;
+DELETE FROM campaigns          WHERE id = :id;
+COMMIT;
+```
+
+5. **Verificar después:** la campaña ya no aparece en `/api/campaigns` ni en la portada, y
+   `GET /api/admin/ledger/audit` sigue informando la cadena **íntegra**.
+6. **Nota sobre donantes:** las fichas de `donors` **no** se tocan (pueden tener historial real
+   de otras campañas). Si alguna queda sin donaciones, es una decisión de la organización
+   consolidarla o no.
