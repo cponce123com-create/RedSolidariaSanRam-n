@@ -244,6 +244,7 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Descripción:** las referencias a campaña/mascota son columnas sueltas sin `.references()`.
 - **Impacto:** filas huérfanas y agregaciones contaminadas al borrar campañas/mascotas (agravado por DB-02).
 - **Solución:** añadir FK con `onDelete` explícito. **Prueba:** insertar `donations.campaign_id=999999` ⇒ rechazo.
+- **✅ CORREGIDO en V7-15 (migración 023):** 11 claves foráneas añadidas con **`NOT VALID`** (no validan las filas históricas y sí **todas** las escrituras nuevas) y `ON DELETE` elegido caso por caso: `RESTRICT` para todo lo que es historial (dinero, gastos, evidencias, imágenes, novedades, bienes, presupuesto) y `SET NULL` donde la fila debe sobrevivir (donación sin el donante consolidado, bien sin su donante y **reporte ciudadano** si se borra la campaña creada a partir de él). **Verificado contra PostgreSQL real: la base rechaza una donación con `campaign_id=999999`** —exactamente la prueba que pedía este hallazgo— y acepta las referencias válidas. Además, `DELETE /admin/pets/:id` responde **409** si la mascota tiene solicitudes de adopción, en lugar de dejarlas huérfanas.
 
 #### DB-05 — `campaigns.title` sin `UNIQUE`; los seeds resuelven por título · MEDIO · CONFIRMADO
 - **Ubicación:** `campaigns.ts:7`; `scripts/src/apply-chocofest-2025.ts:57-73`; `apply-chocolatada-2024.ts:49-62`; `seed.ts:690-691`

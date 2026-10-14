@@ -825,3 +825,54 @@ aparecería en un incidente real de madrugada, y ahora queda documentado en el p
 artifacts/api-server/tests/e2e/run-e2e.sh     sección 7: ensayo de respaldo y restauración
 docs/MIGRACIONES_Y_RESPALDOS.md               referencia al ensayo automatizado
 ```
+
+---
+
+## 17. Incremento V7-15 — Claves foráneas ausentes (B-2 / DB-04) · CERRADO
+
+### 17.1 Qué estaba mal
+
+Referencias que eran **columnas sueltas sin clave foránea**: nada impedía que una donación, un
+gasto, una evidencia, una imagen, una novedad, un bien o un presupuesto apuntaran a una
+**campaña inexistente**; ni que borrar una mascota dejara **solicitudes de adopción huérfanas**.
+Peor: el borrado de mascotas no comprobaba nada, así que se podía eliminar una mascota con
+solicitudes y dejarlas colgando, con personas esperando una respuesta que ya nadie daría.
+
+### 17.2 Qué se implementó
+
+**Migración 023 (aditiva) con 11 claves foráneas `NOT VALID`.** El `NOT VALID` es justo lo que
+desbloquea B-2: **no** se validan las filas históricas (en producción puede haber huérfanas, y
+esta migración no puede fallar ni borrar nada) y **todas las escrituras nuevas quedan
+comprobadas** desde ya. Para endurecerlo más adelante, la propia migración documenta el orden
+correcto: contar huérfanos y después `VALIDATE CONSTRAINT`.
+
+**`ON DELETE` elegido caso por caso** (no un valor por defecto):
+
+| Referencia | Política | Por qué |
+|---|---|---|
+| donaciones → campaña | `RESTRICT` | dinero: la base nunca borra historial contable |
+| donaciones → donante | `SET NULL` | la donación sobrevive si el donante se consolida o se borra |
+| gastos, evidencias, imágenes, novedades, bienes, presupuesto → campaña | `RESTRICT` | historial: nada se borra en cascada por su cuenta |
+| bienes → donante | `SET NULL` | el bien sobrevive |
+| reportes ciudadanos → campaña | `SET NULL` | **el reporte no debe desaparecer**; solo se limpia el vínculo |
+| solicitudes de adopción → mascota | `RESTRICT` | no perder solicitudes de personas |
+
+**Y el borrado de mascotas ahora avisa:** si la mascota tiene solicitudes de adopción responde
+**409** indicando cuántas, en lugar de dejarlas huérfanas.
+
+### 17.3 Verificación (E2E contra PostgreSQL real)
+
+- **11/11 claves foráneas** presentes.
+- **La base RECHAZA** una donación apuntando a una campaña inexistente (error con el nombre de la
+  clave) y **acepta** las referencias válidas.
+- El flujo HTTP completo sigue en verde —prueba positiva de que las claves no rompen las
+  escrituras legítimas—, **23 migraciones** idempotentes y el ensayo de restauración sigue
+  pasando con la **cadena del libro íntegra**.
+
+### 17.4 Archivos
+
+```
+lib/db/src/migrate.ts                        migración 023 (11 claves foráneas, NOT VALID)
+artifacts/api-server/src/routes/pets.ts      borrado de mascota con solicitudes → 409
+artifacts/api-server/tests/e2e/run-e2e.sh    verificación (existencia + rechazo real de una referencia inválida)
+```

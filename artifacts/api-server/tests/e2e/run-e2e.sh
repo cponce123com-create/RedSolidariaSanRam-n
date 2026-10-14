@@ -149,6 +149,37 @@ else
   exit 1
 fi
 
+echo "== 4c. Claves foráneas ausentes (DB-04 / B-2) =="
+FKS="$(psql_c "SELECT count(*) FROM pg_constraint WHERE contype='f' AND conname IN ('donations_campaign_id_fkey','donations_donor_id_fkey','campaign_expenses_campaign_id_fkey','campaign_evidence_campaign_id_fkey','campaign_images_campaign_id_fkey','campaign_updates_campaign_id_fkey','campaign_leftovers_campaign_id_fkey','campaign_leftovers_donor_id_fkey','campaign_budgets_campaign_id_fkey','community_reports_campaign_id_fkey','adoption_requests_pet_id_fkey')")"
+echo "   claves foráneas de la migración 023: $FKS/11"
+if [ "$FKS" -lt 11 ]; then
+  echo "   FAIL - faltan claves foráneas"
+  exit 1
+fi
+
+# La base debe RECHAZAR una referencia a una campaña que no existe.
+SEEDED_DONATION="$(psql_c "SELECT id FROM donations ORDER BY id LIMIT 1")"
+if [ -z "$SEEDED_DONATION" ]; then
+  echo "   FAIL - no hay donaciones sembradas para probar la clave foránea"
+  exit 1
+fi
+BAD_FK="$(psql_c "UPDATE donations SET campaign_id = 999999 WHERE id = $SEEDED_DONATION" 2>&1 || true)"
+if echo "$BAD_FK" | grep -qi "donations_campaign_id_fkey"; then
+  echo "   ok   - la base RECHAZA una donación apuntando a una campaña inexistente"
+else
+  echo "   FAIL - la base aceptó una referencia inexistente: $BAD_FK"
+  exit 1
+fi
+
+# Y una referencia válida se sigue aceptando.
+GOOD_FK="$(psql_c "UPDATE donations SET campaign_id = campaign_id WHERE id = $SEEDED_DONATION RETURNING campaign_id")"
+if [ -n "$GOOD_FK" ]; then
+  echo "   ok   - una referencia válida se sigue aceptando (donación #$SEEDED_DONATION → campaña $GOOD_FK)"
+else
+  echo "   FAIL - la base rechazó una referencia válida"
+  exit 1
+fi
+
 echo "== 5. Flujo funcional completo por HTTP =="
 node "$REPO/artifacts/api-server/tests/e2e/flow.mjs" "http://127.0.0.1:$APIPORT"
 FLOW_STATUS=$?

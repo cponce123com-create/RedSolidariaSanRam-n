@@ -29,7 +29,7 @@ No se usan porcentajes de avance.
 | **Verificación del libro contable (cadena de hashes)** | **IMPLEMENTADO Y PROBADO** | `lib/ledger.ts`, `routes/campaign-movements.ts` | `ledger.test.mjs`, `ledger-chain.test.mjs`; endpoints públicos `/movements/verify` y `/ledger/root` |
 | **Informe administrativo de integridad del libro** | **IMPLEMENTADO Y PROBADO** | `lib/ledger-audit.ts`, `routes/ledger-audit.ts`, `pages/admin/ledger-audit.tsx` | `ledger-audit.test.mjs` (11) + `ledger-audit-auth.test.mjs` (2) + página `/admin/libro` |
 | Restricción real del libro en producción (`RESTRICT`) | **IMPLEMENTADO Y PROBADO** | `docs/migraciones/010_low_risk.sql`, `lib/db/src/migrate.ts` | **Aplicada en producción el 2026-10-13** con respaldo previo y autorización explícita (registrada en `drizzle_migrations`); borrar una campaña con asientos responde 409 |
-| Claves foráneas ausentes (DB-04) | **BLOQUEADO** | esquemas de `lib/db/src/schema` | **B-2**: requiere decidir sobre datos huérfanos |
+| Claves foráneas ausentes (DB-04) | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (023), `routes/pets.ts` | **11/11** claves `NOT VALID` con `ON DELETE` por caso; E2E contra base real: **rechaza** una donación con `campaign_id=999999` y acepta las válidas; borrar una mascota con solicitudes → 409 |
 | Donaciones confirmadas sin asiento (DB-09) | **PARCIAL** | — | **Detectadas** por el informe de V7-3; la regularización es una decisión contable |
 
 ## 2. Integración admin ↔ frontend (Fase 2)
@@ -125,16 +125,16 @@ No se usan porcentajes de avance.
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **165/165** + **29/29** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
-| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–022) | Verificado contra **PostgreSQL 17.7 real**: 22 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
-| E2E con PostgreSQL real (flujo completo + esquema + restauración) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **41/41** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos) **+ 5 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido) y disparadores de `updated_at` **+ ensayo de respaldo y restauración** (la base se destruye y se restaura; datos idénticos y **cadena del libro verificada**) |
-| Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (113 donaciones, 1 asiento, 22 claves, 22 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
+| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–023) | Verificado contra **PostgreSQL 17.7 real**: 23 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
+| E2E con PostgreSQL real (flujo + esquema + restauración) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **41/41** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos) **+ 10 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido), disparadores de `updated_at` y **claves foráneas** (rechazo real de una referencia inexistente) **+ ensayo de respaldo y restauración** (la base se destruye y se restaura; datos idénticos y **cadena del libro verificada**) |
+| Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (113 donaciones, 1 asiento, 22 claves, 23 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
 
 ## 10. Bloqueos que esperan decisión
 
 | # | Bloqueo | Qué se necesita para desbloquearlo |
 |---|---|---|
 | ~~B-1~~ | ~~Migración 010 (libro `CASCADE` → `RESTRICT`)~~ | ✅ **RESUELTO**: aplicada en producción el **2026-10-13** con respaldo previo y autorización explícita, y registrada en `drizzle_migrations` |
-| B-2 | Claves foráneas ausentes (DB-04) | Decisión sobre datos huérfanos existentes + autorización de la migración |
+| ~~B-2~~ | ~~Claves foráneas ausentes (DB-04)~~ | ✅ **RESUELTO** en V7-15: migración **023** con 11 claves `NOT VALID` y `ON DELETE` por caso (no exigió decidir sobre huérfanos históricos); verificado contra base real |
 | B-3 | Certificados con QR (5.2) | Definir tipos, vigencia, revocación y datos publicados |
 | B-4 | Mensajería automatizada de WhatsApp | Credenciales y proveedor oficial aprobado |
 | B-5 | Artefactos de migración obsoletos | Autorización para eliminarlos del repositorio |

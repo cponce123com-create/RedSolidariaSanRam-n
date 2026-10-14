@@ -562,6 +562,78 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         FOR EACH ROW EXECUTE FUNCTION set_updated_at();
     `,
   },
+  {
+    name: "023_missing_foreign_keys.sql",
+    sql: `
+      -- DB-04 (B-2): referencias que eran columnas sueltas SIN clave foránea.
+      -- Nada impedía que una donación, un gasto o una evidencia apuntaran a una
+      -- campaña inexistente, ni que borrar una mascota dejara solicitudes de
+      -- adopción huérfanas.
+      --
+      -- NOT VALID, igual que las restricciones de estado (022): las filas YA
+      -- existentes no se revisan (en producción puede haber huérfanas y esta
+      -- migración no puede fallar ni borrar nada), y TODAS las escrituras nuevas
+      -- quedan comprobadas desde este momento. Para validarlas más adelante,
+      -- primero se miran los huérfanos y luego se valida:
+      --
+      --   SELECT count(*) FROM donations d
+      --     LEFT JOIN campaigns c ON c.id = d.campaign_id
+      --     WHERE d.campaign_id IS NOT NULL AND c.id IS NULL;
+      --   ALTER TABLE donations VALIDATE CONSTRAINT donations_campaign_id_fkey;
+      --
+      -- ON DELETE conservador: RESTRICT en todo lo que es historial (dinero,
+      -- gastos, evidencias, bienes, imágenes, novedades, presupuesto) para que la
+      -- base no borre nada en cascada por su cuenta, y SET NULL donde la fila debe
+      -- sobrevivir aunque desaparezca la referencia (una donación sin el donante
+      -- consolidado, un reporte ciudadano sin la campaña creada a partir de él).
+
+      ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_campaign_id_fkey;
+      ALTER TABLE donations ADD CONSTRAINT donations_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_donor_id_fkey;
+      ALTER TABLE donations ADD CONSTRAINT donations_donor_id_fkey
+        FOREIGN KEY (donor_id) REFERENCES donors(id) ON DELETE SET NULL NOT VALID;
+
+      ALTER TABLE campaign_expenses DROP CONSTRAINT IF EXISTS campaign_expenses_campaign_id_fkey;
+      ALTER TABLE campaign_expenses ADD CONSTRAINT campaign_expenses_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_evidence DROP CONSTRAINT IF EXISTS campaign_evidence_campaign_id_fkey;
+      ALTER TABLE campaign_evidence ADD CONSTRAINT campaign_evidence_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_images DROP CONSTRAINT IF EXISTS campaign_images_campaign_id_fkey;
+      ALTER TABLE campaign_images ADD CONSTRAINT campaign_images_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_updates DROP CONSTRAINT IF EXISTS campaign_updates_campaign_id_fkey;
+      ALTER TABLE campaign_updates ADD CONSTRAINT campaign_updates_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_leftovers DROP CONSTRAINT IF EXISTS campaign_leftovers_campaign_id_fkey;
+      ALTER TABLE campaign_leftovers ADD CONSTRAINT campaign_leftovers_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      ALTER TABLE campaign_leftovers DROP CONSTRAINT IF EXISTS campaign_leftovers_donor_id_fkey;
+      ALTER TABLE campaign_leftovers ADD CONSTRAINT campaign_leftovers_donor_id_fkey
+        FOREIGN KEY (donor_id) REFERENCES donors(id) ON DELETE SET NULL NOT VALID;
+
+      ALTER TABLE campaign_budgets DROP CONSTRAINT IF EXISTS campaign_budgets_campaign_id_fkey;
+      ALTER TABLE campaign_budgets ADD CONSTRAINT campaign_budgets_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID;
+
+      -- Un reporte ciudadano no debe desaparecer: si se borra la campaña creada a
+      -- partir de él, el vínculo se limpia y el reporte sigue existiendo.
+      ALTER TABLE community_reports DROP CONSTRAINT IF EXISTS community_reports_campaign_id_fkey;
+      ALTER TABLE community_reports ADD CONSTRAINT community_reports_campaign_id_fkey
+        FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE SET NULL NOT VALID;
+
+      ALTER TABLE adoption_requests DROP CONSTRAINT IF EXISTS adoption_requests_pet_id_fkey;
+      ALTER TABLE adoption_requests ADD CONSTRAINT adoption_requests_pet_id_fkey
+        FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE RESTRICT NOT VALID;
+    `,
+  },
 ];
 
 /**

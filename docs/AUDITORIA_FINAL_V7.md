@@ -588,3 +588,28 @@ migraciones), arranque sin migrar de nuevo y **cadena verificada** tras la resta
 **Problema de operación encontrado por el propio ensayo (y corregido):** `dropdb` falla si
 queda alguna conexión abierta (el API recién parado deja conexiones del pool) → se usa
 `DROP DATABASE ... WITH (FORCE)`. Es el fallo que habría aparecido en una recuperación real.
+
+---
+
+## 27. Apéndice — Incremento V7-15 (claves foráneas ausentes, B-2 / DB-04)
+
+**Completado.** Siete tablas tenían referencias a campaña/donante/mascota como **columnas
+sueltas sin clave foránea**: la base permitía donaciones, gastos, evidencias, imágenes,
+novedades, bienes o presupuestos apuntando a campañas inexistentes, y borrar una mascota dejaba
+sus solicitudes de adopción huérfanas (el borrado ni siquiera lo comprobaba).
+
+- **Migración 023 (aditiva): 11 claves foráneas `NOT VALID`.** El `NOT VALID` es lo que
+  desbloquea B-2 sin necesidad de decidir antes qué hacer con los huérfanos históricos: no se
+  validan las filas existentes y **sí** se comprueban todas las escrituras nuevas. El camino
+  para endurecerlo (contar huérfanos → `VALIDATE CONSTRAINT`) queda escrito en la migración.
+- **`ON DELETE` caso por caso:** `RESTRICT` para todo lo que es historial (dinero, gastos,
+  evidencias, imágenes, novedades, bienes, presupuesto) y `SET NULL` donde la fila debe
+  sobrevivir (una donación sin el donante consolidado, un bien sin su donante, y **un reporte
+  ciudadano** si se borra la campaña creada a partir de él).
+- **`DELETE /admin/pets/:id`** responde **409** con el número de solicitudes si la mascota tiene
+  alguna, en lugar de dejarlas huérfanas.
+
+**Verificado contra PostgreSQL real:** **11/11** claves presentes; la base **rechaza** una
+donación que apunta a una campaña inexistente y **acepta** las válidas; el flujo HTTP completo
+sigue en verde (prueba positiva), 23 migraciones idempotentes y el ensayo de restauración pasa
+con la cadena del libro íntegra.
