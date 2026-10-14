@@ -122,16 +122,56 @@ npx tsc --build
 
 ---
 
-## 5. Próximos pasos (incremento 3 — Fase 2: ChocoFest 2026)
+## 5. Incremento 3A (Fase 2, base) — cerrado
 
-1. **Portada:** ChocoFest 2026 en el primer bloque visual mientras esté configurada como protagonista y publicada, sin desplazar de forma permanente la identidad de Red Solidaria (reutiliza `protagonist_campaign_id` y `resolveProtagonist`, ya existentes).
-2. **Información del evento editable:** fecha, lugar, horario, descripción, objetivos, metas, galería, programa de actividades, responsables y estado de organización (sobre `campaign_updates`, `campaign_images` y las claves `settings` de la allowlist pública).
-3. **Chocolatada, regalos y canastas:** metas de niños/raciones, insumos con recibido/usado/restante, clasificación y entrega de juguetes, composición y entrega de canastas con evidencia — reutilizando inventario y sobrantes existentes, **sin crear una campaña por producto**.
-4. **Presupuesto:** por categoría, meta de recaudación, donaciones verificadas, gastos aprobados, saldo y avance.
+### 5.1 Lo que ya existía y se verificó (sin cambios)
 
-**Dependencia de datos:** este incremento necesita que la organización apruebe y proporcione las **cifras reales** (metas de niños, raciones, canastas, presupuesto). No se introducirá ninguna cifra inventada: el panel quedará listo para cargarlas y, mientras no existan, la interfaz mostrará el estado «sin metas definidas».
+- **Portada:** `HomeHero` (identidad de Red Solidaria) → `ProtagonistCampaignSection` (ChocoFest) justo después, y solo si la campaña está configurada como protagonista, `active` y no vencida. No desplaza la identidad y no inventa cifras (`components/home/ProtagonistCampaignSection.tsx`).
+- **Página pública** `/campanas/chocofest-2026` con 12 secciones (presentación, metas, avance, donaciones, inventario, voluntariado, aliados, cronograma, localidades, galería, transparencia, resultados).
+- **Panel** `/admin/chocofest`: KPIs, interruptor de protagonista, creación guiada de la campaña y datos del evento (lugar, horario, lema) guardados en `settings` con allowlist pública.
 
-## 6. Riesgos y bloqueos
+### 5.2 Lo que faltaba y ahora está implementado
+
+**Modelo de bienes e insumos del evento (migración 015, aditiva y reversible).**
+No se crea una tabla por producto: se reutiliza `campaign_leftovers` y se le añaden `category`, `target_qty`, `received_qty` y `used_qty`.
+
+- **Regla única del saldo** (`resolveStock`, función pura en `src/lib/inventory.ts`): con flujo registrado, `disponible = recibido − usado`; en filas antiguas, el propio `quantity`. La usan el panel y la página pública, así que no pueden discrepar.
+- **Metas por producto sin inventar cifras** (`goalProgress`): si no hay meta devuelve `hasTarget: false` y la interfaz muestra «Sin meta definida todavía» en lugar de un porcentaje inventado.
+- **Agrupación por producto** (`groupInventoryByCategory`): chocolatada y raciones, regalos y juguetes, canastas de víveres, otros bienes.
+- **Panel** (pestaña «Bienes e insumos»): se registra lo recibido y lo usado; el servidor calcula el saldo; validación cruzada «lo usado no puede superar lo recibido» con mensaje real; tabla con recibido/usado/disponible y avance de meta.
+- **Página pública:** inventario agrupado por producto con recibido, usado, disponible y barra de avance de meta (o el estado «sin meta definida»).
+- **API** (`campaign-leftovers.ts`): validación con mensajes accionables (antes era un 400 genérico), `quantity` normalizado al saldo cuando hay flujo, y **PUT con merge** para que cambiar un solo campo (p. ej. la visibilidad) no borre el resto.
+- **i18n:** cinco claves nuevas en `es` y `en`; el test de claves pasa.
+
+### 5.3 Archivos modificados en el incremento 3A
+
+```
+lib/db/src/migrate.ts                                      migración 015 (aditiva)
+lib/db/src/schema/campaign-leftovers.ts                    category, target_qty, received_qty, used_qty
+artifacts/api-server/src/routes/campaign-leftovers.ts      validación real, saldo normalizado, PUT con merge
+artifacts/red-solidaria/src/lib/inventory.ts               resolveStock, goalProgress, agrupación por categoría
+artifacts/red-solidaria/tests/inventory.test.mjs           +7 pruebas (flujo, metas, agrupación)
+artifacts/red-solidaria/src/hooks/use-phase3.ts            tipo Leftover ampliado + mensaje real del servidor
+artifacts/red-solidaria/src/pages/admin/campaign-detail.tsx  pestaña de bienes e insumos
+artifacts/red-solidaria/src/pages/chocofest-2026.tsx       inventario público por producto con metas
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts   etiquetas nuevas
+```
+
+### 5.4 Verificación del incremento 3A
+
+`api-server` **272/272** · `red-solidaria` **97/97** node:test (+7) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
+
+## 6. Próximos pasos (incremento 3B — Fase 2, resto)
+
+1. **Presupuesto por categoría:** meta de recaudación por categoría, donaciones verificadas, gastos aprobados, saldo y avance (reutiliza `campaign_expenses.category` y `campaigns.goal`).
+2. **Programa de actividades y responsables:** hoy el «cronograma» son novedades; falta un programa estructurado con responsables por actividad.
+3. **Estado de organización real:** el checklist de preparación del panel tiene un punto (`cronograma`) fijado en `false`; debe calcularse con datos reales.
+4. **Regalos con donante y evidencia de entrega:** asociar cada bien a su donante y a la evidencia de entrega (reutiliza `donations` en especie y `campaign_evidence`).
+5. **Canastas:** composición por canasta y meta de canastas preparadas/entregadas.
+
+**Dependencia de datos:** las **metas** (niños, raciones, juguetes, canastas, presupuesto) las carga la organización desde el panel. No se ha introducido ninguna cifra inventada: mientras no existan, la interfaz muestra «sin meta definida» y el avance se calcula solo con lo realmente registrado.
+
+## 7. Riesgos y bloqueos
 
 - **R-1 / R-2** (claves foráneas ausentes y doble migrador): ver `docs/AUDITORIA_INICIAL.md` §3. Ningún incremento realizado hasta ahora toca la base de datos.
 - **Fase 12 (identidad visual)** bloqueada hasta disponer de los archivos oficiales del logo y de Piñito; no se generará ningún diseño sustituto.

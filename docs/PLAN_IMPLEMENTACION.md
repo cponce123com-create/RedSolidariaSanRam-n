@@ -52,13 +52,19 @@ Correcciones:
 - **Claves separadas admin/público** (RC-S9): revisado; el riesgo queda neutralizado por `private, no-store` con sesión y la invalidación por entidad. **Decisión documentada, sin cambios.**
 - **Pruebas de integración con base real** (borrado `204`, `409` por dependencias, limpieza del protagonista al archivar): requieren una base PostgreSQL accesible; en este contenedor las suites usan un `DATABASE_URL` ficticio, así que se ejecutan en el entorno de despliegue. **Trasladado al incremento 16.**
 
-## Incremento 3 — Fase 2: ChocoFest 2026 como campaña principal
+## Incremento 3 — Fase 2: ChocoFest 2026 como campaña principal 🟡 PARCIAL (3A completado)
 
-- ChocoFest 2026 en el primer bloque de la portada **solo** mientras esté protagonista y publicada (reutiliza `protagonist_campaign_id` y `resolveProtagonist`).
-- Información del evento editable (fecha, lugar, horario, descripción, objetivos, metas, galería, programa, responsables, estado) sobre `campaign_updates`, `campaign_images` y `settings` con allowlist pública.
-- Chocolatada (meta de niños y raciones, insumos, recibido/usado/restante), regalos (clasificación, inventario, donantes, asignación, entrega, saldo) y canastas (composición, meta, preparadas, entregadas, evidencia) sobre el inventario existente (`campaign_leftovers` + inventario valorizado) sin crear campañas por producto.
-- Presupuesto por categoría, meta de recaudación, donaciones verificadas, gastos aprobados, saldo y avance.
-- **Sin cifras inventadas:** todas las metas se administran desde el panel.
+**3A — cerrado:** portada verificada (identidad → bloque protagonista, solo si está publicada y vigente), modelo de bienes e insumos del evento con **metas por producto** y **flujo recibido/usado** (migración 015 aditiva, sin una tabla por producto), panel de registro con validación cruzada, inventario público agrupado por producto con avance de meta y estado «sin meta definida» cuando no hay meta aprobada. Detalle en `docs/ESTADO_IMPLEMENTACION.md` §5.
+
+**3B — pendiente:**
+- Presupuesto por categoría (meta, donaciones verificadas, gastos aprobados, saldo y avance).
+- Programa de actividades con responsables (hoy el cronograma son novedades).
+- Estado de organización calculado con datos reales (el checklist tiene un punto fijo en `false`).
+- Regalos asociados a su donante y a la evidencia de entrega.
+- Composición de canastas y meta de canastas preparadas/entregadas.
+- Información del evento editable ampliada: fecha, objetivos, galería, responsables.
+
+**Regla de datos:** las metas se cargan desde el panel cuando la organización las aprueba. No se introduce ninguna cifra inventada.
 
 ## Incremento 4 — Fase 3: sistema profesional de donantes
 

@@ -1236,6 +1236,11 @@ export const es = {
     inventoryLinesLabel: "Líneas de inventario",
     inventoryUnitsLabel: "Unidades registradas",
     emptyInventory: "Aún no se ha publicado el inventario de la campaña.",
+    itemReceived: "Recibido",
+    itemUsed: "Usado o entregado",
+    itemRemaining: "Disponible",
+    itemGoal: "Meta",
+    itemNoGoal: "Sin meta definida todavía.",
     inventoryNote:
       "El inventario incluye chocolatada y raciones, juguetes y canastas de víveres. La valorización estimada es informativa y no se suma al dinero recaudado.",
     resultsCountLabel: "Evidencias publicadas",

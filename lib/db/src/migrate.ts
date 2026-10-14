@@ -299,6 +299,21 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON volunteer_participations (volunteer_id, participated_at DESC);
     `,
   },
+  {
+    name: "015_campaign_items_flow.sql",
+    sql: `
+      -- Bienes del evento (chocolatada, regalos, canastas): clasificación, meta
+      -- y flujo recibido/usado. ADITIVA y reversible (DROP COLUMN deshace).
+      -- Reutiliza campaign_leftovers: no se crea una tabla por producto.
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS category text;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS target_qty real;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS received_qty real;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS used_qty real;
+
+      CREATE INDEX IF NOT EXISTS idx_campaign_leftovers_category
+        ON campaign_leftovers (campaign_id, category);
+    `,
+  },
 ];
 
 /**

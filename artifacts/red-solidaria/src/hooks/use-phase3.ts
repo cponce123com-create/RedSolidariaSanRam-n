@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { readErrorMessage } from "@/lib/api-error";
 
 // Types based on the backend schema
 export interface TransparencyData {
@@ -58,6 +59,9 @@ export interface Evidence {
 }
 
 // Sobrantes de campaña: ítems/dinero que quedaron tras el evento.
+// Bienes e insumos de campaña: chocolatada, regalos y canastas.
+// `quantity` es el SALDO disponible; cuando se registra el flujo
+// (`receivedQty`/`usedQty`) el servidor lo recalcula como recibido - usado.
 export interface Leftover {
   id: number;
   campaignId: number;
@@ -66,6 +70,14 @@ export interface Leftover {
   unit?: string | null;
   notes?: string | null;
   isPublic: boolean;
+  /** Clasificación del bien: chocolatada | regalos | canastas | general. */
+  category?: string | null;
+  /** Meta del producto (opcional; 0 o ausente = sin meta definida). */
+  targetQty?: number | null;
+  /** Cantidad recibida. */
+  receivedQty?: number | null;
+  /** Cantidad usada o entregada. */
+  usedQty?: number | null;
   createdAt: string;
 }
 
@@ -272,7 +284,7 @@ export function useCreateLeftover(campaignId: number) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create leftover");
+      if (!res.ok) throw new Error(await readErrorMessage(res));
       return res.json();
     },
     onSuccess: () => {

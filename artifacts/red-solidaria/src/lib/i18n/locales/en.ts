@@ -1240,6 +1240,11 @@ export const en: TranslationSchema = {
     inventoryLinesLabel: "Inventory lines",
     inventoryUnitsLabel: "Registered units",
     emptyInventory: "The campaign inventory has not been published yet.",
+    itemReceived: "Received",
+    itemUsed: "Used or delivered",
+    itemRemaining: "Available",
+    itemGoal: "Goal",
+    itemNoGoal: "No goal defined yet.",
     inventoryNote:
       "The inventory includes hot chocolate and servings, toys and food baskets. The estimated value is informative and is not added to the money raised.",
     resultsCountLabel: "Published evidence",

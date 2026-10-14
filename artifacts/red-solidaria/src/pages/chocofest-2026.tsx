@@ -43,6 +43,9 @@ import { usePublicSettings } from "@/hooks/use-public-settings";
 import {
   formatItemAmount,
   formatQuantity,
+  goalProgress,
+  groupInventoryByCategory,
+  resolveStock,
   summarizeInventory,
 } from "@/lib/inventory";
 import { isVideoEvidence, summarizeEvidence } from "@/lib/results";
@@ -168,6 +171,9 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   // los "sobrantes" públicos de la campaña, ya incluidos en la transparencia.
   const inventory = transparency?.publicLeftovers ?? [];
   const inventorySummary = summarizeInventory(inventory);
+  // Agrupación por producto para poder mostrar metas y saldos por bloque
+  // (chocolatada, regalos, canastas) sin inventar cifras.
+  const inventoryGroups = groupInventoryByCategory(inventory);
   // Resultados y rendición final: reutiliza las evidencias públicas.
   const publicEvidence = transparency?.publicEvidence ?? [];
   const resultsSummary = summarizeEvidence(publicEvidence);
@@ -366,7 +372,7 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
             <Section id="especie" icon={<Gift className="w-5 h-5" />} title={t("chocofest.sectionInventory")}>
               {inventory.length > 0 ? (
                 <>
-                  <div className="flex flex-wrap gap-4 mb-4">
+                  <div className="flex flex-wrap gap-4 mb-6">
                     <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
                       <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
                         {t("chocofest.inventoryLinesLabel")}
@@ -382,21 +388,56 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
                       </div>
                     </div>
                   </div>
-                  <ul className="grid gap-3 sm:grid-cols-2">
-                    {inventory.map((item) => (
-                      <li key={item.id} className="bg-card border border-border rounded-2xl p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-semibold text-foreground">{item.item}</p>
-                          <span className="font-bold text-primary whitespace-nowrap">
-                            {formatItemAmount(item)}
-                          </span>
-                        </div>
-                        {item.notes ? (
-                          <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
-                        ) : null}
-                      </li>
+
+                  <div className="space-y-8">
+                    {inventoryGroups.map((group) => (
+                      <div key={group.category}>
+                        {/* Etiqueta del catálogo compartido (misma fuente que el panel). */}
+                        <h3 className="font-display font-bold text-foreground mb-3">{group.label}</h3>
+                        <ul className="grid gap-3 sm:grid-cols-2">
+                          {group.items.map((item) => {
+                            const stock = resolveStock(item);
+                            const progress = goalProgress(item.targetQty, stock.received);
+                            return (
+                              <li key={item.id} className="bg-card border border-border rounded-2xl p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="font-semibold text-foreground">{item.item}</p>
+                                  <span className="font-bold text-primary whitespace-nowrap">
+                                    {formatItemAmount({ quantity: stock.remaining, unit: item.unit })}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
+                                  <span>{t("chocofest.itemReceived")}: {formatQuantity(stock.received)}</span>
+                                  <span>{t("chocofest.itemUsed")}: {formatQuantity(stock.used)}</span>
+                                  <span className="font-semibold text-foreground">
+                                    {t("chocofest.itemRemaining")}: {formatQuantity(stock.remaining)}
+                                  </span>
+                                </div>
+                                {progress.hasTarget ? (
+                                  <div className="mt-3">
+                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                      <span>{t("chocofest.itemGoal")}: {formatQuantity(progress.target)}</span>
+                                      <span className="font-bold text-primary">
+                                        {t("chocofest.progressLabel", { progress: progress.percent })}
+                                      </span>
+                                    </div>
+                                    <Progress value={progress.percent} className="h-2" />
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {t("chocofest.itemNoGoal")}
+                                  </p>
+                                )}
+                                {item.notes ? (
+                                  <p className="text-xs text-muted-foreground mt-2">{item.notes}</p>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </>
               ) : (
                 <EmptyBox text={t("chocofest.emptyInventory")} />
