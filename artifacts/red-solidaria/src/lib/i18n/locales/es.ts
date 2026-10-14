@@ -512,6 +512,9 @@ export const es = {
     readMore: "Leer más →",
     emptyTitle: "Aún no hay noticias",
     emptyDescription: "Las novedades de la comunidad aparecerán aquí.",
+    backToList: "Volver a noticias",
+    notFoundTitle: "Noticia no encontrada",
+    notFoundDescription: "La noticia que buscas no existe o fue retirada.",
   },
   contact: {
     seoDescription:

@@ -20,6 +20,7 @@ const CampaignTransparency = lazy(() => import("./pages/campaign-transparency"))
 const Chocofest2026 = lazy(() => import("./pages/chocofest-2026"));
 const Transparency = lazy(() => import("./pages/transparency"));
 const News = lazy(() => import("./pages/news"));
+const NewsDetail = lazy(() => import("./pages/news-detail"));
 const Contact = lazy(() => import("./pages/contact"));
 const NotFound = lazy(() => import("./pages/not-found"));
 const ReportForm = lazy(() => import("./pages/report-form"));
@@ -343,6 +344,11 @@ function App() {
                 <Route path="/nosotros">
                   <MainLayout>
                     <About />
+                  </MainLayout>
+                </Route>
+                <Route path="/noticias/:id">
+                  <MainLayout>
+                    <NewsDetail />
                   </MainLayout>
                 </Route>
                 <Route path="/noticias">

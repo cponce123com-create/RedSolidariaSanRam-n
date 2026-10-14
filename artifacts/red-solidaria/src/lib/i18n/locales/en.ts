@@ -513,6 +513,9 @@ export const en: TranslationSchema = {
     readMore: "Read more →",
     emptyTitle: "No news yet",
     emptyDescription: "Community updates will appear here.",
+    backToList: "Back to news",
+    notFoundTitle: "News post not found",
+    notFoundDescription: "The news post you are looking for does not exist or was removed.",
   },
   contact: {
     seoDescription:
