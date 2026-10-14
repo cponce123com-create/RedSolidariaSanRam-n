@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db, certificatesTable, campaignsTable, insertCertificateSchema } from "@workspace/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, and, isNull } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import {
   canRevoke,
+  findDuplicateCertificate,
   generateCertificateCode,
   isCertificateType,
   isValidCertificateCode,
@@ -118,6 +119,41 @@ router.post("/admin/certificates", requireAdmin, adminActionLimiter, async (req,
   }
 
   try {
+    // Protección contra duplicados: no se emiten dos certificados VIGENTES del
+    // mismo tipo para el mismo titular y campaña. Un revocado no bloquea.
+    const sameTypeAndCampaign = await db
+      .select({
+        id: certificatesTable.id,
+        code: certificatesTable.code,
+        holderName: certificatesTable.holderName,
+        type: certificatesTable.type,
+        campaignId: certificatesTable.campaignId,
+        status: certificatesTable.status,
+      })
+      .from(certificatesTable)
+      .where(
+        and(
+          eq(certificatesTable.type, data.type),
+          eq(certificatesTable.status, "issued"),
+          data.campaignId
+            ? eq(certificatesTable.campaignId, data.campaignId)
+            : isNull(certificatesTable.campaignId),
+        ),
+      );
+
+    const duplicate = findDuplicateCertificate(sameTypeAndCampaign, {
+      holderName: data.holderName,
+      type: data.type,
+      campaignId: data.campaignId ?? null,
+    });
+    if (duplicate) {
+      return res.status(409).json({
+        error: "conflict",
+        message: `Ya existe un certificado vigente para «${duplicate.holderName}» de este tipo. Revócalo antes de emitir otro (código ${duplicate.code}).`,
+        code: duplicate.code,
+      });
+    }
+
     // Colisión de código: improbable (30^12), pero se reintenta en vez de fallar.
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const code = generateCertificateCode();
