@@ -124,7 +124,7 @@ No se usan porcentajes de avance.
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **153/153** + **23/23** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
-| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–020) | Verificado contra **PostgreSQL 17.7 real**: 20 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
+| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–021) | Verificado contra **PostgreSQL 17.7 real**: 21 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
 | E2E con PostgreSQL real (flujo completo) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **38/38** comprobaciones en verde contra una base real: campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad |
 | Lint automatizado | **PENDIENTE** | — | No hay script de lint en el proyecto |
 | Respaldo y recuperación documentados | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `docs/MIGRACIONES_Y_RESPALDOS.md` | Documentado; sin ensayo de restauración en este entorno |

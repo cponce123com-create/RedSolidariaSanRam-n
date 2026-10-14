@@ -440,3 +440,24 @@ PostgreSQL real** con **20 migraciones** aplicadas.
 **Estado de la Fase 4 tras este incremento:** la rendición de resultados queda cerrada. Sigue
 **pendiente** el modelo de **patrocinios con estados de negociación** (relacionado con el
 bloqueo B-6).
+
+---
+
+## 21. Apéndice — Incremento V7-9 (índices por caso de uso, DB-07)
+
+**Completado.** Al revisar DB-07 resultó que las migraciones **001** y **012** ya habían
+cubierto los índices simples por campaña; lo que faltaba eran los **compuestos por caso de
+uso** y `adoption_requests`.
+
+- **Migración 021 (aditiva: solo `CREATE INDEX IF NOT EXISTS`, sin tocar datos ni columnas):**
+  `adoption_requests (pet_id)`, `adoption_requests (status)`,
+  `campaign_expenses (campaign_id, is_public)`, `campaign_evidence (campaign_id, is_public)`,
+  `campaign_updates (campaign_id, created_at DESC)` y
+  `donations (campaign_id, status, created_at DESC)`.
+- **Verificado en base real:** **21 migraciones** aplicadas (idempotentes en el segundo
+  arranque) y **6/6 índices** presentes, dentro del E2E que sigue en `E2E COMPLETO: OK`.
+
+**Límite declarado:** la prueba propuesta por la auditoría (`EXPLAIN ANALYZE` con volumen) no
+se ejecutó porque en una base vacía PostgreSQL prefiere un *seq scan*; el E2E comprueba la
+existencia y la correspondencia con las consultas identificadas. Medir el plan real queda como
+verificación pendiente y **no se marca como hecha**.

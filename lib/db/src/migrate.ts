@@ -444,6 +444,40 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    name: "021_use_case_indexes.sql",
+    sql: `
+      -- DB-07 (V7-9): índices compuestos por CASO DE USO. Las migraciones 001 y
+      -- 012 ya cubrieron los índices simples por campaña; estos son los que
+      -- faltaban para las consultas que realmente hace el sistema, y son
+      -- ADITIVOS: solo crean índices, no tocan datos ni columnas.
+      --
+      -- 1) Solicitudes de adopción: se listan por mascota y el panel cuenta las
+      --    pendientes por estado (dashboard).
+      CREATE INDEX IF NOT EXISTS idx_adoption_requests_pet
+        ON adoption_requests (pet_id);
+      CREATE INDEX IF NOT EXISTS idx_adoption_requests_status
+        ON adoption_requests (status);
+
+      -- 2) Gastos de campaña: el panel de transparencia filtra por campaña y por
+      --    visibilidad pública (nunca se muestran gastos privados).
+      CREATE INDEX IF NOT EXISTS idx_expenses_campaign_public
+        ON campaign_expenses (campaign_id, is_public);
+
+      -- 3) Evidencias: mismo caso (campaña + visibilidad pública).
+      CREATE INDEX IF NOT EXISTS idx_evidence_campaign_public
+        ON campaign_evidence (campaign_id, is_public);
+
+      -- 4) Novedades de campaña: se listan por campaña en orden cronológico.
+      CREATE INDEX IF NOT EXISTS idx_updates_campaign_created
+        ON campaign_updates (campaign_id, created_at DESC);
+
+      -- 5) Donaciones: las cifras filtradas del panel (campaña + estado +
+      --    rango de fechas) y la recaudación verificada por campaña.
+      CREATE INDEX IF NOT EXISTS idx_donations_campaign_status_created
+        ON donations (campaign_id, status, created_at DESC);
+    `,
+  },
 ];
 
 /**

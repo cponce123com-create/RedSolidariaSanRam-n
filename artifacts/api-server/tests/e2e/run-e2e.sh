@@ -83,6 +83,12 @@ else
 fi
 UNIQUE_SOURCE="$(psql_c "SELECT count(*) FROM pg_indexes WHERE tablename='campaign_movements' AND indexdef ILIKE '%unique%' AND indexdef ILIKE '%source%'")"
 echo "   índice único de origen en el libro: $UNIQUE_SOURCE"
+USE_CASE_INDEXES="$(psql_c "SELECT count(*) FROM pg_indexes WHERE indexname IN ('idx_adoption_requests_pet','idx_adoption_requests_status','idx_expenses_campaign_public','idx_evidence_campaign_public','idx_updates_campaign_created','idx_donations_campaign_status_created')")"
+echo "   índices por caso de uso (migración 021): $USE_CASE_INDEXES/6"
+if [ "$USE_CASE_INDEXES" -lt 6 ]; then
+  echo "   FAIL - faltan índices de la migración 021"
+  exit 1
+fi
 
 echo "== 5. Flujo funcional completo por HTTP =="
 node "$REPO/artifacts/api-server/tests/e2e/flow.mjs" "http://127.0.0.1:$APIPORT"

@@ -518,3 +518,48 @@ No se creó ninguna tabla nueva: el módulo reutiliza el patrón de configuraci�
 datos que ya existen (transparencia, inventario, programa). Así el informe no puede
 desincronizarse de las cifras que el sitio ya publica, y el módulo es reutilizable para
 futuros eventos cambiando las claves.
+
+---
+
+## 11. Incremento V7-9 — Índices por caso de uso (DB-07) · CERRADO
+
+### 11.1 Qué faltaba
+
+La auditoría (DB-07) señalaba índices ausentes en columnas consultadas. Al revisarlo, las
+migraciones **001** y **012** ya habían cubierto los índices simples por campaña
+(`campaign_expenses`, `campaign_evidence`, `campaign_updates`, `campaign_images`,
+`campaign_leftovers`, `campaign_budgets`, `campaign_movements`), así que lo que faltaba de
+verdad eran los **compuestos por caso de uso** y `adoption_requests`.
+
+### 11.2 Qué se implementó
+
+**Migración 021 (aditiva: solo índices, no toca datos ni columnas)** con los índices que
+corresponden a consultas reales del sistema:
+
+| Índice | Consulta que sirve |
+|---|---|
+| `adoption_requests (pet_id)` | solicitudes de una mascota (auditoría DB-07) |
+| `adoption_requests (status)` | conteo de solicitudes pendientes del panel |
+| `campaign_expenses (campaign_id, is_public)` | gastos públicos de una campaña (transparencia) |
+| `campaign_evidence (campaign_id, is_public)` | evidencias públicas de una campaña |
+| `campaign_updates (campaign_id, created_at DESC)` | novedades de una campaña en orden |
+| `donations (campaign_id, status, created_at DESC)` | cifras filtradas del panel (campaña + estado + fechas) y recaudación verificada por campaña |
+
+### 11.3 Archivos
+
+```
+lib/db/src/migrate.ts                             migración 021 (índices, aditiva)
+artifacts/api-server/tests/e2e/run-e2e.sh         verifica los 6 índices en base real
+```
+
+### 11.4 Verificación
+
+- **E2E contra PostgreSQL real: `E2E COMPLETO: OK`** con **21 migraciones** aplicadas y
+  **6/6 índices** por caso de uso presentes (`pg_indexes`), más la idempotencia del segundo
+  arranque.
+- **Límite declarado con honestidad:** la prueba que proponía la auditoría era
+  `EXPLAIN ANALYZE` con volumen real. En una base recién creada y vacía PostgreSQL prefiere
+  un *seq scan*, así que el E2E comprueba la **existencia** de los índices y que corresponden
+  a las consultas identificadas, no el plan de ejecución. Medir el plan requiere datos de
+  producción o un juego de datos grande, y queda como verificación pendiente (no se marca como
+  hecha).
