@@ -8,7 +8,8 @@ import {
   useGetCampaignDonors,
   type Campaign,
 } from "@workspace/api-client-react";
-import { useCampaignTransparency } from "@/hooks/use-phase3";
+import { useCampaignTransparency, usePublicCampaignBudgets } from "@/hooks/use-phase3";
+import { buildBudget, campaignBalance } from "@/lib/budget";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,13 +37,18 @@ import { DonationModal } from "@/components/shared/DonationModal";
 import {
   CHOCOFEST_2026,
   CHOCOFEST_2026_PATH,
+  CHOCOFEST_PROGRAM_SETTING_KEY,
   findChocofest2026,
+  parseProgram,
   resolveEventDetails,
 } from "@/lib/chocofest";
 import { usePublicSettings } from "@/hooks/use-public-settings";
 import {
   formatItemAmount,
   formatQuantity,
+  goalProgress,
+  groupInventoryByCategory,
+  resolveStock,
   summarizeInventory,
 } from "@/lib/inventory";
 import { isVideoEvidence, summarizeEvidence } from "@/lib/results";
@@ -164,10 +170,26 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   // configurado se usan los textos de trabajo marcados como provisionales.
   const { data: settings } = usePublicSettings();
   const details = resolveEventDetails(settings);
+  // Programa de actividades con responsables: texto editable desde el panel,
+  // interpretado por el parser puro (tolerante a líneas incompletas).
+  const program = parseProgram(settings?.[CHOCOFEST_PROGRAM_SETTING_KEY]);
   // Inventario y bienes (chocolatada, juguetes, canastas de víveres): reutiliza
   // los "sobrantes" públicos de la campaña, ya incluidos en la transparencia.
   const inventory = transparency?.publicLeftovers ?? [];
   const inventorySummary = summarizeInventory(inventory);
+  // Agrupación por producto para poder mostrar metas y saldos por bloque
+  // (chocolatada, regalos, canastas) sin inventar cifras.
+  const inventoryGroups = groupInventoryByCategory(inventory);
+  // Presupuesto por categoría (Fase 2.5): previsión administrada frente a los
+  // gastos PUBLICADOS — el sitio público nunca muestra gastos privados — y saldo
+  // general con el mismo monto recaudado que muestra la sección de avance.
+  const { data: budgetLines } = usePublicCampaignBudgets(campaign.id);
+  const budgetOverview = buildBudget(budgetLines, transparency?.publicExpenses ?? []);
+  const balance = campaignBalance(
+    campaign.raised ?? 0,
+    budgetOverview.totals.spent,
+    campaign.goal,
+  );
   // Resultados y rendición final: reutiliza las evidencias públicas.
   const publicEvidence = transparency?.publicEvidence ?? [];
   const resultsSummary = summarizeEvidence(publicEvidence);
@@ -237,7 +259,7 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
               {t("chocofest.provisionalMottoLabel")}: {details.motto}
             </p>
             <p className="text-sm text-muted-foreground">
-              {CHOCOFEST_2026.organizer} · {details.place}
+              {details.organizers} · {details.place}
             </p>
           </div>
 
@@ -275,6 +297,13 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
 
             {/* 3. Objetivo y metas */}
             <Section id="objetivo" icon={<Target className="w-5 h-5" />} title={t("chocofest.sectionGoal")}>
+              {/* Objetivos editables desde el panel. Si la organización aún no los
+                  ha definido no se muestra nada: nunca se inventa texto. */}
+              {details.objectives ? (
+                <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed mb-5">
+                  {details.objectives}
+                </p>
+              ) : null}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="bg-secondary/50 rounded-2xl p-5 border border-border/50">
                   <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
@@ -366,7 +395,7 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
             <Section id="especie" icon={<Gift className="w-5 h-5" />} title={t("chocofest.sectionInventory")}>
               {inventory.length > 0 ? (
                 <>
-                  <div className="flex flex-wrap gap-4 mb-4">
+                  <div className="flex flex-wrap gap-4 mb-6">
                     <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
                       <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
                         {t("chocofest.inventoryLinesLabel")}
@@ -382,26 +411,129 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
                       </div>
                     </div>
                   </div>
-                  <ul className="grid gap-3 sm:grid-cols-2">
-                    {inventory.map((item) => (
-                      <li key={item.id} className="bg-card border border-border rounded-2xl p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-semibold text-foreground">{item.item}</p>
-                          <span className="font-bold text-primary whitespace-nowrap">
-                            {formatItemAmount(item)}
-                          </span>
-                        </div>
-                        {item.notes ? (
-                          <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
-                        ) : null}
-                      </li>
+
+                  <div className="space-y-8">
+                    {inventoryGroups.map((group) => (
+                      <div key={group.category}>
+                        {/* Etiqueta del catálogo compartido (misma fuente que el panel). */}
+                        <h3 className="font-display font-bold text-foreground mb-3">{group.label}</h3>
+                        <ul className="grid gap-3 sm:grid-cols-2">
+                          {group.items.map((item) => {
+                            const stock = resolveStock(item);
+                            const progress = goalProgress(item.targetQty, stock.received);
+                            return (
+                              <li key={item.id} className="bg-card border border-border rounded-2xl p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="font-semibold text-foreground">{item.item}</p>
+                                  <span className="font-bold text-primary whitespace-nowrap">
+                                    {formatItemAmount({ quantity: stock.remaining, unit: item.unit })}
+                                  </span>
+                                </div>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
+                                  <span>{t("chocofest.itemReceived")}: {formatQuantity(stock.received)}</span>
+                                  <span>{t("chocofest.itemUsed")}: {formatQuantity(stock.used)}</span>
+                                  <span className="font-semibold text-foreground">
+                                    {t("chocofest.itemRemaining")}: {formatQuantity(stock.remaining)}
+                                  </span>
+                                </div>
+                                {progress.hasTarget ? (
+                                  <div className="mt-3">
+                                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                                      <span>{t("chocofest.itemGoal")}: {formatQuantity(progress.target)}</span>
+                                      <span className="font-bold text-primary">
+                                        {t("chocofest.progressLabel", { progress: progress.percent })}
+                                      </span>
+                                    </div>
+                                    <Progress value={progress.percent} className="h-2" />
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    {t("chocofest.itemNoGoal")}
+                                  </p>
+                                )}
+                                {item.notes ? (
+                                  <p className="text-xs text-muted-foreground mt-2">{item.notes}</p>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </>
               ) : (
                 <EmptyBox text={t("chocofest.emptyInventory")} />
               )}
               <p className="text-xs text-muted-foreground mt-3">{t("chocofest.inventoryNote")}</p>
+            </Section>
+
+            {/* 6b. Presupuesto por categoría y saldo general (Fase 2.5) */}
+            <Section id="presupuesto" icon={<ClipboardList className="w-5 h-5" />} title={t("chocofest.sectionBudget")}>
+              {budgetOverview.rows.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-4 mb-6">
+                    {[
+                      { label: t("chocofest.budgetPlanned"), value: budgetOverview.totals.planned },
+                      { label: t("chocofest.budgetSpent"), value: budgetOverview.totals.spent },
+                      { label: t("chocofest.budgetRemaining"), value: budgetOverview.totals.remaining },
+                      { label: t("chocofest.balanceLabel"), value: balance.balance },
+                    ].map((card) => (
+                      <div
+                        key={card.label}
+                        className="bg-secondary/50 px-4 py-3 rounded-xl border border-border/50"
+                      >
+                        <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                          {card.label}
+                        </div>
+                        <div
+                          className={`font-display font-bold ${
+                            card.value < 0 ? "text-destructive" : "text-foreground"
+                          }`}
+                        >
+                          S/ {card.value.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <ul className="space-y-3">
+                    {budgetOverview.rows.map((row) => (
+                      <li key={row.key} className="bg-card border border-border rounded-2xl p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-foreground">{row.category}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {t("chocofest.budgetPlanned")}: S/{" "}
+                              {row.planned.toLocaleString("es-PE", { maximumFractionDigits: 2 })} ·{" "}
+                              {t("chocofest.budgetSpent")}: S/{" "}
+                              {row.spent.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <span
+                            className={`font-bold whitespace-nowrap ${
+                              row.remaining < 0 ? "text-destructive" : "text-primary"
+                            }`}
+                          >
+                            S/ {row.remaining.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        {row.progress.hasTarget ? (
+                          <div className="mt-3">
+                            <Progress value={row.progress.percent} className="h-2" />
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {t("chocofest.budgetUnbudgeted")}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <EmptyBox text={t("chocofest.budgetEmpty")} />
+              )}
+              <p className="text-xs text-muted-foreground mt-3">{t("chocofest.budgetNote")}</p>
             </Section>
 
             {/* 7. Voluntariado */}
@@ -422,6 +554,29 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
 
             {/* 9. Cronograma de actividades */}
             <Section id="cronograma" icon={<Calendar className="w-5 h-5" />} title={t("chocofest.sectionTimeline")}>
+              {/* Programa estructurado (hora · actividad · responsable) definido
+                  desde el panel. Si aún no se ha definido, no se muestra nada:
+                  nunca se inventa un programa. */}
+              {program.length > 0 ? (
+                <ol className="space-y-3 mb-6">
+                  {program.map((activity, index) => (
+                    <li
+                      key={`${activity.time}-${activity.title}-${index}`}
+                      className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-baseline gap-x-3 gap-y-1"
+                    >
+                      {activity.time ? (
+                        <span className="font-display font-bold text-primary whitespace-nowrap">
+                          {activity.time}
+                        </span>
+                      ) : null}
+                      <span className="font-semibold text-foreground">{activity.title}</span>
+                      {activity.responsible ? (
+                        <span className="text-sm text-muted-foreground">· {activity.responsible}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
               {loadingUpdates ? (
                 <div className="h-20 flex items-center justify-center text-muted-foreground">{t("common.loading")}</div>
               ) : updates && updates.length > 0 ? (

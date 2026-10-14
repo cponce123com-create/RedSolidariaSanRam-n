@@ -49,9 +49,21 @@ const FILTER_TABS: { value: FilterStatus; label: string }[] = [
   { value: "archived", label: "Archivadas" },
 ];
 
+/** Criterios de ordenación de la lista (locales: no vuelven a pedir al API). */
+type SortOption = "recent" | "oldest" | "title" | "goal" | "raised";
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: "recent", label: "Más recientes" },
+  { value: "oldest", label: "Más antiguas" },
+  { value: "title", label: "Título (A-Z)" },
+  { value: "goal", label: "Meta (mayor)" },
+  { value: "raised", label: "Recaudado (mayor)" },
+];
+
 export default function AdminCampaigns() {
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("recent");
   const apiFilter = filter === "all" ? undefined : filter;
   const { data: campaigns, isLoading } = useGetCampaigns(apiFilter ? { status: apiFilter } : undefined);
   const createMutation = useCreateCampaign();
@@ -60,15 +72,32 @@ export default function AdminCampaigns() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Búsqueda local por título o categoría
+  // Búsqueda local por título o categoría + ordenación de lo visible. El
+  // servidor ya devuelve la lista filtrada por estado; aquí solo se reordena.
   const query = search.trim().toLowerCase();
-  const filteredCampaigns = (campaigns ?? []).filter((c) => {
-    if (!query) return true;
-    return (
-      c.title.toLowerCase().includes(query) ||
-      (c.category ?? "").toLowerCase().includes(query)
-    );
-  });
+  const filteredCampaigns = (campaigns ?? [])
+    .filter((c) => {
+      if (!query) return true;
+      return (
+        c.title.toLowerCase().includes(query) ||
+        (c.category ?? "").toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "title":
+          return a.title.localeCompare(b.title, "es");
+        case "goal":
+          return b.goal - a.goal;
+        case "raised":
+          return b.raised - a.raised;
+        case "oldest":
+          return (a.startDate ?? "").localeCompare(b.startDate ?? "");
+        case "recent":
+        default:
+          return (b.startDate ?? "").localeCompare(a.startDate ?? "");
+      }
+    });
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -183,6 +212,20 @@ export default function AdminCampaigns() {
             className="pl-9 rounded-xl bg-background"
             aria-label="Buscar campañas"
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortOption)}
+            aria-label="Ordenar campañas"
+            className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

@@ -9,6 +9,7 @@ import {
   campaignLeftoversTable,
   campaignImagesTable,
   campaignUpdatesTable,
+  communityReportsTable,
   settings,
   insertCampaignSchema,
 } from "@workspace/db";
@@ -49,12 +50,26 @@ function parseId(raw: unknown): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-/** Cuenta las filas dependientes de una campaña (para el borrado seguro). */
+/**
+ * Cuenta las filas dependientes de una campaña (para el borrado seguro).
+ *
+ * Incluye los REPORTES CIUDADANOS: `community_reports.campaign_id` no tiene FK
+ * (a diferencia del libro contable), así que sin contarlos el borrado los
+ * dejaría huérfanos apuntando a una campaña inexistente.
+ */
 async function countCampaignDependencies(
   campaignId: number,
 ): Promise<CampaignDependencies> {
-  const [donations, movements, expenses, evidence, leftovers, images, updates] =
-    await Promise.all([
+  const [
+    donations,
+    movements,
+    expenses,
+    evidence,
+    leftovers,
+    images,
+    updates,
+    communityReports,
+  ] = await Promise.all([
       db.select({ n: sql<number>`count(*)::int` }).from(donationsTable).where(eq(donationsTable.campaignId, campaignId)),
       db.select({ n: sql<number>`count(*)::int` }).from(campaignMovementsTable).where(eq(campaignMovementsTable.campaignId, campaignId)),
       db.select({ n: sql<number>`count(*)::int` }).from(campaignExpensesTable).where(eq(campaignExpensesTable.campaignId, campaignId)),
@@ -62,6 +77,7 @@ async function countCampaignDependencies(
       db.select({ n: sql<number>`count(*)::int` }).from(campaignLeftoversTable).where(eq(campaignLeftoversTable.campaignId, campaignId)),
       db.select({ n: sql<number>`count(*)::int` }).from(campaignImagesTable).where(eq(campaignImagesTable.campaignId, campaignId)),
       db.select({ n: sql<number>`count(*)::int` }).from(campaignUpdatesTable).where(eq(campaignUpdatesTable.campaignId, campaignId)),
+      db.select({ n: sql<number>`count(*)::int` }).from(communityReportsTable).where(eq(communityReportsTable.campaignId, campaignId)),
     ]);
 
   return {
@@ -72,6 +88,7 @@ async function countCampaignDependencies(
     leftovers: leftovers[0]?.n ?? 0,
     images: images[0]?.n ?? 0,
     updates: updates[0]?.n ?? 0,
+    communityReports: communityReports[0]?.n ?? 0,
   };
 }
 

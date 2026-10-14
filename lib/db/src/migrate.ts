@@ -299,6 +299,46 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON volunteer_participations (volunteer_id, participated_at DESC);
     `,
   },
+  {
+    name: "015_campaign_items_flow.sql",
+    sql: `
+      -- Bienes del evento (chocolatada, regalos, canastas): clasificación, meta
+      -- y flujo recibido/usado. ADITIVA y reversible (DROP COLUMN deshace).
+      -- Reutiliza campaign_leftovers: no se crea una tabla por producto.
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS category text;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS target_qty real;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS received_qty real;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS used_qty real;
+
+      CREATE INDEX IF NOT EXISTS idx_campaign_leftovers_category
+        ON campaign_leftovers (campaign_id, category);
+    `,
+  },
+  {
+    name: "016_campaign_budgets.sql",
+    sql: `
+      -- Presupuesto por categoría (Fase 2.5 del Prompt Maestro): monto previsto
+      -- por categoría frente a los gastos aprobados. ADITIVA (solo crea tabla e
+      -- índices); no toca ninguna tabla existente.
+      CREATE TABLE IF NOT EXISTS campaign_budgets (
+        id serial PRIMARY KEY,
+        campaign_id integer NOT NULL,
+        category text NOT NULL,
+        planned_amount real NOT NULL DEFAULT 0,
+        notes text,
+        is_public boolean NOT NULL DEFAULT true,
+        created_at timestamp NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_campaign_budgets_campaign
+        ON campaign_budgets (campaign_id);
+
+      -- Una sola línea de presupuesto por categoría y campaña (sin distinguir
+      -- mayúsculas ni espacios), para que el panel no duplique partidas.
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_budgets_category
+        ON campaign_budgets (campaign_id, lower(category));
+    `,
+  },
 ];
 
 /**

@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
 import { useReconcileDonation } from "@/hooks/use-donors-admin";
+import { invalidateDonationQueries } from "@/lib/query-invalidation";
 
 type FilterStatus = "all" | "pending" | "approved" | "rejected" | "reconciled";
 
@@ -78,8 +79,7 @@ export default function AdminDonations() {
         description: "Recargando las donaciones…",
         variant: "destructive",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+      invalidateDonationQueries(queryClient);
       return;
     }
     updateStatus.mutate(
@@ -87,8 +87,9 @@ export default function AdminDonations() {
       {
         onSuccess: () => {
           toast({ title: "Donación aprobada", description: "El estado ha sido actualizado." });
-          queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+          // Aprobar cambia el monto recaudado y el panel de transparencia: se
+          // refresca la entidad donaciones Y la entidad campañas.
+          invalidateDonationQueries(queryClient);
         },
         onError: (err) => {
           toast({ title: "No se pudo aprobar", description: mutationError(err), variant: "destructive" });
@@ -106,8 +107,7 @@ export default function AdminDonations() {
         description: "Recargando las donaciones…",
         variant: "destructive",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+      invalidateDonationQueries(queryClient);
       return;
     }
     updateStatus.mutate(
@@ -115,8 +115,7 @@ export default function AdminDonations() {
       {
         onSuccess: () => {
           toast({ title: "Donación rechazada", description: "Se guardó la nota de rechazo." });
-          queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+          invalidateDonationQueries(queryClient);
           setRejectDialogId(null);
           setRejectNote("");
         },

@@ -62,13 +62,16 @@ const AdminFaq = lazy(() => import("./pages/admin/faq"));
 const AdminUsers = lazy(() => import("./pages/admin/users"));
 const AdminSettings = lazy(() => import("./pages/admin/settings"));
 
-// Caché de 60s + sin refetch al enfocar la pestaña: al volver al home (o navegar
-// de vuelta) los datos ya cacheados se muestran al instante, sin recargar.
+// Caché de 60s y refresco al volver a la pestaña: los datos ya cacheados se
+// muestran al instante y, si tienen más de 60s, se revalidan al enfocar la
+// ventana. Antes `refetchOnWindowFocus: false` mantenía la web pública con datos
+// viejos hasta una recarga manual, lo que hacía parecer que el panel de
+// administración «no guardaba» (Fase 1 — sincronización admin↔público).
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60_000,
-      refetchOnWindowFocus: false,
+      refetchOnWindowFocus: true,
     },
   },
 });

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { 
   useGetCampaign, 
   useUpdateCampaign, 
@@ -22,8 +22,13 @@ import {
   useAdminCampaignLeftovers,
   useCreateLeftover,
   useUpdateLeftover,
-  useDeleteLeftover
+  useDeleteLeftover,
+  useCampaignTransparency,
+  useAdminCampaignBudgets,
+  useCreateBudget,
+  useDeleteBudget
 } from "@/hooks/use-phase3";
+import { buildBudget, campaignBalance } from "@/lib/budget";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +59,14 @@ import {
   lifecycleActions,
   type LifecycleAction,
 } from "@/lib/campaign-admin";
+import {
+  INVENTORY_CATEGORIES,
+  INVENTORY_CATEGORY_LABEL,
+  formatQuantity,
+  goalProgress,
+  normalizeCategory,
+  resolveStock,
+} from "@/lib/inventory";
 
 // Selector de ubicación con mapa libre (Leaflet/OpenStreetMap) — lazy para no
 // inflar el bundle del panel admin.
@@ -106,10 +119,42 @@ const evidenceSchema = z.object({
   isPublic: z.boolean().default(true),
 });
 
-const leftoverSchema = z.object({
-  item: z.string().min(3, "Ítem requerido"),
-  quantity: z.coerce.number().min(0, "La cantidad no puede ser negativa").default(1),
-  unit: z.string().optional(),
+/**
+ * Bien o insumo del evento (Fase 2): raciones de chocolatada, regalos y
+ * juguetes, canastas de víveres y otros aportes en especie.
+ *
+ * Se registra el FLUJO (recibido/usado): el saldo disponible lo calcula el
+ * servidor como `recibido - usado`, así que el panel no puede dejar el
+ * inventario descuadrado ni con dos cifras distintas.
+ */
+const leftoverSchema = z
+  .object({
+    item: z.string().min(3, "Ítem requerido"),
+    category: z
+      .enum(["chocolatada", "regalos", "canastas", "general"])
+      .default("general"),
+    targetQty: z.coerce.number().min(0, "La meta no puede ser negativa").optional(),
+    receivedQty: z.coerce.number().min(0, "La cantidad recibida no puede ser negativa"),
+    usedQty: z.coerce.number().min(0, "La cantidad usada no puede ser negativa").default(0),
+    unit: z.string().optional(),
+    notes: z.string().optional(),
+    isPublic: z.boolean().default(true),
+  })
+  .refine((v) => v.usedQty <= v.receivedQty, {
+    message: "Lo usado no puede superar lo recibido",
+    path: ["usedQty"],
+  });
+
+/**
+ * Partida de presupuesto por categoría (Fase 2.5).
+ *
+ * Es una PREVISIÓN administrada: el gasto real vive en los gastos de la campaña
+ * (única fuente del dinero gastado) y el cruce entre ambos lo hace la función
+ * pura `buildBudget`, así que aquí no se guarda ningún saldo.
+ */
+const budgetSchema = z.object({
+  category: z.string().min(3, "Categoría requerida"),
+  plannedAmount: z.coerce.number().min(0, "El monto no puede ser negativo"),
   notes: z.string().optional(),
   isPublic: z.boolean().default(true),
 });
@@ -129,7 +174,12 @@ export default function AdminCampaignDetail() {
   const { data: leftovers } = useAdminCampaignLeftovers(campaignId);
 
   const updateCampaign = useUpdateCampaign();
-  const { setStatus: setLifecycleStatus } = useCampaignLifecycle();
+  const { setStatus: setLifecycleStatus, remove: deleteCampaign } = useCampaignLifecycle();
+  const [, setLocation] = useLocation();
+  // Fuente de verdad de la recaudación: donaciones CONFIRMADAS (approved o
+  // reconciled). El campo manual de la campaña solo es la fuente cuando todavía
+  // no hay ninguna donación confirmada (por eso se avisa en el formulario).
+  const { data: transparency } = useCampaignTransparency(campaignId);
   const addImage = useAddCampaignImage();
   const deleteImage = useDeleteCampaignImage();
   const addUpdate = useCreateCampaignUpdate();
@@ -147,6 +197,11 @@ export default function AdminCampaignDetail() {
   const createLeftover = useCreateLeftover(campaignId);
   const updateLeftover = useUpdateLeftover(campaignId);
   const deleteLeftover = useDeleteLeftover(campaignId);
+
+  // Presupuesto por categoría (Fase 2.5): previsión administrada por rubro.
+  const { data: budgets } = useAdminCampaignBudgets(campaignId);
+  const createBudget = useCreateBudget(campaignId);
+  const deleteBudget = useDeleteBudget(campaignId);
 
   const infoForm = useForm<z.infer<typeof infoSchema>>({
     resolver: zodResolver(infoSchema),
@@ -180,7 +235,21 @@ export default function AdminCampaignDetail() {
 
   const leftoverForm = useForm<z.infer<typeof leftoverSchema>>({
     resolver: zodResolver(leftoverSchema),
-    defaultValues: { item: "", quantity: 1, unit: "", notes: "", isPublic: true }
+    defaultValues: {
+      item: "",
+      category: "general",
+      targetQty: undefined,
+      receivedQty: 0,
+      usedQty: 0,
+      unit: "",
+      notes: "",
+      isPublic: true,
+    },
+  });
+
+  const budgetForm = useForm<z.infer<typeof budgetSchema>>({
+    resolver: zodResolver(budgetSchema),
+    defaultValues: { category: "", plannedAmount: 0, notes: "", isPublic: true },
   });
 
   useEffect(() => {
@@ -268,15 +337,82 @@ export default function AdminCampaignDetail() {
   };
 
   const onLeftoverSubmit = (values: z.infer<typeof leftoverSchema>) => {
-    createLeftover.mutate(values, {
-      onSuccess: () => {
-        toast({ title: "Sobrante registrado" });
-        leftoverForm.reset({ item: "", quantity: 1, unit: "", notes: "", isPublic: true });
-      }
-    });
+    // El servidor calcula el saldo (`recibido - usado`): aquí solo se envían los
+    // datos del bien. Si rechaza algo, se muestra su mensaje real.
+    createLeftover.mutate(
+      {
+        item: values.item,
+        category: values.category,
+        targetQty: values.targetQty ?? null,
+        receivedQty: values.receivedQty,
+        usedQty: values.usedQty,
+        unit: values.unit,
+        notes: values.notes,
+        isPublic: values.isPublic,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Bien registrado" });
+          leftoverForm.reset({
+            item: "",
+            category: "general",
+            targetQty: undefined,
+            receivedQty: 0,
+            usedQty: 0,
+            unit: "",
+            notes: "",
+            isPublic: true,
+          });
+        },
+        onError: (err) => {
+          toast({
+            title: "No se pudo registrar el bien",
+            description: errorMessage(err),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
+  const onBudgetSubmit = (values: z.infer<typeof budgetSchema>) => {
+    // `plannedAmount` es una PREVISIÓN: el gasto real lo aportan los gastos de la
+    // campaña. Si el backend rechaza la partida (categoría duplicada, monto
+    // inválido…), se muestra su mensaje real.
+    createBudget.mutate(
+      {
+        category: values.category,
+        plannedAmount: values.plannedAmount,
+        notes: values.notes,
+        isPublic: values.isPublic,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Partida presupuestada" });
+          budgetForm.reset({ category: "", plannedAmount: 0, notes: "", isPublic: true });
+        },
+        onError: (err) => {
+          toast({
+            title: "No se pudo guardar la partida",
+            description: errorMessage(err),
+            variant: "destructive",
+          });
+        },
+      },
+    );
   };
 
   if (isLoading || !campaign) return <div className="p-8 flex justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>;
+
+  // Presupuesto por categoría y saldo (Fase 2.5) con las MISMAS funciones puras
+  // que usa el sitio público: el gasto sale de los gastos de la campaña, nunca
+  // de una copia guardada en la partida.
+  const budgetOverview = buildBudget(budgets, expenses);
+  const balance = campaignBalance(
+    campaign.raised ?? 0,
+    budgetOverview.totals.spent,
+    campaign.goal,
+  );
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto" data-testid="admin-campaign-detail">
@@ -310,6 +446,33 @@ export default function AdminCampaignDetail() {
               {action.label}
             </Button>
           ))}
+          {campaign.status === "draft" && (
+            <Button
+              variant="outline"
+              className="rounded-xl text-destructive hover:bg-destructive/10"
+              disabled={deleteCampaign.isPending}
+              data-testid="delete-campaign-draft"
+              onClick={() => {
+                // El backend solo borra DEFINITIVAMENTE borradores sin ningún
+                // registro asociado; si los tiene responde 409 con el motivo y la
+                // salida segura es Archivar (que conserva todo el historial).
+                if (
+                  !confirm(
+                    "Se eliminará DEFINITIVAMENTE este borrador. Solo es posible si no tiene ningún registro asociado (donaciones, movimientos del libro, gastos, evidencias, sobrantes, imágenes, novedades o reportes). Si los tiene, usa Archivar. ¿Continuar?",
+                  )
+                )
+                  return;
+                deleteCampaign.mutate(campaignId, {
+                  onSuccess: () => {
+                    toast({ title: "Borrador eliminado" });
+                    setLocation("/admin/campanas");
+                  },
+                });
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Eliminar borrador
+            </Button>
+          )}
           <Link href={`/campanas/${campaignId}/transparencia`}>
             <Button variant="default" className="rounded-xl shadow-md hover-elevate">
               <Eye className="w-4 h-4 mr-2" /> Ver P. Transparente
@@ -360,9 +523,34 @@ export default function AdminCampaignDetail() {
                 <FormField control={infoForm.control} name="goal" render={({ field }) => (
                   <FormItem><FormLabel>Meta (S/)</FormLabel><FormControl><Input type="number" className="rounded-xl bg-secondary/30" {...field} /></FormControl></FormItem>
                 )} />
-                <FormField control={infoForm.control} name="raised" render={({ field }) => (
-                  <FormItem><FormLabel>Recaudación Actual (S/)</FormLabel><FormControl><Input type="number" className="rounded-xl bg-secondary/30" {...field} /></FormControl><p className="text-xs text-muted-foreground">Normalmente se actualiza automático por donaciones.</p></FormItem>
-                )} />
+                <FormField control={infoForm.control} name="raised" render={({ field }) => {
+                  // La recaudación real la determinan las DONACIONES CONFIRMADAS:
+                  // el backend publica max(columna manual, donaciones). Si ya hay
+                  // donaciones, el valor manual no tiene efecto, así que se
+                  // bloquea y se explica en lugar de dejar creer que se guardó.
+                  const confirmedRaised = transparency?.totalRaised ?? 0;
+                  const confirmedDonors = transparency?.donorCount ?? 0;
+                  const fromDonations = confirmedRaised > 0;
+                  return (
+                    <FormItem>
+                      <FormLabel>Recaudación actual (S/)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          className="rounded-xl bg-secondary/30"
+                          {...field}
+                          disabled={fromDonations}
+                          data-testid="campaign-raised-input"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        {fromDonations
+                          ? `Fuente de verdad: ${confirmedDonors} donación(es) confirmada(s) suman S/ ${confirmedRaised.toFixed(2)}. Mientras existan, este campo es de solo lectura y el sitio público muestra ese total.`
+                          : "Todavía no hay donaciones confirmadas: este valor manual es el que se muestra en el sitio público y se reemplazará automáticamente al aprobar la primera donación."}
+                      </p>
+                    </FormItem>
+                  );
+                }} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -653,6 +841,146 @@ export default function AdminCampaignDetail() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Presupuesto por categoría (Fase 2.5): previsión administrada frente a
+              los gastos reales. El gasto NO se copia aquí: se cruza por categoría
+              con `buildBudget`, la misma función pura que usa el sitio público. */}
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm" data-testid="budget-panel">
+            <h3 className="font-display font-bold text-xl mb-2">Presupuesto por categoría</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Cuánto teníamos previsto por rubro frente a los gastos registrados. Es una previsión:
+              el dinero gastado sale siempre de los gastos de esta campaña, así que no hay dos
+              cifras posibles.
+            </p>
+
+            <Form {...budgetForm}>
+              <form onSubmit={budgetForm.handleSubmit(onBudgetSubmit)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="md:col-span-6">
+                    <FormField control={budgetForm.control} name="category" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Categoría</FormLabel>
+                        <FormControl><Input placeholder="alimentación, transporte, materiales..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl>
+                        <p className="text-xs text-muted-foreground">Debe coincidir con la categoría de los gastos para poder cruzarlos.</p>
+                        <FormMessage/>
+                      </FormItem>
+                    )} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <FormField control={budgetForm.control} name="plannedAmount" render={({ field }) => (
+                      <FormItem><FormLabel>Monto previsto (S/)</FormLabel><FormControl><Input type="number" step="0.01" min="0" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    )} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <FormField control={budgetForm.control} name="notes" render={({ field }) => (
+                      <FormItem><FormLabel>Notas (opcional)</FormLabel><FormControl><Input placeholder="Detalle de la partida" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    )} />
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-secondary/30 rounded-xl p-4 border border-border">
+                  <FormField control={budgetForm.control} name="isPublic" render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 space-y-0">
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <div className="space-y-0.5"><FormLabel className="cursor-pointer">Visible en el sitio público</FormLabel><p className="text-xs text-muted-foreground">Se publica en la sección de presupuesto del evento</p></div>
+                    </FormItem>
+                  )} />
+                  <Button type="submit" disabled={createBudget.isPending} className="rounded-xl px-8 shadow-md hover-elevate w-full md:w-auto">
+                    <Save className="w-4 h-4 mr-2" /> Guardar partida
+                  </Button>
+                </div>
+              </form>
+            </Form>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Previsto</p>
+                <p className="text-lg font-display font-bold">S/ {budgetOverview.totals.planned.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Gastado</p>
+                <p className="text-lg font-display font-bold">S/ {budgetOverview.totals.spent.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Saldo previsto</p>
+                <p className={`text-lg font-display font-bold ${budgetOverview.totals.remaining < 0 ? "text-destructive" : ""}`}>
+                  S/ {budgetOverview.totals.remaining.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Saldo general</p>
+                <p className={`text-lg font-display font-bold ${balance.balance < 0 ? "text-destructive" : ""}`}>
+                  S/ {balance.balance.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {balance.goalProgress.hasTarget
+                    ? `Recaudado S/ ${balance.raised.toLocaleString("es-PE")} · ${balance.goalProgress.percent}% de la meta`
+                    : "Sin meta de recaudación definida"}
+                </p>
+              </div>
+            </div>
+
+            {budgetOverview.totals.exceededRows > 0 && (
+              <p className="text-sm text-destructive mt-4">
+                {budgetOverview.totals.exceededRows} partida(s) excedida(s): el gasto supera lo previsto.
+              </p>
+            )}
+
+            <div className="mt-6" data-testid="budget-table">
+              {budgetOverview.rows.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-secondary/50">
+                    <TableRow>
+                      <TableHead>Categoría</TableHead>
+                      <TableHead>Previsto</TableHead>
+                      <TableHead>Gastado</TableHead>
+                      <TableHead>Saldo</TableHead>
+                      <TableHead>Avance</TableHead>
+                      <TableHead className="text-center">Visibilidad</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {budgetOverview.rows.map(row => {
+                      const rowId = row.id;
+                      return (
+                        <TableRow key={row.key}>
+                          <TableCell className="font-medium">
+                            {row.category}
+                            {row.notes ? <p className="text-xs text-muted-foreground font-normal">{row.notes}</p> : null}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">S/ {row.planned.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="whitespace-nowrap">S/ {row.spent.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</TableCell>
+                          <TableCell className={`font-bold whitespace-nowrap ${row.remaining < 0 ? "text-destructive" : "text-primary"}`}>
+                            S/ {row.remaining.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {row.progress.hasTarget ? `${row.progress.percent}%` : "Sin partida"}
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">
+                            {rowId === undefined ? "—" : row.isPublic ? "Público" : "Oculto"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {rowId === undefined ? (
+                              <span className="text-xs text-muted-foreground">Presupuesta esta categoría</span>
+                            ) : (
+                              <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm(`¿Eliminar la partida de «${row.category}»? Los gastos registrados NO se borran.`)) deleteBudget.mutate(rowId) }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="py-8 text-center text-muted-foreground">
+                  Aún no hay partidas de presupuesto. Registra cuánto prevéis por categoría para poder compararlo con los gastos reales.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -780,40 +1108,84 @@ export default function AdminCampaignDetail() {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
 
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm">
-            <h3 className="font-display font-bold text-xl mb-6">Registrar Sobrante</h3>
+            <h3 className="font-display font-bold text-xl mb-2">Registrar bien o insumo</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Chocolatada y raciones, regalos y juguetes, canastas de víveres y otros aportes en
+              especie. Se registra lo <strong>recibido</strong> y lo <strong>usado</strong>: el
+              saldo disponible se calcula solo (recibido − usado), así el inventario nunca queda
+              descuadrado ni con dos cifras distintas.
+            </p>
             <Form {...leftoverForm}>
               <form onSubmit={leftoverForm.handleSubmit(onLeftoverSubmit)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className="md:col-span-6">
+                  <div className="md:col-span-5">
                     <FormField control={leftoverForm.control} name="item" render={({ field }) => (
-                      <FormItem><FormLabel>Ítem sobrante</FormLabel><FormControl><Input placeholder="Ej. 2 cajas de panetón, S/ 50 en efectivo..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                      <FormItem><FormLabel>Bien o insumo</FormLabel><FormControl><Input placeholder="Ej. Raciones de chocolate, juguetes, canastas..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
                     )} />
                   </div>
-                  <div className="md:col-span-3">
-                    <FormField control={leftoverForm.control} name="quantity" render={({ field }) => (
-                      <FormItem><FormLabel>Cantidad</FormLabel><FormControl><Input type="number" step="any" min="0" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                  <div className="md:col-span-4">
+                    <FormField control={leftoverForm.control} name="category" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Grupo</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl><SelectTrigger className="bg-secondary/30 rounded-xl"><SelectValue placeholder="Selecciona un grupo" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            {INVENTORY_CATEGORIES.map((category) => (
+                              <SelectItem key={category} value={category}>{INVENTORY_CATEGORY_LABEL[category]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage/>
+                      </FormItem>
                     )} />
                   </div>
                   <div className="md:col-span-3">
                     <FormField control={leftoverForm.control} name="unit" render={({ field }) => (
-                      <FormItem><FormLabel>Unidad</FormLabel><FormControl><Input placeholder="cajas, kg, S/..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                      <FormItem><FormLabel>Unidad</FormLabel><FormControl><Input placeholder="raciones, juguetes, canastas" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
                     )} />
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField control={leftoverForm.control} name="receivedQty" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cantidad recibida</FormLabel>
+                      <FormControl><Input type="number" step="any" min="0" className="bg-secondary/30 rounded-xl" {...field} /></FormControl>
+                      <p className="text-xs text-muted-foreground">Donada o comprada.</p>
+                      <FormMessage/>
+                    </FormItem>
+                  )} />
+                  <FormField control={leftoverForm.control} name="usedQty" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cantidad usada o entregada</FormLabel>
+                      <FormControl><Input type="number" step="any" min="0" className="bg-secondary/30 rounded-xl" {...field} /></FormControl>
+                      <p className="text-xs text-muted-foreground">Lo ya repartido o consumido.</p>
+                      <FormMessage/>
+                    </FormItem>
+                  )} />
+                  <FormField control={leftoverForm.control} name="targetQty" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Meta (opcional)</FormLabel>
+                      <FormControl><Input type="number" step="any" min="0" placeholder="Ej. 80" className="bg-secondary/30 rounded-xl" value={field.value ?? ""} onChange={field.onChange} /></FormControl>
+                      <p className="text-xs text-muted-foreground">Déjala vacía si aún no hay meta aprobada.</p>
+                      <FormMessage/>
+                    </FormItem>
+                  )} />
+                </div>
+
                 <FormField control={leftoverForm.control} name="notes" render={({ field }) => (
-                  <FormItem><FormLabel>Destino / Notas</FormLabel><FormControl><Textarea placeholder="Ej. entregados a la comunidad, en custodia, donados..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                  <FormItem><FormLabel>Destino / Notas</FormLabel><FormControl><Textarea placeholder="Ej. entregados en la comunidad, en custodia, valorizados... (informativo: no se suma al dinero recaudado)" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
                 )} />
 
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-secondary/30 rounded-xl p-4 border border-border">
                   <FormField control={leftoverForm.control} name="isPublic" render={({ field }) => (
                     <FormItem className="flex items-center gap-3 space-y-0">
                       <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                      <div className="space-y-0.5"><FormLabel className="cursor-pointer">Sobrante Público</FormLabel><p className="text-xs text-muted-foreground">Visible para todos en el panel de transparencia</p></div>
+                      <div className="space-y-0.5"><FormLabel className="cursor-pointer">Visible en el sitio público</FormLabel><p className="text-xs text-muted-foreground">Aparece en el inventario del panel de transparencia</p></div>
                     </FormItem>
                   )} />
                   <Button type="submit" disabled={createLeftover.isPending} className="rounded-xl px-8 shadow-md hover-elevate w-full md:w-auto">
-                    <Save className="w-4 h-4 mr-2" /> Guardar Sobrante
+                    <Save className="w-4 h-4 mr-2" /> Guardar bien
                   </Button>
                 </div>
               </form>
@@ -825,22 +1197,48 @@ export default function AdminCampaignDetail() {
               <Table>
                 <TableHeader className="bg-secondary/50">
                   <TableRow>
-                    <TableHead>Cantidad</TableHead>
-                    <TableHead>Ítem</TableHead>
-                    <TableHead>Destino / Notas</TableHead>
+                    <TableHead>Bien</TableHead>
+                    <TableHead>Grupo</TableHead>
+                    <TableHead>Recibido / Usado</TableHead>
+                    <TableHead>Disponible</TableHead>
+                    <TableHead>Meta</TableHead>
                     <TableHead className="text-center">Visibilidad</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {leftovers.map(lo => (
+                  {leftovers.map(lo => {
+                    // Saldo y avance se calculan con las MISMAS funciones puras que
+                    // usa la página pública: panel y sitio no pueden discrepar.
+                    const stock = resolveStock(lo);
+                    const progress = goalProgress(lo.targetQty, stock.received);
+                    return (
                     <TableRow key={lo.id}>
-                      <TableCell className="font-display font-bold text-primary whitespace-nowrap">
-                        {Number(lo.quantity).toLocaleString("es-PE", { maximumFractionDigits: 2 })}
-                        {lo.unit ? ` ${lo.unit}` : ""}
+                      <TableCell className="font-medium text-foreground">
+                        {lo.item}
+                        {lo.notes ? (
+                          <p className="text-xs text-muted-foreground font-normal">{lo.notes}</p>
+                        ) : null}
                       </TableCell>
-                      <TableCell className="font-medium text-foreground">{lo.item}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{lo.notes || "-"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {INVENTORY_CATEGORY_LABEL[normalizeCategory(lo.category)]}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatQuantity(stock.received)}
+                        {lo.unit ? ` ${lo.unit}` : ""} − {formatQuantity(stock.used)}
+                      </TableCell>
+                      <TableCell className="font-display font-bold text-primary whitespace-nowrap">
+                        {formatQuantity(stock.remaining)}{lo.unit ? ` ${lo.unit}` : ""}
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {progress.hasTarget ? (
+                          <span className={progress.reached ? "text-primary font-bold" : "text-muted-foreground"}>
+                            {formatQuantity(progress.current)} / {formatQuantity(progress.target)} ({progress.percent}%)
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">Sin meta</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2 text-xs">
                           <Switch checked={lo.isPublic} onCheckedChange={(val) => updateLeftover.mutate({ id: lo.id, data: { isPublic: val }})} aria-label="Toggle visibility" />
@@ -848,18 +1246,19 @@ export default function AdminCampaignDetail() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm("¿Eliminar sobrante?")) deleteLeftover.mutate(lo.id) }}>
+                        <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm("¿Eliminar este bien del inventario?")) deleteLeftover.mutate(lo.id) }}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             ) : (
               <div className="p-12 text-center text-muted-foreground">
                 <PackageOpen className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>No hay sobrantes registrados. Cuando la campaña cierre, registra aquí los ítems o dinero que quedaron.</p>
+                <p>No hay bienes registrados. Registra aquí lo recibido (raciones, juguetes, canastas) para poder mostrar el avance de las metas del evento.</p>
               </div>
             )}
           </div>

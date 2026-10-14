@@ -1,19 +1,123 @@
 import { Router, type IRouter } from "express";
-import { db, campaignLeftoversTable, insertCampaignLeftoverSchema } from "@workspace/db";
+import { db, campaignLeftoversTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
-
-// Sobrantes de campaña: solo administrador o superadmin para escribir.
-const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { adminActionLimiter } from "../middleware/rate-limit";
+
+// Bienes e insumos de una campaña (Fase 2 del Prompt Maestro): raciones de
+// chocolatada, juguetes/regalos, canastas de víveres y otros aportes en especie.
+// Se reutiliza `campaign_leftovers`; no hay una tabla por producto.
+//
+// Solo administrador o superadmin para escribir.
+const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 
 const router: IRouter = Router();
 
-// Público: SOLO sobrantes publicados (is_public=true). El filtro va en SQL
-// para que las filas privadas NUNCA salgan por este endpoint anónimo (mismo
-// patrón que /campaigns/:id/evidence).
+const MAX_TEXT = 300;
+const MAX_ITEM = 120;
+const MAX_CATEGORY = 40;
+
+interface ItemPayload {
+  item: string;
+  quantity: number;
+  unit: string | null;
+  notes: string | null;
+  isPublic: boolean;
+  category: string | null;
+  targetQty: number | null;
+  receivedQty: number | null;
+  usedQty: number | null;
+}
+
+type ParseResult =
+  | { ok: true; data: ItemPayload }
+  | { ok: false; message: string };
+
+function optionalText(value: unknown, max = MAX_TEXT): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, max) : null;
+}
+
+/**
+ * Cantidad opcional: acepta número, cadena numérica, null o vacío.
+ * Devuelve `"invalid"` si no es un número finito no negativo.
+ */
+function optionalQty(value: unknown): number | null | "invalid" {
+  if (value === null || value === undefined || value === "") return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 0) return "invalid";
+  return n;
+}
+
+/**
+ * Valida el cuerpo de un bien. Devuelve un mensaje REAL y accionable en lugar
+ * de un 400 genérico, para que el panel pueda explicarlo.
+ *
+ * Regla del saldo: si se registra el flujo (`receivedQty`), `quantity` pasa a
+ * ser el SALDO (`recibido - usado`). Así cualquier lector que use `quantity`
+ * —incluida la sección pública de inventario— sigue viendo el número correcto,
+ * y la regla de presentación vive en la función pura `resolveStock` del
+ * frontend (`src/lib/inventory.ts`).
+ */
+function parseItemPayload(body: unknown, campaignId: number): ParseResult {
+  const raw = (body ?? {}) as Record<string, unknown>;
+
+  const item = optionalText(raw.item, MAX_ITEM);
+  if (!item) {
+    return { ok: false, message: "El nombre del bien es obligatorio." };
+  }
+
+  const quantityRaw = optionalQty(raw.quantity);
+  if (quantityRaw === "invalid") {
+    return { ok: false, message: "La cantidad disponible debe ser un número mayor o igual a 0." };
+  }
+
+  const targetQty = optionalQty(raw.targetQty);
+  if (targetQty === "invalid") {
+    return { ok: false, message: "La meta debe ser un número mayor o igual a 0." };
+  }
+  const receivedQty = optionalQty(raw.receivedQty);
+  if (receivedQty === "invalid") {
+    return { ok: false, message: "La cantidad recibida debe ser un número mayor o igual a 0." };
+  }
+  const usedQty = optionalQty(raw.usedQty);
+  if (usedQty === "invalid") {
+    return { ok: false, message: "La cantidad usada debe ser un número mayor o igual a 0." };
+  }
+  if (receivedQty !== null && usedQty !== null && usedQty > receivedQty) {
+    return {
+      ok: false,
+      message: `La cantidad usada (${usedQty}) no puede superar la recibida (${receivedQty}).`,
+    };
+  }
+
+  const hasFlow = receivedQty !== null;
+  const quantity = hasFlow
+    ? Math.max(0, receivedQty - (usedQty ?? 0))
+    : (quantityRaw ?? 1);
+
+  return {
+    ok: true,
+    data: {
+      item,
+      quantity,
+      unit: optionalText(raw.unit, 40),
+      notes: optionalText(raw.notes),
+      isPublic: raw.isPublic === undefined ? true : Boolean(raw.isPublic),
+      category: optionalText(raw.category, MAX_CATEGORY),
+      targetQty,
+      receivedQty,
+      usedQty,
+    },
+  };
+}
+
+// Público: SOLO bienes publicados (is_public=true). El filtro va en SQL para que
+// las filas privadas NUNCA salgan por este endpoint anónimo (mismo patrón que
+// /campaigns/:id/evidence).
 router.get("/campaigns/:id/leftovers", async (req, res) => {
   try {
     const campaignId = Number(req.params.id);
@@ -34,7 +138,7 @@ router.get("/campaigns/:id/leftovers", async (req, res) => {
   }
 });
 
-// Admin: TODOS los sobrantes (públicos y privados) para gestión interna.
+// Admin: TODOS los bienes (públicos y privados) para gestión interna.
 // Protegido por el gate global /admin/* (index.ts) y por adminOnly.
 router.get(
   "/admin/campaigns/:id/leftovers",
@@ -61,14 +165,20 @@ router.post(
   ...adminOnly,
   adminActionLimiter,
   async (req, res) => {
+    const campaignId = Number(req.params.id);
+    const parsed = parseItemPayload(req.body, campaignId);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: "validation_error", message: parsed.message });
+    }
     try {
-      const campaignId = Number(req.params.id);
-      const data = insertCampaignLeftoverSchema.parse({ ...req.body, campaignId });
-      const [leftover] = await db.insert(campaignLeftoversTable).values(data).returning();
-      res.status(201).json(formatLeftover(leftover));
+      const [leftover] = await db
+        .insert(campaignLeftoversTable)
+        .values({ ...parsed.data, campaignId })
+        .returning();
+      return res.status(201).json(formatLeftover(leftover));
     } catch (err) {
       req.log.error({ err }, "Failed to create campaign leftover");
-      res.status(400).json({ error: "validation_error", message: "Invalid leftover data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo guardar el bien." });
     }
   },
 );
@@ -78,13 +188,31 @@ router.put(
   ...adminOnly,
   adminActionLimiter,
   async (req, res) => {
+    const campaignId = Number(req.params.id);
+    const leftoverId = Number(req.params.leftoverId);
     try {
-      const campaignId = Number(req.params.id);
-      const leftoverId = Number(req.params.leftoverId);
-      const data = insertCampaignLeftoverSchema.parse({ ...req.body, campaignId });
+      // PUT con MERGE: se parte de la fila guardada, así el panel puede cambiar
+      // un solo campo (p. ej. la visibilidad) sin borrar el resto. Antes exigía
+      // el objeto completo y un cambio parcial fallaba con 400.
+      const [existing] = await db
+        .select()
+        .from(campaignLeftoversTable)
+        .where(
+          and(
+            eq(campaignLeftoversTable.id, leftoverId),
+            eq(campaignLeftoversTable.campaignId, campaignId),
+          ),
+        );
+      if (!existing) {
+        return res.status(404).json({ error: "not_found", message: "Bien no encontrado" });
+      }
+      const parsed = parseItemPayload({ ...existing, ...(req.body ?? {}) }, campaignId);
+      if (!parsed.ok) {
+        return res.status(400).json({ error: "validation_error", message: parsed.message });
+      }
       const [leftover] = await db
         .update(campaignLeftoversTable)
-        .set(data)
+        .set(parsed.data)
         .where(
           and(
             eq(campaignLeftoversTable.id, leftoverId),
@@ -92,11 +220,13 @@ router.put(
           ),
         )
         .returning();
-      if (!leftover) return res.status(404).json({ error: "not_found", message: "Leftover not found" });
+      if (!leftover) {
+        return res.status(404).json({ error: "not_found", message: "Bien no encontrado" });
+      }
       return res.json(formatLeftover(leftover));
     } catch (err) {
       req.log.error({ err }, "Failed to update campaign leftover");
-      return res.status(400).json({ error: "validation_error", message: "Invalid leftover data" });
+      return res.status(500).json({ error: "server_error", message: "No se pudo actualizar el bien." });
     }
   },
 );
@@ -134,6 +264,11 @@ export function formatLeftover(e: typeof campaignLeftoversTable.$inferSelect) {
     unit: e.unit,
     notes: e.notes,
     isPublic: e.isPublic,
+    // Migración 015: clasificación, meta y flujo recibido/usado.
+    category: e.category,
+    targetQty: e.targetQty,
+    receivedQty: e.receivedQty,
+    usedQty: e.usedQty,
     createdAt: toIsoSafe(e.createdAt),
   };
 }

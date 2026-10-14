@@ -6,16 +6,25 @@ const { PUBLIC_SETTING_KEYS, filterPublicSettings, isPublicSettingKey } = await 
   "./dist/lib/public-settings.mjs"
 );
 
+// Las claves públicas del evento deben coincidir con las que edita el panel y
+// consume el sitio (CHOCOFEST_SETTING_KEYS del frontend): esta lista es el
+// contrato, y cualquier clave nueva queda privada hasta añadirla aquí.
+const EXPECTED_PUBLIC_KEYS = [
+  "protagonist_campaign_id",
+  "chocofest_2026_place",
+  "chocofest_2026_schedule",
+  "chocofest_2026_motto",
+  "chocofest_2026_objectives",
+  "chocofest_2026_organizers",
+  "chocofest_2026_program",
+];
+
 test("allowlist: contiene las claves que consume el sitio público", () => {
-  for (const key of [
-    "protagonist_campaign_id",
-    "chocofest_2026_place",
-    "chocofest_2026_schedule",
-    "chocofest_2026_motto",
-  ]) {
+  for (const key of EXPECTED_PUBLIC_KEYS) {
     assert.equal(isPublicSettingKey(key), true, `${key} debería ser pública`);
   }
-  assert.equal(PUBLIC_SETTING_KEYS.length, 4);
+  assert.equal(PUBLIC_SETTING_KEYS.length, EXPECTED_PUBLIC_KEYS.length);
+  assert.deepEqual([...PUBLIC_SETTING_KEYS].sort(), [...EXPECTED_PUBLIC_KEYS].sort());
 });
 
 test("allowlist: el resto de configuraciones son PRIVADAS por defecto", () => {
@@ -36,6 +45,7 @@ test("filterPublicSettings: solo devuelve claves de la allowlist", () => {
   const map = filterPublicSettings([
     { key: "protagonist_campaign_id", value: "7" },
     { key: "chocofest_2026_place", value: "Plaza de Armas" },
+    { key: "chocofest_2026_objectives", value: "Atender a los niños del distrito" },
     { key: "donation_bcp", value: "193-12345678-0-55" },
     { key: "org_email", value: "contacto@redsolidariasanramon.org" },
     { key: "otra_clave", value: "x" },
@@ -43,6 +53,7 @@ test("filterPublicSettings: solo devuelve claves de la allowlist", () => {
   assert.deepEqual(map, {
     protagonist_campaign_id: "7",
     chocofest_2026_place: "Plaza de Armas",
+    chocofest_2026_objectives: "Atender a los niños del distrito",
   });
 });
 

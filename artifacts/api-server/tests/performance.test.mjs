@@ -128,6 +128,29 @@ test("publicApiCache: GETs sensibles/admin y POSTs NO se cachean", async () => {
   });
 });
 
+test("publicApiCache: una petición CON sesión nunca se sirve de caché", async () => {
+  // Sincronización admin↔público: el administrador que acaba de guardar un
+  // cambio no puede recibir la respuesta cacheada del navegador (60s).
+  const app = buildCacheApp();
+  await withServer(app, async (base) => {
+    const res = await fetch(`${base}/api/campaigns`, {
+      headers: { cookie: "connect.sid=sesion-de-prueba" },
+    });
+    assert.equal(res.headers.get("cache-control"), "private, no-store");
+  });
+});
+
+test("publicApiCache: la variante anónima se marca Vary: Cookie", async () => {
+  // Sin Vary, una caché compartida podría entregar la variante anónima a un
+  // administrador (o al revés) al compartir URL.
+  const app = buildCacheApp();
+  await withServer(app, async (base) => {
+    const res = await fetch(`${base}/api/campaigns`);
+    assert.equal(res.headers.get("cache-control"), "public, max-age=60");
+    assert.equal(res.headers.get("vary"), "Cookie");
+  });
+});
+
 // ─── compression ─────────────────────────────────────────────────────────────
 
 test("compression: respuestas JSON >= 256B viajan gzip", async () => {

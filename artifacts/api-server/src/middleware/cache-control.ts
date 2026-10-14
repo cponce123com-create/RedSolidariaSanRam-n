@@ -9,6 +9,15 @@ import type { Request, Response, NextFunction } from "express";
  * de donaciones, que llevan datos personales aunque tengan requireAdmin) y el
  * health check quedan excluidas para no cachear datos privados ni enmascarar
  * caídas del servicio.
+ *
+ * POR QUÉ SE EXCLUYE CUALQUIER PETICIÓN CON COOKIE (Fase 1 — sincronización):
+ * una misma ruta pública devuelve contenido distinto según la sesión (p. ej.
+ * `/api/campaigns` oculta borradores al público pero no al administrador) y,
+ * sobre todo, el administrador que acaba de guardar un cambio NO puede recibir
+ * una respuesta servida por la caché del navegador: eso era una de las causas
+ * de que «los cambios del panel no se vean». Con sesión → `private, no-store`;
+ * sin sesión → caché pública de 60s + `Vary: Cookie` para que ninguna caché
+ * compartida mezcle ambas variantes.
  */
 const MAX_AGE_SECONDS = 60;
 
@@ -36,13 +45,25 @@ function isPublicCacheable(path: string): boolean {
   return true;
 }
 
+/** Hay sesión si viaja la cookie de sesión (no hace falta parsearla). */
+function hasSessionCookie(req: Request): boolean {
+  const cookie = req.headers.cookie;
+  return typeof cookie === "string" && cookie.length > 0;
+}
+
 export function publicApiCache(
   req: Request,
   res: Response,
   next: NextFunction,
 ) {
   if (req.method === "GET" && isPublicCacheable(req.path)) {
-    res.setHeader("Cache-Control", `public, max-age=${MAX_AGE_SECONDS}`);
+    if (hasSessionCookie(req)) {
+      // Sesión iniciada (administrador/coordinación): nunca desde caché.
+      res.setHeader("Cache-Control", "private, no-store");
+    } else {
+      res.setHeader("Cache-Control", `public, max-age=${MAX_AGE_SECONDS}`);
+      res.setHeader("Vary", "Cookie");
+    }
   }
   next();
 }

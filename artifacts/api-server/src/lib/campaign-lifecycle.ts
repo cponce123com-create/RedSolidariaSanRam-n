@@ -48,6 +48,7 @@ export function isHiddenStatus(status: string | null | undefined): boolean {
 /**
  * Transiciones permitidas del ciclo de vida.
  * - draft → active            (publicar)
+ * - draft → archived          (descartar un borrador CONSERVANDO su traza)
  * - active ↔ paused           (pausar / reanudar)
  * - active/paused → draft     (despublicar)
  * - active/paused → completed (finalizar)
@@ -55,10 +56,13 @@ export function isHiddenStatus(status: string | null | undefined): boolean {
  * - active/paused/completed → archived (archivar)
  * - archived → completed      (restaurar como historial visible)
  *
- * Un borrador NO se archiva (se publica o se elimina si no tiene dependencias).
+ * Por qué `draft → archived`: un borrador con dependencias (imágenes, novedades,
+ * reportes) no puede eliminarse —borrar en cascada destruiría historial— y antes
+ * tampoco podía archivarse, así que quedaba atrapado para siempre. Archivarlo es
+ * la salida segura: desaparece de los listados y conserva todo.
  */
 const TRANSITIONS: Record<CampaignStatus, readonly CampaignStatus[]> = {
-  draft: ["active"],
+  draft: ["active", "archived"],
   active: ["paused", "completed", "draft", "archived"],
   paused: ["active", "completed", "draft", "archived"],
   completed: ["active", "archived"],
@@ -103,6 +107,8 @@ export interface CampaignDependencies {
   leftovers: number;
   images: number;
   updates: number;
+  /** Reportes ciudadanos que apuntan a la campaña (sin FK: quedarían huérfanos). */
+  communityReports: number;
 }
 
 export const EMPTY_DEPENDENCIES: CampaignDependencies = {
@@ -113,6 +119,7 @@ export const EMPTY_DEPENDENCIES: CampaignDependencies = {
   leftovers: 0,
   images: 0,
   updates: 0,
+  communityReports: 0,
 };
 
 export function totalDependencies(deps: CampaignDependencies): number {
@@ -138,7 +145,22 @@ export function deleteBlockReason(
   }
   const total = totalDependencies(deps);
   if (total > 0) {
-    return `El borrador tiene ${total} registro(s) asociado(s) (donaciones, movimientos del libro, gastos, evidencias, sobrantes, imágenes o novedades) y no puede eliminarse. Archívalo o revisa sus registros.`;
+    return `El borrador tiene ${total} registro(s) asociado(s) (donaciones, movimientos del libro, gastos, evidencias, sobrantes, imágenes, novedades o reportes de la comunidad) y no puede eliminarse: borrarlos destruiría historial. Archívalo para conservar la traza.`;
+  }
+  return null;
+}
+
+/**
+ * Motivo por el que una campaña NO puede ser la protagonista de la portada, o
+ * `null` si es válida. La portada solo puede destacar campañas visibles al
+ * público: fijar un borrador o una archivada dejaría el bloque vacío sin que el
+ * administrador supiera por qué.
+ */
+export function protagonistError(status: string): string | null {
+  if (isHiddenStatus(status)) {
+    return `Una campaña ${statusLabel(
+      status,
+    )} no se muestra en el sitio público y no puede ser la protagonista de la portada. Publícala primero.`;
   }
   return null;
 }

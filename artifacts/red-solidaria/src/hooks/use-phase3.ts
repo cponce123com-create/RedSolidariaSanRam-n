@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { readErrorMessage } from "@/lib/api-error";
 
 // Types based on the backend schema
 export interface TransparencyData {
@@ -58,6 +59,9 @@ export interface Evidence {
 }
 
 // Sobrantes de campaña: ítems/dinero que quedaron tras el evento.
+// Bienes e insumos de campaña: chocolatada, regalos y canastas.
+// `quantity` es el SALDO disponible; cuando se registra el flujo
+// (`receivedQty`/`usedQty`) el servidor lo recalcula como recibido - usado.
 export interface Leftover {
   id: number;
   campaignId: number;
@@ -66,6 +70,14 @@ export interface Leftover {
   unit?: string | null;
   notes?: string | null;
   isPublic: boolean;
+  /** Clasificación del bien: chocolatada | regalos | canastas | general. */
+  category?: string | null;
+  /** Meta del producto (opcional; 0 o ausente = sin meta definida). */
+  targetQty?: number | null;
+  /** Cantidad recibida. */
+  receivedQty?: number | null;
+  /** Cantidad usada o entregada. */
+  usedQty?: number | null;
   createdAt: string;
 }
 
@@ -272,7 +284,7 @@ export function useCreateLeftover(campaignId: number) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create leftover");
+      if (!res.ok) throw new Error(await readErrorMessage(res));
       return res.json();
     },
     onSuccess: () => {
@@ -362,5 +374,80 @@ export function useCampaignLedgerVerify(id: number) {
       return res.json();
     },
     enabled: !!id,
+  });
+}
+
+// ─── Presupuesto por categoría (Fase 2.5) ────────────────────────────────────
+// `plannedAmount` es una PREVISIÓN administrada; el dinero gastado sigue siendo
+// la única fuente `campaign_expenses`. El cruce entre ambos lo hace la función
+// pura `buildBudget` (src/lib/budget.ts) en el panel y en el sitio público.
+
+export interface BudgetEntry {
+  id: number;
+  campaignId: number;
+  category: string;
+  plannedAmount: number;
+  notes?: string | null;
+  isPublic: boolean;
+  createdAt: string;
+}
+
+export function useAdminCampaignBudgets(id: number) {
+  return useQuery<BudgetEntry[]>({
+    queryKey: ["/api/admin/campaigns", id, "budgets"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/campaigns/${id}/budgets`);
+      if (!res.ok) throw new Error("Failed to fetch budgets");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+export function usePublicCampaignBudgets(id: number) {
+  return useQuery<BudgetEntry[]>({
+    queryKey: ["/api/campaigns", id, "budgets"],
+    queryFn: async () => {
+      const res = await fetch(`/api/campaigns/${id}/budgets`);
+      if (!res.ok) throw new Error("Failed to fetch budgets");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+}
+
+function invalidateBudgetQueries(queryClient: ReturnType<typeof useQueryClient>, campaignId: number) {
+  queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "budgets"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "budgets"] });
+  queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+}
+
+export function useCreateBudget(campaignId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<BudgetEntry>) => {
+      const res = await fetch(`/api/campaigns/${campaignId}/budgets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      // Mensaje real del servidor (categoría duplicada, monto inválido…).
+      if (!res.ok) throw new Error(await readErrorMessage(res));
+      return res.json();
+    },
+    onSuccess: () => invalidateBudgetQueries(queryClient, campaignId),
+  });
+}
+
+export function useDeleteBudget(campaignId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (budgetId: number) => {
+      const res = await fetch(`/api/campaigns/${campaignId}/budgets/${budgetId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error(await readErrorMessage(res));
+    },
+    onSuccess: () => invalidateBudgetQueries(queryClient, campaignId),
   });
 }
