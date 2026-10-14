@@ -54,15 +54,17 @@ todo lo que queda bloqueado por decisiones de negocio o credenciales externas:
 - **DB-09 (integridad):** las donaciones históricas cargadas por seed quedaron **aprobadas sin
   asiento** en el libro. La verificación de cadena devolvía «íntegra», que es correcto para la
   cadena pero no para el libro. Detectable ahora con el informe de V7-3.
-- **DB-02 / migración 010 sin aplicar:** el esquema Drizzle ya declara `ON DELETE RESTRICT` en
-  el libro, pero la restricción real de producción sigue siendo `CASCADE` (la migración está
-  ensayada y deliberadamente fuera de `migrate.ts`). **Bloqueo B-1.**
-- **DB-03 / artefactos de migración divergentes:** `lib/db/drizzle/0000_*.sql` y `0001_*.sql`
-  nunca se aplican y contradicen a `migrate.ts`; un `drizzle-kit push` accidental
-  reintroduciría el `CASCADE`. **Bloqueo B-5.**
-- **DB-04:** faltan claves foráneas en `donations`, `campaign_expenses`, `campaign_evidence`,
-  `campaign_images`, `campaign_updates`, `community_reports`, `campaign_leftovers`. La única
-  protección contra huérfanos es el conteo en la aplicación. **Bloqueo B-2.**
+- **DB-02 / migración 010:** ✅ **RESUELTO** — aplicada en **producción el 2026-10-13** con
+  respaldo previo y autorización explícita, y registrada en `drizzle_migrations`. El esquema
+  Drizzle ya declaraba `ON DELETE RESTRICT`; ahora la base también.
+- **DB-03 / artefactos de migración divergentes:** ✅ **RESUELTO en V7-16** — los artefactos
+  `lib/db/drizzle/0000_*.sql`, `0001_*.sql` y su carpeta `meta/` se eliminaron del repositorio
+  (nada los referenciaba: ni scripts, ni CI, ni build) y `drizzle.config.ts` documenta que la
+  única fuente de verdad es `lib/db/src/migrate.ts`. **Ya no hay dos esquemas en conflicto.**
+- **DB-04 / claves foráneas:** ✅ **RESUELTO en V7-15** — 11 claves `NOT VALID` (no validan los
+  huérfanos históricos y sí todas las escrituras nuevas) con `ON DELETE` elegido caso por caso;
+  verificado contra base real (rechaza `campaign_id=999999`) y el borrado de una mascota con
+  solicitudes responde **409**.
 - **API-06:** el patrón `catch → 400 validation_error` enmascara fallos de infraestructura
   como si fueran errores del cliente (dificulta el diagnóstico). **Pendiente (V7-4).**
 - **SEC-01:** la cookie de sesión usa `secure` solo con `NODE_ENV==='production'`; tras un
@@ -229,8 +231,8 @@ del contacto sigue privado.
 | V-5 | SEC-03 lockout 2FA por `userId` (DoS de cuenta) | media | Se aborda en V7-4 junto con SEC-02/04 (límites en memoria) |
 | V-6 | SEC-08 rutas admin sin gate propio | baja | Defensa en profundidad; V7-4 |
 | V-7 | API-06 `catch → 400` enmascara fallos 500 | baja | V7-4 (afecta a varias rutas; cambio transversal) |
-| V-8 | DB-02 restricción `CASCADE` real en el libro | **alta** | **Bloqueo B-1: requiere autorización** |
-| V-9 | DB-04 claves foráneas ausentes | alta | **Bloqueo B-2: requiere decidir sobre datos huérfanos** |
+| V-8 | DB-02 restricción `CASCADE` real en el libro | **alta** | ✅ **RESUELTO**: aplicada en producción el 2026-10-13 (registrada en `drizzle_migrations`) |
+| V-9 | DB-04 claves foráneas ausentes | alta | ✅ **RESUELTO** en V7-15: migración 023, 11 claves `NOT VALID` con `ON DELETE` por caso |
 | V-10 | 66 avisos de dependencias de desarrollo (11 críticos) | baja (no llegan a producción) | No se actualizan majors a ciegas; recomendación en §16 |
 
 ---

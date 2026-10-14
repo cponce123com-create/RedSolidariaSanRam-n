@@ -237,6 +237,7 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Ubicación:** `drizzle.config.ts:8-13` (sin `out`); `lib/db/src/migrate.ts:14-143` (001-009 embebidas al arrancar); `lib/db/drizzle/0000_*.sql` y `0001_*.sql` (generadas, nunca aplicadas)
 - **Descripción:** `campaign_leftovers` está definida dos veces (0001 y `migrate.ts:110-127`); su FK existe en la BD pero no en el esquema ⇒ `push` la eliminaría. La documentación dice «001-007» cuando en realidad hay 009.
 - **Solución:** una única fuente de verdad; alinear esquema y migraciones.
+- **✅ RESUELTO en V7-16 (B-5):** los artefactos `lib/db/drizzle/0000_*.sql`, `0001_*.sql` y su carpeta `meta/` **se eliminaron** (5 archivos) tras verificar que ni los scripts, ni el CI, ni el build los referencian. La política queda escrita en `drizzle.config.ts`: la única fuente de verdad es **`lib/db/src/migrate.ts`**, no se usa `drizzle-kit generate` y su salida no debe commitearse. Con esto desaparece también la definición duplicada de `campaign_leftovers` y la referencia a `0000_*.sql:290` que citaba IMP-07. Verificado: typecheck 0 y **E2E COMPLETO: OK**.
 - **Prueba:** `push` dry-run contra una BD creada por `migrate.ts`.
 
 #### DB-04 — FK ausentes en `campaign_id`/`pet_id` → huérfanos y mezcla · ALTO · CONFIRMADO

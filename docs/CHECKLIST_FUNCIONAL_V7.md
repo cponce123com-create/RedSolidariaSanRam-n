@@ -137,5 +137,5 @@ No se usan porcentajes de avance.
 | ~~B-2~~ | ~~Claves foráneas ausentes (DB-04)~~ | ✅ **RESUELTO** en V7-15: migración **023** con 11 claves `NOT VALID` y `ON DELETE` por caso (no exigió decidir sobre huérfanos históricos); verificado contra base real |
 | B-3 | Certificados con QR (5.2) | Definir tipos, vigencia, revocación y datos publicados |
 | B-4 | Mensajería automatizada de WhatsApp | Credenciales y proveedor oficial aprobado |
-| B-5 | Artefactos de migración obsoletos | Autorización para eliminarlos del repositorio |
+| ~~B-5~~ | ~~Artefactos de migración obsoletos~~ | ✅ **RESUELTO** en V7-16: eliminados (2 SQL + `meta/`, 5 archivos) y la política queda escrita en `drizzle.config.ts`; verificado con typecheck 0 y **E2E COMPLETO: OK** |
 | B-6 | Insignias y embajadores (5.3/5.4) | Definición del programa (niveles, vigencia, qué se publica) |
