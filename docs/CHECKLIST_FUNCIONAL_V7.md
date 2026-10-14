@@ -4,7 +4,7 @@
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
 **Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 329/329 ·
-`red-solidaria` 165/165 node:test + 29/29 vitest · typecheck 0 en libs/API/frontend/scripts ·
+`red-solidaria` 174/174 node:test + 33/33 vitest · typecheck 0 en libs/API/frontend/scripts ·
 build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 41/41 contra
 PostgreSQL real**).
 No se usan porcentajes de avance.
@@ -115,7 +115,7 @@ No se usan porcentajes de avance.
 | Imágenes con `loading="lazy"` | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `components/**` | Verificación por inspección (FE-08 del informe integral) |
 | Gate del panel por rol en el cliente (FE-03) | **IMPLEMENTADO Y PROBADO** | `lib/admin-session.ts`, `pages/admin/layout.tsx` | `admin-session.test.mjs` (12) + `vitest/admin-layout-gate.test.tsx` (6): solo el 401 redirige; un 500 o un fallo de red NO expulsan al login; un rol desconocido se explica en pantalla |
 | Estados de carga/vacío/error consistentes (FE-04) | **PARCIAL** | `lib/Skeleton.tsx`, `components/shared/EmptyState.tsx`, `pages/admin/layout.tsx` | El panel ya tiene carga, error de servidor (con «Reintentar») y permiso explicados y probados; el resto de páginas mantiene los estados existentes |
-| SEO por página (FE-09) y zod unificado (FE-10) | **PARCIAL** | `components/shared/SEO.tsx` | Usado en un subconjunto de páginas |
+| SEO por página (FE-09) y zod unificado (FE-10) | **PARCIAL** | `components/shared/SEO.tsx`, `lib/structured-data.ts` | **FE-09 hecho**: 9 páginas con SEO + URL pública configurable, `hreflang` honesto (solo `x-default`) y JSON-LD (`NGO`/`WebSite`) con retirada al cambiar de página; 13 pruebas (9 puras + 4 de componente). **FE-10 pendiente** (zod 3 en el cliente vs `zod/v4` en `lib/db`) |
 
 ## 9. Pruebas y despliegue (Fase 9)
 

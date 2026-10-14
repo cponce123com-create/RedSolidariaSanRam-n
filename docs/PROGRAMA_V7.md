@@ -722,3 +722,58 @@ La propia prueba descubrió dos cosas del esquema real que la revisión no habí
 sobre una fila sembrada; además el seed del API es **asíncrono** respecto al arranque, así que
 el chequeo ahora **espera a que haya datos** antes de medir y falla si no los hay, en lugar de
 probar en vacío y dar un falso verde.
+
+---
+
+## 15. Incremento V7-13 — SEO: URL pública, `hreflang` honesto y datos estructurados (FE-09) · CERRADO
+
+### 15.1 Qué faltaba
+
+1. La URL pública estaba **fija en el código**: un dominio distinto generaba `canonical` y Open
+   Graph apuntando al dominio viejo.
+2. `hreflang="es"` y `hreflang="en"` apuntaban **a la misma URL** (el idioma se persiste en el
+   navegador), que es justo lo que un buscador interpreta como engañoso.
+3. No había **datos estructurados** (JSON-LD).
+4. Y al revisarlo apareció un cuarto problema: las etiquetas del `<head>` solo se **añadían o
+   actualizaban**, nunca se retiraban, así que los datos estructurados de una página se habrían
+   quedado pegados en la siguiente.
+
+### 15.2 Qué se implementó
+
+- **Lógica pura** (`src/lib/structured-data.ts`, 9 pruebas): `resolvePublicBaseUrl`
+  (configurable y sin barras finales), `absoluteUrl`, `buildOrganizationJsonLd` (ONG),
+  `buildWebsiteJsonLd`, `buildSiteJsonLd` y `serializeJsonLd`, que **escapa** `<`, `>` y `&`
+  para que un texto con `</script>` no pueda cerrar la etiqueta (además de U+2028/U+2029) y
+  devuelve JSON válido e idéntico al original.
+- **`SEO.tsx`**: URL pública desde `VITE_PUBLIC_URL` (por defecto, el despliegue actual);
+  `jsonLd` opcional que se **publica y se retira** al cambiar de página —el efecto depende del
+  texto ya serializado, así que no se reejecuta en cada render—; y `hreflang` honesto: solo
+  `x-default`, retirando los alternates de idioma que hubieran quedado de antes.
+- **Portada**: publica `NGO` + `WebSite` con el nombre y la descripción del idioma activo.
+- **Decisión deliberada y documentada:** ChocoFest 2026 **no** publica datos estructurados de
+  tipo `Event` porque sus fechas oficiales todavía no están definidas. Un `Event` sin
+  `startDate` no aporta resultados enriquecidos, y poner una fecha inventada sería peor que no
+  poner nada.
+
+### 15.3 Verificación
+
+- `red-solidaria`: **174/174** node:test (+9) + **33/33** vitest (+4) · typecheck **0** ·
+  build **OK**.
+- Las 4 pruebas de componente fijan el comportamiento real en `<head>`: el JSON-LD se publica,
+  se **retira** al pasar a una página sin datos estructurados, no quedan `hreflang` de idioma
+  apuntando a la misma URL y el canonical se actualiza entre páginas.
+- **Corrección durante la verificación:** la primera versión de `serializeJsonLd` usaba
+  `"\u003c"`, que en JavaScript es **el propio carácter** `<` y no la secuencia escapada, así
+  que el escape no hacía absolutamente nada. Lo detectó la prueba y se corrigió con
+  `String.raw`. Sin esa prueba, el «escape» habría sido cosmético.
+
+### 15.4 Archivos
+
+```
+artifacts/red-solidaria/src/lib/structured-data.ts                 builders + serialización segura
+artifacts/red-solidaria/tests/structured-data.test.mjs             9 pruebas
+artifacts/red-solidaria/src/components/shared/SEO.tsx              URL pública, jsonLd, hreflang
+artifacts/red-solidaria/tests/vitest/seo-structured-data.test.tsx   4 pruebas de componente
+artifacts/red-solidaria/src/pages/home.tsx                         NGO + WebSite en la portada
+artifacts/red-solidaria/build-tests.mjs                            entry point del módulo
+```

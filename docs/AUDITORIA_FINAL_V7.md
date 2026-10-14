@@ -536,3 +536,34 @@ una fila; 22 migraciones idempotentes; flujo HTTP 41/41; `api-server` 329/329; t
 (`description`, `start_date`) que obligaron a cambiar el enfoque a un `UPDATE` sobre una fila
 sembrada, y el seed del API es asíncrono, así que la comprobación **espera a que existan
 datos** antes de medir (antes habría dado un falso verde probando en vacío).
+
+---
+
+## 25. Apéndice — Incremento V7-13 (SEO: FE-09)
+
+**Completado.** Cuatro defectos del `<head>`, no solo los tres que la auditoría había listado:
+
+1. la **URL pública estaba fija en el código** → ahora sale de `VITE_PUBLIC_URL` (con el
+   despliegue actual por defecto), así que un dominio distinto ya no publica canonical y Open
+   Graph apuntando al dominio viejo;
+2. `hreflang="es"` y `hreflang="en"` apuntaban **a la misma URL** → ahora se declara solo
+   `x-default` y se retiran los alternates de idioma que hubieran quedado (el sitio se sirve en
+   una sola URL: el idioma se persiste en el navegador);
+3. **no había datos estructurados** → `NGO` + `WebSite` en la portada, con lógica pura y probada
+   (`src/lib/structured-data.ts`) y serialización que **escapa** `<`, `>` y `&` para que un
+   texto con `</script>` no pueda cerrar la etiqueta;
+4. **las etiquetas solo se añadían, nunca se retiraban** → el JSON-LD se publica y se **retira**
+   al cambiar de página (si no, la siguiente heredaría los datos de la anterior).
+
+**Pendiente deliberado:** el `Event` de ChocoFest 2026 no se publica porque sus fechas oficiales
+todavía no están definidas; un `Event` sin `startDate` no aporta resultados enriquecidos y una
+fecha inventada sería peor que no poner nada.
+
+**Verificado:** `red-solidaria` **174/174** (+9) + **33/33** vitest (+4), typecheck **0**, build
+**OK**. Las pruebas de componente fijan el comportamiento en `<head>` y la de serialización
+demuestra que `</script>` no puede cerrar la etiqueta.
+
+**Hallazgo de la propia verificación (y corrección):** la primera versión usaba `"\u003c"`, que
+en JavaScript es **el propio carácter** `<` y no la secuencia escapada: el escape no hacía nada.
+Lo detectó la prueba; se corrigió con `String.raw`. Sin esa prueba habría quedado un «escape»
+cosmético en el código.

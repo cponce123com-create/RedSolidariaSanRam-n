@@ -400,6 +400,7 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Ubicación:** `shared/SEO.tsx`.
 - **Corregido:** añadido `<SEO>` a `transparency.tsx`, `adoptions.tsx` y `volunteer.tsx` → **9 páginas** con SEO.
 - **Pendiente:** `BASE_URL` hardcodeado, `hreflang` es/en apuntando a la misma URL y datos estructurados (JSON-LD).
+- **Corregido en V7-13:** `BASE_URL` configurable (`VITE_PUBLIC_URL`, con el despliegue actual por defecto); `hreflang` honesto (solo `x-default`, sin alternates de idioma apuntando a la misma URL); datos estructurados JSON-LD (`NGO` + `WebSite` en la portada) con serialización que **no se puede cerrar con `</script>`** y que **se retira** al cambiar de página; 9 pruebas puras + 4 de componente. **Pendiente deliberado:** el `Event` de ChocoFest 2026 no se publica porque sus fechas oficiales no están definidas (no se inventan datos).
 
 #### FE-10 a FE-15 — BAJO
 - `pnpm-workspace.yaml:30`: `zod` 3.25.76 en cliente vs `zod/v4` en `lib/db` (FE-10). *Pendiente.*
