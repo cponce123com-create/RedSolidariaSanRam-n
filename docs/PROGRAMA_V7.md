@@ -619,3 +619,52 @@ artifacts/api-server/src/routes/{donations,news,campaign-evidence,campaign-expen
   testimonials,admin,campaign-images,campaign-updates,contact,stats}.ts   13 bloques
 artifacts/api-server/tests/e2e/flow.mjs                                    3 comprobaciones nuevas
 ```
+
+---
+
+## 13. Incremento V7-11 — Gate del panel y estados de carga/error (Fase 8: FE-03 y FE-04) · CERRADO
+
+### 13.1 Qué estaba mal
+
+El gate del panel vivía disperso en el componente (`pages/admin/layout.tsx`) y tenía tres
+problemas reales:
+
+- **cualquier error** de `/api/admin/me` mandaba al login: una caída del servidor o un 500 se
+  presentaban como «sesión expirada», y el usuario perdía el contexto de lo que estaba haciendo;
+- **un rol sin permiso** no se trataba: se renderizaba la estructura del panel (el backend
+  bloqueaba los datos, pero la interfaz no explicaba nada);
+- el caso de error devolvía `null` → **pantalla en blanco**;
+- la carga era un texto suelto («Cargando...») sin ninguna señal visual.
+
+### 13.2 Qué se implementó
+
+- **Lógica pura** (`src/lib/admin-session.ts`, 12 pruebas): `resolvePanelGate` decide el estado
+  del panel — `loading`, `unauthenticated` (**solo un 401** manda al formulario de acceso),
+  `forbidden` (403 o rol desconocido), `unavailable` (500 o fallo de red: **no expulsa al
+  usuario** y ofrece reintentar) y `ready`. Se acompaña de `ADMIN_PANEL_ROLES` (los cuatro
+  roles que acepta la API), `normalizeRole`, `isAdminPanelRole` y `errorStatus`, que lee el
+  código HTTP sin depender de la clase de error (el cliente generado y el del panel tienen
+  `ApiError` distintos).
+- **El panel usa esa decisión**: esqueleto de carga con spinner; pantalla explicada para el rol
+  sin permiso (con el rol declarado y vuelta al sitio público); pantalla de error del servidor
+  con botón **Reintentar** que relanza la consulta; y con sesión válida, el panel de siempre.
+  Además, con datos ya cargados, un error posterior **no** expulsa al usuario.
+
+### 13.3 Verificación
+
+- `red-solidaria`: **165/165** node:test (+12) + **29/29** vitest (+6) · typecheck **0** ·
+  build de producción **OK**.
+- Las **6 pruebas de componente** (vitest + Testing Library) fijan el comportamiento: un 500
+  **no** manda al login y muestra «Reintentar»; un fallo de red tampoco; un rol `invitado`
+  muestra acceso denegado con su rol; la carga muestra el esqueleto; el 401 no muestra ni el
+  panel ni las pantallas de error; y con sesión válida el panel se renderiza.
+
+### 13.4 Archivos
+
+```
+artifacts/red-solidaria/src/lib/admin-session.ts                 decisión del gate (pura)
+artifacts/red-solidaria/tests/admin-session.test.mjs             12 pruebas
+artifacts/red-solidaria/tests/vitest/admin-layout-gate.test.tsx   6 pruebas de componente
+artifacts/red-solidaria/src/pages/admin/layout.tsx               usa el gate + estados
+artifacts/red-solidaria/build-tests.mjs                          entry point del módulo
+```

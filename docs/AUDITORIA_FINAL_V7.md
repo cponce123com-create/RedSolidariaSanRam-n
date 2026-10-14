@@ -488,3 +488,26 @@ validación sigue devolviendo `400 validation_error`.
 **Límite declarado:** la rama del 500 no se prueba de forma automatizada (exigiría tumbar la
 base durante el E2E); se cubre por revisión y compilador, y la rama que el cambio podía romper
 —la validación— sí está probada.
+
+---
+
+## 23. Apéndice — Incremento V7-11 (gate del panel y estados, FE-03 y FE-04)
+
+**Completado.** El gate del panel tenía tres defectos reales: **cualquier** error de
+`/api/admin/me` mandaba al login (así que una caída del servidor se presentaba como «sesión
+expirada»), un **rol sin permiso** no se trataba, y el caso de error devolvía `null` (pantalla
+en blanco).
+
+- **Decisión pura y probada** (`src/lib/admin-session.ts`, 12 pruebas): `resolvePanelGate`
+  distingue `loading`, `unauthenticated` (**solo 401** → formulario de acceso), `forbidden`
+  (403 o rol desconocido), `unavailable` (500 o fallo de red: no expulsa al usuario, ofrece
+  reintentar) y `ready`. Los roles del panel se contrastaron con `middleware/roles.ts` de la
+  API (superadmin, administrador, moderador, supervisor).
+- **Estados en el panel (FE-04):** esqueleto de carga, pantalla de rol sin permiso con el rol
+  declarado, pantalla de error del servidor con **Reintentar** (relanza la consulta) y el panel
+  normal cuando la sesión es válida. Con datos cargados, un error posterior ya no expulsa.
+
+**Verificado:** `red-solidaria` **165/165** (+12) + **29/29** vitest (+6), typecheck **0** y
+build **OK**. Las 6 pruebas de componente fijan el comportamiento observable (500 y fallo de
+red no redirigen; rol sin permiso se explica; la carga se ve; el 401 no muestra pantallas de
+error; con sesión válida se renderiza el panel).

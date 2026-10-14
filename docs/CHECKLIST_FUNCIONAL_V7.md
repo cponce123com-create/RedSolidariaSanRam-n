@@ -4,7 +4,7 @@
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
 **Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 329/329 ·
-`red-solidaria` 153/153 node:test + 23/23 vitest · typecheck 0 en libs/API/frontend/scripts ·
+`red-solidaria` 165/165 node:test + 29/29 vitest · typecheck 0 en libs/API/frontend/scripts ·
 build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 41/41 contra
 PostgreSQL real**).
 No se usan porcentajes de avance.
@@ -112,8 +112,8 @@ No se usan porcentajes de avance.
 | i18n es/en con paridad de claves | **IMPLEMENTADO Y PROBADO** | `lib/i18n/**` | `i18n-keys.test.mjs` |
 | Code splitting y carga diferida por ruta | **IMPLEMENTADO Y PROBADO** | `App.tsx`, `vite.config.ts` | Build con chunks por página (salida real del build) |
 | Imágenes con `loading="lazy"` | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `components/**` | Verificación por inspección (FE-08 del informe integral) |
-| Gate del panel por rol en el cliente (FE-03) | **PENDIENTE** | `pages/admin/layout.tsx` | V7-4 |
-| Estados de carga/vacío/error consistentes (FE-04) | **PARCIAL** | `lib/Skeleton.tsx`, `components/shared/EmptyState.tsx` | Usados en parte de las páginas |
+| Gate del panel por rol en el cliente (FE-03) | **IMPLEMENTADO Y PROBADO** | `lib/admin-session.ts`, `pages/admin/layout.tsx` | `admin-session.test.mjs` (12) + `vitest/admin-layout-gate.test.tsx` (6): solo el 401 redirige; un 500 o un fallo de red NO expulsan al login; un rol desconocido se explica en pantalla |
+| Estados de carga/vacío/error consistentes (FE-04) | **PARCIAL** | `lib/Skeleton.tsx`, `components/shared/EmptyState.tsx`, `pages/admin/layout.tsx` | El panel ya tiene carga, error de servidor (con «Reintentar») y permiso explicados y probados; el resto de páginas mantiene los estados existentes |
 | SEO por página (FE-09) y zod unificado (FE-10) | **PARCIAL** | `components/shared/SEO.tsx` | Usado en un subconjunto de páginas |
 
 ## 9. Pruebas y despliegue (Fase 9)
