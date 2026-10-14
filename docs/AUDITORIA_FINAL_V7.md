@@ -374,3 +374,40 @@ memoria) y FE-03 (gate del panel por rol en el cliente).
 
 **Nota de alcance:** el filtro por «evento» queda cubierto por el filtro de campaña, porque
 un evento solidario (ChocoFest) es una campaña del sistema; no se duplica el concepto.
+
+---
+
+## 19. Apéndice — Incremento V7-7 (verificación E2E con PostgreSQL real)
+
+**Arnés:** `artifacts/api-server/tests/e2e/run-e2e.sh` levanta un clúster PostgreSQL 17.7
+temporal, aplica el schema base con `drizzle-kit push --force`, arranca el API compilado (el
+migrador embebido corre las migraciones), comprueba el esquema con `psql`, ejecuta el flujo
+HTTP completo y limpia todo. No toca ninguna base real.
+
+**Resultado: `E2E COMPLETO: OK` (38/38 comprobaciones).**
+
+- **19 migraciones** aplicadas y **no duplicadas** en un segundo arranque (idempotencia real).
+- `donations.collaboration_type` con default `'dinero'` ✔ y **5 claves** de WhatsApp en
+  `settings` ✔, verificado en la base.
+- Flujo verificado: sesión y gate admin en rutas públicas · crear/publicar/archivar/restaurar ·
+  borrador no público · donación de dinero y en especie · **comprobante obligatorio solo para
+  dinero digital** · **un asiento por dinero aprobado, ninguno por especie con valor 0** ·
+  cadena de hashes íntegra · **ficha y transparencia con la misma cifra** · borrado **409** con
+  motivo · archivada fuera del listado y sin aceptar donaciones · filtros del panel contra
+  datos reales · filtro inválido → 400.
+- **DB-09 confirmado con datos reales:** el informe detecta **111 donaciones confirmadas sin
+  asiento** (datos históricos del seed) frente a **1 asiento** (el del propio E2E). La cifra
+  «el libro no cuenta toda la historia» deja de ser una hipótesis.
+
+**Hallazgo nuevo corregido (API-07):** en el router del libro se usaba
+`Number(req.params.id)` sin validar, de modo que un identificador no numérico producía un
+**500** (consulta con `NaN`). Corregido con un `router.param("id", …)` único que devuelve 400
+para todas las rutas del router, con comprobación en el flujo E2E.
+
+**Matiz que corrige el alcance del bloqueo B-1:** una base **nueva** creada con el esquema
+actual ya nace con el libro en `ON DELETE RESTRICT` (el esquema Drizzle se corrigió en la Fase
+1 del plan). El `CASCADE` solo persiste en bases **anteriores** a ese arreglo, es decir en
+producción. La migración 010 sigue siendo necesaria allí, pero **no** para despliegues nuevos.
+
+**Estado de la Fase 9:** migraciones y E2E pasan de *pendiente* a **implementado y probado**.
+Sigue pendiente el **lint automatizado** (no existe script de lint en el proyecto).

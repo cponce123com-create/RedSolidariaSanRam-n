@@ -378,3 +378,76 @@ artifacts/red-solidaria/src/pages/admin/dashboard.tsx   barra de filtros + naveg
 - Casos cubiertos: sin filtros, parámetros desconocidos, `campaignId` inválido, estado
   desconocido, fechas inválidas, rango invertido, un solo extremo del rango, parámetros
   repetidos y descripción legible de lo aplicado.
+
+---
+
+## 9. Incremento V7-7 — Verificación E2E con PostgreSQL real (Fase 2.4 y 9) · CERRADO
+
+### 9.1 Qué faltaba
+
+Toda la verificación del programa se hacía con funciones puras y pruebas de autorización
+contra un `DATABASE_URL` ficticio. **Nadie había ejecutado el sistema contra una base real**,
+así que ni las migraciones ni los flujos financieros de punta a punta estaban comprobados.
+
+### 9.2 Arnés implementado
+
+`artifacts/api-server/tests/e2e/run-e2e.sh` (todo en un solo comando, porque el entorno mata
+los procesos en segundo plano al terminar cada comando):
+
+1. crea un clúster **PostgreSQL 17.7** temporal (`initdb` + `pg_ctl` en un directorio de trabajo);
+2. aplica el schema base con `drizzle-kit push --force`;
+3. arranca el **API compilado**, de modo que el migrador embebido corre las migraciones;
+4. comprueba el esquema resultante con `psql`;
+5. ejecuta el flujo funcional completo por HTTP (`flow.mjs`, 38 comprobaciones);
+6. reinicia el API para demostrar que las migraciones son **idempotentes**;
+7. para PostgreSQL, mata el API y borra el directorio temporal.
+
+**No toca ninguna base real**: construye su propia `DATABASE_URL` y borra todo al terminar.
+
+### 9.3 Resultado de la ejecución completa
+
+| Comprobación | Resultado |
+|---|---|
+| Migraciones aplicadas | **19** (`001`–`019`) y **no se duplican** en el segundo arranque |
+| `donations.collaboration_type` | default `'dinero'::text` ✔ (migración 018 sobre base real) |
+| Claves de WhatsApp en `settings` | **5** ✔ (migración 019 + seed) |
+| FK del libro en una base creada con el esquema actual | `RESTRICT` ✔ (ver matiz en 9.5) |
+| Flujo funcional por HTTP | **38/38 en verde** |
+| Informe de integridad sobre datos reales | cadena **íntegra**; detecta **111 donaciones confirmadas sin asiento** (DB-09) y **1 asiento** (el del propio E2E) |
+
+Lo verificado de punta a punta: sesión y gate de rutas admin en rutas públicas · crear
+campaña como borrador · el borrador **no** es público (404) · publicar · donación pública de
+dinero · donación en especie sin monto ni método · rechazo de donación a campaña inexistente ·
+**comprobante obligatorio solo para dinero digital** (aprobar sin comprobante → 400; con
+comprobante → 200) · aprobar una donación en especie sin pago → 200 · **un asiento por dinero
+aprobado y ninguno por una especie con valor 0** · la cadena de hashes verifica · la ficha
+pública y el **panel de transparencia publican la MISMA cifra** (S/ 80, sin la especie) con
+desglose verificado/histórico y fecha de actualización · **borrado bloqueado (409)** con motivo
+accionable · archivar → fuera del listado público pero accesible por URL directa (política
+documentada) · **una campaña archivada no acepta donaciones (400)** · restaurar · informe de
+integridad · filtros del panel por campaña contra datos reales · filtro inválido → 400 con el
+motivo.
+
+### 9.4 Hallazgo nuevo, corregido en este incremento (API-07)
+
+El E2E descubrió que en el router del libro `Number(req.params.id)` se usaba **sin validar**:
+un identificador no numérico llegaba a la consulta como `NaN` y PostgreSQL devolvía **500**
+en lugar de un error de cliente. Corregido con un único `router.param("id", …)` que valida
+todas las rutas del router (400 «Identificador inválido») y con la comprobación
+correspondiente en el flujo E2E.
+
+### 9.5 Matiz importante sobre el bloqueo B-1
+
+El clúster temporal se crea con el esquema **actual** de Drizzle, que ya declara
+`ON DELETE RESTRICT`, así que en una base **nueva** el libro nace protegido. El `CASCADE`
+solo persiste en bases **creadas antes** del arreglo del esquema (producción). Es decir:
+la migración 010 sigue siendo necesaria para producción, pero **no** para despliegues nuevos.
+
+### 9.6 Cómo se ejecuta
+
+```bash
+bash artifacts/api-server/tests/e2e/run-e2e.sh
+```
+
+Requiere los binarios de PostgreSQL documentados en `docs/ROADMAP.md`. El script imprime
+cada comprobación con `ok`/`FAIL` y termina con `E2E COMPLETO: OK` o el número de fallos.
