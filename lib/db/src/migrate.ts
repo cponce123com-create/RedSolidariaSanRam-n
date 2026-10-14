@@ -397,6 +397,31 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         WHERE lower(type) IN ('anónimo', 'anonymo', 'anonymous', 'anonima', 'anónima');
     `,
   },
+  {
+    name: "019_whatsapp_settings.sql",
+    sql: `
+      -- Fase 7 (V7-2): contacto y mensajes de WhatsApp configurables.
+      -- El número estaba FIJO en el código del sitio y los mensajes no existían.
+      -- Se crean como configuración editable (grupo "contacto"), con el número
+      -- que el sitio publica hoy para no cambiar el comportamiento, y mensajes
+      -- vacíos: si están vacíos, la interfaz usa el texto por defecto del idioma.
+      --
+      -- El INSERT solo actúa si \`settings\` YA tiene contenido (despliegue
+      -- existente). En una base nueva la migración no escribe nada para no
+      -- romper el seed, que solo carga la configuración si la tabla está vacía.
+      INSERT INTO settings (key, value, label, "group")
+      SELECT v.key, v.value, v.label, v."group"
+      FROM (VALUES
+        ('org_whatsapp', '51921615737', 'Número de WhatsApp (solo dígitos, con código de país)', 'contacto'),
+        ('whatsapp_message_general', '', 'Mensaje de WhatsApp: contacto general', 'contacto'),
+        ('whatsapp_message_donation', '', 'Mensaje de WhatsApp: donaciones', 'contacto'),
+        ('whatsapp_message_volunteer', '', 'Mensaje de WhatsApp: voluntariado', 'contacto'),
+        ('whatsapp_message_sponsor', '', 'Mensaje de WhatsApp: auspicios y donaciones en especie', 'contacto')
+      ) AS v(key, value, label, "group")
+      WHERE EXISTS (SELECT 1 FROM settings)
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 /**

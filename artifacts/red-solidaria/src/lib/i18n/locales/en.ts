@@ -45,6 +45,9 @@ export const en: TranslationSchema = {
   whatsapp: {
     aria: "Contact us on WhatsApp",
     message: "Hi, I would like more information about how to help.",
+    messageDonation: "Hi, I would like to make a donation to Red Solidaria San Ramón.",
+    messageVolunteer: "Hi, I would like to volunteer at Red Solidaria San Ramón.",
+    messageSponsor: "Hi, I would like to sponsor or donate goods to Red Solidaria San Ramón.",
   },
   mobileNav: {
     home: "Home",

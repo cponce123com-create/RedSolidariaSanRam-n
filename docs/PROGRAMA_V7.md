@@ -31,7 +31,7 @@
 | 5.3 | Insignias y reconocimientos | **NO EXISTE** | Requiere decisión de negocio. |
 | 5.4 | Embajadores y auspiciadores | **PARCIAL** | Aliados (CRUD + visibilidad pública) ✔; embajadores con código de referencia, captaciones y métricas no existen. |
 | 6 | Dashboard unificado | **PARCIAL** | Existe `GET /admin/dashboard` + panel, con cifras ya coherentes (V7-1). Faltan filtros por campaña/estado/fechas. |
-| 7 | Comunicaciones y WhatsApp | **PARCIAL** | Números fijos en el código (`FloatingWhatsApp.tsx`, catálogo, cómo ayudar…). La clave `org_whatsapp` existe pero **no** está en la allowlist pública ni la consume el frontend. |
+| 7 | Comunicaciones y WhatsApp | **PARCIAL → mejorado (V7-2)** | El número y los mensajes predefinidos ya son configuración editable (allowlist pública + panel + migración 019) y desaparecieron los números fijos del código, incluido el de ejemplo `51999999999` que el catálogo abría en producción. Falta la mensajería automatizada (bloqueo B-4). Ver §5. |
 | 8 | Frontend (UX, rendimiento, SEO) | **PARCIAL** | FE-03 (gate de rol en cliente), FE-04 (estados de carga/vacío/error), FE-09 (SEO en 5 páginas), FE-10 (zod 3 en cliente vs zod/v4 en DB). |
 | 9 | Pruebas y despliegue | **PARCIAL** | `api-server` 295/295, `red-solidaria` 133/133 + 23/23 vitest, typecheck 0 (libs, API, frontend, scripts) y build de producción OK. Faltan E2E con base real y lint automatizado. |
 | 10 | Informe final y checklist | **PENDIENTE** | Se generan al cerrar el programa. |
@@ -122,3 +122,65 @@ donaciones registradas (procedimiento documentado, sin doble conteo).
 6. **V7-7 · Fase 2.4/9:** pruebas extremo a extremo con PostgreSQL real (migraciones, borrado 204, 409 por dependencias) en el sandbox.
 7. **V7-8 · Fase 10:** `AUDITORIA_FINAL_V7.md` + `CHECKLIST_FUNCIONAL_V7.md`.
 8. **Bloqueados:** B-1 a B-6 (§3), a la espera de aprobación.
+
+---
+
+## 5. Incremento V7-2 — Contacto por WhatsApp configurable (Fase 7, parte sin credenciales) · CERRADO
+
+### 5.1 Defecto corregido
+
+El número de contacto estaba **fijo en el código**: `FloatingWhatsApp.tsx` y `how-to-help.tsx`
+publicaban `51921615737` y el catálogo de bienes abría `51999999999`, un **número de
+ejemplo** con el comentario «Reemplazar con el número real de WhatsApp», en producción. La
+clave `org_whatsapp` existía en `settings` (con otro valor de ejemplo, `51987654321`) pero
+**no** estaba en la allowlist pública, así que el sitio no podía leerla.
+
+### 5.2 Qué se implementó
+
+- **Migración 019 (aditiva e idempotente):** crea en `settings` el número y los cuatro
+  mensajes predefinidos (contacto general, donaciones, voluntariado, auspicios). Solo
+  escribe si `settings` **ya** tiene contenido (despliegue existente); en una base nueva no
+  escribe nada para no romper el seed, que solo carga si la tabla está vacía.
+  `ON CONFLICT DO NOTHING`: no sobrescribe lo que el administrador ya haya editado.
+- **Allowlist pública:** `org_whatsapp` y los cuatro mensajes pasan a ser públicos (se
+  publican en enlaces `wa.me`); `org_phone`, `org_email`, `org_address` y las cuentas
+  bancarias **siguen privados**, y hay una prueba que lo fija.
+- **Lógica pura** (`src/lib/whatsapp.ts`, con 10 pruebas): normaliza el número (solo
+  dígitos, 8–15, acepta `+`, espacios y guiones), lo formatea para mostrar
+  (`+51 921 615 737`), construye el enlace `wa.me` con el mensaje codificado y resuelve el
+  contacto por propósito (el mensaje configurado gana; si está vacío se usa el texto del
+  idioma activo).
+- **Interfaz:** el botón flotante, «cómo ayudar» y el catálogo de bienes leen la
+  configuración. **Si no hay número configurado no se inventa uno:** el botón flotante y el
+  enlace no se muestran, y en el catálogo los botones de patrocinio llevan a la página de
+  contacto en lugar de abrir un chat inexistente.
+- **Panel:** las cinco claves se editan en «Datos de Contacto» (el panel agrupa por `group`,
+  así que aparecen sin tocar la interfaz) y se sirven al público al guardarlas.
+
+### 5.3 Archivos
+
+```
+lib/db/src/migrate.ts                                    migración 019 (aditiva, idempotente)
+artifacts/api-server/src/lib/public-settings.ts          +5 claves públicas de WhatsApp
+artifacts/api-server/src/lib/seed.ts                     número real + claves de mensajes
+artifacts/api-server/tests/public-settings.test.mjs      contrato de la allowlist actualizado
+artifacts/red-solidaria/src/lib/whatsapp.ts              normalización, formato, enlace y resolución
+artifacts/red-solidaria/tests/whatsapp.test.mjs          +10 pruebas
+artifacts/red-solidaria/build-tests.mjs                  entry point del nuevo módulo
+artifacts/red-solidaria/src/components/layout/FloatingWhatsApp.tsx   configuración, no constante
+artifacts/red-solidaria/src/pages/how-to-help.tsx        enlace desde la configuración
+artifacts/red-solidaria/src/pages/stock-catalog.tsx      adiós al número de ejemplo
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts 3 mensajes por propósito
+```
+
+### 5.4 Verificación
+
+- `api-server`: **296/296** (+1: contrato de la allowlist) · typecheck **0**.
+- `red-solidaria`: **143/143** node:test (+10) + **23/23** vitest · typecheck **0**.
+- La migración 019 no modifica ni sobrescribe datos existentes.
+
+### 5.5 Pendiente de este bloque
+
+La **mensajería automatizada** (Cloud API oficial, plantillas y consentimiento de contacto)
+queda en el bloqueo **B-4**: necesita credenciales y proveedor aprobado. Lo implementado no
+depende de ellas y no bloquea el despliegue.

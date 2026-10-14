@@ -16,6 +16,8 @@ import {
   Package,
   Info
 } from "lucide-react";
+import { usePublicSettings } from "@/hooks/use-public-settings";
+import { buildWhatsAppUrl, resolveWhatsAppContact } from "@/lib/whatsapp";
 
 interface StockItem {
   id: number;
@@ -133,23 +135,32 @@ const CATEGORY_FILTERS = ["Todos", "Movilidad", "Ortopedia", "Vestimenta", "Equi
 
 export default function StockCatalog() {
   const { t } = useTranslation();
+  const { data: settings } = usePublicSettings();
+  // Fase 7 (V7-2): el número estaba fijo en el código y era de EJEMPLO
+  // (51999999999), que se abría en producción. Ahora se lee de la configuración
+  // del panel; si la organización aún no lo ha configurado, el botón lleva a la
+  // página de contacto en lugar de abrir un chat inexistente.
+  const whatsapp = resolveWhatsAppContact(settings, "sponsor", t("stockCatalog.waGeneralSponsor"));
+
+  const openWhatsApp = (message: string) => {
+    const url = whatsapp ? buildWhatsAppUrl(whatsapp.number, message) : null;
+    if (url) {
+      window.open(url, "_blank");
+      return;
+    }
+    window.location.href = "/contacto";
+  };
 
   const handleSponsorClick = (item: StockItem) => {
-    const phoneNumber = "51999999999"; // Reemplazar con el número real de WhatsApp
-    const message = encodeURIComponent(
-      `${t("stockCatalog.waSponsorIntro", { name: t(item.nameKey) })}
+    openWhatsApp(`${t("stockCatalog.waSponsorIntro", { name: t(item.nameKey) })}
 
 ${item.sponsorMessageKey ? t(item.sponsorMessageKey) : t("stockCatalog.waMoreInfo")}
 
-${t("stockCatalog.waThanks")}`
-    );
-    window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+${t("stockCatalog.waThanks")}`);
   };
 
   const handleGeneralSponsorClick = () => {
-    const phoneNumber = "51999999999"; // Reemplazar con el número real de WhatsApp
-    const message = encodeURIComponent(t("stockCatalog.waGeneralSponsor"));
-    window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+    openWhatsApp(t("stockCatalog.waGeneralSponsor"));
   };
 
   return (

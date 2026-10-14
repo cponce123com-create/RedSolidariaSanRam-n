@@ -7,9 +7,15 @@ import {
   ArrowRight, CheckCircle, Phone, QrCode, Banknote, CreditCard,
   Gift, Leaf, Star
 } from "lucide-react";
+import { usePublicSettings } from "@/hooks/use-public-settings";
+import { resolveWhatsAppContact } from "@/lib/whatsapp";
 
 export default function HowToHelp() {
   const { t } = useTranslation();
+  const { data: settings } = usePublicSettings();
+  // Fase 7 (V7-2): el número de WhatsApp es configuración editable del panel,
+  // no una constante del código. Si no está configurado no se ofrece el enlace.
+  const whatsapp = resolveWhatsAppContact(settings, "donation", t("whatsapp.messageDonation"));
 
   const HELP_WAYS = [
     {
@@ -209,7 +215,16 @@ export default function HowToHelp() {
         </div>
         <p className="text-center text-sm text-muted-foreground mt-6">
           {t("howToHelp.afterDonation")}{" "}
-          <a href="https://wa.me/51921615737" className="text-green-700 font-semibold hover:underline">WhatsApp 921 615 737</a>
+          {whatsapp && (
+            <a
+              href={whatsapp.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-700 font-semibold hover:underline"
+            >
+              WhatsApp {whatsapp.display}
+            </a>
+          )}
         </p>
       </div>
 

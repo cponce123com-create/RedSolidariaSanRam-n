@@ -43,6 +43,9 @@ export const es = {
   whatsapp: {
     aria: "Contactar por WhatsApp",
     message: "Hola, quisiera más información sobre cómo ayudar.",
+    messageDonation: "Hola, quisiera hacer una donación a Red Solidaria San Ramón.",
+    messageVolunteer: "Hola, quisiera ser voluntario/a de Red Solidaria San Ramón.",
+    messageSponsor: "Hola, quisiera auspiciar o donar productos a Red Solidaria San Ramón.",
   },
   mobileNav: {
     home: "Inicio",
