@@ -20,7 +20,32 @@ import {
 } from "@/lib/volunteers-admin";
 import { formatSafeDate } from "@/lib/i18n/date";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Eye, Link2, Loader2, MapPin, Search, Users } from "lucide-react";
+import {
+  useAssignTeam,
+  useLeaveTeam,
+  useMemberships,
+  useParticipations,
+  useRecordParticipation,
+  useTeams,
+} from "@/hooks/use-volunteer-teams-admin";
+import {
+  VOLUNTEER_ACTIVITY_TYPES,
+  activityTypeLabel,
+  countActiveTeams,
+  formatHours,
+  teamOptionsFor,
+} from "@/lib/volunteer-teams-admin";
+import {
+  Copy,
+  Eye,
+  Link2,
+  Loader2,
+  MapPin,
+  Plus,
+  Search,
+  UserMinus,
+  Users,
+} from "lucide-react";
 
 /**
  * Panel de voluntariado (Fase 5).
@@ -282,6 +307,12 @@ function VolunteerDialog({ id, onClose }: { id: number; onClose: () => void }) {
               )}
             </div>
 
+            {/* Equipos del voluntario */}
+            <VolunteerTeamsSection volunteerId={volunteer.id} />
+
+            {/* Historial de participación */}
+            <VolunteerParticipationSection volunteerId={volunteer.id} />
+
             {/* Enlace de seguimiento */}
             <div className="border-t border-border pt-4">
               <Button
@@ -300,6 +331,267 @@ function VolunteerDialog({ id, onClose }: { id: number; onClose: () => void }) {
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Equipos del voluntario: asignar, listar y cerrar pertenencias. */
+function VolunteerTeamsSection({ volunteerId }: { volunteerId: number }) {
+  const { data: memberships, isLoading } = useMemberships(volunteerId);
+  const { data: teams } = useTeams();
+  const assign = useAssignTeam();
+  const leave = useLeaveTeam();
+
+  const [teamId, setTeamId] = useState("");
+  const [role, setRole] = useState("");
+
+  const options = teamOptionsFor(teams, memberships);
+  const rows = memberships ?? [];
+  const activeCount = countActiveTeams(rows);
+
+  const onAssign = () => {
+    const parsed = Number.parseInt(teamId, 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return;
+    assign.mutate(
+      { volunteerId, teamId: parsed, ...(role.trim() ? { role: role.trim() } : {}) },
+      {
+        onSuccess: () => {
+          setTeamId("");
+          setRole("");
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="border-t border-border pt-4">
+      <div className="flex items-center justify-between mb-2">
+        <Label>Equipos</Label>
+        <span className="text-xs text-muted-foreground">
+          {activeCount} activo{activeCount === 1 ? "" : "s"}
+        </span>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Cargando equipos...</p>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Aún no pertenece a ningún equipo.</p>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((membership) => (
+            <div
+              key={membership.id}
+              className="flex flex-wrap items-center gap-2 text-sm bg-secondary/40 rounded-xl px-3 py-2"
+            >
+              <span
+                aria-hidden
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: membership.color || "var(--border)" }}
+              />
+              <span className="font-medium text-foreground">{membership.teamName}</span>
+              {membership.role ? (
+                <span className="text-muted-foreground">· {membership.role}</span>
+              ) : null}
+              {membership.active ? (
+                <>
+                  <span className="text-xs text-muted-foreground">
+                    desde{" "}
+                    {membership.joinedAt ? formatSafeDate(membership.joinedAt, "dd/MM/yy") : "—"}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto h-7 rounded-lg text-xs text-destructive hover:bg-destructive/10"
+                    disabled={leave.isPending}
+                    onClick={() => leave.mutate({ volunteerId, memberId: membership.id })}
+                  >
+                    <UserMinus className="w-3.5 h-3.5 mr-1" /> Retirar
+                  </Button>
+                </>
+              ) : (
+                <span className="text-xs text-muted-foreground ml-auto">
+                  retirado
+                  {membership.leftAt
+                    ? ` el ${formatSafeDate(membership.leftAt, "dd/MM/yy")}`
+                    : ""}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 mt-3">
+        <select
+          value={teamId}
+          onChange={(e) => setTeamId(e.target.value)}
+          aria-label="Equipo a asignar"
+          className="h-10 w-[220px] rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+        >
+          <option value="">Elegir equipo...</option>
+          {options.map((team) => (
+            <option key={team.id} value={String(team.id)}>
+              {team.name}
+            </option>
+          ))}
+        </select>
+        <Input
+          placeholder="Rol (opcional)"
+          value={role}
+          onChange={(e) => setRole(e.target.value)}
+          className="rounded-xl w-[160px]"
+        />
+        <Button
+          className="rounded-xl gap-2 h-10"
+          disabled={!teamId || assign.isPending}
+          onClick={onAssign}
+        >
+          {assign.isPending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Plus className="w-4 h-4" />
+          )}
+          Asignar
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground mt-2">
+        Los equipos se crean y desactivan en la pantalla «Equipos».
+      </p>
+    </div>
+  );
+}
+
+/** Historial de participación: resumen, listado y registro de una actividad. */
+function VolunteerParticipationSection({ volunteerId }: { volunteerId: number }) {
+  const { data: history, isLoading } = useParticipations(volunteerId);
+  const record = useRecordParticipation();
+
+  const [activityType, setActivityType] = useState<string>("brigada");
+  const [title, setTitle] = useState("");
+  const [hours, setHours] = useState("");
+  const [participatedAt, setParticipatedAt] = useState("");
+  const [description, setDescription] = useState("");
+
+  const items = history?.items ?? [];
+  const summary = history?.summary ?? { count: 0, totalHours: 0, lastAt: null };
+  const canSubmit = title.trim().length >= 3 && participatedAt.length > 0;
+
+  const onSubmit = () => {
+    record.mutate(
+      {
+        volunteerId,
+        input: {
+          activityType,
+          title: title.trim(),
+          participatedAt,
+          ...(hours.trim() ? { hours: Number(hours) } : {}),
+          ...(description.trim() ? { description: description.trim() } : {}),
+        },
+      },
+      {
+        onSuccess: () => {
+          setTitle("");
+          setHours("");
+          setParticipatedAt("");
+          setDescription("");
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="border-t border-border pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <Label>Historial de participación</Label>
+        <span className="text-xs text-muted-foreground">
+          {summary.count === 0
+            ? "sin registros"
+            : `${summary.count} registro${summary.count === 1 ? "" : "s"} · ${formatHours(summary.totalHours)} acumuladas`}
+        </span>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Cargando historial...</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Todavía no hay participaciones registradas.</p>
+      ) : (
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+          {items.map((item) => (
+            <div key={item.id} className="bg-secondary/40 rounded-xl px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <Badge variant="outline">{item.activityLabel}</Badge>
+                <span className="font-medium text-foreground">{item.title}</span>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {item.participatedAt ? formatSafeDate(item.participatedAt, "dd/MM/yyyy") : "—"}
+                  {item.hours ? ` · ${formatHours(item.hours)}` : ""}
+                </span>
+              </div>
+              {item.description ? (
+                <p className="text-xs text-muted-foreground mt-1">{item.description}</p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-2 sm:grid-cols-2 mt-3">
+        <select
+          value={activityType}
+          onChange={(e) => setActivityType(e.target.value)}
+          aria-label="Tipo de actividad"
+          className="h-10 rounded-xl border border-border bg-background px-3 text-sm text-foreground"
+        >
+          {VOLUNTEER_ACTIVITY_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {activityTypeLabel(type)}
+            </option>
+          ))}
+        </select>
+        <Input
+          type="date"
+          value={participatedAt}
+          onChange={(e) => setParticipatedAt(e.target.value)}
+          aria-label="Fecha de la participación"
+          className="rounded-xl"
+        />
+        <Input
+          placeholder="Título de la actividad"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="rounded-xl"
+        />
+        <Input
+          type="number"
+          min="0"
+          max="24"
+          step="0.5"
+          placeholder="Horas (opcional)"
+          value={hours}
+          onChange={(e) => setHours(e.target.value)}
+          className="rounded-xl"
+        />
+        <Input
+          placeholder="Detalle (opcional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="rounded-xl sm:col-span-2"
+        />
+      </div>
+      <Button
+        className="mt-3 rounded-xl gap-2 h-10"
+        disabled={!canSubmit || record.isPending}
+        onClick={onSubmit}
+      >
+        {record.isPending ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Plus className="w-4 h-4" />
+        )}
+        Registrar participación
+      </Button>
+      <p className="text-xs text-muted-foreground mt-2">
+        El historial no se edita: cada actividad queda registrada con quién la anotó.
+      </p>
+    </div>
   );
 }
 

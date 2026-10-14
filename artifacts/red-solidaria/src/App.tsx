@@ -52,6 +52,7 @@ const AdminReportDetail = lazy(() => import("./pages/admin/report-detail"));
 const AdminAdoptions = lazy(() => import("./pages/admin/adoptions"));
 const AdminPetForm = lazy(() => import("./pages/admin/pet-form"));
 const AdminVolunteers = lazy(() => import("./pages/admin/volunteers"));
+const AdminVolunteerTeams = lazy(() => import("./pages/admin/volunteer-teams"));
 const AdminAllies = lazy(() => import("./pages/admin/allies"));
 const AdminDashboard = lazy(() => import("./pages/admin/dashboard"));
 const AdminNews = lazy(() => import("./pages/admin/news"));
@@ -112,6 +113,11 @@ function App() {
               <Switch>
                 {/* Admin routes */}
                 <Route path="/admin/login" component={AdminLogin} />
+                <Route path="/admin/voluntariado/equipos">
+                  <AdminLayout>
+                    <AdminVolunteerTeams />
+                  </AdminLayout>
+                </Route>
                 <Route path="/admin/voluntarios">
                   <AdminLayout>
                     <AdminVolunteers />
