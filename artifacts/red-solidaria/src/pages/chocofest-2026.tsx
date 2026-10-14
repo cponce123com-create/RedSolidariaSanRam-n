@@ -45,6 +45,7 @@ import {
   formatQuantity,
   summarizeInventory,
 } from "@/lib/inventory";
+import { isVideoEvidence, summarizeEvidence } from "@/lib/results";
 
 /** Encabezado de sección homogéneo para toda la página. */
 function Section({
@@ -167,6 +168,9 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   // los "sobrantes" públicos de la campaña, ya incluidos en la transparencia.
   const inventory = transparency?.publicLeftovers ?? [];
   const inventorySummary = summarizeInventory(inventory);
+  // Resultados y rendición final: reutiliza las evidencias públicas.
+  const publicEvidence = transparency?.publicEvidence ?? [];
+  const resultsSummary = summarizeEvidence(publicEvidence);
 
   const goal = campaign.goal || 0;
   const raised = campaign.raised || 0;
@@ -510,9 +514,87 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
               </Link>
             </Section>
 
-            {/* 13. Resultados y cierre */}
+            {/* 13. Resultados y rendición final */}
             <Section id="resultados" icon={<Sparkles className="w-5 h-5" />} title={t("chocofest.sectionResults")}>
-              <EmptyBox text={t("chocofest.emptyResults")} />
+              {resultsSummary.total > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.resultsCountLabel")}
+                      </div>
+                      <div className="font-bold text-foreground">{resultsSummary.total}</div>
+                    </div>
+                    <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.resultsImagesLabel")}
+                      </div>
+                      <div className="font-bold text-foreground">{resultsSummary.images}</div>
+                    </div>
+                    <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.resultsVideosLabel")}
+                      </div>
+                      <div className="font-bold text-foreground">{resultsSummary.videos}</div>
+                    </div>
+                    {transparency && (
+                      <div className="bg-primary/5 px-4 py-2 rounded-xl border border-primary/20">
+                        <div className="text-xs text-primary uppercase tracking-wide font-semibold mb-1">
+                          {t("chocofest.resultsExecutionLabel")}
+                        </div>
+                        <div className="font-bold text-primary">
+                          {transparency.executionPercent}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {publicEvidence.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm"
+                      >
+                        {!isVideoEvidence(item) && (
+                          <img
+                            src={optimizeImageUrl(item.mediaUrl, { width: 800 })}
+                            alt={item.title}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-48 object-cover"
+                          />
+                        )}
+                        <div className="p-4">
+                          <h3 className="font-bold text-foreground">{item.title}</h3>
+                          {item.description ? (
+                            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                              {item.description}
+                            </p>
+                          ) : null}
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs text-muted-foreground">
+                              {formatSafeDate(item.date, t("campaignDetail.dateFormat"), {
+                                locale: getDateFormatLocale(),
+                              })}
+                            </span>
+                            {isVideoEvidence(item) && (
+                              <a
+                                href={item.mediaUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-semibold text-primary hover:underline"
+                              >
+                                {t("chocofest.resultsVideoCta")}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <EmptyBox text={t("chocofest.emptyResults")} />
+              )}
               <p className="text-xs text-muted-foreground mt-3">{t("chocofest.resultsNote")}</p>
             </Section>
           </div>

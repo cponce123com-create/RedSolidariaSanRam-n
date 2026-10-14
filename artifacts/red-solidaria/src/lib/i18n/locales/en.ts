@@ -1238,6 +1238,11 @@ export const en: TranslationSchema = {
     emptyInventory: "The campaign inventory has not been published yet.",
     inventoryNote:
       "The inventory includes hot chocolate and servings, toys and food baskets. The estimated value is informative and is not added to the money raised.",
+    resultsCountLabel: "Published evidence",
+    resultsImagesLabel: "Photos",
+    resultsVideosLabel: "Videos",
+    resultsExecutionLabel: "Budget execution",
+    resultsVideoCta: "Watch video",
   },
   adminChocofest: {
     title: "ChocoFest 2026",

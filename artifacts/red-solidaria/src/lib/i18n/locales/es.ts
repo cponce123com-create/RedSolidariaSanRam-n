@@ -1234,6 +1234,11 @@ export const es = {
     emptyInventory: "Aún no se ha publicado el inventario de la campaña.",
     inventoryNote:
       "El inventario incluye chocolatada y raciones, juguetes y canastas de víveres. La valorización estimada es informativa y no se suma al dinero recaudado.",
+    resultsCountLabel: "Evidencias publicadas",
+    resultsImagesLabel: "Fotografías",
+    resultsVideosLabel: "Videos",
+    resultsExecutionLabel: "Ejecución del presupuesto",
+    resultsVideoCta: "Ver video",
   },
   adminChocofest: {
     title: "ChocoFest 2026",
