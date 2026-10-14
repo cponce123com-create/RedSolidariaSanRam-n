@@ -56,6 +56,12 @@
 - **Cambio:** `ADD CONSTRAINT … CHECK (status IN (…))` tras **auditar valores existentes**.
 - **Riesgo:** medio (valores fuera de catálogo) → informe previo y normalización.
 - **Reversión:** `DROP CONSTRAINT`.
+- **✅ APLICADO en V7-12 (migración 022)** con el patrón **`NOT VALID`**: no revisa las filas
+  históricas (por eso no puede fallar ni exigir limpieza previa) y **sí** comprueba todas las
+  escrituras nuevas. Los valores de cada tabla se tomaron de los esquemas de la aplicación, no
+  de una lista inventada. Para endurecerlo cuando los datos estén limpios:
+  `SELECT status, count(*) FROM <tabla> GROUP BY status;` y
+  `ALTER TABLE <tabla> VALIDATE CONSTRAINT <nombre>;`.
 
 ## 6. DB-07 — Índices faltantes
 
@@ -121,5 +127,42 @@ Los conteos coinciden con producción (6 campañas, 70 donaciones, 5 movimientos
 
 **Pendiente de ensayo:**
 - **IMP-04** — la clave natural tiene **1 duplicado real** que bloquea el índice único (requiere decisión sobre el duplicado).
-- **DB-05 / DB-06 / DB-08** — unicidad, tipos `text`→`date` y `real`→`numeric`: **cambian el contrato de la API**
-  (`numeric` se serializa como string), así que exigen ajuste en la capa de consulta antes de migrar.
+- **DB-05 / DB-06** — unicidad de campaña y tipos `text`→`date` / `real`→`numeric`: **cambian el contrato de la API**.
+- **DB-08** — ✅ **YA NO PENDIENTE**: aplicado en la **migración 022** (V7-12) con `CHECK … NOT VALID`
+  en las 7 tablas con estado, sin exigir limpieza previa de datos históricos.
+
+---
+
+## 11. Ensayo automatizado de respaldo y restauración (2026-10-14) — RESULTADOS
+
+El checklist tenía el respaldo como **documentado pero sin probar**. Ahora se ensaya de verdad en
+cada ejecución del E2E (`artifacts/api-server/tests/e2e/run-e2e.sh`, sección 7), **contra una base
+PostgreSQL real y sin tocar producción**:
+
+1. se para el API;
+2. `pg_dump` de la base;
+3. se cuentan donaciones, asientos, configuración y migraciones;
+4. **se destruye la base** (`DROP DATABASE … WITH (FORCE)`) y se recrea vacía;
+5. se restaura **solo** desde el respaldo;
+6. se comparan los conteos;
+7. el API arranca sobre la base restaurada (no debe volver a migrar);
+8. y se comprueba lo importante: **la cadena de hashes del libro sigue verificando**.
+
+**Resultado real:**
+
+```
+   antes: donaciones=113 · asientos=1 · configuración=22 · migraciones=22
+   respaldo creado: 114927 bytes
+   ok   - la base restaurada tiene los mismos datos
+   ok   - el API arranca sobre la base restaurada sin duplicar migraciones (22)
+   ok   - la cadena del libro sigue verificando tras la restauración
+```
+
+**Aprendizaje operativo:** el primer intento usaba `dropdb`, que **falla si queda alguna conexión
+abierta** (el API recién parado deja conexiones del pool). Se usa
+`DROP DATABASE … WITH (FORCE)`, que las cierra. Es el fallo que aparecería en una recuperación
+real, y queda documentado aquí y en el propio arnés.
+
+**Nota sobre DB-05 / DB-06 (del ensayo anterior):** los cambios de tipo (`text`→`date`,
+`real`→`numeric`) **cambian el contrato de la API** —`numeric` se serializa como string— así que
+exigen ajuste en la capa de consulta antes de migrar.

@@ -567,3 +567,24 @@ demuestra que `</script>` no puede cerrar la etiqueta.
 en JavaScript es **el propio carácter** `<` y no la secuencia escapada: el escape no hacía nada.
 Lo detectó la prueba; se corrigió con `String.raw`. Sin esa prueba habría quedado un «escape»
 cosmético en el código.
+
+---
+
+## 26. Apéndice — Incremento V7-14 (respaldo y restauración probados)
+
+**Completado.** El checklist declaraba el respaldo como **documentado pero sin prueba**; ahora
+está **probado**. Una copia de seguridad que nunca se ha restaurado no es una copia de
+seguridad.
+
+El E2E (contra PostgreSQL real) ensaya el ciclo **en frío**: para el API → `pg_dump` → cuenta
+donaciones/asientos/configuración/migraciones → **destruye la base** → la recrea vacía → la
+restaura **solo** desde el respaldo → compara los conteos → arranca el API sobre la base
+restaurada → y comprueba que **la cadena de hashes del libro sigue íntegra** y que las
+migraciones no se duplican.
+
+**Salida real:** datos idénticos (113 donaciones, 1 asiento, 22 claves de configuración, 22
+migraciones), arranque sin migrar de nuevo y **cadena verificada** tras la restauración.
+
+**Problema de operación encontrado por el propio ensayo (y corregido):** `dropdb` falla si
+queda alguna conexión abierta (el API recién parado deja conexiones del pool) → se usa
+`DROP DATABASE ... WITH (FORCE)`. Es el fallo que habría aparecido en una recuperación real.

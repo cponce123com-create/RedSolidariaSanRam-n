@@ -184,6 +184,74 @@ else
   FLOW_STATUS=1
 fi
 
+echo "== 7. Ensayo de respaldo y restauración (docs/MIGRACIONES_Y_RESPALDOS.md) =="
+DUMP_FILE="$WORK/backup.sql"
+
+# Se para el API: el respaldo y la restauración se hacen en frío, como en un
+# incidente real, y así la base no tiene conexiones abiertas al eliminarla.
+kill "$API_PID" 2>/dev/null
+wait "$API_PID" 2>/dev/null
+API_PID=""
+
+BEFORE_DONATIONS="$(psql_c "SELECT count(*) FROM donations")"
+BEFORE_MOVEMENTS="$(psql_c "SELECT count(*) FROM campaign_movements")"
+BEFORE_SETTINGS="$(psql_c "SELECT count(*) FROM settings")"
+BEFORE_MIGRATIONS="$(psql_c "SELECT count(*) FROM drizzle_migrations")"
+echo "   antes: donaciones=$BEFORE_DONATIONS · asientos=$BEFORE_MOVEMENTS · configuración=$BEFORE_SETTINGS · migraciones=$BEFORE_MIGRATIONS"
+
+"$PGBIN/pg_dump" -h 127.0.0.1 -p "$PGPORT" -U postgres -d "$DBNAME" -f "$DUMP_FILE" >/dev/null 2>&1
+if [ ! -s "$DUMP_FILE" ]; then
+  echo "   FAIL - el respaldo quedó vacío"
+  exit 1
+fi
+echo "   respaldo creado: $(wc -c <"$DUMP_FILE" | tr -d ' ') bytes"
+
+# Se DESTRUYE la base y se restaura solo desde el respaldo. WITH (FORCE) cierra
+# las conexiones que hubieran quedado del API recién parado.
+DROP_OUT="$("$PGBIN/psql" -h 127.0.0.1 -p "$PGPORT" -U postgres -d postgres -q -c "DROP DATABASE IF EXISTS \"$DBNAME\" WITH (FORCE)" 2>&1)" || { echo "   FAIL - no se pudo eliminar la base: $DROP_OUT"; exit 1; }
+"$PGBIN/createdb" -h 127.0.0.1 -p "$PGPORT" -U postgres "$DBNAME" || { echo "   FAIL - no se pudo recrear la base"; exit 1; }
+"$PGBIN/psql" -h 127.0.0.1 -p "$PGPORT" -U postgres -d "$DBNAME" -q -f "$DUMP_FILE" >/dev/null 2>&1 || { echo "   FAIL - la restauración devolvió error"; exit 1; }
+
+AFTER_DONATIONS="$(psql_c "SELECT count(*) FROM donations")"
+AFTER_MOVEMENTS="$(psql_c "SELECT count(*) FROM campaign_movements")"
+AFTER_SETTINGS="$(psql_c "SELECT count(*) FROM settings")"
+AFTER_MIGRATIONS="$(psql_c "SELECT count(*) FROM drizzle_migrations")"
+if [ "$AFTER_DONATIONS" = "$BEFORE_DONATIONS" ] && [ "$AFTER_MOVEMENTS" = "$BEFORE_MOVEMENTS" ] && [ "$AFTER_SETTINGS" = "$BEFORE_SETTINGS" ] && [ "$AFTER_MIGRATIONS" = "$BEFORE_MIGRATIONS" ]; then
+  echo "   ok   - la base restaurada tiene los mismos datos (donaciones=$AFTER_DONATIONS · asientos=$AFTER_MOVEMENTS · configuración=$AFTER_SETTINGS · migraciones=$AFTER_MIGRATIONS)"
+else
+  echo "   FAIL - los datos no coinciden tras restaurar: donaciones=$AFTER_DONATIONS/$BEFORE_DONATIONS asientos=$AFTER_MOVEMENTS/$BEFORE_MOVEMENTS configuración=$AFTER_SETTINGS/$BEFORE_SETTINGS migraciones=$AFTER_MIGRATIONS/$BEFORE_MIGRATIONS"
+  exit 1
+fi
+
+# El API debe arrancar sobre la base restaurada sin volver a migrar ni duplicar.
+( cd "$REPO" && node "$SERVER" >"$WORK/api3.log" 2>&1 ) &
+API_PID=$!
+if ! wait_for_api; then
+  echo "   FAIL - el API no arrancó sobre la base restaurada"
+  tail -30 "$WORK/api3.log"
+  exit 1
+fi
+MIGRATIONS_3="$(psql_c "SELECT count(*) FROM drizzle_migrations")"
+if [ "$MIGRATIONS_3" != "$BEFORE_MIGRATIONS" ]; then
+  echo "   FAIL - el arranque tras restaurar duplicó migraciones ($MIGRATIONS_3 vs $BEFORE_MIGRATIONS)"
+  exit 1
+fi
+echo "   ok   - el API arranca sobre la base restaurada sin duplicar migraciones ($MIGRATIONS_3)"
+
+# Y la prueba de fondo: el libro contable sigue íntegro (cadena de hashes).
+CHAIN_CAMPAIGN="$(psql_c "SELECT campaign_id FROM campaign_movements ORDER BY id LIMIT 1")"
+if [ -n "$CHAIN_CAMPAIGN" ]; then
+  VERIFY_BODY="$(curl -s "http://127.0.0.1:$APIPORT/api/campaigns/$CHAIN_CAMPAIGN/movements/verify")"
+  if echo "$VERIFY_BODY" | grep -q '"verified":true'; then
+    echo "   ok   - la cadena del libro sigue verificando tras la restauración"
+  else
+    echo "   FAIL - la cadena del libro no verifica tras restaurar: $VERIFY_BODY"
+    exit 1
+  fi
+else
+  echo "   nota - no hay asientos en el libro: la cadena no es comprobable en este ensayo"
+fi
+
 echo ""
 if [ "$FLOW_STATUS" -eq 0 ]; then
   echo "E2E COMPLETO: OK"

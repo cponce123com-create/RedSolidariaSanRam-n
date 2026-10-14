@@ -777,3 +777,51 @@ artifacts/red-solidaria/tests/vitest/seo-structured-data.test.tsx   4 pruebas de
 artifacts/red-solidaria/src/pages/home.tsx                         NGO + WebSite en la portada
 artifacts/red-solidaria/build-tests.mjs                            entry point del módulo
 ```
+
+---
+
+## 16. Incremento V7-14 — Respaldo y restauración probados de verdad (Fase 9) · CERRADO
+
+### 16.1 Qué faltaba
+
+El checklist declaraba «respaldo y recuperación documentados» como **IMPLEMENTADO SIN PRUEBA
+COMPLETA**: existía el procedimiento escrito, pero **nunca se había ejecutado una
+restauración**. Un respaldo que nunca se ha restaurado no es un respaldo, es una suposición.
+
+### 16.2 Qué se implementó
+
+Una sección nueva en el E2E (contra PostgreSQL real) que **ensaya el ciclo completo en frío**:
+
+1. se para el API;
+2. `pg_dump` de la base;
+3. se cuentan donaciones, asientos, configuración y migraciones;
+4. **se destruye la base** y se recrea vacía;
+5. se restaura **solo** desde el respaldo;
+6. se comparan los conteos;
+7. se arranca el API sobre la base restaurada;
+8. y se comprueba lo que de verdad importa: **la cadena de hashes del libro sigue verificando**
+   y las migraciones **no** se duplican.
+
+### 16.3 Verificación (salida real)
+
+```
+== 7. Ensayo de respaldo y restauración (docs/MIGRACIONES_Y_RESPALDOS.md) ==
+   antes: donaciones=113 · asientos=1 · configuración=22 · migraciones=22
+   respaldo creado: 114927 bytes
+   ok   - la base restaurada tiene los mismos datos (donaciones=113 · asientos=1 · configuración=22 · migraciones=22)
+   ok   - el API arranca sobre la base restaurada sin duplicar migraciones (22)
+   ok   - la cadena del libro sigue verificando tras la restauración
+E2E COMPLETO: OK
+```
+
+**Y el ensayo encontró un problema real de operación:** el primer intento usaba `dropdb`, que
+**falla si queda alguna conexión abierta** (el API recién parado deja conexiones del pool). Se
+cambió a `DROP DATABASE ... WITH (FORCE)`, que las cierra. Es exactamente el fallo que
+aparecería en un incidente real de madrugada, y ahora queda documentado en el propio arnés.
+
+### 16.4 Archivos
+
+```
+artifacts/api-server/tests/e2e/run-e2e.sh     sección 7: ensayo de respaldo y restauración
+docs/MIGRACIONES_Y_RESPALDOS.md               referencia al ensayo automatizado
+```
