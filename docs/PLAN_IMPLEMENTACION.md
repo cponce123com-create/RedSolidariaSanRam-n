@@ -43,13 +43,14 @@ Correcciones:
 
 ---
 
-## Incremento 2 — Fase 1 (cierre): administración y experiencia
+## Incremento 2 — Fase 1 (cierre): administración y experiencia ✅ COMPLETADO
 
-- **Monto recaudado con fuente única:** el formulario de campaña mostrará el valor calculado a partir de donaciones confirmadas como fuente de verdad, marcando explícitamente cuándo el valor manual no aplica (RC-S8).
-- **Borrado desde el detalle** con confirmación explícita y explicación de por qué una campaña con historial se archiva en lugar de eliminarse (RC3).
-- **Claves separadas** admin/público si se confirma la colisión (RC-S9).
-- **UX administrativa:** tablas, filtros, ordenación, estados de carga, alertas, mensajes de error, responsive y accesibilidad; botón discreto de acceso al panel desde la web pública.
-- **Pruebas:** borrado `204` y `409` con base real (integración), protagonista al archivar, invalidación end-to-end.
+- **Monto recaudado con fuente única** (RC-S8): el formulario del detalle de campaña lee la transparencia real; con donaciones confirmadas el campo pasa a solo lectura y se explica el total, y sin donaciones sigue siendo manual con aviso. **Hecho.**
+- **Borrado desde el detalle** con confirmación explícita y explicación de por qué una campaña con historial se archiva en lugar de eliminarse (RC3). **Hecho.**
+- **Búsqueda, filtrado y ordenación** en la lista de campañas (más recientes, más antiguas, título A-Z, meta y recaudado). **Hecho.**
+- **Botón discreto de acceso al panel**: ya existía (`AdminAccessLink`, barra de navegación escritorio/móvil y pie) y se verificó que reutiliza la sesión existente. **Verificado, sin cambios.**
+- **Claves separadas admin/público** (RC-S9): revisado; el riesgo queda neutralizado por `private, no-store` con sesión y la invalidación por entidad. **Decisión documentada, sin cambios.**
+- **Pruebas de integración con base real** (borrado `204`, `409` por dependencias, limpieza del protagonista al archivar): requieren una base PostgreSQL accesible; en este contenedor las suites usan un `DATABASE_URL` ficticio, así que se ejecutan en el entorno de despliegue. **Trasladado al incremento 16.**
 
 ## Incremento 3 — Fase 2: ChocoFest 2026 como campaña principal
 

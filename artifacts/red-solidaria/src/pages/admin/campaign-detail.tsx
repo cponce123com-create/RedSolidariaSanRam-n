@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { 
   useGetCampaign, 
   useUpdateCampaign, 
@@ -22,7 +22,8 @@ import {
   useAdminCampaignLeftovers,
   useCreateLeftover,
   useUpdateLeftover,
-  useDeleteLeftover
+  useDeleteLeftover,
+  useCampaignTransparency
 } from "@/hooks/use-phase3";
 
 import { Button } from "@/components/ui/button";
@@ -129,7 +130,12 @@ export default function AdminCampaignDetail() {
   const { data: leftovers } = useAdminCampaignLeftovers(campaignId);
 
   const updateCampaign = useUpdateCampaign();
-  const { setStatus: setLifecycleStatus } = useCampaignLifecycle();
+  const { setStatus: setLifecycleStatus, remove: deleteCampaign } = useCampaignLifecycle();
+  const [, setLocation] = useLocation();
+  // Fuente de verdad de la recaudación: donaciones CONFIRMADAS (approved o
+  // reconciled). El campo manual de la campaña solo es la fuente cuando todavía
+  // no hay ninguna donación confirmada (por eso se avisa en el formulario).
+  const { data: transparency } = useCampaignTransparency(campaignId);
   const addImage = useAddCampaignImage();
   const deleteImage = useDeleteCampaignImage();
   const addUpdate = useCreateCampaignUpdate();
@@ -310,6 +316,33 @@ export default function AdminCampaignDetail() {
               {action.label}
             </Button>
           ))}
+          {campaign.status === "draft" && (
+            <Button
+              variant="outline"
+              className="rounded-xl text-destructive hover:bg-destructive/10"
+              disabled={deleteCampaign.isPending}
+              data-testid="delete-campaign-draft"
+              onClick={() => {
+                // El backend solo borra DEFINITIVAMENTE borradores sin ningún
+                // registro asociado; si los tiene responde 409 con el motivo y la
+                // salida segura es Archivar (que conserva todo el historial).
+                if (
+                  !confirm(
+                    "Se eliminará DEFINITIVAMENTE este borrador. Solo es posible si no tiene ningún registro asociado (donaciones, movimientos del libro, gastos, evidencias, sobrantes, imágenes, novedades o reportes). Si los tiene, usa Archivar. ¿Continuar?",
+                  )
+                )
+                  return;
+                deleteCampaign.mutate(campaignId, {
+                  onSuccess: () => {
+                    toast({ title: "Borrador eliminado" });
+                    setLocation("/admin/campanas");
+                  },
+                });
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Eliminar borrador
+            </Button>
+          )}
           <Link href={`/campanas/${campaignId}/transparencia`}>
             <Button variant="default" className="rounded-xl shadow-md hover-elevate">
               <Eye className="w-4 h-4 mr-2" /> Ver P. Transparente
@@ -360,9 +393,34 @@ export default function AdminCampaignDetail() {
                 <FormField control={infoForm.control} name="goal" render={({ field }) => (
                   <FormItem><FormLabel>Meta (S/)</FormLabel><FormControl><Input type="number" className="rounded-xl bg-secondary/30" {...field} /></FormControl></FormItem>
                 )} />
-                <FormField control={infoForm.control} name="raised" render={({ field }) => (
-                  <FormItem><FormLabel>Recaudación Actual (S/)</FormLabel><FormControl><Input type="number" className="rounded-xl bg-secondary/30" {...field} /></FormControl><p className="text-xs text-muted-foreground">Normalmente se actualiza automático por donaciones.</p></FormItem>
-                )} />
+                <FormField control={infoForm.control} name="raised" render={({ field }) => {
+                  // La recaudación real la determinan las DONACIONES CONFIRMADAS:
+                  // el backend publica max(columna manual, donaciones). Si ya hay
+                  // donaciones, el valor manual no tiene efecto, así que se
+                  // bloquea y se explica en lugar de dejar creer que se guardó.
+                  const confirmedRaised = transparency?.totalRaised ?? 0;
+                  const confirmedDonors = transparency?.donorCount ?? 0;
+                  const fromDonations = confirmedRaised > 0;
+                  return (
+                    <FormItem>
+                      <FormLabel>Recaudación actual (S/)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          className="rounded-xl bg-secondary/30"
+                          {...field}
+                          disabled={fromDonations}
+                          data-testid="campaign-raised-input"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">
+                        {fromDonations
+                          ? `Fuente de verdad: ${confirmedDonors} donación(es) confirmada(s) suman S/ ${confirmedRaised.toFixed(2)}. Mientras existan, este campo es de solo lectura y el sitio público muestra ese total.`
+                          : "Todavía no hay donaciones confirmadas: este valor manual es el que se muestra en el sitio público y se reemplazará automáticamente al aprobar la primera donación."}
+                      </p>
+                    </FormItem>
+                  );
+                }} />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
