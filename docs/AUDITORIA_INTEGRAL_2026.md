@@ -272,7 +272,7 @@ y `campaign_movements→campaigns` (CASCADE); `campaign_leftovers→campaigns` *
 - **Ubicación:** `community-reports.ts:22`; `pets.ts:31`; `settings.ts:9`
 
 #### DB-11 — Documentación obsoleta · BAJO · CONFIRMADO
-- **Ubicación:** `README.md:148` y `ROADMAP.md:63` («001-007» vs 009); `ledger.ts:15-17` dice «real float4» cuando la migración 006 ya usa `numeric(12,2)`.
+- **Ubicación:** `README.md:148` y `docs/ROADMAP.md:63` («001-007» vs 009); `ledger.ts:15-17` dice «real float4» cuando la migración 006 ya usa `numeric(12,2)`.
 
 ---
 

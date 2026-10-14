@@ -4,11 +4,10 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { brotliCompressSync, constants as zlibConstants, gzipSync } from "node:zlib";
-import runtimeErrorModal from "@replit/vite-plugin-runtime-error-modal";
 
-// PORT y BASE_PATH los inyectan Replit y el script dev del root; fuera de esos
-// entornos (p.ej. el build de Render) usamos valores por defecto para que el
-// build del frontend nunca falle por configuración de entorno.
+// PORT y BASE_PATH los inyecta el script dev del root; fuera de ese entorno
+// (p.ej. el build de Render) usamos valores por defecto para que el build del
+// frontend nunca falle por configuración de entorno.
 const rawPort = process.env.PORT || "5173";
 
 const port = Number(rawPort);
@@ -42,8 +41,10 @@ function preloadHomeChunk(): Plugin {
       }
       if (!homeChunk || html.includes(homeChunk)) return;
       const base = basePath.endsWith("/") ? basePath : `${basePath}/`;
-      const link = `    <link rel="modulepreload" href="${base}assets/${homeChunk}" />\n`;
-      writeFileSync(htmlPath, html.replace("<head>", `<head>\n${link}`));
+      const link = `    <link rel="modulepreload" href="${base}assets/${homeChunk}" />
+`;
+      writeFileSync(htmlPath, html.replace("<head>", `<head>
+${link}`));
     },
   };
 }
@@ -79,32 +80,17 @@ function precompressBuildAssets(): Plugin {
   };
 }
 
-export default defineConfig(async ({ mode }) => ({
+export default defineConfig(({ mode }) => ({
   base: basePath,
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorModal(),
     preloadHomeChunk(),
     precompressBuildAssets(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
-      "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
       // Fuerza UNA única copia de React en dev (pre-bundle y módulos): evita el
       // error de runtime "Cannot set properties of undefined (setting 'Children')"
       // por dos copias de React o interop CJS/ESM rota en la caché de optimizeDeps.
