@@ -10,6 +10,7 @@ import {
   useCreateCampaignUpdate,
   useDeleteCampaignUpdate
 } from "@workspace/api-client-react";
+import { useDonors } from "@/hooks/use-donors-admin";
 import { 
   useAdminCampaignExpenses, 
   useCreateExpense, 
@@ -172,6 +173,9 @@ export default function AdminCampaignDetail() {
   const { data: updates } = useGetCampaignUpdates(campaignId);
   const { data: expenses } = useAdminCampaignExpenses(campaignId);
   const { data: evidence } = useAdminCampaignEvidence(campaignId);
+  // Donantes del panel (ids reales de donante) para vincular cada bien con quien
+  // lo donó, y evidencias de la campaña para la entrega (migración 017).
+  const { data: donors } = useDonors();
   const { data: leftovers } = useAdminCampaignLeftovers(campaignId);
 
   const updateCampaign = useUpdateCampaign();
@@ -1241,6 +1245,47 @@ export default function AdminCampaignDetail() {
                         {lo.notes ? (
                           <p className="text-xs text-muted-foreground font-normal">{lo.notes}</p>
                         ) : null}
+                        {/* Trazabilidad del bien (migración 017): quién lo donó y con
+                            qué evidencia se entregó. El PUT hace merge en el servidor,
+                            así que cambiar solo estos campos no borra el resto. */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <select
+                            value={lo.donorId ?? ""}
+                            onChange={(e) =>
+                              updateLeftover.mutate({
+                                id: lo.id,
+                                data: { donorId: e.target.value ? Number(e.target.value) : null },
+                              })
+                            }
+                            aria-label="Donante del bien"
+                            className="h-8 max-w-[190px] rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+                          >
+                            <option value="">Sin donante asignado</option>
+                            {(donors ?? []).map((donor) => (
+                              <option key={donor.id} value={donor.id}>
+                                {donor.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={lo.evidenceId ?? ""}
+                            onChange={(e) =>
+                              updateLeftover.mutate({
+                                id: lo.id,
+                                data: { evidenceId: e.target.value ? Number(e.target.value) : null },
+                              })
+                            }
+                            aria-label="Evidencia de entrega"
+                            className="h-8 max-w-[210px] rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+                          >
+                            <option value="">Sin evidencia asociada</option>
+                            {(evidence ?? []).map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {INVENTORY_CATEGORY_LABEL[normalizeCategory(lo.category)]}
