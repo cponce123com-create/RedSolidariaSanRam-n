@@ -16,6 +16,7 @@ await build({
     "./src/lib/audit-admin.ts",
     "./src/lib/reports-admin.ts",
     "./src/lib/observations-admin.ts",
+    "./src/lib/volunteers-admin.ts",
     "./src/lib/admin-access.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",

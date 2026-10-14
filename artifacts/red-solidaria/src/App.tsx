@@ -46,6 +46,7 @@ const AdminAudit = lazy(() => import("./pages/admin/audit"));
 const AdminInformes = lazy(() => import("./pages/admin/informes"));
 const AdminReportPrint = lazy(() => import("./pages/admin/report-print"));
 const AdminObservations = lazy(() => import("./pages/admin/observations"));
+const VolunteerStatus = lazy(() => import("./pages/volunteer-status"));
 const AdminReports = lazy(() => import("./pages/admin/reports"));
 const AdminReportDetail = lazy(() => import("./pages/admin/report-detail"));
 const AdminAdoptions = lazy(() => import("./pages/admin/adoptions"));
@@ -289,6 +290,11 @@ function App() {
                   <MainLayout>
                     <AnimalWelfare />
                   </MainLayout>
+                </Route>
+                {/* Seguimiento del voluntario: fuera del layout para que se vea
+                    como una página propia y no exponga el menú completo. */}
+                <Route path="/voluntariado/estado/:token">
+                  <VolunteerStatus />
                 </Route>
                 <Route path="/voluntariado">
                   <MainLayout>

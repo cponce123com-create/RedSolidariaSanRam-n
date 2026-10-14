@@ -11,6 +11,7 @@ import { requireRole, ROLES } from "../middleware/roles";
 import { logAuditAction } from "../middleware/auth-utils";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 import {
+  allowedTransitions,
   canTransition,
   normalizeVolunteerEmail,
   requiresDecisionTrace,
@@ -43,8 +44,14 @@ function formatVolunteer(v: typeof volunteersTable.$inferSelect) {
     priorExperience: v.priorExperience,
     status: v.status,
     statusLabel: volunteerStatusLabel(v.status),
+    // Estados a los que se puede pasar. La UI solo ofrece acciones VÁLIDAS: la
+    // regla vive en el servidor (única fuente de verdad).
+    allowedTransitions: [...allowedTransitions(v.status)],
     adminNotes: v.adminNotes,
     photo: v.photo,
+    // Token del enlace de seguimiento: lo necesita el panel para compartirlo con
+    // el voluntario. El endpoint de consulta pública NO lo devuelve.
+    publicToken: v.publicToken,
     approvedAt: toIsoSafe(v.approvedAt),
     approvedBy: v.approvedBy,
     updatedAt: toIsoSafe(v.updatedAt),
