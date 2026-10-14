@@ -84,6 +84,19 @@ export const CHOCOLATADA_2024_CASH_TOTAL = 2818.5;
 
 export const CHOCOLATADA_2024_TITLE = "Chocolatada Navideña 2024";
 
+// ⚠️ DATOS PENDIENTES DE CORREGIR (hallazgo V7-17, 2026-10-14)
+//
+// Este bloque de donaciones NO es el de 2024: es una COPIA de la hoja de 2025.
+// Evidencia: los donantes, los importes y el total (S/. 2,818.5) coinciden uno a
+// uno con `chocofest-2025-data.ts`, los comentarios de fecha de aquí dentro dicen
+// «2025» y el helper `iso` de la línea 18 también usa 2025, así que la campaña de
+// 2024 acaba publicando donaciones fechadas en diciembre de 2025.
+//
+// No se corrige aquí porque **no existe la hoja fuente de 2024 en el repositorio**
+// y este proyecto no inventa datos históricos. Para arreglarlo hace falta el
+// informe real de la Chocolatada 2024; mientras tanto, el test
+// `tests/chocolatada-2024-contamination.test.mjs` lo deja marcado como pendiente
+// (TODO) para que no pase desapercibido.
 export const CHOCOLATADA_2024_DONATIONS: ChocolatadaDonationSeed[] = [
   // ── 4/12/2025 ──
   cash("M", 100, 4),

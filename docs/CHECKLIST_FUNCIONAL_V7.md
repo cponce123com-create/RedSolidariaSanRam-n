@@ -3,10 +3,12 @@
 **Rama:** `feat/implementacion-integral-2026` · **Fecha:** 14 de octubre de 2026
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
-**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 329/329 ·
+**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 330/331 ·
 `red-solidaria` 174/174 node:test + 33/33 vitest · typecheck 0 en libs/API/frontend/scripts ·
 build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 41/41 contra
 PostgreSQL real**).
+Hay **1 prueba marcada `TODO`** (V7-17: falta la hoja real de 2024) que **no** cuenta como
+aprobada.
 No se usan porcentajes de avance.
 
 ---
@@ -31,6 +33,7 @@ No se usan porcentajes de avance.
 | Restricción real del libro en producción (`RESTRICT`) | **IMPLEMENTADO Y PROBADO** | `docs/migraciones/010_low_risk.sql`, `lib/db/src/migrate.ts` | **Aplicada en producción el 2026-10-13** con respaldo previo y autorización explícita (registrada en `drizzle_migrations`); borrar una campaña con asientos responde 409 |
 | Claves foráneas ausentes (DB-04) | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (023), `routes/pets.ts` | **11/11** claves `NOT VALID` con `ON DELETE` por caso; E2E contra base real: **rechaza** una donación con `campaign_id=999999` y acepta las válidas; borrar una mascota con solicitudes → 409 |
 | Donaciones confirmadas sin asiento (DB-09) | **PARCIAL** | — | **Detectadas** por el informe de V7-3; la regularización es una decisión contable |
+| Datos históricos de la Chocolatada 2024 | **BLOQUEADO** | `lib/chocolatada-2024-data.ts`, `tests/chocolatada-2024-contamination.test.mjs` | **V7-17**: el bloque de donaciones es una **copia del de 2025** (mismo total S/. 2,818.5 y fechas de 2025). No se corrige sin la hoja real de 2024 porque **no se inventan datos**: el bloque lleva una advertencia y una prueba `TODO` que lo mantiene visible (`# todo 1`) |
 
 ## 2. Integración admin ↔ frontend (Fase 2)
 
@@ -121,7 +124,7 @@ No se usan porcentajes de avance.
 
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
-| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **329/329** (incluye barrido del gate, SEC-03 y filtros del panel) |
+| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **330/331** aprobadas (+ **1 `TODO`** de V7-17, que no cuenta como aprobada): incluye barrido del gate, SEC-03, filtros del panel y la detección de datos históricos duplicados |
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **165/165** + **29/29** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
