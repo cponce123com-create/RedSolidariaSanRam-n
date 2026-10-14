@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { readErrorMessage } from "@/lib/api-error";
+import { invalidateEntities } from "@/lib/query-invalidation";
 
 /**
  * Cliente y presentación del panel de DONANTES (Fase 3 del Prompt Maestro).
@@ -190,16 +191,15 @@ export const DUPLICATES_QUERY_KEY = "/api/admin/donations/duplicates";
 /**
  * Invalida donantes, duplicados y las consultas afectadas por la conciliación
  * (donaciones y campañas, cuyos totales dependen del estado de las donaciones).
+ *
+ * Las dos últimas usan los predicados de entidad compartidos
+ * (`lib/query-keys.ts`): antes comparaban `queryKey[0] === "/api/campaigns"` y
+ * no alcanzaban el detalle (`["/api/campaigns/5"]`).
  */
 export function invalidateDonorQueries(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({
     predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === DONORS_QUERY_KEY,
   });
   void queryClient.invalidateQueries({ queryKey: [DUPLICATES_QUERY_KEY] });
-  void queryClient.invalidateQueries({
-    predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/donations",
-  });
-  void queryClient.invalidateQueries({
-    predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === "/api/campaigns",
-  });
+  invalidateEntities(queryClient, ["donations", "campaigns"]);
 }

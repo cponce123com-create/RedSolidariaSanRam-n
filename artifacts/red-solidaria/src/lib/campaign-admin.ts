@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { ApiError, errorMessage, readErrorMessage } from "@/lib/api-error";
+import { invalidateEntities } from "@/lib/query-invalidation";
 
 /**
  * Cliente del ciclo de vida de campañas (Fase 1 del Prompt Maestro).
@@ -46,18 +47,17 @@ export async function deleteCampaignDraft(id: number): Promise<void> {
 }
 
 /**
- * Invalida TODAS las consultas de campañas (lista con cualquier filtro y
- * detalle) más `settings` (protagonista). React Query invalida por prefijo, y
- * la clave del detalle (`["/api/campaigns/5"]`) NO es prefijo de la lista
- * (`["/api/campaigns"]`): por eso se usa un predicado sobre `queryKey[0]`.
- * Así el panel y el frontend público se sincronizan sin recargar.
+ * Invalida TODAS las consultas de campañas (lista con cualquier filtro, detalle
+ * y subrecursos públicos/administrativos) más `settings` (protagonista).
+ *
+ * El predicado de entidad vive en `lib/query-keys.ts`: cubre tanto las claves
+ * compuestas (`["/api/campaigns", 5, "transparency"]`) como las claves de un
+ * solo string del cliente generado (`["/api/campaigns/5"]`), que era la causa
+ * de que el detalle público siguiera mostrando datos viejos tras editar en el
+ * panel.
  */
 export function invalidateCampaignQueries(queryClient: QueryClient): void {
-  void queryClient.invalidateQueries({
-    predicate: (q) =>
-      Array.isArray(q.queryKey) && q.queryKey[0] === "/api/campaigns",
-  });
-  void queryClient.invalidateQueries({ queryKey: ["settings"] });
+  invalidateEntities(queryClient, ["campaigns", "settings"]);
 }
 
 /**
@@ -142,11 +142,23 @@ export interface LifecycleAction {
  * Acciones disponibles para el estado actual. Refleja las transiciones que el
  * backend permite (`campaign-lifecycle.ts`); el backend vuelve a validarlas y
  * responde 409 con un mensaje si algo no cuadra.
+ *
+ * En un borrador se ofrecen Publicar Y Archivar: un borrador con dependencias
+ * (imágenes, novedades, reportes) no puede eliminarse —sería destruir
+ * historial— y sin archivar quedaba atrapado para siempre.
  */
 export function lifecycleActions(current: string): LifecycleAction[] {
   switch (current) {
     case "draft":
-      return [{ status: "active", label: "Publicar" }];
+      return [
+        { status: "active", label: "Publicar" },
+        {
+          status: "archived",
+          label: "Archivar",
+          confirm:
+            "Se retirará el borrador de la vista de trabajo conservando sus registros (imágenes, novedades, reportes). ¿Continuar?",
+        },
+      ];
     case "active":
       return [
         { status: "paused", label: "Pausar" },

@@ -3,7 +3,7 @@ import { db, campaignsTable } from "@workspace/db";
 import { settings } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { requireRole, ROLES } from "../middleware/roles";
-import { PROTAGONIST_SETTING_KEY } from "../lib/campaign-lifecycle";
+import { PROTAGONIST_SETTING_KEY, protagonistError } from "../lib/campaign-lifecycle";
 import { filterPublicSettings } from "../lib/public-settings";
 
 const router = Router();
@@ -48,17 +48,24 @@ router.put("/admin/settings/:key", requireRole(ROLES.SUPERADMIN), async (req, re
   return res.json(row);
 });
 
-// PUT /admin/settings — batch update
+// PUT /admin/settings — batch (upsert de varias claves a la vez).
+// Antes hacía solo UPDATE: una clave que aún no existía se descartaba en
+// silencio y el administrador creía haberla guardado (Fase 1 — sincronización).
 router.put("/admin/settings", requireRole(ROLES.SUPERADMIN), async (req, res) => {
   const updates = req.body as Record<string, string>;
   if (!updates || typeof updates !== "object") return res.status(400).json({ error: "Body inválido" });
 
   const results = [];
-  for (const [key, value] of Object.entries(updates)) {
+  for (const [rawKey, value] of Object.entries(updates)) {
+    const key = rawKey.trim().slice(0, 100);
+    if (!key) continue;
     const [row] = await db
-      .update(settings)
-      .set({ value: String(value), updatedAt: new Date() })
-      .where(eq(settings.key, key))
+      .insert(settings)
+      .values({ key, value: String(value), label: key, group: "general" })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value: String(value), updatedAt: new Date() },
+      })
       .returning();
     if (row) results.push(row);
   }
@@ -94,11 +101,17 @@ router.put("/admin/protagonist-campaign", requireRole(ROLES.SUPERADMIN), async (
     targetId = campaignId;
 
     const [campaign] = await db
-      .select({ id: campaignsTable.id })
+      .select({ id: campaignsTable.id, status: campaignsTable.status })
       .from(campaignsTable)
       .where(eq(campaignsTable.id, targetId));
     if (!campaign) {
       return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+    }
+    // Solo una campaña VISIBLE puede protagonizar la portada: antes se aceptaba
+    // un borrador o una archivada y la portada quedaba vacía sin explicación.
+    const blocked = protagonistError(campaign.status);
+    if (blocked) {
+      return res.status(409).json({ error: "invalid_status", message: blocked });
     }
   }
 

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { invalidateAllyQueries } from "@/lib/query-invalidation";
 import {
   Building2, Plus, Star, Globe, Trash2, Edit2,
   Check, X, Eye, EyeOff
@@ -197,7 +198,8 @@ export default function AdminAllies() {
       await fetch(`/api/admin/allies/${id}`, { method: "DELETE", credentials: "include" });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/allies"] });
+      // Aliados es UNA entidad: se refrescan el panel y la página pública.
+      invalidateAllyQueries(queryClient);
       toast({ title: "Aliado eliminado" });
     },
   });
@@ -211,11 +213,11 @@ export default function AdminAllies() {
       });
       return res.json();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/allies"] }),
+    onSuccess: () => invalidateAllyQueries(queryClient),
   });
 
   const handleSave = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/allies"] });
+    invalidateAllyQueries(queryClient);
     setShowForm(false);
     setEditingAlly(null);
   };

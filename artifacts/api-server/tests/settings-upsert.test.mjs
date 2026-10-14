@@ -118,3 +118,36 @@ test("PUT /admin/settings/:key válido (superadmin) no es 400 ni 403", async () 
     assert.notEqual(res.status, 403);
   });
 });
+
+// ─── Campaña protagonista (Fase 1: solo campañas visibles) ───────────────────
+
+test("PUT /admin/protagonist-campaign sin sesión → 403", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await put(base, "/admin/protagonist-campaign", { campaignId: 1 });
+    assert.equal(res.status, 403);
+  });
+});
+
+test("PUT /admin/protagonist-campaign con rol insuficiente → 403", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await put(base, "/admin/protagonist-campaign", { campaignId: 1 }, "moderador");
+    assert.equal(res.status, 403);
+  });
+});
+
+test("PUT /admin/protagonist-campaign con id no entero → 400 (no llega a la DB)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await put(
+      base,
+      "/admin/protagonist-campaign",
+      { campaignId: "abc" },
+      "superadmin",
+    );
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.error, "invalid_body");
+  });
+});
