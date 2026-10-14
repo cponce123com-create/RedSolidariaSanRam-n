@@ -32,6 +32,7 @@ await build({
     "./src/lib/two-factor-lockout.ts",
     "./src/lib/random-password.ts",
     "./src/lib/csp.ts",
+    "./src/lib/security-config.ts",
     "./src/lib/ledger.ts",
     "./src/lib/ledger-audit.ts",
     "./src/lib/ledger-regularization.ts",
