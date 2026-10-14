@@ -153,4 +153,67 @@ test("informe vacío: sin movimientos ni orígenes, sano si la cadena verifica",
   });
   assert.equal(report.healthy, true);
   assert.equal(report.movementCount, 0);
+  assert.deepEqual(report.duplicateMovements, []);
+  assert.deepEqual(report.totals, []);
+  assert.deepEqual(report.unbalancedCampaigns, []);
+});
+
+// Fase 2 (V7.1): movimientos duplicados y saldos por campaña.
+test("movimientos duplicados: un origen con dos asientos se detecta", () => {
+  const report = auditLedger({
+    movements: [movement(1, "donation", 10, 100), movement(2, "donation", 10, 100)],
+    donations: [donation(10, 100)],
+    expenses: [],
+    chain: OK_CHAIN,
+  });
+  assert.equal(report.healthy, false);
+  assert.deepEqual(report.duplicateMovements, [
+    { sourceType: "donation", sourceId: 10, movementIds: [1, 2], count: 2 },
+  ]);
+});
+
+test("saldos: un ingreso sin asiento descuadra el saldo de la campaña", () => {
+  const report = auditLedger({
+    movements: [movement(1, "donation", 10, 100)],
+    donations: [donation(10, 100), donation(11, 250, 1)],
+    expenses: [],
+    chain: OK_CHAIN,
+  });
+  const totals = report.totals.find((t) => t.campaignId === 1);
+  assert.equal(totals.ledgerNet, 100);
+  assert.equal(totals.sourceNet, 350);
+  assert.equal(totals.balanced, false);
+  assert.deepEqual(report.unbalancedCampaigns, [1]);
+  assert.equal(report.healthy, false);
+});
+
+test("saldos: libro y orígenes cuadrados por campaña (ingresos y gastos)", () => {
+  const report = auditLedger({
+    movements: [
+      movement(1, "donation", 10, 100, 1, "ingreso"),
+      movement(2, "expense", 5, 40, 1, "gasto"),
+      movement(3, "donation", 11, 20, 2, "ingreso"),
+    ],
+    donations: [donation(10, 100, 1), donation(11, 20, 2)],
+    expenses: [{ id: 5, campaignId: 1, amount: 40 }],
+    chain: OK_CHAIN,
+  });
+  assert.deepEqual(report.unbalancedCampaigns, []);
+  const c1 = report.totals.find((t) => t.campaignId === 1);
+  assert.equal(c1.ledgerIncome, 100);
+  assert.equal(c1.ledgerExpense, 40);
+  assert.equal(c1.ledgerNet, 60);
+  assert.equal(c1.balanced, true);
+  assert.equal(report.healthy, true);
+});
+
+test("saldos: una donación pendiente NO descuadra el saldo", () => {
+  const report = auditLedger({
+    movements: [movement(1, "donation", 10, 100)],
+    donations: [donation(10, 100, 1, true), donation(11, 250, 1, false)],
+    expenses: [],
+    chain: OK_CHAIN,
+  });
+  assert.deepEqual(report.unbalancedCampaigns, []);
+  assert.equal(report.healthy, true);
 });

@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { ApiError, errorMessage, readErrorMessage } from "@/lib/api-error";
 import { invalidateEntities } from "@/lib/query-invalidation";
+import type { CampaignDeletionDiagnostic } from "./campaign-deletion";
 
 /**
  * Cliente del ciclo de vida de campañas (Fase 1 del Prompt Maestro).
@@ -42,6 +43,39 @@ export async function deleteCampaignDraft(id: number): Promise<void> {
   const res = await fetch(`/api/campaigns/${id}`, {
     method: "DELETE",
     credentials: "include",
+  });
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
+}
+
+/**
+ * Diagnóstico previo a la eliminación (Fase 1.2): dependencias clasificadas,
+ * motivo concreto del bloqueo y operaciones permitidas. NO borra nada. La
+ * interfaz lo muestra antes de confirmar cualquier eliminación.
+ */
+export async function fetchCampaignDeletionDiagnostic(
+  id: number,
+): Promise<CampaignDeletionDiagnostic> {
+  const res = await fetch(`/api/campaigns/${id}/deletion-diagnostic`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
+  return (await res.json()) as CampaignDeletionDiagnostic;
+}
+
+/**
+ * Purga de datos de prueba (Fase 1.3, Modalidad C). Exige rol superadmin en el
+ * servidor y un motivo escrito; el servidor rechaza con 409 si hay contabilidad
+ * real (asientos, gastos o donaciones confirmadas).
+ */
+export async function purgeCampaignTestData(
+  id: number,
+  reason: string,
+): Promise<void> {
+  const res = await fetch(`/api/campaigns/${id}/test-purge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ confirm: true, reason }),
   });
   if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
 }
@@ -214,7 +248,27 @@ export function lifecycleActions(current: string): LifecycleAction[] {
   }
 }
 
-/** Un borrador sin dependencias es el único borrado permanente permitido. */
-export function canPermanentlyDelete(status: string): boolean {
-  return status === "draft";
-}
+/**
+ * Presentación del diagnóstico de borrado: el tipo y los helpers viven en
+ * `lib/campaign-deletion.ts` (puros y testeables) y se re-exportan aquí para que
+ * el panel los consuma desde un único punto de entrada del dominio de campañas.
+ *
+ * Ya NO existe `canPermanentlyDelete(status)`: que una campaña sea borrador no
+ * basta —depende de sus dependencias reales—, así que la decisión la da el
+ * diagnóstico del servidor (`canDelete`), no el estado.
+ */
+export {
+  canPurgeTestData,
+  deletionHeadline,
+  describeDependencies,
+  findOperation,
+  groupDependencies,
+  totalOf,
+} from "./campaign-deletion";
+export type {
+  CampaignDeletionDiagnostic,
+  DeletionDependency,
+  DeletionDiagnostic,
+  DeletionOperation,
+  GroupedDependencies,
+} from "./campaign-deletion";

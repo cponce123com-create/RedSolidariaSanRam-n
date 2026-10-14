@@ -6,6 +6,7 @@ export * from "./contact";
 export * from "./volunteers";
 export * from "./donations";
 export * from "./donors";
+export * from "./donation-consents";
 export * from "./donation-proofs";
 export * from "./campaign-updates";
 export * from "./campaign-images";

@@ -78,6 +78,56 @@ export function verifyChain(rows: LedgerRow[]): VerifyResult {
   return { verified: true, brokenAt: null, rootHash: prev, count: rows.length };
 }
 
+/** Resultado agregado de verificar todas las cadenas de la base. */
+export interface CampaignChainsResult extends VerifyResult {
+  /** Número de cadenas (campañas con movimientos) verificadas. */
+  campaigns: number;
+}
+
+/**
+ * Verifica la cadena POR CAMPAÑA y agrega el resultado.
+ *
+ * La cadena de hashes es INDEPENDIENTE por campaña: `appendMovement` enlaza cada
+ * asiento con el último de la MISMA campaña y `verifyLedger(campaignId)` verifica
+ * una sola. Verificar todas las filas como si fueran una única cadena global da
+ * un falso «cadena rota» en cuanto hay movimientos de dos campañas, así que el
+ * informe de integridad debe agrupar por campaña antes de verificar.
+ *
+ * `rootHash` solo tiene sentido con UNA cadena: con varias es ambiguo y se
+ * devuelve `null` (la UI muestra el número de cadenas verificadas).
+ */
+export function verifyCampaignChains(
+  rows: readonly (LedgerRow & { campaignId: number })[],
+): CampaignChainsResult {
+  const groups = new Map<number, LedgerRow[]>();
+  for (const row of rows) {
+    const list = groups.get(row.campaignId);
+    if (list) list.push(row);
+    else groups.set(row.campaignId, [row]);
+  }
+
+  let verified = true;
+  let brokenAt: number | null = null;
+  const roots: string[] = [];
+  for (const list of groups.values()) {
+    const result = verifyChain(list);
+    if (!result.verified) {
+      verified = false;
+      if (brokenAt === null) brokenAt = result.brokenAt;
+    } else if (result.rootHash) {
+      roots.push(result.rootHash);
+    }
+  }
+
+  return {
+    verified,
+    brokenAt,
+    rootHash: groups.size === 1 ? roots[0] ?? null : null,
+    count: rows.length,
+    campaigns: groups.size,
+  };
+}
+
 // Cliente compatible con db y con el cliente transaccional de drizzle.
 interface LedgerClient {
   select: typeof db.select;

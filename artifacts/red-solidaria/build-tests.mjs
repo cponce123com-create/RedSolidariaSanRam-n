@@ -9,6 +9,7 @@ rmSync("tests/dist", { recursive: true, force: true });
 await build({
   entryPoints: [
     "./src/lib/campaign-urgency.ts",
+    "./src/lib/campaign-deletion.ts",
     "./src/lib/chocofest.ts",
     "./src/lib/inventory.ts",
     "./src/lib/results.ts",
@@ -25,6 +26,7 @@ await build({
     "./src/lib/admin-access.ts",
     "./src/lib/whatsapp.ts",
     "./src/lib/event-results.ts",
+    "./src/lib/allies.ts",
     "./src/lib/admin-session.ts",
     "./src/lib/structured-data.ts",
     "./src/lib/i18n/locales/es.ts",

@@ -128,3 +128,49 @@ export function validateRevocation(reason: unknown, minLength = 5): RevocationCh
   }
   return { ok: true, reason: text };
 }
+
+/**
+ * Normaliza el nombre del titular para comparar: sin distinguir mayúsculas ni
+ * espacios repetidos. «María  GÓMEZ» y «maría gómez» son la misma persona.
+ */
+export function normalizeHolderName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+export interface CertificateForDuplicateCheck {
+  id: number;
+  code: string;
+  holderName: string;
+  type: string;
+  campaignId: number | null;
+  status: string;
+}
+
+export interface DuplicateCandidate {
+  holderName: string;
+  type: string;
+  campaignId?: number | null;
+}
+
+/**
+ * Protección contra certificados DUPLICADOS: un mismo titular no debe recibir
+ * dos certificados VIGENTES del mismo tipo para la misma campaña. Un certificado
+ * revocado no bloquea emitir uno nuevo (el reconocimiento se rehace), y el mismo
+ * titular sí puede tener certificados de tipos distintos o de otras campañas.
+ */
+export function findDuplicateCertificate(
+  existing: readonly CertificateForDuplicateCheck[],
+  candidate: DuplicateCandidate,
+): CertificateForDuplicateCheck | null {
+  const name = normalizeHolderName(candidate.holderName);
+  const campaignId = candidate.campaignId ?? null;
+  return (
+    existing.find(
+      (cert) =>
+        cert.status === "issued" &&
+        cert.type === candidate.type &&
+        (cert.campaignId ?? null) === campaignId &&
+        normalizeHolderName(cert.holderName) === name,
+    ) ?? null
+  );
+}

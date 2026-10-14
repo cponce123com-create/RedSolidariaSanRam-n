@@ -222,6 +222,90 @@ check("una campaña archivada NO acepta donaciones (400)", archivedDonation.stat
 const restored = await call("PATCH", `/api/campaigns/${campaignId}/status`, { status: "completed" }, { auth: true });
 check("restaurar (archivada → finalizada) responde 200", restored.status === 200, `status=${restored.status}`);
 
+// ── 7bis. Eliminación por NATURALEZA de las dependencias (V7.1 · Fase 1) ─────
+// Reproduce el caso real: un borrador con SOLO dependencias auxiliares (galería
+// y novedades, sin valor contable) se elimina de forma segura; uno con historial
+// protegido (donación confirmada + asiento) se BLOQUEA y ofrece archivar. Antes
+// CUALQUIER fila dependiente bloqueaba el borrado para siempre.
+const auxDraft = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `E2E auxiliar ${stamp}`,
+    description: "Borrador con dependencias auxiliares (galería y novedades).",
+    goal: 500,
+    category: "general",
+    startDate: "2026-02-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const auxId = auxDraft.body?.id;
+await call(
+  "POST",
+  `/api/campaigns/${auxId}/images`,
+  { imageUrl: "https://res.cloudinary.com/demo/image/upload/v1/aux.jpg", caption: "Imagen auxiliar" },
+  { auth: true },
+);
+await call(
+  "POST",
+  `/api/campaigns/${auxId}/updates`,
+  { title: "Novedad auxiliar", content: "Contenido de presentación sin valor contable." },
+  { auth: true },
+);
+
+const auxDiag = await call("GET", `/api/campaigns/${auxId}/deletion-diagnostic`, undefined, { auth: true });
+check("diagnóstico del borrador auxiliar: permite eliminar", auxDiag.body?.diagnostic?.canDelete === true, JSON.stringify(auxDiag.body?.diagnostic?.dependencies ?? null));
+check("diagnóstico: desglosa las dependencias auxiliares (galería + novedades)", Number(auxDiag.body?.diagnostic?.auxiliaryCount) >= 2, `aux=${auxDiag.body?.diagnostic?.auxiliaryCount}`);
+check("diagnóstico: NO marca ninguna dependencia protegida", Number(auxDiag.body?.diagnostic?.protectedCount) === 0, `protegidas=${auxDiag.body?.diagnostic?.protectedCount}`);
+
+const auxDelete = await call("DELETE", `/api/campaigns/${auxId}`, undefined, { auth: true });
+check("un borrador con SOLO dependencias auxiliares se elimina (204)", auxDelete.status === 204, `status=${auxDelete.status}`);
+const auxGone = await call("GET", `/api/campaigns/${auxId}`, undefined, { auth: true });
+check("la campaña eliminada ya no existe (404)", auxGone.status === 404, `status=${auxGone.status}`);
+
+// Borrador con historial protegido: se publica, recibe una donación confirmada
+// (que genera asiento) y se vuelve a borrador. NO puede eliminarse.
+const protectedDraft = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `E2E protegido ${stamp}`,
+    description: "Borrador que recibió una donación confirmada antes de despublicarse.",
+    goal: 500,
+    category: "general",
+    startDate: "2026-02-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const protectedId = protectedDraft.body?.id;
+await call("PATCH", `/api/campaigns/${protectedId}/status`, { status: "active" }, { auth: true });
+const protectedDonation = await call("POST", "/api/donations", {
+  campaignId: protectedId,
+  firstName: "Prueba",
+  lastName: "Protegida",
+  email: `protected-${donorEmail}`,
+  amount: 25,
+  paymentMethod: "transfer",
+  collaborationType: "dinero",
+  proofImageUrl: "https://res.cloudinary.com/demo/image/upload/v1/protegida.jpg",
+  proofPublicId: "e2e/protegida",
+});
+await call("PUT", `/api/donations/${protectedDonation.body?.id}`, { status: "approved" }, { auth: true });
+await call("PATCH", `/api/campaigns/${protectedId}/status`, { status: "draft" }, { auth: true });
+
+const protectedDiag = await call("GET", `/api/campaigns/${protectedId}/deletion-diagnostic`, undefined, { auth: true });
+check("diagnóstico del borrador con historial: BLOQUEA la eliminación", protectedDiag.body?.diagnostic?.canDelete === false, protectedDiag.body?.diagnostic?.blockedReason ?? "");
+check(
+  "diagnóstico: explica el motivo concreto (dependencias protegidas)",
+  typeof protectedDiag.body?.diagnostic?.blockedReason === "string" && protectedDiag.body.diagnostic.blockedReason.length > 0,
+);
+check("diagnóstico: ofrece archivar como alternativa segura", protectedDiag.body?.diagnostic?.canArchive === true);
+
+const protectedDelete = await call("DELETE", `/api/campaigns/${protectedId}`, undefined, { auth: true });
+check("borrar el borrador con donación confirmada se bloquea (409)", protectedDelete.status === 409, `status=${protectedDelete.status} ${protectedDelete.body?.message ?? ""}`);
+
 // ── 8. Informe de integridad del libro ───────────────────────────────────────
 const audit = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
 check("el informe de integridad responde 200", audit.status === 200, `status=${audit.status}`);

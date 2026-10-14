@@ -47,6 +47,30 @@ overrides:
   # DEP-01 (CRÍTICO): >=2.0.8 corrige el IP spoofing vía IPv4-mapeado-en-IPv6,
   # que permitía eludir el rate-limit y el lockout por IP.
   proxy-addr: ^2.0.8
+  # V7.1 (Fase 3): parches de dependencias de DESARROLLO (build/lint).
+  # `pnpm audit --prod` NO reporta vulnerabilidades en producción; estos avisos
+  # afectan solo al toolchain. Se corrigen igual (el CI no debe quedar expuesto)
+  # fijando la versión parcheada MÍNIMA de la MISMA major para no romper la
+  # compatibilidad de los consumidores.
+  lodash: ^4.18.0
+  postcss: ^8.5.18
+  source-map-js: ^1.2.2
+  js-yaml: ^4.3.2
+  fast-uri: ^3.1.7
+  linkify-it: ^5.0.2
+  browserslist: ^4.28.7
+  vite: ^7.3.5
+  picomatch: ^4.0.4
+  # Codegen (dev): la versión parcheada sigue en la misma major (8.x).
+  orval: ^8.22.0
+  # `brace-expansion` se usa con dos APIs incompatibles (1.x para minimatch@3,
+  # 2.x para minimatch@5+). La línea 2.x es la que tiene parche; se fija ahí.
+  brace-expansion: ^2.1.7
+  yaml: ^2.8.3
+  markdown-it: ^14.3.1
+  postcss-selector-parser: ^7.1.6
+  fast-copy: ^4.1.0
+  vitest: ^4.1.11
   # Fuerza una única versión de React en todo el monorepo: evita el error de
   # runtime "Cannot set properties of undefined (setting 'Children')" cuando
   # una dependencia arrastra una segunda copia de React.

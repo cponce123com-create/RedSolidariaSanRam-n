@@ -46,6 +46,7 @@ import {
   parseProtagonistId,
   resolveEventDetails,
 } from "@/lib/chocofest";
+import { RESULTS_SETTING_KEYS } from "@/lib/event-results";
 import { usePublicSettings } from "@/hooks/use-public-settings";
 import { useSaveSettings, useSetProtagonist } from "@/hooks/use-campaign-lifecycle";
 import { errorMessage, invalidateCampaignQueries } from "@/lib/campaign-admin";
@@ -239,6 +240,12 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
   const [objectives, setObjectives] = useState("");
   const [organizers, setOrganizers] = useState("");
   const [program, setProgram] = useState("");
+  // Rendición de resultados: datos que solo la organización puede declarar (las
+  // cifras de dinero y bienes se calculan solas en la página pública).
+  const [beneficiaries, setBeneficiaries] = useState("");
+  const [resultsActivities, setResultsActivities] = useState("");
+  const [resultsSummary, setResultsSummary] = useState("");
+  const [leftoversDestination, setLeftoversDestination] = useState("");
 
   // Sincroniza el formulario con lo guardado (una vez cargada la configuración).
   useEffect(() => {
@@ -248,6 +255,10 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
     setObjectives(settings?.[CHOCOFEST_SETTING_KEYS.objectives] ?? "");
     setOrganizers(settings?.[CHOCOFEST_SETTING_KEYS.organizers] ?? "");
     setProgram(settings?.[CHOCOFEST_PROGRAM_SETTING_KEY] ?? "");
+    setBeneficiaries(settings?.[RESULTS_SETTING_KEYS.beneficiaries] ?? "");
+    setResultsActivities(settings?.[RESULTS_SETTING_KEYS.activities] ?? "");
+    setResultsSummary(settings?.[RESULTS_SETTING_KEYS.summary] ?? "");
+    setLeftoversDestination(settings?.[RESULTS_SETTING_KEYS.leftoversDestination] ?? "");
   }, [settings]);
 
   const goal = campaign.goal || 0;
@@ -302,6 +313,35 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
         key: CHOCOFEST_PROGRAM_SETTING_KEY,
         value: program,
         label: "Programa de actividades ChocoFest 2026",
+        group: "chocofest",
+      },
+    ]);
+  };
+
+  const saveResults = () => {
+    saveSettings.mutate([
+      {
+        key: RESULTS_SETTING_KEYS.beneficiaries,
+        value: beneficiaries,
+        label: "Beneficiarios atendidos en ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: RESULTS_SETTING_KEYS.activities,
+        value: resultsActivities,
+        label: "Actividades realizadas en ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: RESULTS_SETTING_KEYS.summary,
+        value: resultsSummary,
+        label: "Resumen de la rendición de ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: RESULTS_SETTING_KEYS.leftoversDestination,
+        value: leftoversDestination,
+        label: "Destino de los recursos sobrantes de ChocoFest 2026",
         group: "chocofest",
       },
     ]);
@@ -479,6 +519,75 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
               : ""}
           </span>
         </div>
+      </div>
+
+      {/* Rendición de resultados (Fase 4.3): datos declarados por la organización.
+          Las cifras de dinero y bienes NO se escriben aquí: se calculan solas. */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="text-lg font-bold text-foreground mb-1">
+          {t("adminChocofest.resultsTitle")}
+        </h3>
+        <p className="text-sm text-muted-foreground mb-5">
+          {t("adminChocofest.resultsNote")}
+        </p>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="cf-beneficiaries">{t("adminChocofest.resultsBeneficiariesLabel")}</Label>
+            <Input
+              id="cf-beneficiaries"
+              inputMode="numeric"
+              value={beneficiaries}
+              onChange={(e) => setBeneficiaries(e.target.value)}
+              placeholder={t("adminChocofest.resultsBeneficiariesPlaceholder")}
+              className="rounded-xl mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="cf-leftovers">{t("adminChocofest.resultsLeftoversLabel")}</Label>
+            <Input
+              id="cf-leftovers"
+              value={leftoversDestination}
+              onChange={(e) => setLeftoversDestination(e.target.value)}
+              className="rounded-xl mt-1"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="cf-results-activities">{t("adminChocofest.resultsActivitiesLabel")}</Label>
+            <textarea
+              id="cf-results-activities"
+              value={resultsActivities}
+              onChange={(e) => setResultsActivities(e.target.value)}
+              rows={3}
+              placeholder={"16:00 | Entrega de regalos | Equipo de voluntarios"}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm mt-1 font-mono"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("adminChocofest.resultsActivitiesHint")}
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="cf-results-summary">{t("adminChocofest.resultsSummaryLabel")}</Label>
+            <textarea
+              id="cf-results-summary"
+              value={resultsSummary}
+              onChange={(e) => setResultsSummary(e.target.value)}
+              rows={3}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm mt-1"
+            />
+          </div>
+        </div>
+
+        <Button
+          className="mt-5 rounded-xl gap-2"
+          disabled={saveSettings.isPending}
+          onClick={saveResults}
+        >
+          <Save className="w-4 h-4" />
+          {saveSettings.isPending
+            ? t("adminChocofest.savingResults")
+            : t("adminChocofest.saveResults")}
+        </Button>
       </div>
 
       {/* Accesos rápidos */}

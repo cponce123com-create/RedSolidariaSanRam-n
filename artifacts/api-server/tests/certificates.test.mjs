@@ -7,11 +7,13 @@ const {
   CERTIFICATE_STATUSES,
   CERTIFICATE_TYPES,
   canRevoke,
+  findDuplicateCertificate,
   generateCertificateCode,
   isCertificateStatus,
   isCertificateType,
   isValidCertificateCode,
   normalizeCertificateCode,
+  normalizeHolderName,
   publicCertificate,
   validateRevocation,
 } = await import("./dist/lib/certificates.mjs");
@@ -135,4 +137,64 @@ test("revocación: el motivo es obligatorio y con contenido", () => {
   const ok = validateRevocation("  Emitido por error en el nombre  ");
   assert.equal(ok.ok, true);
   assert.equal(ok.reason, "Emitido por error en el nombre");
+});
+
+// Fase 5 (V7.1): protección contra certificados duplicados.
+const cert = (id, holderName, type, campaignId, status = "issued") => ({
+  id,
+  code: `CODE${id}`,
+  holderName,
+  type,
+  campaignId,
+  status,
+});
+
+test("duplicados: normaliza el nombre del titular", () => {
+  assert.equal(normalizeHolderName("  María   GÓMEZ "), "maría gómez");
+  assert.equal(normalizeHolderName("Ana"), "ana");
+});
+
+test("duplicados: mismo titular, tipo y campaña vigente → se detecta", () => {
+  const existing = [cert(1, "María Gómez", "donante", 5)];
+  const dup = findDuplicateCertificate(existing, {
+    holderName: "MARÍA  gómez",
+    type: "donante",
+    campaignId: 5,
+  });
+  assert.equal(dup?.id, 1);
+  assert.equal(dup?.code, "CODE1");
+});
+
+test("duplicados: un certificado revocado NO bloquea emitir otro", () => {
+  const existing = [cert(1, "María Gómez", "donante", 5, "revoked")];
+  const dup = findDuplicateCertificate(existing, {
+    holderName: "María Gómez",
+    type: "donante",
+    campaignId: 5,
+  });
+  assert.equal(dup, null);
+});
+
+test("duplicados: distinto tipo o distinta campaña no son duplicados", () => {
+  const existing = [cert(1, "María Gómez", "donante", 5)];
+  assert.equal(
+    findDuplicateCertificate(existing, { holderName: "María Gómez", type: "voluntario", campaignId: 5 }),
+    null,
+  );
+  assert.equal(
+    findDuplicateCertificate(existing, { holderName: "María Gómez", type: "donante", campaignId: 6 }),
+    null,
+  );
+  // Sin campaña se compara contra certificados sin campaña.
+  assert.equal(
+    findDuplicateCertificate(existing, { holderName: "María Gómez", type: "donante" }),
+    null,
+  );
+});
+
+test("duplicados: sin certificados previos no hay duplicado", () => {
+  assert.equal(
+    findDuplicateCertificate([], { holderName: "Ana", type: "colaborador", campaignId: null }),
+    null,
+  );
 });

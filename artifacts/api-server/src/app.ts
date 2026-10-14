@@ -20,6 +20,11 @@ import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
 import { buildCspDirectives } from "./lib/csp";
+import {
+  resolveCookieSecure,
+  resolveCorsOrigin,
+  validateSecurityConfig,
+} from "./lib/security-config";
 
 const app: Express = express();
 
@@ -51,7 +56,6 @@ app.use(
       preload: true,
     },
     permittedCrossDomainPolicies: { permittedPolicies: "none" },
-    xssFilter: true,
   }),
 );
 
@@ -75,14 +79,12 @@ app.use(
   }),
 );
 
-// CORS: en producción restringido al frontend (mismo origin o CORS_ORIGIN explícito)
+// CORS: en producción restringido al frontend. `resolveCorsOrigin` deriva el
+// origen del entorno y NUNCA devuelve `*` cuando se envían credenciales (cookies
+// de sesión); la validación de arranque de abajo rechaza un comodín explícito.
 app.use(
   cors({
-    origin:
-      process.env.CORS_ORIGIN ||
-      (process.env.NODE_ENV === "production"
-        ? "https://redsolidariasanramon.org"
-        : true),
+    origin: resolveCorsOrigin(process.env),
     credentials: true,
   }),
 );
@@ -136,6 +138,16 @@ if (process.env.NODE_ENV !== "development") {
   }
 }
 
+// Configuración de seguridad (SEC-01/SEC-05): un comodín de CORS con credenciales
+// o un SITE_URL no-HTTPS en producción impiden el arranque en vez de degradar la
+// seguridad en silencio.
+const securityErrors = validateSecurityConfig(process.env);
+if (securityErrors.length > 0) {
+  throw new Error(
+    `Configuración de seguridad inválida: ${securityErrors.join(" ")}`,
+  );
+}
+
 // Secreto de sesión: en staging/producción se exige SESSION_SECRET (validación
 // de arriba). En desarrollo local, si no está definido, se genera uno aleatorio
 // por arranque: sin secretos hardcodeados en el repositorio (las sesiones de
@@ -168,7 +180,9 @@ app.use(
     // de INACTIVIDAD (no 24h desde el login, que expulsaría admins activos).
     rolling: true,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // Solo HTTPS en producción
+      // Secure en producción O cuando el sitio se sirve por HTTPS (SEC-01): la
+      // cookie de sesión nunca viaja por HTTP en un despliegue HTTPS.
+      secure: resolveCookieSecure(process.env),
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
       sameSite: "lax", // Prevenir CSRF
