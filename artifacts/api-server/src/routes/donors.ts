@@ -8,6 +8,8 @@ import {
 import { eq, desc, sql } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
+import { logAuditAction } from "../middleware/auth-utils";
+import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { toIsoSafe } from "../lib/date-format";
 import { toSafeAmount } from "../lib/amount-format";
@@ -283,6 +285,22 @@ router.patch("/admin/donations/:id/reconcile", ...adminOnly, adminActionLimiter,
       })
       .where(eq(donationsTable.id, id))
       .returning();
+
+    // Auditoría (Fase 4): la conciliación es una corrección contable trazable;
+    // queda registrado quién, cuándo, desde qué estado y sobre qué monto.
+    await logAuditAction({
+      ...auditContext(req),
+      action: AUDIT_ACTIONS.donationReconciled,
+      resource: AUDIT_RESOURCES.donations,
+      resourceId: String(id),
+      details: {
+        from: donation.status,
+        to: "reconciled",
+        amount: toSafeAmount(updated.amount),
+        campaignId: updated.campaignId,
+      },
+    });
+
     return res.json(formatDonationSummary(updated));
   } catch (err) {
     req.log.error({ err }, "Failed to reconcile donation");

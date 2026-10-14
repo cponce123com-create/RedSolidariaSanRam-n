@@ -55,6 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           : [
               { href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" },
               { href: "/admin/donantes", icon: HandHeart, label: "Donantes" },
+              { href: "/admin/auditoria", icon: ShieldCheck, label: "Auditoría" },
             ]),
         { href: "/admin/reportes", icon: AlertTriangle, label: "Reportes", highlight: true },
         { href: "/admin/adopciones", icon: Dog, label: "Adopciones", animal: true },

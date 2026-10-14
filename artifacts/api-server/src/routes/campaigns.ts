@@ -15,6 +15,8 @@ import {
 import { eq, and, sql, desc, inArray, notInArray, type SQL } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
+import { logAuditAction } from "../middleware/auth-utils";
+import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 import { toIsoSafe } from "../lib/date-format";
 import { toSafeAmount } from "../lib/amount-format";
 import { isForeignKeyViolation } from "../lib/pg-errors";
@@ -354,6 +356,14 @@ router.patch("/campaigns/:id/status", requireAdmin, adminActionLimiter, async (r
     if (isHiddenStatus(target)) {
       await clearProtagonistIfMatches(id);
     }
+    // Auditoría (Fase 4): el ciclo de vida de una campaña queda trazado.
+    await logAuditAction({
+      ...auditContext(req),
+      action: AUDIT_ACTIONS.campaignStatusChanged,
+      resource: AUDIT_RESOURCES.campaigns,
+      resourceId: String(id),
+      details: { from: existing.status, to: target },
+    });
     return res.json(formatCampaign(updated, 0, 0));
   } catch (err) {
     req.log.error({ err }, "Failed to change campaign status");
@@ -390,6 +400,15 @@ router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, re
 
     await db.delete(campaignsTable).where(eq(campaignsTable.id, id));
     await clearProtagonistIfMatches(id);
+    // Auditoría (Fase 4): el borrado permanente queda trazado (título y estado
+    // originales, para que el registro siga siendo útil tras el borrado).
+    await logAuditAction({
+      ...auditContext(req),
+      action: AUDIT_ACTIONS.campaignDeleted,
+      resource: AUDIT_RESOURCES.campaigns,
+      resourceId: String(id),
+      details: { title: existing.title, status: existing.status },
+    });
     return res.status(204).send();
   } catch (err) {
     // Segunda barrera: si algo escapó a la comprobación anterior, la FK RESTRICT
