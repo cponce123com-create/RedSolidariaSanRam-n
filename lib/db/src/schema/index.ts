@@ -24,3 +24,4 @@ export * from "./settings";
 export * from "./audit-logs";
 export * from "./supervisor-observations";
 export * from "./volunteer-teams";
+export * from "./certificates";

@@ -634,6 +634,53 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE RESTRICT NOT VALID;
     `,
   },
+  {
+    name: "024_certificates.sql",
+    sql: `
+      -- Certificados con QR (Fase 5.2 / B-3). ADITIVA: crea una tabla nueva, no
+      -- toca ninguna existente.
+      --
+      -- Un certificado RECONOCE a una persona o entidad y se publica en
+      -- /certificados/:code. Solo se publica lo que la organización autoriza:
+      -- nombre, tipo, título, fecha y campaña. **Nunca** importes ni datos de
+      -- contacto: un certificado no es un recibo.
+      --
+      -- El código público es aleatorio (12 caracteres de un alfabeto sin
+      -- caracteres ambiguos) y tiene índice único, así que no se puede enumerar
+      -- quién tiene certificado.
+      --
+      -- ON DELETE SET NULL en la campaña: si la campaña desaparece, el certificado
+      -- se conserva sin vínculo, porque reconoce a una persona y no es un dato
+      -- de la campaña.
+      CREATE TABLE IF NOT EXISTS certificates (
+        id serial PRIMARY KEY,
+        code text NOT NULL,
+        holder_name text NOT NULL,
+        type text NOT NULL DEFAULT 'donante',
+        title text NOT NULL,
+        description text,
+        campaign_id integer REFERENCES campaigns(id) ON DELETE SET NULL,
+        issued_at text NOT NULL,
+        status text NOT NULL DEFAULT 'issued',
+        revoked_at timestamp,
+        revocation_reason text,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_certificates_code ON certificates (code);
+      CREATE INDEX IF NOT EXISTS idx_certificates_status ON certificates (status);
+      CREATE INDEX IF NOT EXISTS idx_certificates_campaign ON certificates (campaign_id);
+
+      -- Mismos valores que los catálogos de la aplicación (lib/certificates.ts).
+      ALTER TABLE certificates DROP CONSTRAINT IF EXISTS certificates_type_check;
+      ALTER TABLE certificates ADD CONSTRAINT certificates_type_check
+        CHECK (type IN ('donante','voluntario','auspiciador','colaborador','reconocimiento')) NOT VALID;
+
+      ALTER TABLE certificates DROP CONSTRAINT IF EXISTS certificates_status_check;
+      ALTER TABLE certificates ADD CONSTRAINT certificates_status_check
+        CHECK (status IN ('issued','revoked')) NOT VALID;
+    `,
+  },
 ];
 
 /**

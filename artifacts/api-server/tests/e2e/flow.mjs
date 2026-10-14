@@ -277,6 +277,71 @@ check(
   `status=${badNews.status} error=${badNews.body?.error ?? ""}`,
 );
 
+// ── 10. Certificados con QR: emitir, abrir por QR, revocar ──────────────────
+const createdCert = await call(
+  "POST",
+  "/api/admin/certificates",
+  {
+    holderName: "E2E Donante",
+    type: "donante",
+    title: "Certificado de agradecimiento",
+    description: "Emitido por el flujo E2E",
+    issuedAt: "2026-10-14",
+  },
+  { auth: true },
+);
+check(
+  "se emite un certificado con código público aleatorio",
+  createdCert.status === 201 && /^[23456789BCDFGHJKMNPQRSTVWXZ]{12}$/.test(createdCert.body?.code ?? ""),
+  `status=${createdCert.status} code=${createdCert.body?.code ?? ""}`,
+);
+
+const certCode = createdCert.body?.code;
+const publicCert = await call("GET", `/api/certificates/${certCode}`);
+check(
+  "el certificado se consulta públicamente (es lo que abre el QR)",
+  publicCert.status === 200 && publicCert.body?.holderName === "E2E Donante",
+  `status=${publicCert.status}`,
+);
+check(
+  "la vista pública NO expone el id interno, ni el estado, ni datos de contacto",
+  publicCert.body?.id === undefined &&
+    publicCert.body?.status === undefined &&
+    publicCert.body?.revocationReason === undefined &&
+    publicCert.body?.createdAt === undefined,
+  `claves=${Object.keys(publicCert.body ?? {}).join(",")}`,
+);
+
+const badCertCode = await call("GET", "/api/certificates/NO-ES-UN-CODIGO");
+check("un código con forma inválida responde 400", badCertCode.status === 400, `status=${badCertCode.status}`);
+
+const revokedCert = await call(
+  "PATCH",
+  `/api/admin/certificates/${createdCert.body?.id}`,
+  { status: "revoked", revocationReason: "Prueba E2E de revocación" },
+  { auth: true },
+);
+check(
+  "se revoca el certificado indicando el motivo",
+  revokedCert.status === 200 && revokedCert.body?.status === "revoked",
+  `status=${revokedCert.status}`,
+);
+
+const afterRevoke = await call("GET", `/api/certificates/${certCode}`);
+check(
+  "un certificado revocado deja de publicarse (404)",
+  afterRevoke.status === 404,
+  `status=${afterRevoke.status}`,
+);
+
+const revokeAgain = await call(
+  "PATCH",
+  `/api/admin/certificates/${createdCert.body?.id}`,
+  { status: "revoked", revocationReason: "Segundo intento" },
+  { auth: true },
+);
+check("no se puede revocar dos veces (409)", revokeAgain.status === 409, `status=${revokeAgain.status}`);
+
 console.log("");
 if (failures === 0) {
   console.log("E2E: TODO OK");

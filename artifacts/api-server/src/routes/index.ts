@@ -31,6 +31,7 @@ import reportsRouter from "./reports";
 import supervisorRouter from "./supervisor";
 import volunteerTeamsRouter from "./volunteer-teams";
 import uploadsRouter from "./uploads";
+import certificatesRouter from "./certificates";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 
@@ -59,6 +60,7 @@ router.use(campaignBudgetsRouter);
 router.use(campaignTransparencyRouter);
 router.use(campaignMovementsRouter);
 router.use(ledgerAuditRouter);
+router.use(certificatesRouter);
 router.use(donationsRouter);
 router.use(donorsRouter);
 router.use(auditLogsRouter);
