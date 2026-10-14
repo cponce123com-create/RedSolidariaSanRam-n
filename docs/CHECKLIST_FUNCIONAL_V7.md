@@ -123,13 +123,13 @@ No se usan porcentajes de avance.
 
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
-| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **324/324** (sin pendientes): incluye barrido del gate, SEC-03, filtros del panel, datasets históricos y las claves foráneas |
+| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **335/335** (sin pendientes): incluye barrido del gate, SEC-03, filtros del panel, datasets históricos, claves foráneas y certificados |
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **174/174** + **33/33** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
 | Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–024) | Verificado contra **PostgreSQL 17.7 real**: 24 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
 | E2E con PostgreSQL real (flujo + esquema + restauración) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **48/48** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos y **certificados con QR**) **+ 10 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido), disparadores de `updated_at` y **claves foráneas** (rechazo real de una referencia inexistente) **+ ensayo de respaldo y restauración** (la base se destruye y se restaura; datos idénticos y **cadena del libro verificada**) |
-| Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (61 donaciones, 1 asiento, 22 claves, 23 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
+| Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (61 donaciones, 1 asiento, 22 claves, 24 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
 
 ## 10. Bloqueos que esperan decisión
 
