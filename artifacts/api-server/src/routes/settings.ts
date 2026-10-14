@@ -21,20 +21,31 @@ router.get("/admin/settings", requireRole(ROLES.SUPERADMIN), async (req, res) =>
   return res.json(rows);
 });
 
-// PUT /admin/settings/:key — update one setting
+// PUT /admin/settings/:key — crea o actualiza una configuración (upsert).
+// Antes solo actualizaba (404 si la clave no existía), lo que impedía crear
+// claves nuevas desde el panel (p. ej. los datos del evento ChocoFest).
 router.put("/admin/settings/:key", requireRole(ROLES.SUPERADMIN), async (req, res) => {
-  const key = String(req.params.key);
-  const { value } = req.body;
-  if (typeof value !== "string") return res.status(400).json({ error: "Valor requerido" });
+  const key = String(req.params.key).trim().slice(0, 100);
+  if (!key) {
+    return res.status(400).json({ error: "validation_error", message: "Clave inválida" });
+  }
+  const body: { value?: unknown; label?: unknown; group?: unknown } = req.body ?? {};
+  if (typeof body.value !== "string") {
+    return res.status(400).json({ error: "validation_error", message: "El valor debe ser texto" });
+  }
+  const label = (typeof body.label === "string" ? body.label : key).slice(0, 200);
+  const group = (typeof body.group === "string" ? body.group : "general").slice(0, 50);
 
-  const [updated] = await db
-    .update(settings)
-    .set({ value, updatedAt: new Date() })
-    .where(eq(settings.key, key))
+  const [row] = await db
+    .insert(settings)
+    .values({ key, value: body.value, label, group })
+    .onConflictDoUpdate({
+      target: settings.key,
+      set: { value: body.value, updatedAt: new Date() },
+    })
     .returning();
 
-  if (!updated) return res.status(404).json({ error: "Configuración no encontrada" });
-  return res.json(updated);
+  return res.json(row);
 });
 
 // PUT /admin/settings — batch update

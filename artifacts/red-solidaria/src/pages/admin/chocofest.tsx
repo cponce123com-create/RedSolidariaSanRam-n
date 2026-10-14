@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
@@ -26,8 +26,21 @@ import {
   XCircle,
   Plus,
   ExternalLink,
+  Star,
+  Save,
 } from "lucide-react";
-import { CHOCOFEST_2026, CHOCOFEST_2026_PATH, findChocofest2026 } from "@/lib/chocofest";
+import {
+  CHOCOFEST_2026,
+  CHOCOFEST_2026_PATH,
+  CHOCOFEST_SETTING_KEYS,
+  PROTAGONIST_SETTING_KEY,
+  findChocofest2026,
+  parseProtagonistId,
+  resolveEventDetails,
+} from "@/lib/chocofest";
+import { usePublicSettings } from "@/hooks/use-public-settings";
+import { useSaveSettings, useSetProtagonist } from "@/hooks/use-campaign-lifecycle";
+import { errorMessage, invalidateCampaignQueries } from "@/lib/campaign-admin";
 
 /** Tarjeta de sección con estado listo/pendiente. */
 function Readiness({
@@ -87,6 +100,7 @@ function CreatePanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createMutation = useCreateCampaign();
+  const setProtagonist = useSetProtagonist();
 
   const [goal, setGoal] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -112,15 +126,22 @@ function CreatePanel() {
         },
       },
       {
-        onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+        onSuccess: (created) => {
+          invalidateCampaignQueries(queryClient);
+          // ChocoFest 2026 pasa a ser la campaña protagonista de la portada:
+          // aparece en el primer bloque relevante de la página de inicio.
+          if (created?.id) setProtagonist.mutate(created.id);
           toast({
             title: t("adminChocofest.createSuccess"),
             description: t("adminChocofest.createSuccessDesc"),
           });
         },
-        onError: () => {
-          toast({ title: t("adminChocofest.createError"), variant: "destructive" });
+        onError: (err) => {
+          toast({
+            title: t("adminChocofest.createError"),
+            description: errorMessage(err),
+            variant: "destructive",
+          });
         },
       },
     );
@@ -186,10 +207,28 @@ function CreatePanel() {
   );
 }
 
-/** Panel cuando la campaña ya existe: KPIs, accesos y estado de secciones. */
+/** Panel cuando la campaña ya existe: KPIs, portada, datos del evento y accesos. */
 function FoundPanel({ campaign }: { campaign: Campaign }) {
   const { t } = useTranslation();
   const { data: images } = useGetCampaignImages(campaign.id);
+  const { data: settings } = usePublicSettings();
+  const setProtagonist = useSetProtagonist();
+  const saveSettings = useSaveSettings();
+
+  const protagonistId = parseProtagonistId(settings?.[PROTAGONIST_SETTING_KEY]);
+  const isProtagonist = protagonistId === campaign.id;
+  const details = resolveEventDetails(settings);
+
+  const [place, setPlace] = useState("");
+  const [schedule, setSchedule] = useState("");
+  const [motto, setMotto] = useState("");
+
+  // Sincroniza el formulario con lo guardado (una vez cargada la configuración).
+  useEffect(() => {
+    setPlace(settings?.[CHOCOFEST_SETTING_KEYS.place] ?? "");
+    setSchedule(settings?.[CHOCOFEST_SETTING_KEYS.schedule] ?? "");
+    setMotto(settings?.[CHOCOFEST_SETTING_KEYS.motto] ?? "");
+  }, [settings]);
 
   const goal = campaign.goal || 0;
   const raised = campaign.raised || 0;
@@ -197,6 +236,29 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
   const hasDonations = (campaign.donorCount ?? 0) > 0;
   const hasImages = !!images && images.length > 0;
   const hasGoal = goal > 0;
+
+  const saveDetails = () => {
+    saveSettings.mutate([
+      {
+        key: CHOCOFEST_SETTING_KEYS.place,
+        value: place,
+        label: "Lugar del evento ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: CHOCOFEST_SETTING_KEYS.schedule,
+        value: schedule,
+        label: "Horario del evento ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: CHOCOFEST_SETTING_KEYS.motto,
+        value: motto,
+        label: "Lema ChocoFest 2026",
+        group: "chocofest",
+      },
+    ]);
+  };
 
   return (
     <div className="space-y-6">
@@ -236,6 +298,98 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
               {campaign.endDate ? ` → ${campaign.endDate}` : ""}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Portada / protagonista */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-500" />
+              {t("adminChocofest.protagonistTitle")}
+            </h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isProtagonist
+                ? t("adminChocofest.protagonistActive")
+                : t("adminChocofest.protagonistInactive")}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("adminChocofest.protagonistNote")}
+            </p>
+          </div>
+          <Button
+            variant={isProtagonist ? "outline" : "default"}
+            className="rounded-xl"
+            disabled={setProtagonist.isPending}
+            onClick={() => setProtagonist.mutate(isProtagonist ? null : campaign.id)}
+          >
+            {isProtagonist
+              ? t("adminChocofest.protagonistRemove")
+              : t("adminChocofest.protagonistSet")}
+          </Button>
+        </div>
+      </div>
+
+      {/* Datos del evento (lugar, horario, lema) */}
+      <div className="rounded-3xl border border-border bg-card p-6">
+        <h3 className="text-lg font-bold text-foreground mb-1">
+          {t("adminChocofest.eventDetailsTitle")}
+        </h3>
+        <p className="text-sm text-muted-foreground mb-5">
+          {t("adminChocofest.eventDetailsNote")}
+        </p>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div>
+            <Label htmlFor="cf-place">{t("adminChocofest.placeLabel")}</Label>
+            <Input
+              id="cf-place"
+              value={place}
+              onChange={(e) => setPlace(e.target.value)}
+              placeholder={t("adminChocofest.placePlaceholder")}
+              className="rounded-xl mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="cf-schedule">{t("adminChocofest.scheduleLabel")}</Label>
+            <Input
+              id="cf-schedule"
+              value={schedule}
+              onChange={(e) => setSchedule(e.target.value)}
+              placeholder={t("adminChocofest.schedulePlaceholder")}
+              className="rounded-xl mt-1"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="cf-motto">{t("adminChocofest.mottoLabel")}</Label>
+            <Input
+              id="cf-motto"
+              value={motto}
+              onChange={(e) => setMotto(e.target.value)}
+              placeholder={t("adminChocofest.mottoPlaceholder")}
+              className="rounded-xl mt-1"
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <Button
+            className="rounded-xl gap-2"
+            disabled={saveSettings.isPending}
+            onClick={saveDetails}
+          >
+            <Save className="w-4 h-4" />
+            {saveSettings.isPending
+              ? t("adminChocofest.savingEventDetails")
+              : t("adminChocofest.saveEventDetails")}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {t("chocofest.eventPlaceLabel")}: {details.place}
+            {details.schedule
+              ? ` · ${t("chocofest.eventScheduleLabel")}: ${details.schedule}`
+              : ""}
+          </span>
         </div>
       </div>
 

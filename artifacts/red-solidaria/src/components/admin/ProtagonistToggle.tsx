@@ -1,8 +1,10 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { PROTAGONIST_SETTING_KEY, parseProtagonistId } from "@/lib/chocofest";
+import { usePublicSettings } from "@/hooks/use-public-settings";
+import { errorMessage, invalidateCampaignQueries, setProtagonistCampaign } from "@/lib/campaign-admin";
 
 /**
  * Fija o quita la campaña protagonista de la portada pública.
@@ -15,39 +17,22 @@ export function ProtagonistToggle({ campaignId }: { campaignId: number }) {
   const { t } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: settings } = useQuery<Record<string, string>>({
-    queryKey: ["settings"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings");
-      if (!res.ok) throw new Error("settings");
-      return (await res.json()) as Record<string, string>;
-    },
-    staleTime: 60 * 1000,
-  });
+  const { data: settings } = usePublicSettings();
 
   const currentId = parseProtagonistId(settings?.[PROTAGONIST_SETTING_KEY]);
   const isProtagonist = currentId === campaignId;
 
   const setProtagonist = async (nextId: number | null) => {
     try {
-      const res = await fetch("/api/admin/protagonist-campaign", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ campaignId: nextId }),
-      });
-      if (!res.ok) throw new Error("request_failed");
-      await queryClient.invalidateQueries({ queryKey: ["settings"] });
-      // La portada pública reordena y excluye campañas según el protagonista:
-      // se invalidan también las consultas de campañas para sincronizarla.
-      await queryClient.invalidateQueries({
-        predicate: (q) =>
-          Array.isArray(q.queryKey) && q.queryKey[0] === "/api/campaigns",
-      });
+      await setProtagonistCampaign(nextId);
+      // Invalida settings y campañas: la portada pública se reordena sin recargar.
+      invalidateCampaignQueries(queryClient);
       toast({ title: t("adminCampaigns.protagonistUpdated") });
-    } catch {
-      toast({ title: t("adminCampaigns.protagonistError"), variant: "destructive" });
+    } catch (err) {
+      toast({
+        title: errorMessage(err, t("adminCampaigns.protagonistError")),
+        variant: "destructive",
+      });
     }
   };
 

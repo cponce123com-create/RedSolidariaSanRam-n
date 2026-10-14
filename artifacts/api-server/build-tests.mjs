@@ -36,6 +36,7 @@ await build({
     "./src/lib/campaign-lifecycle.ts",
     "./src/routes/stats.ts",
     "./src/routes/sitemap.ts",
+    "./src/routes/settings.ts",
     "./src/routes/campaigns.ts",
     "./src/routes/campaign-movements.ts",
     "./src/routes/allies.ts",

@@ -128,3 +128,41 @@ export function findChocofest2026<T extends CampaignLike>(
     return t.includes("chocofest") && t.includes(String(CHOCOFEST_2026.year));
   });
 }
+
+/**
+ * Claves de `settings` (grupo "chocofest") con los datos del evento que el
+ * administrador puede editar y que se muestran en la página pública.
+ * No requieren migración: `settings` es una tabla clave-valor genérica.
+ */
+export const CHOCOFEST_SETTING_KEYS = {
+  place: "chocofest_2026_place",
+  schedule: "chocofest_2026_schedule",
+  motto: "chocofest_2026_motto",
+} as const;
+
+export interface ChocofestEventDetails {
+  place: string;
+  schedule: string;
+  motto: string;
+}
+
+/**
+ * Resuelve los datos del evento a partir de `settings`, con los textos de
+ * trabajo como respaldo cuando aún no se han configurado. Función pura y
+ * testeable (nunca inventa datos: solo usa lo guardado o el respaldo marcado
+ * como provisional).
+ */
+export function resolveEventDetails(
+  settings: Record<string, string> | undefined | null,
+): ChocofestEventDetails {
+  const pick = (key: string, fallback: string): string => {
+    const raw = settings?.[key];
+    const value = typeof raw === "string" ? raw.trim() : "";
+    return value || fallback;
+  };
+  return {
+    place: pick(CHOCOFEST_SETTING_KEYS.place, CHOCOFEST_2026.location),
+    schedule: pick(CHOCOFEST_SETTING_KEYS.schedule, ""),
+    motto: pick(CHOCOFEST_SETTING_KEYS.motto, CHOCOFEST_2026.provisionalMotto),
+  };
+}

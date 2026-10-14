@@ -4,8 +4,11 @@ import {
   deleteCampaignDraft,
   errorMessage,
   invalidateCampaignQueries,
+  saveSettings,
   setCampaignStatus,
+  setProtagonistCampaign,
   type CampaignStatus,
+  type SettingEntry,
 } from "@/lib/campaign-admin";
 
 /**
@@ -52,4 +55,50 @@ export function useCampaignLifecycle() {
   });
 
   return { setStatus, remove };
+}
+
+/**
+ * Fija (o quita con `null`) la campaña protagonista de la portada. Invalida
+ * campañas + settings: el primer bloque de la página de inicio cambia al
+ * instante, sin recargar.
+ */
+export function useSetProtagonist() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (campaignId: number | null) => setProtagonistCampaign(campaignId),
+    onSuccess: () => {
+      invalidateCampaignQueries(queryClient);
+      toast({ title: "Portada actualizada" });
+    },
+    onError: (err) => {
+      toast({
+        title: "No se pudo actualizar la portada",
+        description: errorMessage(err),
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+/** Guarda configuraciones (lugar, horario, lema…) del evento. */
+export function useSaveSettings() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (entries: SettingEntry[]) => saveSettings(entries),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+      toast({ title: "Datos del evento guardados" });
+    },
+    onError: (err) => {
+      toast({
+        title: "No se pudieron guardar los datos",
+        description: errorMessage(err),
+        variant: "destructive",
+      });
+    },
+  });
 }

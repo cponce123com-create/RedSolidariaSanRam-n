@@ -86,6 +86,47 @@ export function invalidateCampaignQueries(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: ["settings"] });
 }
 
+/**
+ * Fija (o limpia con `null`) la campaña protagonista de la portada.
+ * La portada pública la muestra en el primer bloque si está activa y no vencida.
+ */
+export async function setProtagonistCampaign(campaignId: number | null): Promise<void> {
+  const res = await fetch("/api/admin/protagonist-campaign", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ campaignId }),
+  });
+  if (!res.ok) throw new CampaignApiError(res.status, await readErrorMessage(res));
+}
+
+export interface SettingEntry {
+  key: string;
+  value: string;
+  label?: string;
+  group?: string;
+}
+
+/** Crea o actualiza una configuración (el backend hace upsert). */
+export async function saveSetting(entry: SettingEntry): Promise<void> {
+  const res = await fetch(`/api/admin/settings/${encodeURIComponent(entry.key)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      value: entry.value,
+      ...(entry.label ? { label: entry.label } : {}),
+      ...(entry.group ? { group: entry.group } : {}),
+    }),
+  });
+  if (!res.ok) throw new CampaignApiError(res.status, await readErrorMessage(res));
+}
+
+/** Guarda varias configuraciones (p. ej. los datos del evento ChocoFest). */
+export async function saveSettings(entries: SettingEntry[]): Promise<void> {
+  await Promise.all(entries.map((entry) => saveSetting(entry)));
+}
+
 // ─── Presentación del ciclo de vida (etiquetas, colores y acciones) ──────────
 
 export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {

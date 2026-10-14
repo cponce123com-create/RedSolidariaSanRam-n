@@ -37,7 +37,9 @@ import {
   CHOCOFEST_2026,
   CHOCOFEST_2026_PATH,
   findChocofest2026,
+  resolveEventDetails,
 } from "@/lib/chocofest";
+import { usePublicSettings } from "@/hooks/use-public-settings";
 
 /** Encabezado de sección homogéneo para toda la página. */
 function Section({
@@ -152,6 +154,10 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   const { data: images, isLoading: loadingImages } = useGetCampaignImages(campaign.id);
   const { data: donors, isLoading: loadingDonors } = useGetCampaignDonors(campaign.id);
   const { data: transparency } = useCampaignTransparency(campaign.id);
+  // Lugar, horario y lema son editables desde el panel (settings); si no se han
+  // configurado se usan los textos de trabajo marcados como provisionales.
+  const { data: settings } = usePublicSettings();
+  const details = resolveEventDetails(settings);
 
   const goal = campaign.goal || 0;
   const raised = campaign.raised || 0;
@@ -215,10 +221,10 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
               {campaign.title}
             </h1>
             <p className="text-lg text-muted-foreground italic mb-2">
-              {t("chocofest.provisionalMottoLabel")}: {CHOCOFEST_2026.provisionalMotto}
+              {t("chocofest.provisionalMottoLabel")}: {details.motto}
             </p>
             <p className="text-sm text-muted-foreground">
-              {CHOCOFEST_2026.organizer} · {CHOCOFEST_2026.location}
+              {CHOCOFEST_2026.organizer} · {details.place}
             </p>
           </div>
 
@@ -267,9 +273,29 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
                 </div>
                 <div className="bg-secondary/50 rounded-2xl p-5 border border-border/50">
                   <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
-                    {t("chocofest.location")}
+                    {t("chocofest.eventPlaceLabel")}
                   </div>
-                  <div className="text-sm font-semibold text-foreground">{CHOCOFEST_2026.location}</div>
+                  <div className="text-sm font-semibold text-foreground">{details.place}</div>
+                </div>
+                <div className="bg-secondary/50 rounded-2xl p-5 border border-border/50">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
+                    {t("chocofest.eventScheduleLabel")}
+                  </div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {details.schedule || "—"}
+                  </div>
+                </div>
+                <div className="bg-secondary/50 rounded-2xl p-5 border border-border/50">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
+                    {t("chocofest.eventDateLabel")}
+                  </div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {campaign.startDate
+                      ? formatSafeDate(campaign.startDate, t("campaignDetail.dateFormat"), {
+                          locale: getDateFormatLocale(),
+                        })
+                      : "—"}
+                  </div>
                 </div>
               </div>
             </Section>
