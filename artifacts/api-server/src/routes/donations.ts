@@ -4,6 +4,7 @@ import {
   donationsTable,
   campaignsTable,
   donationProofsTable,
+  donationConsentsTable,
   donorsTable,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -19,8 +20,10 @@ import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
 // Dinero: solo administrador o superadmin (los moderadores gestionan contenido).
 const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { logAuditAction } from "../middleware/auth-utils";
+import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 import { appendMovement } from "../lib/ledger";
 import { toSafeAmount } from "../lib/amount-format";
+import { consentState, validateConsentDecision } from "../lib/donor-consent";
 import {
   approvalRequiresProof,
   donationInputSchema,
@@ -623,6 +626,123 @@ function formatDonationRow(r: Record<string, unknown>) {
     createdAt,
   };
 }
+
+// ─── Consentimientos del donante (Fase 4 · V7.1) ─────────────────────────────
+//
+// El consentimiento para el reconocimiento público (nombre, comprobante,
+// fotografías) se registra como DECISIONES append-only: nunca se sobrescribe
+// nada, así que revocar no destruye historial. Son datos PRIVADOS: solo el panel
+// administrativo (administrador/superadmin) los consulta y los registra.
+
+// GET /donations/:id/consents — estado vigente + historial completo.
+router.get("/donations/:id/consents", ...adminOnly, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  try {
+    const [donation] = await db
+      .select({ id: donationsTable.id, donorId: donationsTable.donorId })
+      .from(donationsTable)
+      .where(eq(donationsTable.id, id));
+    if (!donation) {
+      return res.status(404).json({ error: "not_found", message: "Donación no encontrada" });
+    }
+
+    const rows = await db
+      .select({
+        scope: donationConsentsTable.scope,
+        granted: donationConsentsTable.granted,
+        version: donationConsentsTable.version,
+        reason: donationConsentsTable.reason,
+        recordedBy: donationConsentsTable.recordedBy,
+        createdAt: donationConsentsTable.createdAt,
+      })
+      .from(donationConsentsTable)
+      .where(eq(donationConsentsTable.donationId, id))
+      .orderBy(donationConsentsTable.createdAt, donationConsentsTable.id);
+
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.json({
+      donationId: id,
+      donorId: donation.donorId ?? null,
+      current: consentState(rows),
+      history: rows.map((r) => ({
+        scope: r.scope,
+        granted: r.granted,
+        version: r.version,
+        reason: r.reason ?? null,
+        recordedBy: r.recordedBy ?? null,
+        at: r.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to read donation consents");
+    return res.status(500).json({ error: "server_error", message: "No se pudieron leer los consentimientos" });
+  }
+});
+
+// POST /donations/:id/consents — registra una DECISIÓN (otorgar o revocar).
+// Revocar exige motivo; la operación queda auditada con quién y cuándo.
+router.post("/donations/:id/consents", ...adminOnly, adminActionLimiter, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  const check = validateConsentDecision(req.body ?? {});
+  if (!check.ok) {
+    return res.status(400).json({ error: "validation_error", message: check.message });
+  }
+  try {
+    const [donation] = await db
+      .select({ id: donationsTable.id, donorId: donationsTable.donorId })
+      .from(donationsTable)
+      .where(eq(donationsTable.id, id));
+    if (!donation) {
+      return res.status(404).json({ error: "not_found", message: "Donación no encontrada" });
+    }
+
+    const [row] = await db
+      .insert(donationConsentsTable)
+      .values({
+        donationId: id,
+        donorId: donation.donorId ?? null,
+        scope: check.scope,
+        granted: check.granted,
+        version: check.version,
+        reason: check.reason,
+        recordedBy: req.session?.adminUser?.username ?? null,
+      })
+      .returning();
+
+    await logAuditAction({
+      ...auditContext(req),
+      action: AUDIT_ACTIONS.donationConsentRecorded,
+      resource: AUDIT_RESOURCES.donations,
+      resourceId: String(id),
+      details: {
+        scope: check.scope,
+        granted: check.granted,
+        version: check.version,
+        reason: check.reason,
+      },
+    });
+
+    return res.status(201).json({
+      id: row.id,
+      donationId: id,
+      scope: row.scope,
+      granted: row.granted,
+      version: row.version,
+      reason: row.reason ?? null,
+      recordedBy: row.recordedBy ?? null,
+      at: row.createdAt.toISOString(),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to record donation consent");
+    return res.status(500).json({ error: "server_error", message: "No se pudo registrar el consentimiento" });
+  }
+});
 
 export default router;
 

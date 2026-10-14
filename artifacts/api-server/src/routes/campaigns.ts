@@ -11,6 +11,7 @@ import {
   campaignUpdatesTable,
   campaignBudgetsTable,
   communityReportsTable,
+  donationConsentsTable,
   settings,
   insertCampaignSchema,
 } from "@workspace/db";
@@ -21,7 +22,6 @@ import { adminActionLimiter } from "../middleware/rate-limit";
 import { logAuditAction } from "../middleware/auth-utils";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 import { toIsoSafe } from "../lib/date-format";
-import { toSafeAmount } from "../lib/amount-format";
 import { campaignFunding } from "../lib/funding";
 import { isForeignKeyViolation } from "../lib/pg-errors";
 import { cleanupCloudinaryAssets } from "../lib/asset-cleanup";
@@ -38,6 +38,8 @@ import {
   type CampaignDependencies,
 } from "../lib/campaign-lifecycle";
 import { CONFIRMED_DONATION_STATUSES } from "../lib/donor-identity";
+import { latestConsentMap, type ConsentDecision } from "../lib/donor-consent";
+import { formatPublicDonor } from "../lib/donor-format";
 
 const router: IRouter = Router();
 
@@ -296,16 +298,34 @@ router.get("/campaigns/:id/donors", async (req, res) => {
       .limit(limit)
       .offset(offset);
 
+    // Consentimientos explícitos de estas donaciones (Fase 4): solo se publica
+    // lo autorizado. El historial es append-only; aquí se proyecta el vigente.
+    const consentRows = donors.length
+      ? await db
+          .select({
+            donationId: donationConsentsTable.donationId,
+            scope: donationConsentsTable.scope,
+            granted: donationConsentsTable.granted,
+            createdAt: donationConsentsTable.createdAt,
+          })
+          .from(donationConsentsTable)
+          .where(inArray(donationConsentsTable.donationId, donors.map((d) => d.id)))
+          .orderBy(donationConsentsTable.createdAt, donationConsentsTable.id)
+      : [];
+    const consentsByDonation = new Map<number, ConsentDecision[]>();
+    for (const row of consentRows) {
+      const bucket = consentsByDonation.get(row.donationId);
+      if (bucket) bucket.push(row);
+      else consentsByDonation.set(row.donationId, [row]);
+    }
+
     res.json(
-      donors.map((d) => ({
-        id: d.id,
-        name: d.anonymous ? null : `${d.firstName} ${d.lastName}`.trim(),
-        amount: toSafeAmount(d.amount),
-        message: d.message,
-        date: d.createdAt.toISOString(),
-        publicProof: d.publicProof,
-        proofUrl: d.publicProof ? d.receiptUrl : null,
-      })),
+      donors.map((d) =>
+        formatPublicDonor({
+          ...d,
+          consents: latestConsentMap(consentsByDonation.get(d.id) ?? []),
+        }),
+      ),
     );
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign donors");

@@ -681,6 +681,46 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         CHECK (status IN ('issued','revoked')) NOT VALID;
     `,
   },
+  {
+    name: "025_donation_consents.sql",
+    sql: `
+      -- Fase 4 (V7.1): consentimiento explícito del donante para el
+      -- reconocimiento público. ADITIVA: crea una tabla nueva, no toca ninguna
+      -- existente ni reinterpreta datos históricos.
+      --
+      -- APPEND-ONLY: cada fila es una DECISIÓN (otorgar o revocar) con su fecha,
+      -- la VERSIÓN del texto aceptado y quién la registró. El estado vigente es
+      -- la última decisión por (donación, alcance); el historial completo queda
+      -- conservado, de modo que revocar no borra nada (no se destruyen registros
+      -- contables) y siempre se puede auditar quién cambió qué y cuándo.
+      --
+      -- Los alcances coinciden con el catálogo de lib/donor-consent.ts:
+      --   public_name  → publicar el nombre del donante
+      --   public_proof → publicar la imagen del comprobante
+      --   public_photo → autorizar el uso de fotografías en reconocimientos
+      CREATE TABLE IF NOT EXISTS donation_consents (
+        id serial PRIMARY KEY,
+        donation_id integer NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
+        donor_id integer REFERENCES donors(id) ON DELETE SET NULL,
+        scope text NOT NULL,
+        granted boolean NOT NULL,
+        version text NOT NULL,
+        reason text,
+        recorded_by text,
+        created_at timestamp NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_donation_consents_donation
+        ON donation_consents (donation_id, scope);
+      CREATE INDEX IF NOT EXISTS idx_donation_consents_donor
+        ON donation_consents (donor_id);
+
+      -- Mismos valores que el catálogo de la aplicación (lib/donor-consent.ts).
+      ALTER TABLE donation_consents DROP CONSTRAINT IF EXISTS donation_consents_scope_check;
+      ALTER TABLE donation_consents ADD CONSTRAINT donation_consents_scope_check
+        CHECK (scope IN ('public_name','public_proof','public_photo')) NOT VALID;
+    `,
+  },
 ];
 
 /**
