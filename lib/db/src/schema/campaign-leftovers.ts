@@ -32,6 +32,13 @@ export const campaignLeftoversTable = pgTable("campaign_leftovers", {
   targetQty: real("target_qty"),
   receivedQty: real("received_qty"),
   usedQty: real("used_qty"),
+  // Migración 017 (aditiva): composición de canastas y trazabilidad.
+  // `composition` guarda una línea por producto ("arroz | 2 kg") y se interpreta
+  // con `parseComposition`; `donorId`/`evidenceId` son opcionales (los bienes
+  // anteriores a la migración quedan sin vínculo).
+  composition: text("composition"),
+  donorId: integer("donor_id"),
+  evidenceId: integer("evidence_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

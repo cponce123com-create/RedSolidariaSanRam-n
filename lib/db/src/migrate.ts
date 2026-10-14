@@ -339,6 +339,25 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON campaign_budgets (campaign_id, lower(category));
     `,
   },
+  {
+    name: "017_campaign_leftovers_composition.sql",
+    sql: `
+      -- Fase 2.4: composición de canastas y trazabilidad del bien.
+      -- ADITIVA y reversible (DROP COLUMN deshace). No toca datos existentes.
+      --
+      -- composition: una línea por producto ("arroz | 2 kg"). Se interpreta con
+      --   la función pura parseComposition; la cobertura de canastas se calcula
+      --   cruzando esta composición con el stock real (basketCoverage).
+      -- donor_id / evidence_id: quién donó el bien y con qué evidencia se
+      --   entregó. Opcionales: los bienes cargados antes quedan sin vínculo.
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS composition text;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS donor_id integer;
+      ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS evidence_id integer;
+
+      CREATE INDEX IF NOT EXISTS idx_campaign_leftovers_donor
+        ON campaign_leftovers (donor_id);
+    `,
+  },
 ];
 
 /**

@@ -1254,6 +1254,11 @@ export const en: TranslationSchema = {
     budgetNote:
       "The budget is a forecast per category; published expenses are the only source of money spent and are accounted for in the ledger.",
     balanceLabel: "Overall balance",
+    basketReady: "Complete baskets ready to assemble",
+    basketLimitedBy: "Limiting item",
+    basketComposition: "Basket composition",
+    basketNoStock: "No stock recorded for this item",
+    basketNoComposition: "The basket composition has not been published yet.",
     inventoryNote:
       "The inventory includes hot chocolate and servings, toys and food baskets. The estimated value is informative and is not added to the money raised.",
     resultsCountLabel: "Published evidence",

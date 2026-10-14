@@ -64,7 +64,8 @@ Correcciones:
 
 **3C-3 — pendiente (diseño listo en `docs/ESTADO_IMPLEMENTACION.md` §6.6):**
 - *Meta de canastas y preparadas/entregadas*: **ya cubierto** por el modelo del 3A (categoría `canastas` con `targetQty`/`receivedQty`/`usedQty`).
-- *Composición por canasta*: migración 017 aditiva (`composition` en `campaign_leftovers`) + parser puro tolerante + función pura de **cobertura** (cuántas canastas completas se pueden armar y qué insumo limita).
+- *Composición por canasta*: ✅ **hecho en el 3C-3a** — migración 017 aditiva (`composition` en `campaign_leftovers`), parser puro tolerante (`parseComposition`/`serializeComposition`), campo en la pestaña de bienes del panel y visualización pública.
+- *Cobertura de canastas*: ✅ **hecho en el 3C-3a** — función pura `basketCoverage` que dice cuántas canastas COMPLETAS se pueden armar hoy con el stock real y qué insumo limita; se muestra en la sección pública de inventario.
 - *Regalos ligados a su donante y a la evidencia de entrega*: migración 017 aditiva (`donor_id`, `evidence_id` opcionales con `ON DELETE SET NULL`) reutilizando las listas de donantes y evidencias que ya existen.
 - *UI*: composición y selectores en la pestaña de bienes del panel; en la web, composición por canasta y «canastas preparables».
 

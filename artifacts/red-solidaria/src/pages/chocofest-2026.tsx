@@ -48,9 +48,11 @@ import {
   formatQuantity,
   goalProgress,
   groupInventoryByCategory,
+  normalizeCategory,
   resolveStock,
   summarizeInventory,
 } from "@/lib/inventory";
+import { basketCoverage, parseComposition } from "@/lib/baskets";
 import { isVideoEvidence, summarizeEvidence } from "@/lib/results";
 
 /** Encabezado de sección homogéneo para toda la página. */
@@ -180,6 +182,14 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   // Agrupación por producto para poder mostrar metas y saldos por bloque
   // (chocolatada, regalos, canastas) sin inventar cifras.
   const inventoryGroups = groupInventoryByCategory(inventory);
+  // Cobertura de canastas (Fase 2.4): la composición que definió la organización
+  // cruzada con el stock real → cuántas canastas COMPLETAS se pueden armar hoy y
+  // qué insumo lo impide. Si falta un insumo, la cifra es 0: no se prometen
+  // canastas que no se pueden llenar.
+  const canastaComposition = parseComposition(
+    inventory.find((item) => normalizeCategory(item.category) === "canastas")?.composition,
+  );
+  const basketReady = basketCoverage(canastaComposition, inventory);
   // Presupuesto por categoría (Fase 2.5): previsión administrada frente a los
   // gastos PUBLICADOS — el sitio público nunca muestra gastos privados — y saldo
   // general con el mismo monto recaudado que muestra la sección de avance.
@@ -461,6 +471,44 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
                       </div>
                     ))}
                   </div>
+                  {/* Cobertura de canastas: cifra honesta calculada con el stock real. */}
+                  {basketReady.hasComposition ? (
+                    <div className="bg-secondary/50 rounded-2xl p-5 border border-border/50 mt-6">
+                      <h4 className="font-display font-bold text-foreground mb-2">
+                        {t("chocofest.basketReady")}: {formatQuantity(basketReady.baskets)}
+                      </h4>
+                      {basketReady.limitedBy ? (
+                        <p className="text-sm text-muted-foreground mb-3">
+                          {t("chocofest.basketLimitedBy")}: {basketReady.limitedBy}
+                        </p>
+                      ) : null}
+                      <ul className="grid gap-2 sm:grid-cols-2">
+                        {basketReady.ingredients.map((ingredient) => (
+                          <li
+                            key={ingredient.name}
+                            className="bg-card border border-border rounded-xl px-3 py-2 text-sm flex items-center justify-between gap-3"
+                          >
+                            <span className="text-foreground">
+                              {ingredient.name}{" "}
+                              <span className="text-muted-foreground">
+                                ({formatQuantity(ingredient.perBasket)}
+                                {ingredient.unit ? ` ${ingredient.unit}` : ""})
+                              </span>
+                            </span>
+                            <span
+                              className={
+                                ingredient.inStock ? "text-muted-foreground" : "text-destructive"
+                              }
+                            >
+                              {ingredient.inStock
+                                ? `${formatQuantity(ingredient.available)} → ${formatQuantity(ingredient.basketsFromIt)}`
+                                : t("chocofest.basketNoStock")}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <EmptyBox text={t("chocofest.emptyInventory")} />

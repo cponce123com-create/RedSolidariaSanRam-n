@@ -136,6 +136,7 @@ const leftoverSchema = z
     targetQty: z.coerce.number().min(0, "La meta no puede ser negativa").optional(),
     receivedQty: z.coerce.number().min(0, "La cantidad recibida no puede ser negativa"),
     usedQty: z.coerce.number().min(0, "La cantidad usada no puede ser negativa").default(0),
+    composition: z.string().optional(),
     unit: z.string().optional(),
     notes: z.string().optional(),
     isPublic: z.boolean().default(true),
@@ -346,6 +347,7 @@ export default function AdminCampaignDetail() {
         targetQty: values.targetQty ?? null,
         receivedQty: values.receivedQty,
         usedQty: values.usedQty,
+        composition: values.composition,
         unit: values.unit,
         notes: values.notes,
         isPublic: values.isPublic,
@@ -359,6 +361,7 @@ export default function AdminCampaignDetail() {
             targetQty: undefined,
             receivedQty: 0,
             usedQty: 0,
+            composition: "",
             unit: "",
             notes: "",
             isPublic: true,
@@ -1172,6 +1175,25 @@ export default function AdminCampaignDetail() {
                     </FormItem>
                   )} />
                 </div>
+
+                <FormField control={leftoverForm.control} name="composition" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Composición (solo canastas)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Arroz | 2 kg   ·   Aceite | 1 l   ·   Frijol | 1 kg"
+                        rows={3}
+                        className="bg-secondary/30 rounded-xl font-mono"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Una línea por producto: <code>producto | cantidad unidad</code>. Con esto la web
+                      calcula cuántas canastas COMPLETAS se pueden armar hoy y qué insumo falta.
+                    </p>
+                    <FormMessage/>
+                  </FormItem>
+                )} />
 
                 <FormField control={leftoverForm.control} name="notes" render={({ field }) => (
                   <FormItem><FormLabel>Destino / Notas</FormLabel><FormControl><Textarea placeholder="Ej. entregados en la comunidad, en custodia, valorizados... (informativo: no se suma al dinero recaudado)" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>

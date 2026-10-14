@@ -78,6 +78,12 @@ export interface Leftover {
   receivedQty?: number | null;
   /** Cantidad usada o entregada. */
   usedQty?: number | null;
+  /** Composición de la canasta: una línea por producto ("arroz | 2 kg"). */
+  composition?: string | null;
+  /** Donante del bien (opcional). */
+  donorId?: number | null;
+  /** Evidencia de entrega asociada (opcional). */
+  evidenceId?: number | null;
   createdAt: string;
 }
 

@@ -1250,6 +1250,11 @@ export const es = {
     budgetNote:
       "El presupuesto es una previsión por rubro; los gastos publicados son la única fuente del dinero gastado y se rinden en el libro contable.",
     balanceLabel: "Saldo general",
+    basketReady: "Canastas completas preparables",
+    basketLimitedBy: "Insumo limitante",
+    basketComposition: "Composición por canasta",
+    basketNoStock: "Sin stock registrado de este insumo",
+    basketNoComposition: "La composición de las canastas aún no se ha publicado.",
     inventoryNote:
       "El inventario incluye chocolatada y raciones, juguetes y canastas de víveres. La valorización estimada es informativa y no se suma al dinero recaudado.",
     resultsCountLabel: "Evidencias publicadas",
