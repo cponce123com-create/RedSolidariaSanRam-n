@@ -20,6 +20,13 @@ export const donationsTable = pgTable("donations", {
   receiptNote: text("receipt_note"),
   status: text("status").notNull().default("pending"),
   adminNote: text("admin_note"),
+  // Fase 3: perfil de donante (persona/familia/empresa/anónimo) al que
+  // pertenece la donación. Nullable: una donación puede no tener perfil.
+  donorId: integer("donor_id"),
+  // Conciliación bancaria trazable: cuándo y quién la confirmó. `status` pasa a
+  // 'reconciled' (texto libre → sin migración de tipos).
+  reconciledAt: timestamp("reconciled_at"),
+  reconciledBy: text("reconciled_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

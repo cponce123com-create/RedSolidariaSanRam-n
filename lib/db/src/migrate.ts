@@ -153,6 +153,51 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT;
     `,
   },
+  {
+    name: "011_donors.sql",
+    sql: `
+      -- Fase 3: perfiles de donante (persona, familia, empresa o anónimo) y su
+      -- vínculo con las donaciones. TOTALMENTE ADITIVA Y REVERSIBLE:
+      --   rollback = ALTER TABLE donations DROP COLUMN reconciled_by,
+      --              DROP COLUMN reconciled_at, DROP COLUMN donor_id;
+      --              DROP TABLE donors;
+      CREATE TABLE IF NOT EXISTS donors (
+        id serial PRIMARY KEY,
+        type text NOT NULL DEFAULT 'individual',
+        name text NOT NULL,
+        email text,
+        phone text,
+        is_recurring boolean NOT NULL DEFAULT false,
+        notes text,
+        created_at timestamp NOT NULL DEFAULT now(),
+        updated_at timestamp NOT NULL DEFAULT now()
+      );
+
+      -- Un correo identifica a un donante (sin distinguir mayúsculas); los
+      -- correos vacíos o nulos no participan del índice único.
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_donors_email
+        ON donors (lower(email)) WHERE email IS NOT NULL AND btrim(email) <> '';
+
+      -- Vínculo opcional: una donación puede pertenecer a un perfil de donante.
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS donor_id integer;
+
+      -- Conciliación bancaria TRAZABLE (Fase 3/4): cuándo y quién la confirmó.
+      -- Nunca se altera silenciosamente un movimiento confirmado.
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS reconciled_at timestamp;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS reconciled_by text;
+
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'donations_donor_id_fkey'
+        ) THEN
+          ALTER TABLE donations
+            ADD CONSTRAINT donations_donor_id_fkey
+            FOREIGN KEY (donor_id) REFERENCES donors(id) ON DELETE SET NULL;
+        END IF;
+      END $$;
+    `,
+  },
 ];
 
 /**
