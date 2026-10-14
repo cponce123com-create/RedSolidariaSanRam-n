@@ -461,3 +461,30 @@ uso** y `adoption_requests`.
 se ejecutó porque en una base vacía PostgreSQL prefiere un *seq scan*; el E2E comprueba la
 existencia y la correspondencia con las consultas identificadas. Medir el plan real queda como
 verificación pendiente y **no se marca como hecha**.
+
+---
+
+## 22. Apéndice — Incremento V7-10 (API-06 completo)
+
+**Completado.** Los **13 bloques `catch` de 9 routers** que respondían `400 "Invalid … data"`
+ante *cualquier* excepción ahora distinguen:
+
+- **validación** (`ZodError`) → **400** `validation_error` (el dato es del cliente);
+- **cualquier otro fallo** → **500** `server_error`, con el error registrado.
+
+Routers: `news`, `campaign-evidence`, `campaign-expenses` (incluye el asiento en el libro),
+`testimonials`, `admin` (login), `campaign-images`, `campaign-updates`, `contact`, `stats`
+(más `donations`, que ya se había corregido en V7-4).
+
+**Efecto real:** una caída de la base o un error de programación ya no se presentan como «datos
+inválidos» al usuario ni quedan invisibles para la monitorización: aparece el 500 y queda el
+registro del error.
+
+**Verificado:** `api-server` **329/329**, typecheck **0** (el cambio obligó a hacer
+consistentes las salidas de los handlers, porque el proyecto tiene `noImplicitReturns`), y
+**E2E 41/41 contra PostgreSQL real** con 3 comprobaciones nuevas que confirman que la
+validación sigue devolviendo `400 validation_error`.
+
+**Límite declarado:** la rama del 500 no se prueba de forma automatizada (exigiría tumbar la
+base durante el E2E); se cubre por revisión y compilador, y la rama que el cambio podía romper
+—la validación— sí está probada.

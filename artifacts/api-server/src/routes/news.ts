@@ -44,10 +44,14 @@ router.post("/news", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
     const data = insertNewsSchema.parse(req.body);
     const [post] = await db.insert(newsTable).values(data).returning();
-    res.status(201).json(formatNews(post));
+    return res.status(201).json(formatNews(post));
   } catch (err) {
+    // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+    if (err instanceof Error && err.name === "ZodError") {
+      return res.status(400).json({ error: "validation_error", message: "Invalid news data" });
+    }
     req.log.error({ err }, "Failed to create news post");
-    res.status(400).json({ error: "validation_error", message: "Invalid news data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo guardar la noticia." });
   }
 });
 
@@ -61,8 +65,12 @@ router.put("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
     }
     return res.json(formatNews(post));
   } catch (err) {
+    // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+    if (err instanceof Error && err.name === "ZodError") {
+      return res.status(400).json({ error: "validation_error", message: "Invalid news data" });
+    }
     req.log.error({ err }, "Failed to update news post");
-    return res.status(400).json({ error: "validation_error", message: "Invalid news data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo actualizar la noticia." });
   }
 });
 
@@ -70,10 +78,10 @@ router.delete("/news/:id", requireAdmin, adminActionLimiter, async (req, res) =>
   try {
     const id = Number(req.params.id);
     await db.delete(newsTable).where(eq(newsTable.id, id));
-    res.status(204).send();
+    return res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete news post");
-    res.status(500).json({ error: "server_error", message: "Failed to delete news post" });
+    return res.status(500).json({ error: "server_error", message: "Failed to delete news post" });
   }
 });
 

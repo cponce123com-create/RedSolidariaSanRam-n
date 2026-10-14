@@ -255,6 +255,28 @@ check(
 const badFilter = await call("GET", "/api/admin/dashboard?status=en-curso", undefined, { auth: true });
 check("un filtro inválido responde 400 con el motivo", badFilter.status === 400, `status=${badFilter.status} ${badFilter.body?.message ?? ""}`);
 
+// ── 9. API-06: la validación sigue siendo 400 (el guard de Zod no la convierte en 500) ──
+const badContact = await call("POST", "/api/contact", {});
+check(
+  "un mensaje de contacto inválido responde 400 de validación",
+  badContact.status === 400 && badContact.body?.error === "validation_error",
+  `status=${badContact.status} error=${badContact.body?.error ?? ""}`,
+);
+
+const badTestimonial = await call("POST", "/api/testimonials", {});
+check(
+  "un testimonio inválido responde 400 de validación",
+  badTestimonial.status === 400 && badTestimonial.body?.error === "validation_error",
+  `status=${badTestimonial.status} error=${badTestimonial.body?.error ?? ""}`,
+);
+
+const badNews = await call("POST", "/api/news", {}, { auth: true });
+check(
+  "una noticia inválida responde 400 de validación (no 500)",
+  badNews.status === 400 && badNews.body?.error === "validation_error",
+  `status=${badNews.status} error=${badNews.body?.error ?? ""}`,
+);
+
 console.log("");
 if (failures === 0) {
   console.log("E2E: TODO OK");

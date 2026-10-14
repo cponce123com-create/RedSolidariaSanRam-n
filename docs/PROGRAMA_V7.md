@@ -563,3 +563,59 @@ artifacts/api-server/tests/e2e/run-e2e.sh         verifica los 6 índices en bas
   a las consultas identificadas, no el plan de ejecución. Medir el plan requiere datos de
   producción o un juego de datos grande, y queda como verificación pendiente (no se marca como
   hecha).
+
+---
+
+## 12. Incremento V7-10 — API-06 completo: ningún fallo del servidor disfrazado de 400 · CERRADO
+
+### 12.1 Qué estaba mal
+
+En **13 bloques `catch` de 9 routers** cualquier excepción se respondía como
+`400 "Invalid … data"`. Consecuencias reales:
+
+- una caída de la base o un error de programación parecía un **dato mal enviado** por el
+  usuario;
+- la interfaz mostraba «datos inválidos» donde debía decir «no se pudo guardar»;
+- **nadie veía una señal de 500**, así que un incidente de infraestructura era invisible en los
+  registros y en la monitorización.
+
+### 12.2 Qué se implementó
+
+En cada bloque, la validación se distingue del fallo inesperado:
+
+```ts
+} catch (err) {
+  if (err instanceof Error && err.name === "ZodError") {
+    return res.status(400).json({ error: "validation_error", message: "Invalid … data" });
+  }
+  req.log.error({ err }, "Failed to …");
+  return res.status(500).json({ error: "server_error", message: "No se pudo …" });
+}
+```
+
+Routers corregidos: `donations` (ya estaba), `news` (POST y PUT), `campaign-evidence` (POST y
+PUT), `campaign-expenses` (POST y PUT — ruta financiera, incluye el asiento en el libro),
+`testimonials` (POST y PUT), `admin` (login), `campaign-images`, `campaign-updates`,
+`contact` y `stats`.
+
+Además se hicieron **consistentes las salidas** de los handlers afectados (los que no
+devolvían explícitamente en el camino de éxito pasaron a hacerlo), porque el proyecto tiene
+`noImplicitReturns` activo y el compilador lo exige: **0 errores de tipo** tras el cambio.
+
+### 12.3 Verificación
+
+- `api-server`: **329/329** · typecheck **0** en libs, API, frontend y scripts.
+- **E2E contra PostgreSQL real: 41/41** (38 anteriores + 3 nuevas) con el servidor real:
+  un mensaje de contacto, un testimonio y una noticia **inválidos** responden
+  `400 validation_error` — es decir, el guard **no rompió la validación** que ya funcionaba.
+- **Límite declarado con honestidad:** la rama del **500** no tiene una prueba automatizada,
+  porque provocarla exigiría tumbar la base durante el E2E. Se verifica por revisión del código
+  y por el compilador; la rama que el cambio podía romper (la validación) sí está probada.
+
+### 12.4 Archivos
+
+```
+artifacts/api-server/src/routes/{donations,news,campaign-evidence,campaign-expenses,
+  testimonials,admin,campaign-images,campaign-updates,contact,stats}.ts   13 bloques
+artifacts/api-server/tests/e2e/flow.mjs                                    3 comprobaciones nuevas
+```

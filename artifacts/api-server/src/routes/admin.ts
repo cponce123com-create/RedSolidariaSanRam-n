@@ -163,8 +163,14 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
 
     return res.status(401).json({ error: "unauthorized", message: "Usuario o contraseña incorrectos" });
   } catch (err) {
+    // API-06: un dato de login mal formado es 400; un fallo del servidor es 500.
+    // Antes TODO se respondía como 400, así que una caída de la base parecía un
+    // error del usuario y nadie veía la señal de 500.
+    if (err instanceof Error && err.name === "ZodError") {
+      return res.status(400).json({ error: "validation_error", message: "Invalid login data" });
+    }
     req.log.error({ err }, "Login error");
-    return res.status(400).json({ error: "validation_error", message: "Invalid login data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo iniciar sesión." });
   }
 });
 

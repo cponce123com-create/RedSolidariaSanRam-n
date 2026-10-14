@@ -59,10 +59,14 @@ router.put("/stats", ...adminOnly, adminActionLimiter, async (req, res) => {
         }
       }
     }
-    res.json(updates);
+    return res.json(updates);
   } catch (err) {
+    // API-06: validación (Zod) → 400; cualquier otro fallo → 500.
+    if (err instanceof Error && err.name === "ZodError") {
+      return res.status(400).json({ error: "validation_error", message: "Invalid stats data" });
+    }
     req.log.error({ err }, "Failed to update stats");
-    res.status(400).json({ error: "validation_error", message: "Invalid stats data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudieron actualizar las estadísticas." });
   }
 });
 
