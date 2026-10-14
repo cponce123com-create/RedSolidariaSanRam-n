@@ -223,6 +223,30 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON supervisor_observations (entity_type, entity_id);
     `,
   },
+  {
+    name: "013_volunteers_permanent.sql",
+    sql: `
+      -- Fase 5: registro PERMANENTE de voluntariado. ADITIVA Y REVERSIBLE:
+      --   rollback = DROP INDEX IF EXISTS idx_volunteers_public_token;
+      --              DROP INDEX IF EXISTS idx_volunteers_email;
+      --              ALTER TABLE volunteers DROP COLUMN public_token,
+      --                DROP COLUMN approved_by, DROP COLUMN approved_at,
+      --                DROP COLUMN updated_at;
+      ALTER TABLE volunteers ADD COLUMN IF NOT EXISTS updated_at timestamp NOT NULL DEFAULT now();
+      ALTER TABLE volunteers ADD COLUMN IF NOT EXISTS approved_at timestamp;
+      ALTER TABLE volunteers ADD COLUMN IF NOT EXISTS approved_by text;
+      ALTER TABLE volunteers ADD COLUMN IF NOT EXISTS public_token text;
+
+      -- Índice NO único A PROPÓSITO: si en producción ya existieran correos
+      -- repetidos, un índice único haría FALLAR la migración y con ella el
+      -- arranque. La deduplicación se aplica en la aplicación (409).
+      CREATE INDEX IF NOT EXISTS idx_volunteers_email ON volunteers (lower(email));
+
+      -- El token público sí es único (los nulos no participan del índice).
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_volunteers_public_token
+        ON volunteers (public_token) WHERE public_token IS NOT NULL;
+    `,
+  },
 ];
 
 /**

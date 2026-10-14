@@ -22,6 +22,14 @@ function buildApp(router) {
     // pino-http provee req.log en producción; aquí se usa un stub para que los
     // handlers que loguean no crasheen.
     req.log = { error: () => {} };
+    // Las rutas /admin exigen autenticación EXPLÍCITA (defensa en profundidad),
+    // además del gate global. Los tests que verifican la VALIDACIÓN de entrada
+    // necesitan pasar antes el control de acceso: piden la sesión con la
+    // cabecera x-test-role. Sin cabecera, el comportamiento no cambia.
+    const role = req.headers["x-test-role"];
+    if (typeof role === "string" && role) {
+      req.session = { adminUser: { id: 1, username: "tester", role } };
+    }
     next();
   });
   app.use("/api", router);
@@ -42,7 +50,7 @@ test("PATCH /api/admin/volunteers/:id con status inválido → 400 (schema Zod a
   await withServer(buildApp(mod.default), async (base) => {
     const res = await fetch(`${base}/api/admin/volunteers/1`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-test-role": "administrador" },
       body: JSON.stringify({ status: "hacked", adminNotes: "nota" }),
     });
     assert.equal(res.status, 400);
@@ -57,7 +65,7 @@ test("PATCH /api/admin/volunteers/:id con adminNotes de tipo inválido → 400",
   await withServer(buildApp(mod.default), async (base) => {
     const res = await fetch(`${base}/api/admin/volunteers/1`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-test-role": "administrador" },
       body: JSON.stringify({ status: "approved", adminNotes: 123 }),
     });
     assert.equal(res.status, 400);

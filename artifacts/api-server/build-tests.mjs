@@ -39,6 +39,8 @@ await build({
     "./src/lib/audit.ts",
     "./src/lib/csv.ts",
     "./src/lib/supervisor.ts",
+    "./src/lib/volunteer-lifecycle.ts",
+    "./src/routes/volunteers.ts",
     "./src/routes/audit-logs.ts",
     "./src/routes/reports.ts",
     "./src/routes/supervisor.ts",
