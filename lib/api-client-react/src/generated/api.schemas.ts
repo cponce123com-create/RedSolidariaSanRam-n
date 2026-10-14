@@ -13,9 +13,11 @@ export type CampaignStatus =
   (typeof CampaignStatus)[keyof typeof CampaignStatus];
 
 export const CampaignStatus = {
+  draft: "draft",
   active: "active",
-  completed: "completed",
   paused: "paused",
+  completed: "completed",
+  archived: "archived",
 } as const;
 
 export interface Campaign {
@@ -38,9 +40,11 @@ export type CreateCampaignInputStatus =
   (typeof CreateCampaignInputStatus)[keyof typeof CreateCampaignInputStatus];
 
 export const CreateCampaignInputStatus = {
+  draft: "draft",
   active: "active",
-  completed: "completed",
   paused: "paused",
+  completed: "completed",
+  archived: "archived",
 } as const;
 
 export interface CreateCampaignInput {
@@ -276,13 +280,19 @@ export interface AdminLoginInput {
   password: string;
 }
 
+export type AdminRole = (typeof AdminRole)[keyof typeof AdminRole];
+
+export const AdminRole = {
+  superadmin: "superadmin",
+  administrador: "administrador",
+  moderador: "moderador",
+} as const;
+
 export interface AdminUser {
   id: number;
   username: string;
-  /** Nombre visible del admin (null para el superadmin de archivo, id 0). */
   name?: string | null;
-  /** Rol operativo; ver enum AdminRole del OpenAPI spec. */
-  role: "superadmin" | "administrador" | "moderador";
+  role: AdminRole;
 }
 
 export interface AdminLoginResponse {
@@ -310,9 +320,11 @@ export type GetCampaignsStatus =
   (typeof GetCampaignsStatus)[keyof typeof GetCampaignsStatus];
 
 export const GetCampaignsStatus = {
+  draft: "draft",
   active: "active",
-  completed: "completed",
   paused: "paused",
+  completed: "completed",
+  archived: "archived",
   all: "all",
 } as const;
 

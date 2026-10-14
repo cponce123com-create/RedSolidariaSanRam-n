@@ -10,7 +10,9 @@ export type CreateCampaignInputStatus =
   (typeof CreateCampaignInputStatus)[keyof typeof CreateCampaignInputStatus];
 
 export const CreateCampaignInputStatus = {
+  draft: "draft",
   active: "active",
-  completed: "completed",
   paused: "paused",
+  completed: "completed",
+  archived: "archived",
 } as const;

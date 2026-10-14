@@ -3,6 +3,7 @@ import { db, campaignsTable } from "@workspace/db";
 import { settings } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { requireRole, ROLES } from "../middleware/roles";
+import { PROTAGONIST_SETTING_KEY } from "../lib/campaign-lifecycle";
 
 const router = Router();
 
@@ -54,11 +55,8 @@ router.put("/admin/settings", requireRole(ROLES.SUPERADMIN), async (req, res) =>
   return res.json({ updated: results.length, settings: results });
 });
 
-/**
- * Clave de `settings` que guarda el id de la campaña protagonista de la portada.
- * Debe coincidir con PROTAGONIST_SETTING_KEY del frontend (src/lib/chocofest.ts).
- */
-export const PROTAGONIST_SETTING_KEY = "protagonist_campaign_id";
+// PROTAGONIST_SETTING_KEY se define en ../lib/campaign-lifecycle (fuente única
+// de verdad, compartida con routes/campaigns.ts y con el frontend).
 
 /**
  * PUT /admin/protagonist-campaign — fija (o limpia) la campaña protagonista.

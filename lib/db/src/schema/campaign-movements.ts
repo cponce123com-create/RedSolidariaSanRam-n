@@ -9,9 +9,12 @@ import { money } from "./money";
 // una entrada compensatoria (o quedando la evidencia en la cadena).
 export const campaignMovementsTable = pgTable("campaign_movements", {
   id: serial("id").primaryKey(),
+  // ON DELETE RESTRICT (migración 010): el libro contable no se borra en
+  // cascada al eliminar una campaña. Debe coincidir con la restricción real de
+  // la BD para no reintroducir drift esquema↔BD (hallazgo DB-02/DB-03).
   campaignId: integer("campaign_id")
     .notNull()
-    .references(() => campaignsTable.id, { onDelete: "cascade" }),
+    .references(() => campaignsTable.id, { onDelete: "restrict" }),
   kind: text("kind").notNull(), // "ingreso" | "gasto"
   amount: money("amount").notNull(),
   description: text("description").notNull(),

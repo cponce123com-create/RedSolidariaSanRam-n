@@ -3,28 +3,115 @@ import {
   db,
   campaignsTable,
   donationsTable,
+  campaignMovementsTable,
+  campaignExpensesTable,
+  campaignEvidenceTable,
+  campaignLeftoversTable,
+  campaignImagesTable,
+  campaignUpdatesTable,
+  settings,
   insertCampaignSchema,
 } from "@workspace/db";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, notInArray, type SQL } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { toIsoSafe } from "../lib/date-format";
-import { formatPublicDonor } from "../lib/donor-format";
 import { toSafeAmount } from "../lib/amount-format";
 import { isForeignKeyViolation } from "../lib/pg-errors";
+import {
+  CAMPAIGN_STATUSES,
+  HIDDEN_STATUSES,
+  PROTAGONIST_SETTING_KEY,
+  canTransition,
+  deleteBlockReason,
+  isCampaignStatus,
+  isHiddenStatus,
+  transitionError,
+  type CampaignDependencies,
+} from "../lib/campaign-lifecycle";
 
 const router: IRouter = Router();
 
-// GET /campaigns — público, con filtros, paginación y agregación en una sola query
+// Una campaña se considera "en borrador" (no publicada) cuando su estado es
+// `draft`. Solo el administrador autenticado puede verlas y gestionarlas.
+function isAdminRequest(req: { session?: { adminUser?: unknown } }): boolean {
+  return Boolean(req.session?.adminUser);
+}
+
+// `req.params.id` puede venir tipado como `string` o `string[]` según la
+// versión de los tipos de Express; se normaliza de forma segura a un entero.
+function parseId(raw: unknown): number | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/** Cuenta las filas dependientes de una campaña (para el borrado seguro). */
+async function countCampaignDependencies(
+  campaignId: number,
+): Promise<CampaignDependencies> {
+  const [donations, movements, expenses, evidence, leftovers, images, updates] =
+    await Promise.all([
+      db.select({ n: sql<number>`count(*)::int` }).from(donationsTable).where(eq(donationsTable.campaignId, campaignId)),
+      db.select({ n: sql<number>`count(*)::int` }).from(campaignMovementsTable).where(eq(campaignMovementsTable.campaignId, campaignId)),
+      db.select({ n: sql<number>`count(*)::int` }).from(campaignExpensesTable).where(eq(campaignExpensesTable.campaignId, campaignId)),
+      db.select({ n: sql<number>`count(*)::int` }).from(campaignEvidenceTable).where(eq(campaignEvidenceTable.campaignId, campaignId)),
+      db.select({ n: sql<number>`count(*)::int` }).from(campaignLeftoversTable).where(eq(campaignLeftoversTable.campaignId, campaignId)),
+      db.select({ n: sql<number>`count(*)::int` }).from(campaignImagesTable).where(eq(campaignImagesTable.campaignId, campaignId)),
+      db.select({ n: sql<number>`count(*)::int` }).from(campaignUpdatesTable).where(eq(campaignUpdatesTable.campaignId, campaignId)),
+    ]);
+
+  return {
+    donations: donations[0]?.n ?? 0,
+    movements: movements[0]?.n ?? 0,
+    expenses: expenses[0]?.n ?? 0,
+    evidence: evidence[0]?.n ?? 0,
+    leftovers: leftovers[0]?.n ?? 0,
+    images: images[0]?.n ?? 0,
+    updates: updates[0]?.n ?? 0,
+  };
+}
+
+/**
+ * Limpia la campaña protagonista de la portada si coincide con `campaignId`.
+ * Se invoca al despublicar, archivar o eliminar: evita un protagonista colgado
+ * apuntando a una campaña que ya no se muestra.
+ */
+async function clearProtagonistIfMatches(campaignId: number): Promise<void> {
+  await db
+    .update(settings)
+    .set({ value: "", updatedAt: new Date() })
+    .where(
+      and(
+        eq(settings.key, PROTAGONIST_SETTING_KEY),
+        eq(settings.value, String(campaignId)),
+      ),
+    );
+}
+
+// GET /campaigns — público, con filtros, paginación y agregación en una sola query.
+// Los estados `draft` y `archived` quedan OCULTOS al público; el administrador
+// autenticado (sesión) los ve todos. Como la respuesta depende de la sesión,
+// nunca se cachea en proxies compartidos cuando la sirve un admin.
 router.get("/campaigns", async (req, res) => {
   try {
     const { status, featured, limit: rawLimit, offset: rawOffset } = req.query;
     const limit = Math.min(Math.max(parseInt(rawLimit as string) || 50, 1), 100);
     const offset = Math.max(parseInt(rawOffset as string) || 0, 0);
+    const isAdmin = isAdminRequest(req);
+    const statusFilter = typeof status === "string" ? status : undefined;
 
-    const conditions = [];
-    if (status && status !== "all") {
-      conditions.push(eq(campaignsTable.status, status as string));
+    const conditions: SQL[] = [];
+    if (statusFilter && statusFilter !== "all") {
+      // Borradores/archivadas solo para administradores: al público no se le
+      // filtra por ellos (lista vacía en vez de revelar su existencia).
+      if (isHiddenStatus(statusFilter) && !isAdmin) {
+        res.json([]);
+        return;
+      }
+      conditions.push(eq(campaignsTable.status, statusFilter));
+    } else if (!isAdmin) {
+      conditions.push(notInArray(campaignsTable.status, [...HIDDEN_STATUSES]));
     }
     if (featured !== undefined && featured !== "all") {
       conditions.push(eq(campaignsTable.featured, featured === "true"));
@@ -44,6 +131,8 @@ router.get("/campaigns", async (req, res) => {
       .limit(limit)
       .offset(offset);
 
+    if (isAdmin) res.setHeader("Cache-Control", "private, no-store");
+
     res.json(
       rows.map(({ campaign, donorCount, raisedFromDonations }) =>
         formatCampaign(campaign, donorCount, raisedFromDonations),
@@ -57,7 +146,10 @@ router.get("/campaigns", async (req, res) => {
 
 router.get("/campaigns/:id", async (req, res) => {
   try {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
+    if (id === null) {
+      return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+    }
     const [row] = await db
       .select({
         campaign: campaignsTable,
@@ -73,6 +165,11 @@ router.get("/campaigns/:id", async (req, res) => {
     if (!row) {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
+    // Un borrador no publicado no se expone al público (404 como si no existiera).
+    if (!isAdminRequest(req) && row.campaign.status === "draft") {
+      return res.status(404).json({ error: "not_found", message: "Campaign not found" });
+    }
+    if (isAdminRequest(req)) res.setHeader("Cache-Control", "private, no-store");
     return res.json(
       formatCampaign(row.campaign, row.donorCount, row.raisedFromDonations),
     );
@@ -140,53 +237,169 @@ router.get("/campaigns/:id/donors", async (req, res) => {
 });
 
 router.post("/campaigns", requireAdmin, adminActionLimiter, async (req, res) => {
+  let data: ReturnType<typeof insertCampaignSchema.parse>;
   try {
-    const data = insertCampaignSchema.parse(req.body);
+    data = insertCampaignSchema.parse(req.body);
+  } catch {
+    return res.status(400).json({ error: "validation_error", message: "Datos de campaña inválidos" });
+  }
+  if (data.status !== undefined && !isCampaignStatus(data.status)) {
+    return res.status(400).json({
+      error: "validation_error",
+      message: `Estado inválido. Permitidos: ${CAMPAIGN_STATUSES.join(", ")}`,
+    });
+  }
+  try {
     const [campaign] = await db.insert(campaignsTable).values(data).returning();
-    res.status(201).json(formatCampaign(campaign, 0, 0));
+    return res.status(201).json(formatCampaign(campaign, 0, 0));
   } catch (err) {
     req.log.error({ err }, "Failed to create campaign");
-    res.status(400).json({ error: "validation_error", message: "Invalid campaign data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo crear la campaña" });
   }
 });
 
 router.put("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  let data: ReturnType<typeof insertCampaignSchema.parse>;
   try {
-    const id = Number(req.params.id);
-    const data = insertCampaignSchema.parse(req.body);
+    data = insertCampaignSchema.parse(req.body);
+  } catch {
+    return res.status(400).json({ error: "validation_error", message: "Datos de campaña inválidos" });
+  }
+  if (data.status !== undefined && !isCampaignStatus(data.status)) {
+    return res.status(400).json({
+      error: "validation_error",
+      message: `Estado inválido. Permitidos: ${CAMPAIGN_STATUSES.join(", ")}`,
+    });
+  }
+  try {
+    const [existing] = await db
+      .select()
+      .from(campaignsTable)
+      .where(eq(campaignsTable.id, id));
+    if (!existing) {
+      return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+    }
+    const changesStatus = data.status !== undefined && data.status !== existing.status;
+    if (changesStatus && !canTransition(existing.status, data.status as string)) {
+      return res.status(409).json({
+        error: "invalid_transition",
+        message: transitionError(existing.status, data.status as string),
+      });
+    }
     const [campaign] = await db
       .update(campaignsTable)
       .set(data)
       .where(eq(campaignsTable.id, id))
       .returning();
     if (!campaign) {
-      return res.status(404).json({ error: "not_found", message: "Campaign not found" });
+      return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+    }
+    if (changesStatus && isHiddenStatus(campaign.status)) {
+      await clearProtagonistIfMatches(id);
     }
     return res.json(formatCampaign(campaign, 0, 0));
   } catch (err) {
     req.log.error({ err }, "Failed to update campaign");
-    return res.status(400).json({ error: "validation_error", message: "Invalid campaign data" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo actualizar la campaña" });
   }
 });
 
-router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, res) => {
+/**
+ * PATCH /campaigns/:id/status — ciclo de vida de la campaña.
+ * Body: { status: "draft" | "active" | "paused" | "completed" | "archived" }.
+ * Valida la transición desde el estado actual (409 si no está permitida) y
+ * limpia la campaña protagonista si el nuevo estado la oculta.
+ */
+router.patch("/campaigns/:id/status", requireAdmin, adminActionLimiter, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  const target = (req.body ?? {}).status;
+  if (!isCampaignStatus(target)) {
+    return res.status(400).json({
+      error: "validation_error",
+      message: `Estado inválido. Permitidos: ${CAMPAIGN_STATUSES.join(", ")}`,
+    });
+  }
   try {
-    const id = Number(req.params.id);
+    const [existing] = await db
+      .select()
+      .from(campaignsTable)
+      .where(eq(campaignsTable.id, id));
+    if (!existing) {
+      return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+    }
+    if (existing.status === target) {
+      return res.json(formatCampaign(existing, 0, 0)); // idempotente
+    }
+    if (!canTransition(existing.status, target)) {
+      return res.status(409).json({
+        error: "invalid_transition",
+        message: transitionError(existing.status, target),
+      });
+    }
+    const [updated] = await db
+      .update(campaignsTable)
+      .set({ status: target })
+      .where(eq(campaignsTable.id, id))
+      .returning();
+    if (isHiddenStatus(target)) {
+      await clearProtagonistIfMatches(id);
+    }
+    return res.json(formatCampaign(updated, 0, 0));
+  } catch (err) {
+    req.log.error({ err }, "Failed to change campaign status");
+    return res.status(500).json({ error: "server_error", message: "No se pudo cambiar el estado de la campaña" });
+  }
+});
+
+/**
+ * DELETE /campaigns/:id — eliminación permanente, RESTRINGIDA a borradores sin
+ * dependencias. Nunca borra en cascada historial contable: una campaña con
+ * historial se archiva (PATCH .../status → archived). La FK RESTRICT del libro
+ * contable (migración 010) actúa como segunda barrera.
+ */
+router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  try {
+    const [existing] = await db
+      .select()
+      .from(campaignsTable)
+      .where(eq(campaignsTable.id, id));
+    if (!existing) {
+      return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+    }
+
+    const deps = await countCampaignDependencies(id);
+    const blocked = deleteBlockReason(existing.status, deps);
+    if (blocked) {
+      req.log.warn({ id, status: existing.status, deps }, "Campaign delete blocked");
+      return res.status(409).json({ error: "conflict", message: blocked, dependencies: deps });
+    }
+
     await db.delete(campaignsTable).where(eq(campaignsTable.id, id));
+    await clearProtagonistIfMatches(id);
     return res.status(204).send();
   } catch (err) {
-    // La FK del ledger es ON DELETE RESTRICT (migración 010): una campaña con
-    // movimientos registrados no puede eliminarse sin destruir el historial de
-    // auditoría. Se responde 409 con un mensaje accionable en vez de un 500.
+    // Segunda barrera: si algo escapó a la comprobación anterior, la FK RESTRICT
+    // del libro contable lo detiene. Se responde 409 con un mensaje accionable.
     if (isForeignKeyViolation(err)) {
       req.log.warn({ err }, "Campaign delete blocked by ledger FK");
       return res.status(409).json({
         error: "conflict",
-        message: "La campaña tiene movimientos registrados en el ledger y no puede eliminarse",
+        message: "La campaña tiene movimientos registrados en el libro contable y no puede eliminarse. Archívala para conservar el historial.",
       });
     }
     req.log.error({ err }, "Failed to delete campaign");
-    return res.status(500).json({ error: "server_error", message: "Failed to delete campaign" });
+    return res.status(500).json({ error: "server_error", message: "No se pudo eliminar la campaña" });
   }
 });
 

@@ -46,6 +46,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { formatSafeDate } from "@/lib/i18n/date";
+import { useCampaignLifecycle } from "@/hooks/use-campaign-lifecycle";
+import {
+  campaignStatusLabel,
+  errorMessage,
+  invalidateCampaignQueries,
+  lifecycleActions,
+  type LifecycleAction,
+} from "@/lib/campaign-admin";
 
 // Selector de ubicación con mapa libre (Leaflet/OpenStreetMap) — lazy para no
 // inflar el bundle del panel admin.
@@ -57,7 +65,7 @@ const infoSchema = z.object({
   goal: z.coerce.number().min(1),
   raised: z.coerce.number().min(0),
   category: z.string().min(2),
-  status: z.enum(["active", "completed", "paused"]),
+  status: z.enum(["draft", "active", "completed", "paused", "archived"]),
   featured: z.boolean(),
   startDate: z.string(),
   endDate: z.string().optional().nullable(),
@@ -121,6 +129,7 @@ export default function AdminCampaignDetail() {
   const { data: leftovers } = useAdminCampaignLeftovers(campaignId);
 
   const updateCampaign = useUpdateCampaign();
+  const { setStatus: setLifecycleStatus } = useCampaignLifecycle();
   const addImage = useAddCampaignImage();
   const deleteImage = useDeleteCampaignImage();
   const addUpdate = useCreateCampaignUpdate();
@@ -198,22 +207,26 @@ export default function AdminCampaignDetail() {
     updateCampaign.mutate({ id: campaignId, data: values }, {
       onSuccess: () => {
         toast({ title: "Campaña actualizada" });
-        queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}`] });
-      }
+        // Invalida lista + detalle + settings: el panel y el sitio público
+        // quedan sincronizados sin recargar.
+        invalidateCampaignQueries(queryClient);
+      },
+      onError: (err) => {
+        toast({
+          title: "No se pudo guardar la campaña",
+          description: errorMessage(err),
+          variant: "destructive",
+        });
+      },
     });
   };
 
-  const handleStatusChange = (newStatus: "active" | "paused" | "completed") => {
-    if (!campaign) return;
-    updateCampaign.mutate({ 
-      id: campaignId, 
-      data: { ...infoForm.getValues(), status: newStatus } 
-    }, {
-      onSuccess: () => {
-        toast({ title: `Campaña ${newStatus === 'active' ? 'activada' : newStatus === 'paused' ? 'pausada' : 'finalizada'}` });
-        queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}`] });
-      }
-    });
+  // Transiciones del ciclo de vida (publicar, pausar, finalizar, archivar,
+  // restaurar…). El backend valida la transición y devuelve un mensaje real si
+  // no está permitida; aquí solo se decide qué acciones ofrecer.
+  const handleLifecycle = (action: LifecycleAction) => {
+    if (action.confirm && !confirm(action.confirm)) return;
+    setLifecycleStatus.mutate({ id: campaignId, status: action.status });
   };
 
   const onImageSubmit = (values: z.infer<typeof imageSchema>) => {
@@ -276,28 +289,27 @@ export default function AdminCampaignDetail() {
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-3xl font-display font-bold">{campaign.title}</h1>
             <Badge variant="outline" className={campaign.status === 'active' ? 'bg-accent/10 text-accent border-accent/20' : ''}>
-              {campaign.status}
+              {campaignStatusLabel(campaign.status)}
             </Badge>
             {campaign.featured && <Badge className="bg-yellow-500 hover:bg-yellow-600">Destacada</Badge>}
           </div>
           <p className="text-muted-foreground mt-1 text-sm">Gestiona la información y la transparencia de la campaña.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {campaign.status !== 'active' && (
-            <Button variant="outline" className="rounded-xl border-accent/30 text-accent hover:bg-accent/10" onClick={() => handleStatusChange("active")}>
-              <Play className="w-4 h-4 mr-2" /> Activar
+          {lifecycleActions(campaign.status).map((action) => (
+            <Button
+              key={action.status}
+              variant="outline"
+              className="rounded-xl"
+              disabled={setLifecycleStatus.isPending}
+              onClick={() => handleLifecycle(action)}
+            >
+              {action.status === "active" && <Play className="w-4 h-4 mr-2" />}
+              {action.status === "paused" && <Pause className="w-4 h-4 mr-2" />}
+              {action.status === "completed" && <CheckCircle className="w-4 h-4 mr-2" />}
+              {action.label}
             </Button>
-          )}
-          {campaign.status === 'active' && (
-            <Button variant="outline" className="rounded-xl border-yellow-500/30 text-yellow-700 hover:bg-yellow-500/10" onClick={() => handleStatusChange("paused")}>
-              <Pause className="w-4 h-4 mr-2" /> Pausar
-            </Button>
-          )}
-          {campaign.status !== 'completed' && (
-            <Button variant="outline" className="rounded-xl" onClick={() => handleStatusChange("completed")}>
-              <CheckCircle className="w-4 h-4 mr-2" /> Finalizar
-            </Button>
-          )}
+          ))}
           <Link href={`/campanas/${campaignId}/transparencia`}>
             <Button variant="default" className="rounded-xl shadow-md hover-elevate">
               <Eye className="w-4 h-4 mr-2" /> Ver P. Transparente

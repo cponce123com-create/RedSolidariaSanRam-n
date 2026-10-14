@@ -10,8 +10,10 @@ export type GetCampaignsStatus =
   (typeof GetCampaignsStatus)[keyof typeof GetCampaignsStatus];
 
 export const GetCampaignsStatus = {
+  draft: "draft",
   active: "active",
-  completed: "completed",
   paused: "paused",
+  completed: "completed",
+  archived: "archived",
   all: "all",
 } as const;

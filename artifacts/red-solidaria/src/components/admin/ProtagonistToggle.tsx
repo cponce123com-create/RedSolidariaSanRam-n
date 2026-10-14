@@ -39,6 +39,12 @@ export function ProtagonistToggle({ campaignId }: { campaignId: number }) {
       });
       if (!res.ok) throw new Error("request_failed");
       await queryClient.invalidateQueries({ queryKey: ["settings"] });
+      // La portada pública reordena y excluye campañas según el protagonista:
+      // se invalidan también las consultas de campañas para sincronizarla.
+      await queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) && q.queryKey[0] === "/api/campaigns",
+      });
       toast({ title: t("adminCampaigns.protagonistUpdated") });
     } catch {
       toast({ title: t("adminCampaigns.protagonistError"), variant: "destructive" });

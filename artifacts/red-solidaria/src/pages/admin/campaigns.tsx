@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useGetCampaigns, useCreateCampaign, useDeleteCampaign } from "@workspace/api-client-react";
+import { useGetCampaigns, useCreateCampaign } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,24 +13,41 @@ import { Progress } from "@/components/ui/progress";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format } from "date-fns";
 import { formatSafeDate } from "@/lib/i18n/date";
-import { Plus, Trash2, Edit, Star, Search } from "lucide-react";
+import { Plus, Trash2, Edit, Star, Search, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProtagonistToggle } from "@/components/admin/ProtagonistToggle";
+import { useCampaignLifecycle } from "@/hooks/use-campaign-lifecycle";
+import {
+  campaignStatusBadge,
+  campaignStatusLabel,
+  canPermanentlyDelete,
+  errorMessage,
+  invalidateCampaignQueries,
+  lifecycleActions,
+} from "@/lib/campaign-admin";
 
 const formSchema = z.object({
   title: z.string().min(3),
   description: z.string().min(10),
   goal: z.coerce.number().min(1),
   category: z.string().min(2),
-  status: z.enum(["active", "completed", "paused"]),
+  status: z.enum(["draft", "active", "paused", "completed"]),
   featured: z.boolean().default(false),
   startDate: z.string(),
   imageUrl: z.string().optional(),
 });
 
-type FilterStatus = "all" | "active" | "paused" | "completed";
+type FilterStatus = "all" | "draft" | "active" | "paused" | "completed" | "archived";
+
+const FILTER_TABS: { value: FilterStatus; label: string }[] = [
+  { value: "all", label: "Todas" },
+  { value: "draft", label: "Borradores" },
+  { value: "active", label: "Activas" },
+  { value: "paused", label: "Pausadas" },
+  { value: "completed", label: "Finalizadas" },
+  { value: "archived", label: "Archivadas" },
+];
 
 export default function AdminCampaigns() {
   const [filter, setFilter] = useState<FilterStatus>("all");
@@ -38,7 +55,7 @@ export default function AdminCampaigns() {
   const apiFilter = filter === "all" ? undefined : filter;
   const { data: campaigns, isLoading } = useGetCampaigns(apiFilter ? { status: apiFilter } : undefined);
   const createMutation = useCreateCampaign();
-  const deleteMutation = useDeleteCampaign();
+  const { setStatus, remove } = useCampaignLifecycle();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
@@ -56,42 +73,43 @@ export default function AdminCampaigns() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: "", description: "", goal: 0, category: "Salud", status: "active", featured: false, startDate: new Date().toISOString().split('T')[0]
+      title: "", description: "", goal: 0, category: "Salud", status: "draft", featured: false, startDate: new Date().toISOString().split('T')[0]
     }
   });
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    createMutation.mutate({ data: { ...values, raised: 0 } }, {
+    // Toda campaña nace como BORRADOR (no publicada): se publica después desde
+    // la propia fila. Evita que un borrador incompleto aparezca en el sitio.
+    createMutation.mutate({ data: { ...values, status: "draft", raised: 0 } }, {
       onSuccess: () => {
-        toast({ title: "Campaña creada" });
-        queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
+        toast({ title: "Campaña creada como borrador", description: "Publícala cuando esté lista." });
+        invalidateCampaignQueries(queryClient);
         setIsOpen(false);
         form.reset();
-      }
+      },
+      onError: (err) => {
+        toast({
+          title: "No se pudo crear la campaña",
+          description: errorMessage(err, "Revisa los datos e inténtalo de nuevo."),
+          variant: "destructive",
+        });
+      },
     });
   };
 
-  const handleDelete = (id: number) => {
-    if(confirm("¿Seguro que deseas eliminar esta campaña? Perderás todo el historial de donaciones asociado.")) {
-      deleteMutation.mutate({ id }, {
-        onSuccess: () => {
-          toast({ title: "Campaña eliminada" });
-          queryClient.invalidateQueries({ queryKey: ["/api/campaigns"] });
-        }
-      });
-    }
+  const runAction = (id: number, label: string, confirmText: string | undefined, status: Parameters<typeof setStatus.mutate>[0]["status"]) => {
+    if (confirmText && !confirm(confirmText)) return;
+    setStatus.mutate({ id, status });
   };
 
-  const statusLabels = {
-    active: "Activa",
-    paused: "Pausada",
-    completed: "Finalizada"
-  };
-
-  const statusColors = {
-    active: "bg-accent hover:bg-accent/90",
-    paused: "bg-yellow-500 hover:bg-yellow-600",
-    completed: "bg-secondary text-foreground hover:bg-secondary/80"
+  const handleDelete = (id: number, title: string) => {
+    if (
+      !confirm(
+        `Se eliminará DEFINITIVAMENTE el borrador «${title}». Esta acción no se puede deshacer. ¿Continuar?`,
+      )
+    )
+      return;
+    remove.mutate(id);
   };
 
   return (
@@ -99,7 +117,7 @@ export default function AdminCampaigns() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold font-display">Gestión de Campañas</h1>
-          <p className="text-muted-foreground mt-1">Crea y administra las campañas solidarias y su progreso.</p>
+          <p className="text-muted-foreground mt-1">Crea, publica, pausa, archiva y administra las campañas solidarias.</p>
         </div>
 
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -110,6 +128,9 @@ export default function AdminCampaigns() {
             <DialogHeader>
               <DialogTitle className="text-2xl font-display">Crear Nueva Campaña</DialogTitle>
             </DialogHeader>
+            <p className="text-sm text-muted-foreground -mt-2">
+              Se creará como <strong>borrador</strong> (oculta al público) hasta que la publiques.
+            </p>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField control={form.control} name="title" render={({ field }) => (
@@ -130,7 +151,8 @@ export default function AdminCampaigns() {
                   <FormItem><FormLabel>Descripción</FormLabel><FormControl><Textarea className="h-24 rounded-xl" {...field} /></FormControl></FormItem>
                 )} />
                 <Button type="submit" className="w-full h-12 rounded-xl text-lg mt-4" disabled={createMutation.isPending}>
-                  Guardar Campaña
+                  {createMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Guardar borrador
                 </Button>
               </form>
             </Form>
@@ -139,19 +161,19 @@ export default function AdminCampaigns() {
       </div>
 
       {/* Filters + Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-        <div className="flex gap-2 bg-secondary/50 p-1.5 rounded-xl inline-flex">
-          {(["all", "active", "paused", "completed"] as const).map(tab => (
+      <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-6">
+        <div className="flex gap-2 bg-secondary/50 p-1.5 rounded-xl inline-flex overflow-x-auto">
+          {FILTER_TABS.map(tab => (
             <button
-              key={tab}
-              onClick={() => setFilter(tab)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === tab ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
+              key={tab.value}
+              onClick={() => setFilter(tab.value)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${filter === tab.value ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
             >
-              {tab === "all" ? "Todas" : statusLabels[tab]}
+              {tab.label}
             </button>
           ))}
         </div>
-        <div className="relative w-full sm:w-auto sm:min-w-[260px] sm:ml-auto">
+        <div className="relative w-full lg:w-auto lg:min-w-[260px] lg:ml-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
@@ -168,9 +190,9 @@ export default function AdminCampaigns() {
         <Table>
           <TableHeader className="bg-secondary/30">
             <TableRow>
-              <TableHead className="w-[30%]">Campaña</TableHead>
+              <TableHead className="w-[26%]">Campaña</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="w-[25%]">Recaudación</TableHead>
+              <TableHead className="w-[20%]">Recaudación</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -179,19 +201,22 @@ export default function AdminCampaigns() {
             {isLoading ? (
               <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">Cargando campañas...</TableCell></TableRow>
             ) : filteredCampaigns.map((c) => {
-              const progress = Math.min(100, Math.round((c.raised / c.goal) * 100)) || 0;
+              const progress = c.goal > 0 ? Math.min(100, Math.round((c.raised / c.goal) * 100)) : 0;
+              const actions = lifecycleActions(c.status);
+              const deletable = canPermanentlyDelete(c.status);
+              const busy = setStatus.isPending || remove.isPending;
               return (
                 <TableRow key={c.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <div className="font-semibold text-foreground truncate max-w-[200px] xl:max-w-[300px]">{c.title}</div>
+                      <div className="font-semibold text-foreground truncate max-w-[180px] xl:max-w-[280px]">{c.title}</div>
                       {c.featured && <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-500" />}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">{c.category}</div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={`${statusColors[c.status]} border-0 shadow-sm px-3`}>
-                      {statusLabels[c.status]}
+                    <Badge className={`${campaignStatusBadge(c.status)} border-0 shadow-sm px-3`}>
+                      {campaignStatusLabel(c.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -205,17 +230,38 @@ export default function AdminCampaigns() {
                   <TableCell className="text-sm text-muted-foreground font-medium">
                     {formatSafeDate(c.startDate, "dd/MM/yy")}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                  <TableCell>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {actions.map((action) => (
+                        <Button
+                          key={action.status}
+                          variant="outline"
+                          size="sm"
+                          className="h-8 rounded-lg text-xs font-medium"
+                          disabled={busy}
+                          onClick={() => runAction(c.id, action.label, action.confirm, action.status)}
+                        >
+                          {action.label}
+                        </Button>
+                      ))}
                       <ProtagonistToggle campaignId={c.id} />
                       <Link href={`/admin/campanas/${c.id}`}>
                         <Button variant="outline" size="sm" className="h-8 rounded-lg text-xs font-medium">
                           <Edit className="w-3.5 h-3.5 mr-1.5" /> Editar
                         </Button>
                       </Link>
-                      <Button variant="outline" size="icon" className="h-10 w-10 rounded-lg text-destructive border-destructive/20 hover:bg-destructive/10" onClick={() => handleDelete(c.id)}>
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
+                      {deletable && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          aria-label={`Eliminar borrador ${c.title}`}
+                          className="h-8 w-8 rounded-lg text-destructive border-destructive/20 hover:bg-destructive/10"
+                          disabled={busy}
+                          onClick={() => handleDelete(c.id, c.title)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -227,6 +273,11 @@ export default function AdminCampaigns() {
           </TableBody>
         </Table>
       </div>
+
+      <p className="text-xs text-muted-foreground mt-4">
+        Una campaña con historial contable no se elimina: se <strong>archiva</strong> para conservar sus registros.
+        Solo los borradores sin movimientos pueden eliminarse definitivamente.
+      </p>
     </div>
   );
 }

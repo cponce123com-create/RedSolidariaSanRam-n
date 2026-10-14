@@ -10,7 +10,9 @@ export type CampaignStatus =
   (typeof CampaignStatus)[keyof typeof CampaignStatus];
 
 export const CampaignStatus = {
+  draft: "draft",
   active: "active",
-  completed: "completed",
   paused: "paused",
+  completed: "completed",
+  archived: "archived",
 } as const;

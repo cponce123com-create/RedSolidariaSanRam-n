@@ -18,7 +18,9 @@ export const HealthCheckResponse = zod.object({
  * @summary List all campaigns
  */
 export const GetCampaignsQueryParams = zod.object({
-  status: zod.enum(["active", "completed", "paused", "all"]).optional(),
+  status: zod
+    .enum(["draft", "active", "paused", "completed", "archived", "all"])
+    .optional(),
   featured: zod.coerce.boolean().optional(),
 });
 
@@ -30,7 +32,7 @@ export const GetCampaignsResponseItem = zod.object({
   goal: zod.number(),
   raised: zod.number(),
   donorCount: zod.number(),
-  status: zod.enum(["active", "completed", "paused"]),
+  status: zod.enum(["draft", "active", "paused", "completed", "archived"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -48,7 +50,7 @@ export const CreateCampaignBody = zod.object({
   imageUrl: zod.string().nullish(),
   goal: zod.number(),
   raised: zod.number().optional(),
-  status: zod.enum(["active", "completed", "paused"]),
+  status: zod.enum(["draft", "active", "paused", "completed", "archived"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -70,7 +72,7 @@ export const GetCampaignResponse = zod.object({
   goal: zod.number(),
   raised: zod.number(),
   donorCount: zod.number(),
-  status: zod.enum(["active", "completed", "paused"]),
+  status: zod.enum(["draft", "active", "paused", "completed", "archived"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -91,7 +93,7 @@ export const UpdateCampaignBody = zod.object({
   imageUrl: zod.string().nullish(),
   goal: zod.number(),
   raised: zod.number().optional(),
-  status: zod.enum(["active", "completed", "paused"]),
+  status: zod.enum(["draft", "active", "paused", "completed", "archived"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -106,7 +108,7 @@ export const UpdateCampaignResponse = zod.object({
   goal: zod.number(),
   raised: zod.number(),
   donorCount: zod.number(),
-  status: zod.enum(["active", "completed", "paused"]),
+  status: zod.enum(["draft", "active", "paused", "completed", "archived"]),
   featured: zod.boolean(),
   category: zod.string(),
   startDate: zod.string(),
@@ -664,6 +666,8 @@ export const AdminLoginResponse = zod.object({
     .object({
       id: zod.number(),
       username: zod.string(),
+      name: zod.string().nullish(),
+      role: zod.enum(["superadmin", "administrador", "moderador"]),
     })
     .optional(),
 });
@@ -682,4 +686,6 @@ export const AdminLogoutResponse = zod.object({
 export const GetAdminMeResponse = zod.object({
   id: zod.number(),
   username: zod.string(),
+  name: zod.string().nullish(),
+  role: zod.enum(["superadmin", "administrador", "moderador"]),
 });

@@ -9,6 +9,7 @@
 export * from "./addDonationProofBody";
 export * from "./adminLoginInput";
 export * from "./adminLoginResponse";
+export * from "./adminRole";
 export * from "./adminUser";
 export * from "./campaign";
 export * from "./campaignDonor";

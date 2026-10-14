@@ -42,7 +42,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [active, completed, paused, all]
+            enum: [draft, active, paused, completed, archived, all]
         - name: featured
           in: query
           schema:
@@ -835,7 +835,7 @@ components:
           type: integer
         status:
           type: string
-          enum: [active, completed, paused]
+          enum: [draft, active, paused, completed, archived]
         featured:
           type: boolean
         category:
@@ -876,7 +876,7 @@ components:
           type: number
         status:
           type: string
-          enum: [active, completed, paused]
+          enum: [draft, active, paused, completed, archived]
         featured:
           type: boolean
         category:
