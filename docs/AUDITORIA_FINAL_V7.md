@@ -1,0 +1,316 @@
+# AUDITORÍA FINAL V7 — Red Solidaria San Ramón
+
+**Fecha:** 14 de octubre de 2026
+**Rama:** `feat/implementacion-integral-2026` (HEAD: `eea170c`)
+**Punto de partida:** V6 (`c2de0ad`) + incrementos 3A–4A
+**Método:** inspección directa del código con evidencia `archivo:línea`, ejecución real de
+`pnpm audit`, typecheck, suites y build de producción. Ninguna operación destructiva sobre
+datos y ningún dato de producción modificado.
+
+> Este informe declara **solo lo verificado**. Lo que no se probó se dice explícitamente.
+> El registro incremental del programa está en `docs/PROGRAMA_V7.md`.
+
+---
+
+## 1. Resumen ejecutivo
+
+El sistema **no necesitaba reconstrucción**: la persistencia, la autorización, el libro
+contable encadenado, el ciclo de vida de campañas, la transparencia pública, ChocoFest y el
+módulo de donantes ya funcionaban y estaban probados. Lo que faltaba era **coherencia
+financiera**, **herramientas de auditoría** y **eliminar datos ficticios del código**.
+
+En este programa se corrigieron tres defectos reales de fondo y se documentó con precisión
+todo lo que queda bloqueado por decisiones de negocio o credenciales externas:
+
+1. **Recaudación no conciliable** (Fase 3.1): el sitio publicaba `max(importe manual, suma de
+   donaciones)` y el dashboard mezclaba ambas fuentes. Sustituido por una regla única,
+   explícita y auditable.
+2. **Libro contable sin herramienta de auditoría** (Fase 1.4): la cadena verificaba pero
+   nadie podía ver que hay donaciones confirmadas sin asiento (DB-09). Ahora hay informe
+   administrativo de solo lectura.
+3. **Datos ficticios en producción** (Fase 7): el catálogo de bienes abría el número de
+   WhatsApp de ejemplo `51999999999` («Reemplazar con el número real») y el número real
+   estaba fijo en el código. Ahora todo es configuración editable.
+
+**Estado de verificación:** `api-server` **309/309**, `red-solidaria` **143/143** node:test +
+**23/23** vitest, typecheck **0** en libs/API/frontend/scripts y **build de producción OK**.
+`pnpm audit --prod` → **0 vulnerabilidades**.
+
+---
+
+## 2. Problemas originales (los que motivaron el programa)
+
+| # | Problema reportado | Diagnóstico real | Estado |
+|---|---|---|---|
+| P-1 | «No puedo eliminar la campaña» | Regla de ciclo de vida demasiado rígida: un borrador con cualquier fila dependiente no podía eliminarse **ni** archivarse (callejón sin salida). Corregido en la Fase 1 previa del plan (`draft → archived`). | **CORREGIDO** (verificado con pruebas de ciclo de vida y de motivo de bloqueo) |
+| P-2 | «El panel muestra una cosa y la web otra» | La invalidación de caché no alcanzaba las claves reales del cliente generado (`["/api/campaigns/5"]`) y el navegador cacheaba GET públicos con sesión. Corregido (invalidación por entidad + `no-store` con sesión). | **CORREGIDO** |
+| P-3 | Cifras financieras no cuadraban entre ficha, transparencia y dashboard | `Math.max` como sustituto de conciliación; la transparencia solo sumaba donaciones; el dashboard ordenaba por la columna manual. | **CORREGIDO en V7-1** |
+| P-4 | Número de WhatsApp de ejemplo en producción | `51999999999` hardcodeado en el catálogo de bienes. | **CORREGIDO en V7-2** |
+
+---
+
+## 3. Hallazgos adicionales (no reportados por el usuario)
+
+- **DB-09 (integridad):** las donaciones históricas cargadas por seed quedaron **aprobadas sin
+  asiento** en el libro. La verificación de cadena devolvía «íntegra», que es correcto para la
+  cadena pero no para el libro. Detectable ahora con el informe de V7-3.
+- **DB-02 / migración 010 sin aplicar:** el esquema Drizzle ya declara `ON DELETE RESTRICT` en
+  el libro, pero la restricción real de producción sigue siendo `CASCADE` (la migración está
+  ensayada y deliberadamente fuera de `migrate.ts`). **Bloqueo B-1.**
+- **DB-03 / artefactos de migración divergentes:** `lib/db/drizzle/0000_*.sql` y `0001_*.sql`
+  nunca se aplican y contradicen a `migrate.ts`; un `drizzle-kit push` accidental
+  reintroduciría el `CASCADE`. **Bloqueo B-5.**
+- **DB-04:** faltan claves foráneas en `donations`, `campaign_expenses`, `campaign_evidence`,
+  `campaign_images`, `campaign_updates`, `community_reports`, `campaign_leftovers`. La única
+  protección contra huérfanos es el conteo en la aplicación. **Bloqueo B-2.**
+- **API-06:** el patrón `catch → 400 validation_error` enmascara fallos de infraestructura
+  como si fueran errores del cliente (dificulta el diagnóstico). **Pendiente (V7-4).**
+- **SEC-01:** la cookie de sesión usa `secure` solo con `NODE_ENV==='production'`; tras un
+  proxy conviene además `trust proxy` explícito. **Pendiente (V7-4).**
+- **SEC-03:** el lockout de 2FA se indexa por `userId`, lo que permite a un atacante dejar
+  fuera a un administrador concreto (DoS de cuenta). **Pendiente (V7-4).**
+- **SEC-08:** varias rutas admin dependen del gate global de `/admin` en lugar de declarar su
+  propio `requireAdmin` (defensa en profundidad). **Pendiente (V7-4).**
+- **FE-03:** el gate del panel en el cliente solo redirige ante 401, no ante rol insuficiente:
+  un usuario autenticado sin rol admin puede ver la estructura del panel (los datos los
+  bloquea el API). **Pendiente (V7-4).**
+- **FE-04 / FE-09 / FE-10:** estados de carga/vacío/error inconsistentes, `SEO` usado en 5
+  páginas y `zod` 3 en el cliente frente a `zod/v4` en `lib/db`. **Pendiente (Fase 8).**
+
+---
+
+## 4. Cambios implementados en este programa
+
+### 4.1 V7-1 — Recaudación conciliable (Fase 3.1 y 3.2)
+
+- Nueva lógica pura `src/lib/funding.ts`: `campaignFunding(histórico, verificado)` →
+  `verifiedRaised`, `historicalRaised`, `historicalCounted`, `reconciledRaised`, más
+  `availableBalance` y `roundMoney`. **Nunca el máximo de dos cifras.**
+- `formatCampaign` deja de usar `Math.max` y publica el desglose; el panel de transparencia
+  publica **la misma cifra** que la ficha (antes solo sumaba donaciones: una campaña con
+  recaudación histórica mostraba S/ 0 en transparencia y su importe en la ficha) e incluye la
+  **fecha de última actualización**.
+- El dashboard calcula el total recaudado y el top de campañas con la misma regla (antes el
+  total salía de las donaciones y el ranking de la columna manual).
+- La interfaz explica la cifra: si el histórico cuenta, lo dice; si solo es referencia, dice
+  por qué no se suma.
+
+### 4.2 V7-2 — Contacto por WhatsApp configurable (Fase 7, parte sin credenciales)
+
+- Migración **019** (aditiva e idempotente): número y cuatro mensajes predefinidos en
+  `settings`, con el número que el sitio publica hoy y mensajes vacíos (la interfaz usa el
+  texto del idioma). Solo escribe si `settings` ya tiene contenido: no rompe el seed de una
+  base nueva y no sobrescribe configuración existente.
+- Allowlist pública ampliada (el número se publica en enlaces `wa.me`); el resto del contacto
+  (`org_phone`, `org_email`, `org_address`, cuentas bancarias) **sigue privado**, con prueba.
+- Lógica pura `src/lib/whatsapp.ts`: normalización (solo dígitos, 8–15, acepta `+`, espacios y
+  guiones), formato para mostrar, construcción del enlace y resolución por propósito.
+- El botón flotante, «cómo ayudar» y el catálogo de bienes leen la configuración. **Sin número
+  configurado no se inventa uno**: no se muestra el botón/enlace y el catálogo lleva a la
+  página de contacto en lugar de abrir un chat inexistente.
+
+### 4.3 V7-3 — Informe de integridad del libro contable (Fase 1.4)
+
+- Lógica pura `src/lib/ledger-audit.ts`: cadena, donaciones confirmadas **sin asiento**,
+  asientos **sin origen** (incluye tipos desconocidos), **importes descuadrados** y asientos
+  **en otra campaña** que su origen. `healthy` exige cadena íntegra **y** cero hallazgos.
+- Ruta `GET /admin/ledger/audit` (solo lectura, `requireAdmin` + rate limit) con el detalle de
+  lo auditado y la fecha del informe.
+- Página «Libro contable» (`/admin/libro`) en el panel, visible solo para administradores.
+
+---
+
+## 5. Archivos modificados y creados
+
+**Nuevos (lógica y pruebas)**
+```
+artifacts/api-server/src/lib/funding.ts
+artifacts/api-server/src/lib/ledger-audit.ts
+artifacts/api-server/src/routes/ledger-audit.ts
+artifacts/api-server/tests/funding.test.mjs
+artifacts/api-server/tests/ledger-audit.test.mjs
+artifacts/api-server/tests/ledger-audit-auth.test.mjs
+artifacts/red-solidaria/src/lib/whatsapp.ts
+artifacts/red-solidaria/src/pages/admin/ledger-audit.tsx
+artifacts/red-solidaria/tests/whatsapp.test.mjs
+docs/PROGRAMA_V7.md
+docs/AUDITORIA_FINAL_V7.md
+docs/CHECKLIST_FUNCIONAL_V7.md
+```
+**Modificados (relevantes)**
+```
+lib/db/src/migrate.ts                                    migración 019 (+ 018 del 4A)
+lib/api-spec/openapi.yaml                                Campaign: verifiedRaised/historicalRaised/historicalCounted
+artifacts/api-server/src/routes/campaigns.ts             formatCampaign conciliado
+artifacts/api-server/src/routes/campaign-transparency.ts misma cifra que la ficha + updatedAt
+artifacts/api-server/src/routes/dashboard.ts             total y top conciliados
+artifacts/api-server/src/routes/index.ts                 registro del router del informe
+artifacts/api-server/src/lib/public-settings.ts          allowlist pública de WhatsApp
+artifacts/api-server/src/lib/seed.ts                     número real + claves de mensajes
+artifacts/api-server/tests/public-settings.test.mjs      contrato de la allowlist
+artifacts/api-server/build-tests.mjs                     entry points nuevos
+artifacts/red-solidaria/src/pages/campaign-detail.tsx    nota de conciliación
+artifacts/red-solidaria/src/pages/campaign-transparency.tsx  desglose + última actualización
+artifacts/red-solidaria/src/hooks/use-phase3.ts          TransparencyData ampliado
+artifacts/red-solidaria/src/components/layout/FloatingWhatsApp.tsx  configuración
+artifacts/red-solidaria/src/pages/how-to-help.tsx        enlace desde la configuración
+artifacts/red-solidaria/src/pages/stock-catalog.tsx      adiós al número de ejemplo
+artifacts/red-solidaria/src/App.tsx                      ruta /admin/libro
+artifacts/red-solidaria/src/pages/admin/layout.tsx       ítem de menú
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts 6 etiquetas nuevas
+lib/api-client-react|api-zod/src/generated/**            cliente regenerado (orval)
+```
+
+---
+
+## 6. Migraciones realizadas
+
+| Migración | Contenido | Tipo | Estado |
+|---|---|---|---|
+| **018** | `donations.collaboration_type` (default `dinero`) + índice; normalización de tipos de donante legados; reclasificación de donaciones en especie históricas | aditiva, idempotente | en `migrate.ts` (incremento 4A) |
+| **019** | Claves de WhatsApp (número + 4 mensajes) en `settings`, solo si la tabla ya tiene contenido | aditiva, idempotente | en `migrate.ts` (V7-2) |
+| 010 | `campaign_movements`: `ON DELETE CASCADE → RESTRICT` + índices por campaña | alteración de restricción | **FUERA de `migrate.ts`, pendiente de autorización (B-1)** |
+
+Ninguna migración aplicada elimina columnas, tablas ni datos. No se ejecutó nada sobre la
+base de producción desde este entorno.
+
+---
+
+## 7. Pruebas ejecutadas
+
+```
+pnpm audit --prod                                     → 0 vulnerabilidades
+pnpm audit (incluye dev)                              → 66 avisos (11 críticos), toolchain dev
+pnpm run typecheck:libs                               → 0 errores
+pnpm --filter @workspace/api-server run typecheck     → 0 errores
+pnpm --filter @workspace/red-solidaria run typecheck  → 0 errores
+pnpm --filter @workspace/api-server run test          → 309 pruebas (node:test)
+pnpm --filter @workspace/red-solidaria run test       → 143 pruebas (node:test) + 23 (vitest)
+pnpm -r --filter ./artifacts/** run build             → build de producción OK
+```
+
+## 8. Resultados de las pruebas
+
+| Suite | Antes de V7 | Después | Resultado |
+|---|---|---|---|
+| `api-server` (node:test) | 286 | **309** | 309/309 ✅ |
+| `red-solidaria` (node:test) | 133 | **143** | 143/143 ✅ |
+| `red-solidaria` (vitest) | 23 | **23** | 23/23 ✅ |
+| typecheck (libs/API/frontend/scripts) | 0 | **0** | ✅ |
+| build de producción | OK | **OK** | ✅ |
+| `pnpm audit --prod` | 0 | **0** | ✅ |
+
+**Cobertura nueva:** 9 pruebas de conciliación de recaudación (incluye la invariante
+`conciliado = verificado + histórico contado` y el caso de duplicidad), 11 del informe del
+libro (cadena rota, DB-09, pendiente que no es hallazgo, asiento sin origen, tipo desconocido,
+importes descuadrados, equivalencia de centimos, campaña distinta), 2 de autorización del
+informe, 10 de contacto por WhatsApp y 1 del contrato de la allowlist pública.
+
+**No se modificó ninguna prueba para ocultar errores:** la única prueba ajustada fue el
+contrato de la allowlist pública (`public-settings.test.mjs`), que **debía** cambiar porque la
+funcionalidad nueva publica claves nuevas; se añadió además la comprobación de que el resto
+del contacto sigue privado.
+
+---
+
+## 9. Vulnerabilidades corregidas
+
+| # | Vulnerabilidad | Corrección |
+|---|---|---|
+| V-1 | **Datos ficticios en producción**: el catálogo abría el WhatsApp de ejemplo `51999999999` | Configuración editable + ausencia de enlace si no hay número (V7-2) |
+| V-2 | **Cifras financieras manipulables en su presentación**: publicar el máximo de dos fuentes permitía que un importe manual tapara las donaciones reales | Regla única de conciliación, con desglose publicado (V7-1) |
+| V-3 | **Ingresos confirmados no auditables**: donaciones aprobadas sin asiento invisibles para la verificación | Informe de integridad que las detecta (V7-3) |
+
+## 10. Vulnerabilidades pendientes
+
+| # | Hallazgo | Severidad | Motivo por el que no se corrigió aquí |
+|---|---|---|---|
+| V-4 | SEC-01 cookie `secure` condicionada a `NODE_ENV` | media | Requiere decidir `trust proxy` en el despliegue; se aborda en V7-4 |
+| V-5 | SEC-03 lockout 2FA por `userId` (DoS de cuenta) | media | Se aborda en V7-4 junto con SEC-02/04 (límites en memoria) |
+| V-6 | SEC-08 rutas admin sin gate propio | baja | Defensa en profundidad; V7-4 |
+| V-7 | API-06 `catch → 400` enmascara fallos 500 | baja | V7-4 (afecta a varias rutas; cambio transversal) |
+| V-8 | DB-02 restricción `CASCADE` real en el libro | **alta** | **Bloqueo B-1: requiere autorización** |
+| V-9 | DB-04 claves foráneas ausentes | alta | **Bloqueo B-2: requiere decidir sobre datos huérfanos** |
+| V-10 | 66 avisos de dependencias de desarrollo (11 críticos) | baja (no llegan a producción) | No se actualizan majors a ciegas; recomendación en §16 |
+
+---
+
+## 11. Funcionalidades completadas en este programa
+
+- Recaudación conciliable y coherente en ficha, transparencia y dashboard (Fase 3.1/3.2).
+- Fecha de última actualización del panel de transparencia (Fase 3.2).
+- Contacto por WhatsApp configurable desde el panel, sin datos ficticios (Fase 7, parte 1).
+- Informe administrativo de integridad del libro contable (Fase 1.4).
+
+## 12. Funcionalidades parcialmente completadas
+
+- **Fase 4 (ChocoFest/eventos):** 3A–3C-3b y 4A cerrados (bienes, presupuesto, programa,
+  composición y cobertura de canastas, tipos de colaboración). Falta la **rendición de
+  resultados del evento** (4.3) y el modelo de patrocinios.
+- **Fase 5.1 (donantes):** panel, historial, tipo, anonimato, duplicados y conciliación.
+  Falta **consentimiento explícito** y **nombre colectivo** de publicación.
+- **Fase 5.4 (auspiciadores):** aliados con CRUD y visibilidad pública. Faltan embajadores con
+  código de referencia y métricas.
+- **Fase 6 (dashboard):** indicadores ya coherentes. Faltan **filtros** por campaña, estado y
+  fechas, y navegación de cada tarjeta a su detalle.
+- **Fase 3.3 (comprobantes):** registro, adjunto, visibilidad y conciliación. Falta historial
+  de cambios del comprobante.
+- **Fase 8 (frontend):** FE-03 (gate por rol), FE-04 (estados), FE-09 (SEO), FE-10 (zod).
+- **Fase 9 (pruebas):** suites y build completos; falta **E2E con PostgreSQL real** y lint
+  automatizado en CI.
+
+## 13. Funcionalidades pendientes (no iniciadas)
+
+- **Certificados digitales con QR** (Fase 5.2) — bloqueo B-3 (decisión de negocio).
+- **Insignias y reconocimientos** (Fase 5.3) — bloqueo B-6.
+- **Mensajería automatizada de WhatsApp** (Fase 7, parte 2) — bloqueo B-4 (credenciales).
+- **Casos sociales permanentes** y flujo de 13 pasos (fases 4/9 del Prompt original).
+
+---
+
+## 14. Riesgos residuales
+
+1. **Alto — B-1:** en producción el libro contable sigue pudiendo borrarse en cascada si
+   alguien elimina una campaña por fuera de la aplicación. La API lo impide, la base no.
+2. **Alto — B-2:** sin claves foráneas, un borrado fuera de la aplicación puede dejar
+   huérfanos (donaciones, gastos, evidencias, imágenes, novedades, reportes, sobrantes).
+3. **Medio — DB-09:** hay donaciones confirmadas sin asiento; el informe ya las muestra, pero
+   **regularizarlas es una decisión contable** (asientos compensatorios autorizados).
+4. **Medio —** límites de tasa y lockout en memoria: no se comparten entre instancias si el
+   despliegue escala horizontalmente.
+5. **Bajo —** los avisos de dependencias de desarrollo no llegan a producción, pero el
+   toolchain debe actualizarse en una ventana planificada.
+6. **Bajo —** la E2E con base real no está automatizada: las rutas con lógica de datos se
+   validan con pruebas puras y de autorización, no contra PostgreSQL.
+
+## 15. Instrucciones de despliegue
+
+1. **Respaldo antes de desplegar** (procedimiento en `docs/MIGRACIONES_Y_RESPALDOS.md`).
+2. Variables de entorno requeridas: `DATABASE_URL`, `SESSION_SECRET`, `NODE_ENV=production`
+   y, si aplica, `CORS_ORIGIN` y las credenciales de Cloudinary. **Ninguna clave nueva es
+   obligatoria** para este despliegue.
+3. Al arrancar, el migrador embebido aplica las migraciones pendientes **018 y 019**
+   (aditivas e idempotentes). No hay pasos manuales.
+4. Verificar después del despliegue:
+   - `/api/health` y `/api/readyz`;
+   - la ficha de una campaña con donaciones (la cifra publicada debe ser la suma verificada);
+   - `/admin/libro` (informe de integridad; **se esperan hallazgos DB-09** hasta regularizar);
+   - el botón de WhatsApp (aparece solo si `org_whatsapp` está configurado en el panel).
+5. **No ejecutar** `drizzle-kit push` (reintroduciría el `CASCADE`; ver B-5).
+6. Rollback: revertir el despliegue del código. Las migraciones 018/019 son aditivas; si se
+   necesitara deshacerlas, `DROP COLUMN collaboration_type` y `DELETE FROM settings WHERE
+   key IN (...)` son suficientes, previa autorización.
+
+## 16. Recomendaciones posteriores
+
+1. **Autorizar B-1 (migración 010)**: es la mitigación más importante pendiente.
+2. **Autorizar el plan de B-2** (informe de huérfanos → FKs con `ON DELETE` conservador).
+3. **Decidir la regularización de DB-09** (asientos compensatorios para las donaciones
+   históricas confirmadas sin asiento) y documentar el procedimiento.
+4. **Planificar la actualización del toolchain de desarrollo** (vite/babel y transitivas) en un
+   PR aislado con CI en verde, en lugar de forzarla aquí.
+5. **Implementar V7-4** (SEC-01/03/08 y API-06) y **V7-5** (filtros del dashboard).
+6. **Automatizar la E2E con PostgreSQL** en CI usando los binarios locales (procedimiento en
+   `docs/ROADMAP.md`) antes de considerar cerrada la Fase 9.
+7. **Abrir la decisión de negocio de certificados con QR** (B-3) y del programa de insignias
+   (B-6) con las propuestas de `docs/PROGRAMA_V7.md` §3.
