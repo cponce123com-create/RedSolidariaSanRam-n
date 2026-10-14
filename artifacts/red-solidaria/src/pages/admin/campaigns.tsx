@@ -17,11 +17,11 @@ import { formatSafeDate } from "@/lib/i18n/date";
 import { Plus, Trash2, Edit, Star, Search, Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProtagonistToggle } from "@/components/admin/ProtagonistToggle";
+import { CampaignDeletionDialog } from "@/components/admin/CampaignDeletionDialog";
 import { useCampaignLifecycle } from "@/hooks/use-campaign-lifecycle";
 import {
   campaignStatusBadge,
   campaignStatusLabel,
-  canPermanentlyDelete,
   errorMessage,
   invalidateCampaignQueries,
   lifecycleActions,
@@ -67,10 +67,14 @@ export default function AdminCampaigns() {
   const apiFilter = filter === "all" ? undefined : filter;
   const { data: campaigns, isLoading } = useGetCampaigns(apiFilter ? { status: apiFilter } : undefined);
   const createMutation = useCreateCampaign();
-  const { setStatus, remove } = useCampaignLifecycle();
+  const { setStatus } = useCampaignLifecycle();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  // Gestión del borrado (Fase 1.4): el diálogo carga el diagnóstico del servidor
+  // antes de mostrar ninguna acción. `manageId === null` = cerrado.
+  const [manageId, setManageId] = useState<number | null>(null);
+  const [manageTitle, setManageTitle] = useState("");
 
   // Búsqueda local por título o categoría + ordenación de lo visible. El
   // servidor ya devuelve la lista filtrada por estado; aquí solo se reordena.
@@ -131,14 +135,11 @@ export default function AdminCampaigns() {
     setStatus.mutate({ id, status });
   };
 
-  const handleDelete = (id: number, title: string) => {
-    if (
-      !confirm(
-        `Se eliminará DEFINITIVAMENTE el borrador «${title}». Esta acción no se puede deshacer. ¿Continuar?`,
-      )
-    )
-      return;
-    remove.mutate(id);
+  // El borrado deja de ser un `confirm()` genérico: se abre el diálogo que
+  // consulta el diagnóstico del servidor y explica las dependencias reales.
+  const openManage = (id: number, title: string) => {
+    setManageId(id);
+    setManageTitle(title);
   };
 
   return (
@@ -246,8 +247,7 @@ export default function AdminCampaigns() {
             ) : filteredCampaigns.map((c) => {
               const progress = c.goal > 0 ? Math.min(100, Math.round((c.raised / c.goal) * 100)) : 0;
               const actions = lifecycleActions(c.status);
-              const deletable = canPermanentlyDelete(c.status);
-              const busy = setStatus.isPending || remove.isPending;
+              const busy = setStatus.isPending;
               return (
                 <TableRow key={c.id}>
                   <TableCell>
@@ -293,18 +293,16 @@ export default function AdminCampaigns() {
                           <Edit className="w-3.5 h-3.5 mr-1.5" /> Editar
                         </Button>
                       </Link>
-                      {deletable && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          aria-label={`Eliminar borrador ${c.title}`}
-                          className="h-8 w-8 rounded-lg text-destructive border-destructive/20 hover:bg-destructive/10"
-                          disabled={busy}
-                          onClick={() => handleDelete(c.id, c.title)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Gestionar la campaña ${c.title}: dependencias, archivar o eliminar`}
+                        className="h-8 rounded-lg text-xs font-medium gap-1.5 text-destructive border-destructive/20 hover:bg-destructive/10"
+                        disabled={busy}
+                        onClick={() => openManage(c.id, c.title)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Gestionar
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -318,9 +316,19 @@ export default function AdminCampaigns() {
       </div>
 
       <p className="text-xs text-muted-foreground mt-4">
-        Una campaña con historial contable no se elimina: se <strong>archiva</strong> para conservar sus registros.
-        Solo los borradores sin movimientos pueden eliminarse definitivamente.
+        Una campaña con historial financiero no se elimina: se <strong>archiva</strong> para conservar
+        sus registros. Pulsa <strong>Gestionar</strong> en cualquier campaña para ver sus dependencias
+        concretas y las operaciones permitidas.
       </p>
+
+      <CampaignDeletionDialog
+        campaignId={manageId}
+        title={manageTitle}
+        open={manageId !== null}
+        onOpenChange={(next) => {
+          if (!next) setManageId(null);
+        }}
+      />
     </div>
   );
 }

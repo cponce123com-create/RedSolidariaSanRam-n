@@ -9,12 +9,14 @@ import {
   campaignLeftoversTable,
   campaignImagesTable,
   campaignUpdatesTable,
+  campaignBudgetsTable,
   communityReportsTable,
   settings,
   insertCampaignSchema,
 } from "@workspace/db";
 import { eq, and, sql, desc, inArray, notInArray, type SQL } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
+import { requireRole, ROLES } from "../middleware/roles";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { logAuditAction } from "../middleware/auth-utils";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
@@ -22,12 +24,14 @@ import { toIsoSafe } from "../lib/date-format";
 import { toSafeAmount } from "../lib/amount-format";
 import { campaignFunding } from "../lib/funding";
 import { isForeignKeyViolation } from "../lib/pg-errors";
+import { cleanupCloudinaryAssets } from "../lib/asset-cleanup";
 import {
   CAMPAIGN_STATUSES,
   HIDDEN_STATUSES,
   PROTAGONIST_SETTING_KEY,
   canTransition,
   deleteBlockReason,
+  deleteDiagnostic,
   isCampaignStatus,
   isHiddenStatus,
   transitionError,
@@ -52,43 +56,86 @@ function parseId(raw: unknown): number | null {
 }
 
 /**
- * Cuenta las filas dependientes de una campaña (para el borrado seguro).
- *
- * Incluye los REPORTES CIUDADANOS: `community_reports.campaign_id` no tiene FK
- * (a diferencia del libro contable), así que sin contarlos el borrado los
- * dejaría huérfanos apuntando a una campaña inexistente.
+ * Ejecutor de consultas: la conexión global o la transacción en curso. Permite
+ * reutilizar el conteo de dependencias dentro de una transacción sin duplicar
+ * la lógica ni relajar el tipado.
+ */
+type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Un BIEN (`campaign_leftovers`) es PROTEGIDO cuando registra un movimiento real
+ * (recibido/usado) o está ligado a un donante/evidencia. Un bien de referencia
+ * sin flujo ni vínculo (p. ej. una meta de producto) es auxiliar y eliminable.
+ */
+function protectedLeftoverCondition(): SQL {
+  return sql`(coalesce(${campaignLeftoversTable.receivedQty}, 0) <> 0
+    or coalesce(${campaignLeftoversTable.usedQty}, 0) <> 0
+    or ${campaignLeftoversTable.donorId} is not null
+    or ${campaignLeftoversTable.evidenceId} is not null)`;
+}
+
+/**
+ * Una EVIDENCIA es PROTEGIDA cuando sirve de prueba de un bien registrado
+ * (alguien la referencia). Una evidencia de actividad sin vínculo financiero es
+ * auxiliar (Fase 1.1, «evidencias asociadas a transacciones»).
+ */
+function protectedEvidenceCondition(): SQL {
+  return sql`exists (select 1 from campaign_leftovers cl where cl.evidence_id = ${campaignEvidenceTable.id})`;
+}
+
+/**
+ * Cuenta las filas dependientes de una campaña y las CLASIFICA (Fase 1.1):
+ * protegidas (bloquean el borrado), auxiliares (se limpian) y desvinculables
+ * (se conservan soltándolas de la campaña). Incluye los REPORTES CIUDADANOS:
+ * `community_reports.campaign_id` no tiene FK, así que sin contarlos el borrado
+ * los dejaría huérfanos apuntando a una campaña inexistente.
  */
 async function countCampaignDependencies(
+  exec: DbExecutor,
   campaignId: number,
 ): Promise<CampaignDependencies> {
   const [
     donations,
     movements,
     expenses,
-    evidence,
-    leftovers,
+    evidenceTotal,
+    evidenceProtected,
+    leftoversTotal,
+    leftoversProtected,
     images,
     updates,
+    budgets,
     communityReports,
   ] = await Promise.all([
-      db.select({ n: sql<number>`count(*)::int` }).from(donationsTable).where(eq(donationsTable.campaignId, campaignId)),
-      db.select({ n: sql<number>`count(*)::int` }).from(campaignMovementsTable).where(eq(campaignMovementsTable.campaignId, campaignId)),
-      db.select({ n: sql<number>`count(*)::int` }).from(campaignExpensesTable).where(eq(campaignExpensesTable.campaignId, campaignId)),
-      db.select({ n: sql<number>`count(*)::int` }).from(campaignEvidenceTable).where(eq(campaignEvidenceTable.campaignId, campaignId)),
-      db.select({ n: sql<number>`count(*)::int` }).from(campaignLeftoversTable).where(eq(campaignLeftoversTable.campaignId, campaignId)),
-      db.select({ n: sql<number>`count(*)::int` }).from(campaignImagesTable).where(eq(campaignImagesTable.campaignId, campaignId)),
-      db.select({ n: sql<number>`count(*)::int` }).from(campaignUpdatesTable).where(eq(campaignUpdatesTable.campaignId, campaignId)),
-      db.select({ n: sql<number>`count(*)::int` }).from(communityReportsTable).where(eq(communityReportsTable.campaignId, campaignId)),
-    ]);
+    exec.select({ n: sql<number>`count(*)::int` }).from(donationsTable).where(eq(donationsTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignMovementsTable).where(eq(campaignMovementsTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignExpensesTable).where(eq(campaignExpensesTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignEvidenceTable).where(eq(campaignEvidenceTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignEvidenceTable).where(and(eq(campaignEvidenceTable.campaignId, campaignId), protectedEvidenceCondition())),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignLeftoversTable).where(eq(campaignLeftoversTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignLeftoversTable).where(and(eq(campaignLeftoversTable.campaignId, campaignId), protectedLeftoverCondition())),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignImagesTable).where(eq(campaignImagesTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignUpdatesTable).where(eq(campaignUpdatesTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(campaignBudgetsTable).where(eq(campaignBudgetsTable.campaignId, campaignId)),
+    exec.select({ n: sql<number>`count(*)::int` }).from(communityReportsTable).where(eq(communityReportsTable.campaignId, campaignId)),
+  ]);
+
+  const evidenceTotalCount = evidenceTotal[0]?.n ?? 0;
+  const evidenceProtectedCount = evidenceProtected[0]?.n ?? 0;
+  const leftoversTotalCount = leftoversTotal[0]?.n ?? 0;
+  const leftoversProtectedCount = leftoversProtected[0]?.n ?? 0;
 
   return {
     donations: donations[0]?.n ?? 0,
     movements: movements[0]?.n ?? 0,
     expenses: expenses[0]?.n ?? 0,
-    evidence: evidence[0]?.n ?? 0,
-    leftovers: leftovers[0]?.n ?? 0,
+    protectedEvidence: evidenceProtectedCount,
+    protectedLeftovers: leftoversProtectedCount,
     images: images[0]?.n ?? 0,
     updates: updates[0]?.n ?? 0,
+    budgets: budgets[0]?.n ?? 0,
+    auxiliaryEvidence: Math.max(0, evidenceTotalCount - evidenceProtectedCount),
+    auxiliaryLeftovers: Math.max(0, leftoversTotalCount - leftoversProtectedCount),
     communityReports: communityReports[0]?.n ?? 0,
   };
 }
@@ -397,10 +444,77 @@ router.patch("/campaigns/:id/status", requireAdmin, adminActionLimiter, async (r
 });
 
 /**
- * DELETE /campaigns/:id — eliminación permanente, RESTRINGIDA a borradores sin
- * dependencias. Nunca borra en cascada historial contable: una campaña con
- * historial se archiva (PATCH .../status → archived). La FK RESTRICT del libro
- * contable (migración 010) actúa como segunda barrera.
+ * Recopila las URLs de los activos externos (imagen principal, galería y
+ * evidencias) para limpiarlas DESPUÉS de confirmar el borrado en la base.
+ */
+async function collectAssetUrls(
+  exec: DbExecutor,
+  campaignId: number,
+  campaignImageUrl: string | null,
+): Promise<string[]> {
+  const [images, evidence] = await Promise.all([
+    exec
+      .select({ url: campaignImagesTable.imageUrl })
+      .from(campaignImagesTable)
+      .where(eq(campaignImagesTable.campaignId, campaignId)),
+    exec
+      .select({ url: campaignEvidenceTable.mediaUrl })
+      .from(campaignEvidenceTable)
+      .where(eq(campaignEvidenceTable.campaignId, campaignId)),
+  ]);
+  const urls = [campaignImageUrl, ...images.map((r) => r.url), ...evidence.map((r) => r.url)].filter(
+    (url): url is string => typeof url === "string" && url.length > 0,
+  );
+  return [...new Set(urls)];
+}
+
+/**
+ * GET /campaigns/:id/deletion-diagnostic — diagnóstico previo (Fase 1.2).
+ * Devuelve, sin borrar nada, el desglose de dependencias clasificadas, el motivo
+ * concreto del bloqueo (si lo hay) y las operaciones permitidas. La interfaz lo
+ * muestra ANTES de confirmar cualquier eliminación.
+ */
+router.get("/campaigns/:id/deletion-diagnostic", requireAdmin, adminActionLimiter, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(campaignsTable).where(eq(campaignsTable.id, id));
+      if (!existing) return null;
+      const deps = await countCampaignDependencies(tx, id);
+      return {
+        id,
+        title: existing.title,
+        status: existing.status,
+        dependencies: deps,
+        diagnostic: deleteDiagnostic(existing.status, deps),
+      };
+    });
+    if (!result) {
+      return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "Failed to build campaign deletion diagnostic");
+    return res.status(500).json({ error: "server_error", message: "No se pudo analizar la campaña" });
+  }
+});
+
+/**
+ * DELETE /campaigns/:id — eliminación permanente (Fase 1.3, Modalidad A).
+ *
+ * Solo procede con BORRADORES cuyas únicas dependencias sean auxiliares o
+ * desvinculables. Las dependencias PROTEGIDAS (donaciones, movimientos del
+ * libro, gastos, evidencias/bienes con obligación de conservación) bloquean el
+ * borrado con un 409 que explica exactamente qué lo impide y ofrece archivar.
+ *
+ * Todo ocurre dentro de una transacción con bloqueo de fila (`for update`): dos
+ * borrados concurrentes no pueden perder ni duplicar información. La limpieza
+ * del CDN se programa DESPUÉS de confirmar la transacción (best-effort, con
+ * reintentos): un fallo externo no corrompe la base.
  */
 router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   const id = parseId(req.params.id);
@@ -408,23 +522,79 @@ router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, re
     return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
   }
   try {
-    const [existing] = await db
-      .select()
-      .from(campaignsTable)
-      .where(eq(campaignsTable.id, id));
-    if (!existing) {
+    const outcome = await db.transaction(async (tx) => {
+      // Bloqueo de la fila: serializa borrados concurrentes de la misma campaña.
+      const [existing] = await tx
+        .select()
+        .from(campaignsTable)
+        .where(eq(campaignsTable.id, id))
+        .for("update");
+      if (!existing) return { kind: "not_found" as const };
+
+      const deps = await countCampaignDependencies(tx, id);
+      const blocked = deleteBlockReason(existing.status, deps);
+      if (blocked) {
+        return { kind: "blocked" as const, status: existing.status, deps, blocked };
+      }
+
+      const assets = await collectAssetUrls(tx, id, existing.imageUrl);
+
+      // C. Reportes ciudadanos: se DESVINCULAN (campaign_id = NULL). No se borran.
+      const unlinked = await tx
+        .update(communityReportsTable)
+        .set({ campaignId: null, updatedAt: new Date() })
+        .where(eq(communityReportsTable.campaignId, id))
+        .returning({ id: communityReportsTable.id });
+
+      // B. Contenido auxiliar: se elimina dentro de la misma transacción.
+      await tx.delete(campaignImagesTable).where(eq(campaignImagesTable.campaignId, id));
+      await tx.delete(campaignUpdatesTable).where(eq(campaignUpdatesTable.campaignId, id));
+      await tx.delete(campaignBudgetsTable).where(eq(campaignBudgetsTable.campaignId, id));
+      await tx
+        .delete(campaignEvidenceTable)
+        .where(and(eq(campaignEvidenceTable.campaignId, id), sql`not (${protectedEvidenceCondition()})`));
+      await tx
+        .delete(campaignLeftoversTable)
+        .where(and(eq(campaignLeftoversTable.campaignId, id), sql`not (${protectedLeftoverCondition()})`));
+
+      await tx.delete(campaignsTable).where(eq(campaignsTable.id, id));
+
+      return {
+        kind: "deleted" as const,
+        row: existing,
+        deps,
+        assets,
+        unlinkedReports: unlinked.length,
+      };
+    });
+
+    if (outcome.kind === "not_found") {
       return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
     }
-
-    const deps = await countCampaignDependencies(id);
-    const blocked = deleteBlockReason(existing.status, deps);
-    if (blocked) {
-      req.log.warn({ id, status: existing.status, deps }, "Campaign delete blocked");
-      return res.status(409).json({ error: "conflict", message: blocked, dependencies: deps });
+    if (outcome.kind === "blocked") {
+      req.log.warn({ id, status: outcome.status, deps: outcome.deps }, "Campaign delete blocked");
+      return res.status(409).json({
+        error: "conflict",
+        message: outcome.blocked,
+        dependencies: outcome.deps,
+        diagnostic: deleteDiagnostic(outcome.status, outcome.deps),
+      });
     }
 
-    await db.delete(campaignsTable).where(eq(campaignsTable.id, id));
+    // Post-transacción: la base YA está consistente. Aquí solo quedan efectos
+    // externos, todos best-effort.
     await clearProtagonistIfMatches(id);
+    const cleanup = await cleanupCloudinaryAssets(outcome.assets, req.log);
+
+    if (outcome.unlinkedReports > 0) {
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.campaignReportsUnlinked,
+        resource: AUDIT_RESOURCES.campaigns,
+        resourceId: String(id),
+        details: { reports: outcome.unlinkedReports },
+      });
+    }
     // Auditoría (Fase 4): el borrado permanente queda trazado (título y estado
     // originales, para que el registro siga siendo útil tras el borrado).
     await logAuditAction({
@@ -432,7 +602,14 @@ router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, re
       action: AUDIT_ACTIONS.campaignDeleted,
       resource: AUDIT_RESOURCES.campaigns,
       resourceId: String(id),
-      details: { title: existing.title, status: existing.status },
+      details: {
+        title: outcome.row.title,
+        status: outcome.row.status,
+        removed: outcome.deps,
+        unlinkedReports: outcome.unlinkedReports,
+        assetsRemoved: cleanup.deleted,
+        assetsFailed: cleanup.failed,
+      },
     });
     return res.status(204).send();
   } catch (err) {
@@ -449,6 +626,203 @@ router.delete("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, re
     return res.status(500).json({ error: "server_error", message: "No se pudo eliminar la campaña" });
   }
 });
+
+/**
+ * GET /campaigns/:id/test-purge/preview — vista previa de la Modalidad C
+ * (Fase 1.3). Muestra exactamente qué se borraría y si la purga está permitida.
+ * No modifica nada.
+ */
+router.get("/campaigns/:id/test-purge/preview", requireAdmin, adminActionLimiter, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (id === null) {
+    return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+  }
+  try {
+    const preview = await db.transaction(async (tx) => {
+      const [existing] = await tx.select().from(campaignsTable).where(eq(campaignsTable.id, id));
+      if (!existing) return null;
+      const deps = await countCampaignDependencies(tx, id);
+      const [confirmedRow] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(donationsTable)
+        .where(and(eq(donationsTable.campaignId, id), inArray(donationsTable.status, [...CONFIRMED_DONATION_STATUSES])));
+      const confirmedDonations = confirmedRow?.n ?? 0;
+
+      const blockReason = testPurgeBlockReason(existing.status, deps, confirmedDonations);
+      return {
+        id,
+        title: existing.title,
+        status: existing.status,
+        dependencies: deps,
+        confirmedDonations,
+        wouldDelete: {
+          donations: Math.max(0, deps.donations - confirmedDonations),
+          images: deps.images,
+          updates: deps.updates,
+          budgets: deps.budgets,
+          evidence: deps.auxiliaryEvidence,
+          leftovers: deps.auxiliaryLeftovers,
+        },
+        wouldUnlink: { communityReports: deps.communityReports },
+        allowed: blockReason === null,
+        blockReason,
+      };
+    });
+    if (!preview) {
+      return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+    }
+    res.setHeader("Cache-Control", "private, no-store");
+    return res.json(preview);
+  } catch (err) {
+    req.log.error({ err }, "Failed to build test purge preview");
+    return res.status(500).json({ error: "server_error", message: "No se pudo preparar la purga" });
+  }
+});
+
+/**
+ * Motivo por el que la Modalidad C (purga de datos de prueba) no está permitida,
+ * o `null` si lo está. Nunca permite destruir contabilidad: exige borrador, sin
+ * asientos en el libro, sin gastos y sin donaciones confirmadas (dinero real).
+ */
+function testPurgeBlockReason(
+  status: string,
+  deps: CampaignDependencies,
+  confirmedDonations: number,
+): string | null {
+  if (status !== "draft") {
+    return `Solo se pueden purgar datos de prueba de un borrador. La campaña está ${status}.`;
+  }
+  if (deps.movements > 0) {
+    return "La campaña tiene asientos en el libro contable: no admite purga de datos de prueba.";
+  }
+  if (deps.expenses > 0) {
+    return "La campaña tiene gastos ejecutados registrados: requiere autorización contable, no una purga.";
+  }
+  if (confirmedDonations > 0) {
+    return `La campaña tiene ${confirmedDonations} donación(es) confirmada(s) (dinero real): archívala para conservar el historial.`;
+  }
+  return null;
+}
+
+/**
+ * POST /campaigns/:id/test-purge — Modalidad C (Fase 1.3).
+ *
+ * Procedimiento ESPECIAL y reforzado para borradores con datos de prueba:
+ *  - Exige rol superadmin (autorización reforzada) y confirmación explícita.
+ *  - Exige un motivo escrito (queda en la auditoría).
+ *  - Rechaza la operación si hay contabilidad real (asientos, gastos o
+ *    donaciones confirmadas): esos casos se ARCHIVAN, nunca se purgan.
+ *  - Registra la operación completa en la auditoría.
+ * No existe ningún botón que borre donaciones, gastos o asientos a ciegas.
+ */
+router.post(
+  "/campaigns/:id/test-purge",
+  requireAdmin,
+  requireRole(ROLES.SUPERADMIN),
+  adminActionLimiter,
+  async (req, res) => {
+    const id = parseId(req.params.id);
+    if (id === null) {
+      return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+    }
+    const body = (req.body ?? {}) as { confirm?: unknown; reason?: unknown };
+    if (body.confirm !== true) {
+      return res.status(400).json({
+        error: "validation_error",
+        message: "La purga exige confirmación explícita (confirm: true).",
+      });
+    }
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    if (reason.length < 10) {
+      return res.status(400).json({
+        error: "validation_error",
+        message: "Indica el motivo de la purga (mínimo 10 caracteres). Queda registrado en la auditoría.",
+      });
+    }
+
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        const [existing] = await tx
+          .select()
+          .from(campaignsTable)
+          .where(eq(campaignsTable.id, id))
+          .for("update");
+        if (!existing) return { kind: "not_found" as const };
+
+        const deps = await countCampaignDependencies(tx, id);
+        const [confirmedRow] = await tx
+          .select({ n: sql<number>`count(*)::int` })
+          .from(donationsTable)
+          .where(and(eq(donationsTable.campaignId, id), inArray(donationsTable.status, [...CONFIRMED_DONATION_STATUSES])));
+        const confirmedDonations = confirmedRow?.n ?? 0;
+
+        const blockReason = testPurgeBlockReason(existing.status, deps, confirmedDonations);
+        if (blockReason) {
+          return { kind: "refused" as const, message: blockReason, deps };
+        }
+
+        const assets = await collectAssetUrls(tx, id, existing.imageUrl);
+        const unlinked = await tx
+          .update(communityReportsTable)
+          .set({ campaignId: null, updatedAt: new Date() })
+          .where(eq(communityReportsTable.campaignId, id))
+          .returning({ id: communityReportsTable.id });
+
+        await tx.delete(donationsTable).where(eq(donationsTable.campaignId, id));
+        await tx.delete(campaignImagesTable).where(eq(campaignImagesTable.campaignId, id));
+        await tx.delete(campaignUpdatesTable).where(eq(campaignUpdatesTable.campaignId, id));
+        await tx.delete(campaignBudgetsTable).where(eq(campaignBudgetsTable.campaignId, id));
+        await tx.delete(campaignEvidenceTable).where(eq(campaignEvidenceTable.campaignId, id));
+        await tx.delete(campaignLeftoversTable).where(eq(campaignLeftoversTable.campaignId, id));
+        await tx.delete(campaignsTable).where(eq(campaignsTable.id, id));
+
+        return {
+          kind: "purged" as const,
+          row: existing,
+          deps,
+          assets,
+          unlinkedReports: unlinked.length,
+        };
+      });
+
+      if (outcome.kind === "not_found") {
+        return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+      }
+      if (outcome.kind === "refused") {
+        req.log.warn({ id, deps: outcome.deps }, "Campaign test purge refused");
+        return res.status(409).json({ error: "conflict", message: outcome.message, dependencies: outcome.deps });
+      }
+
+      await clearProtagonistIfMatches(id);
+      const cleanup = await cleanupCloudinaryAssets(outcome.assets, req.log);
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.campaignTestPurged,
+        resource: AUDIT_RESOURCES.campaigns,
+        resourceId: String(id),
+        details: {
+          title: outcome.row.title,
+          reason,
+          removed: outcome.deps,
+          unlinkedReports: outcome.unlinkedReports,
+          assetsRemoved: cleanup.deleted,
+          assetsFailed: cleanup.failed,
+        },
+      });
+      return res.status(204).send();
+    } catch (err) {
+      if (isForeignKeyViolation(err)) {
+        req.log.warn({ err }, "Campaign test purge blocked by ledger FK");
+        return res.status(409).json({
+          error: "conflict",
+          message: "La campaña tiene movimientos registrados en el libro contable y no puede purgarse.",
+        });
+      }
+      req.log.error({ err }, "Failed to purge campaign test data");
+      return res.status(500).json({ error: "server_error", message: "No se pudo purgar los datos de prueba" });
+    }
+  },
+);
 
 function formatCampaign(
   c: typeof campaignsTable.$inferSelect,

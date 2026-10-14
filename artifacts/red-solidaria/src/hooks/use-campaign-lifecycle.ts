@@ -1,9 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
   deleteCampaignDraft,
   errorMessage,
+  fetchCampaignDeletionDiagnostic,
   invalidateCampaignQueries,
+  purgeCampaignTestData,
   saveSettings,
   setCampaignStatus,
   setProtagonistCampaign,
@@ -54,7 +56,41 @@ export function useCampaignLifecycle() {
     },
   });
 
-  return { setStatus, remove };
+  /**
+   * Purga de datos de prueba (Modalidad C). El servidor exige superadmin y
+   * rechaza la operación (409) si hay contabilidad real: el mensaje REAL del
+   * backend se muestra tal cual, sin genéricos.
+   */
+  const purgeTestData = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) =>
+      purgeCampaignTestData(id, reason),
+    onSuccess: () => {
+      invalidateCampaignQueries(queryClient);
+      toast({ title: "Datos de prueba purgados", description: "La operación quedó registrada en la auditoría." });
+    },
+    onError: (err) => {
+      toast({
+        title: "No se pudo purgar los datos de prueba",
+        description: errorMessage(err),
+        variant: "destructive",
+      });
+    },
+  });
+
+  return { setStatus, remove, purgeTestData };
+}
+
+/**
+ * Diagnóstico de borrado de una campaña (Fase 1.2). Solo se consulta cuando hay
+ * un `id` (el diálogo está abierto): evita peticiones innecesarias.
+ */
+export function useCampaignDeletionDiagnostic(id: number | null) {
+  return useQuery({
+    queryKey: ["campaign-deletion-diagnostic", id],
+    queryFn: () => fetchCampaignDeletionDiagnostic(id as number),
+    enabled: typeof id === "number" && id > 0,
+    staleTime: 0,
+  });
 }
 
 /**
