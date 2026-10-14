@@ -1,0 +1,124 @@
+# PROGRAMA V7 — Auditoría correctiva, pendientes y estabilización
+
+**Rama:** `feat/implementacion-integral-2026` · **Punto de partida:** V6 (`c2de0ad` + incrementos 3A–4A)
+**Método:** inspección directa del código con evidencia `archivo:línea`, ejecución real de `pnpm audit`, typecheck, suites y build de producción. No se ha modificado ningún dato de producción.
+
+> Este documento es el registro vivo del programa V7. Los entregables finales
+> (`AUDITORIA_FINAL_V7.md` y `CHECKLIST_FUNCIONAL_V7.md`) se generan al cerrar el
+> programa y se nutren de lo aquí registrado. No se marca nada como hecho sin
+> pruebas ejecutadas.
+
+---
+
+## 1. Matriz de brechas (V6 → V7)
+
+| Fase | Requisito | Estado real | Evidencia / motivo |
+|---|---|---|---|
+| 1.1 | Auditoría de dependencias | **PARCIAL** | `pnpm audit --prod` → **0 vulnerabilidades**. Total (incluye dev): 66 avisos (2 low, 19 moderate, 34 high, 11 critical) en toolchain de desarrollo (`@vitejs/plugin-react > @babel/core`, etc.). No se actualizan majors a ciegas: se documenta el alcance dev-only. |
+| 1.2 | Autenticación y permisos | **IMPLEMENTADO** con hallazgos abiertos | `requireAdmin`/`requireRole` en todas las rutas admin, TOTP + lockout, auditoría de acciones. Abiertos: SEC-01 (cookie `secure`), SEC-02/03/04 (límites y lockout en memoria), SEC-05 (CORS), SEC-08 (rutas admin sin gate propio). |
+| 1.3 | Operaciones financieras | **PARCIAL** | Transacciones en alta de donación, conversión de reportes y adopciones (API-02/03/04 ✔), comprobante obligatorio antes de aprobar (API-05 ✔), importes `numeric(12,2)` ✔, un asiento por donación/gasto (índice único) ✔. Abierto: API-06 (`catch → 400` enmascara fallos 500). |
+| 1.4 | Verificación del libro contable | **PARCIAL** | Cadena de hashes verificable y pública (`/campaigns/:id/movements/verify`, `/ledger/root`, anclaje). Falta herramienta **administrativa** con informe y detección de donaciones aprobadas sin asiento (DB-09). |
+| 2.1 | Flujo completo de campañas | **IMPLEMENTADO** | `lib/campaign-lifecycle.ts` (estados, transiciones, `deleteBlockReason`) + `PATCH /campaigns/:id/status`. |
+| 2.2 | Eliminación y archivado | **IMPLEMENTADO**, con bloqueo de migración | Solo se elimina un borrador sin dependencias; el resto se archiva (conserva historial). **Bloqueo:** la migración 010 (`ON DELETE CASCADE → RESTRICT` en el libro) está ensayada pero **no aplicada**; en producción el ledger sigue en CASCADE. |
+| 2.3 | Sincronización admin → público | **CORREGIDO** (Fase 1 del plan) | Invalidación por entidad + `no-store` con sesión; se eliminó la colisión de claves del cliente generado. |
+| 2.4 | Pruebas extremo a extremo | **PENDIENTE** | Requieren PostgreSQL real (hay binarios en el sandbox); hoy las suites usan `DATABASE_URL` ficticio. |
+| 3.1 | Unificar el cálculo de recaudación | **IMPLEMENTADO (V7-1)** | Se eliminó `Math.max(columna manual, donaciones)` de `campaigns.ts` y la columna cruda del dashboard. Ver §2. |
+| 3.2 | Panel de transparencia | **PARCIAL → mejorado (V7-1)** | Ya existía; ahora publica el desglose conciliado y la fecha de última actualización. Falta unificar la exportación PDF/Excel del libro completo. |
+| 3.3 | Gestión de comprobantes | **PARCIAL** | Registro, adjunto, visibilidad pública opcional y conciliación ✔. Falta historial de cambios del comprobante. |
+| 4 | ChocoFest 2026 y eventos | **PARCIAL** | 3A–3C-3b y 4A cerrados (bienes, presupuesto, programa, composición de canastas, tipos de colaboración). Falta rendición de resultados del evento (4.3) y patrocinios. |
+| 5.1 | Donantes | **PARCIAL** | Panel, historial, tipo de donante (incl. organización), anonimato, conciliación y detección de duplicados ✔. Falta consentimiento explícito y nombre colectivo de publicación. |
+| 5.2 | Certificados con QR | **NO EXISTE** | Requiere decisión de negocio (ver §3). |
+| 5.3 | Insignias y reconocimientos | **NO EXISTE** | Requiere decisión de negocio. |
+| 5.4 | Embajadores y auspiciadores | **PARCIAL** | Aliados (CRUD + visibilidad pública) ✔; embajadores con código de referencia, captaciones y métricas no existen. |
+| 6 | Dashboard unificado | **PARCIAL** | Existe `GET /admin/dashboard` + panel, con cifras ya coherentes (V7-1). Faltan filtros por campaña/estado/fechas. |
+| 7 | Comunicaciones y WhatsApp | **PARCIAL** | Números fijos en el código (`FloatingWhatsApp.tsx`, catálogo, cómo ayudar…). La clave `org_whatsapp` existe pero **no** está en la allowlist pública ni la consume el frontend. |
+| 8 | Frontend (UX, rendimiento, SEO) | **PARCIAL** | FE-03 (gate de rol en cliente), FE-04 (estados de carga/vacío/error), FE-09 (SEO en 5 páginas), FE-10 (zod 3 en cliente vs zod/v4 en DB). |
+| 9 | Pruebas y despliegue | **PARCIAL** | `api-server` 295/295, `red-solidaria` 133/133 + 23/23 vitest, typecheck 0 (libs, API, frontend, scripts) y build de producción OK. Faltan E2E con base real y lint automatizado. |
+| 10 | Informe final y checklist | **PENDIENTE** | Se generan al cerrar el programa. |
+
+---
+
+## 2. Incremento V7-1 — Recaudación conciliable (Fase 3.1 y 3.2) · CERRADO
+
+### 2.1 Defecto corregido
+
+`formatCampaign` publicaba `raised = max(columna manual, suma de donaciones confirmadas)`
+(`routes/campaigns.ts`) y el dashboard ordenaba el top de campañas por la columna manual
+cruda (`routes/dashboard.ts`). Dos cifras de naturaleza distinta mezcladas sin criterio:
+un importe histórico podía tapar las donaciones reales y, en el mismo panel, el total
+general y el ranking de campañas se calculaban con fuentes distintas. Es exactamente el
+sustituto de conciliación que el Prompt Maestro prohíbe.
+
+### 2.2 Regla implementada (una sola fuente: `src/lib/funding.ts`)
+
+| Concepto | Definición aplicada |
+|---|---|
+| **Recaudación verificada** (`verifiedRaised`) | Suma de donaciones confirmadas (aprobadas + conciliadas). |
+| **Recaudación histórica registrada** (`historicalRaised`) | Importe escrito a mano en la campaña (importaciones anteriores a la plataforma). |
+| **¿Cuenta el histórico?** (`historicalCounted`) | Solo si **no hay ninguna donación registrada**: entonces es la única fuente. Si hay donaciones, se publica como referencia y **no** se suma (sumarlo duplicaría importes que ya están en la base). |
+| **Total conciliado** (`reconciledRaised`) | Verificado + histórico contado. **Nunca** el máximo de dos cifras. |
+| **Saldo disponible** | Conciliado − egresos válidos (derivado, nunca guardado). |
+
+- Aplicado en la **ficha pública de campaña**, en el **panel de transparencia de la campaña** (antes solo sumaba donaciones, así que una campaña con recaudación histórica mostraba S/ 0 mientras su ficha mostraba el importe) y en el **dashboard** (total y top de campañas, que ahora usan la misma regla).
+- Redondeo a céntimos (`roundMoney`) para que la suma de `numeric(12,2)` no derive.
+- Importes negativos o corruptos se normalizan a 0: nunca restan recaudación ni rompen la interfaz.
+- La interfaz **explica** la cifra: si el histórico cuenta, se dice; si solo es referencia, se dice por qué no se suma.
+- El panel de transparencia publica además la **fecha de última actualización** (los datos se leen en vivo de la base).
+
+### 2.3 Archivos
+
+```
+artifacts/api-server/src/lib/funding.ts                       regla pura de conciliación + saldo
+artifacts/api-server/tests/funding.test.mjs                   +9 pruebas (regla, duplicidad, invariante, redondeo)
+artifacts/api-server/build-tests.mjs                          entry point del nuevo módulo
+artifacts/api-server/src/routes/campaigns.ts                  formatCampaign sin Math.max + desglose
+artifacts/api-server/src/routes/campaign-transparency.ts      misma cifra que la ficha + updatedAt
+artifacts/api-server/src/routes/dashboard.ts                  total conciliado y top por la misma regla
+lib/api-spec/openapi.yaml                                     Campaign: verifiedRaised/historicalRaised/historicalCounted
+lib/api-client-react|api-zod/src/generated/**                 cliente regenerado (orval)
+artifacts/red-solidaria/src/pages/campaign-detail.tsx         nota de conciliación bajo la barra de progreso
+artifacts/red-solidaria/src/pages/campaign-transparency.tsx   desglose + última actualización
+artifacts/red-solidaria/src/hooks/use-phase3.ts               TransparencyData ampliado
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts      3 etiquetas nuevas
+```
+
+### 2.4 Verificación
+
+- `api-server`: **295/295** (+9) · typecheck **0**.
+- `red-solidaria`: **133/133** node:test + **23/23** vitest · typecheck **0**.
+- `typecheck:libs` **0** · build de producción **OK**.
+- No se modificó ningún dato: la regla es de cálculo y presentación.
+
+### 2.5 Impacto visible (decisión de negocio, ya aplicada por mandato del Prompt)
+
+Las campañas que hoy muestran el **máximo** entre su importe histórico y sus donaciones
+pasarán a mostrar el **total conciliado**: si tienen donaciones registradas, la cifra
+publicada baja al importe realmente verificable y el histórico se muestra como referencia
+etiquetada. Para que el importe histórico cuente, la organización debe cargarlo como
+donaciones registradas (procedimiento documentado, sin doble conteo).
+
+---
+
+## 3. Bloqueos que requieren aprobación específica
+
+| # | Bloqueo | Por qué necesita aprobación | Propuesta |
+|---|---|---|---|
+| B-1 | **Migración 010 sin aplicar** (`campaign_movements` de `ON DELETE CASCADE` a `RESTRICT`) | Es una alteración de restricción sobre la base de producción; el propio archivo `docs/migraciones/010_low_risk.sql` la dejó fuera de `migrate.ts` a propósito. Hoy la única defensa del libro contable es el conteo en la aplicación. | Añadirla a `migrate.ts` (idempotente: `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT`) tras confirmar que no hay movimientos huérfanos. Se puede ensayar antes en la réplica local. |
+| B-2 | **Claves foráneas ausentes (DB-04)** en `donations`, `campaign_expenses`, `campaign_evidence`, `campaign_images`, `campaign_updates`, `community_reports`, `campaign_leftovers` | Añadir FKs falla si ya existen huérfanos; hay que limpiarlos o dejarlos documentados. | Migración aditiva en dos pasos: informe de huérfanos → FK con `ON DELETE RESTRICT` (o `SET NULL` en las opcionales). Requiere decisión sobre los datos existentes. |
+| B-3 | **Certificados con QR (Fase 5.2)** | Define datos personales publicados: nombre autorizado, tipo de reconocimiento, vigencia y revocación. | Propuesta: tabla `certificates` (identificador público aleatorio, nombre autorizado, campaña/evento, tipo, fecha, estado, motivo de revocación) + página pública `/certificados/:code` con datos mínimos + QR generado en el cliente (sin servicio externo). Pendiente: confirmar tipos de certificado y si el monto se incluye (recomendado: **no**). |
+| B-4 | **WhatsApp Business automatizado (Fase 7)** | Requiere credenciales y proveedor oficial (Cloud API) y consentimiento de contacto. | Implementar primero lo que no depende de credenciales: enlaces y mensajes configurables desde el panel, contacto por campaña/tipo. Dejar la mensajería automatizada tras la decisión y las credenciales. |
+| B-5 | **Artefactos de migración obsoletos** (`lib/db/drizzle/0000_*.sql`, `0001_*.sql`) | Son DDL generado que **nunca** se aplica y contradice a `migrate.ts` (el esquema ya declara `RESTRICT`): un `drizzle-kit push` accidental reintroduciría el CASCADE. | Eliminarlos del repositorio (o moverlos a `docs/legacy/`) y documentar que la única fuente es `lib/db/src/migrate.ts`. Requiere confirmación por ser borrado de archivos. |
+| B-6 | **Insignias/embajadores (Fase 5.3/5.4)** | Definición de programa (niveles, vigencia, qué se publica). | Requiere decisión de negocio antes de modelar. |
+
+---
+
+## 4. Plan de ejecución restante (orden de prioridad)
+
+1. **V7-2 · Fase 7 (parte sin credenciales):** WhatsApp y contactos configurables desde el panel (allowlist pública de `org_whatsapp`, mensajes predefinidos, contacto por campaña) — elimina números fijos del código.
+2. **V7-3 · Fase 1.4:** herramienta administrativa de verificación del libro: informe de integridad (cadena rota, donaciones confirmadas sin asiento, movimientos sin origen), sin modificar registros.
+3. **V7-4 · Fase 1.2/1.3:** cerrar SEC-01/SEC-03/SEC-08 y API-06 (errores de infraestructura dejan de reportarse como validación).
+4. **V7-5 · Fase 6:** filtros del dashboard (campaña, estado, fechas) y enlaces de cada tarjeta a su detalle.
+5. **V7-6 · Fase 5.1:** consentimiento explícito y nombre colectivo del donante (con separación estricta público/privado).
+6. **V7-7 · Fase 2.4/9:** pruebas extremo a extremo con PostgreSQL real (migraciones, borrado 204, 409 por dependencias) en el sandbox.
+7. **V7-8 · Fase 10:** `AUDITORIA_FINAL_V7.md` + `CHECKLIST_FUNCIONAL_V7.md`.
+8. **Bloqueados:** B-1 a B-6 (§3), a la espera de aprobación.

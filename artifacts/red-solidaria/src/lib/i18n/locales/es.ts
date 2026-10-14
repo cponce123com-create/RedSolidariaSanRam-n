@@ -419,6 +419,10 @@ export const es = {
     startDate: "Fecha de Inicio",
     endDate: "Fecha de Cierre",
     closedCampaign: "Campaña Cerrada",
+    fundingHistoricalCounted:
+      "Incluye S/ {{amount}} de recaudación histórica registrada, aún sin donaciones registradas en la plataforma.",
+    fundingHistoricalReference:
+      "Registro histórico de la campaña: S/ {{amount}} (referencia; no se suma porque ya hay donaciones registradas y se duplicaría).",
     shareDescription: "Apoya esta campaña solidaria en San Ramón, Chanchamayo.",
     shareQr: "Compartir QR",
     percentTransparent: "100% Transparente",
@@ -630,6 +634,7 @@ export const es = {
   },
   campaignTransparency: {
     loading: "Cargando datos de transparencia...",
+    updatedAt: "Última actualización: {{date}}",
     unavailableTitle: "Información no disponible",
     unavailableDescription:
       "No pudimos cargar el panel de transparencia de esta campaña.",

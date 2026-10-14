@@ -421,6 +421,10 @@ export const en: TranslationSchema = {
     startDate: "Start Date",
     endDate: "End Date",
     closedCampaign: "Campaign Closed",
+    fundingHistoricalCounted:
+      "Includes S/ {{amount}} of recorded historical fundraising, with no donations recorded on the platform yet.",
+    fundingHistoricalReference:
+      "Campaign historical record: S/ {{amount}} (reference only; not added because donations are already recorded and it would be double counted).",
     shareDescription: "Support this charity campaign in San Ramón, Chanchamayo.",
     shareQr: "Share QR",
     percentTransparent: "100% Transparent",
@@ -632,6 +636,7 @@ export const en: TranslationSchema = {
   },
   campaignTransparency: {
     loading: "Loading transparency data...",
+    updatedAt: "Last updated: {{date}}",
     unavailableTitle: "Information unavailable",
     unavailableDescription:
       "We could not load the transparency panel for this campaign.",

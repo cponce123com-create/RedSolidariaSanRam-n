@@ -190,6 +190,20 @@ export default function CampaignTransparency() {
             <div className="text-3xl font-display font-bold text-foreground relative z-10">
               {formatCurrency(transparency.totalRaised)}
             </div>
+            {/* Fase 3.1 y 3.2: se explica de dónde sale la cifra (histórico
+                contado solo cuando no hay donaciones) y cuándo se leyó. */}
+            {transparency.historicalCounted && (
+              <p className="text-[11px] text-muted-foreground mt-2 relative z-10" data-testid="transparency-historical-counted">
+                {t("campaignDetail.fundingHistoricalCounted", {
+                  amount: transparency.historicalRaised.toLocaleString("es-PE", { minimumFractionDigits: 0 }),
+                })}
+              </p>
+            )}
+            <p className="text-[11px] text-muted-foreground mt-3 relative z-10" data-testid="transparency-updated-at">
+              {t("campaignTransparency.updatedAt", {
+                date: formatSafeDate(transparency.updatedAt, "dd/MM/yyyy HH:mm", { locale: getDateFormatLocale() }),
+              })}
+            </p>
           </div>
 
           <div className="bg-card rounded-3xl p-6 shadow-sm border border-border flex flex-col relative overflow-hidden group hover-elevate" data-testid="transparency-spent">

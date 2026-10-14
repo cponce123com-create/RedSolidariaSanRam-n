@@ -20,6 +20,7 @@ import { logAuditAction } from "../middleware/auth-utils";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 import { toIsoSafe } from "../lib/date-format";
 import { toSafeAmount } from "../lib/amount-format";
+import { campaignFunding } from "../lib/funding";
 import { isForeignKeyViolation } from "../lib/pg-errors";
 import {
   CAMPAIGN_STATUSES,
@@ -454,12 +455,12 @@ function formatCampaign(
   donorCount: number,
   raisedFromDonations: number,
 ) {
-  // El monto recaudado proviene de las donaciones aprobadas (fuente de verdad);
-  // la columna raised solo se usa como respaldo durante el seed.
-  // toSafeAmount: la proyección por tabla puede devolver la columna money como
-  // string ("3250.00") según la versión de drizzle — Math.max lo coercearía,
-  // pero normalizamos para que el contrato sea number real siempre.
-  const raised = Math.max(toSafeAmount(c.raised), raisedFromDonations);
+  // Recaudación conciliada (Prompt Maestro V7, Fase 3.1): la cifra publicada se
+  // deriva de fuentes que NO se solapan, nunca del máximo de dos cantidades.
+  // `raised` se conserva por compatibilidad con el contrato público y equivale
+  // al total conciliado; el desglose viaja en los campos nuevos para que la
+  // interfaz pueda explicar de dónde sale cada sol.
+  const funding = campaignFunding(c.raised, raisedFromDonations);
 
   return {
     id: c.id,
@@ -467,7 +468,10 @@ function formatCampaign(
     description: c.description,
     imageUrl: c.imageUrl,
     goal: c.goal,
-    raised,
+    raised: funding.reconciledRaised,
+    verifiedRaised: funding.verifiedRaised,
+    historicalRaised: funding.historicalRaised,
+    historicalCounted: funding.historicalCounted,
     donorCount,
     status: c.status,
     featured: c.featured,

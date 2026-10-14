@@ -831,6 +831,12 @@ components:
           type: number
         raised:
           type: number
+        verifiedRaised:
+          type: number
+        historicalRaised:
+          type: number
+        historicalCounted:
+          type: boolean
         donorCount:
           type: integer
         status:
@@ -853,6 +859,9 @@ components:
         - description
         - goal
         - raised
+        - verifiedRaised
+        - historicalRaised
+        - historicalCounted
         - donorCount
         - status
         - featured
