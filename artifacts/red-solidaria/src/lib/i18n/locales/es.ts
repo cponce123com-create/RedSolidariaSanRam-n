@@ -120,6 +120,25 @@ export const es = {
     linkCopiedDescription: "Ya puedes compartirlo con tu comunidad.",
     qrAria: "Código QR de la campaña {{title}}",
   },
+  certificate: {
+    title: "Certificado",
+    loading: "Cargando el certificado…",
+    issuedTo: "Otorgado a",
+    notFoundTitle: "Certificado no disponible",
+    notFoundText:
+      "Este certificado no existe o ha sido revocado. Comprueba el enlace o el código del QR.",
+    backHome: "Ir al inicio",
+    qrAria: "Código QR del certificado",
+    publicNote:
+      "Esta página solo muestra la información que la organización autoriza a publicar.",
+    type: {
+      donante: "Donante",
+      voluntario: "Voluntario/a",
+      auspiciador: "Auspiciador",
+      colaborador: "Colaborador/a",
+      reconocimiento: "Reconocimiento",
+    },
+  },
   share: {
     title: "Compartir campaña",
     whatsapp: "WhatsApp",

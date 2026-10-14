@@ -122,6 +122,24 @@ export const en: TranslationSchema = {
     linkCopiedDescription: "Now you can share it with your community.",
     qrAria: "QR code of the {{title}} campaign",
   },
+  certificate: {
+    title: "Certificate",
+    loading: "Loading the certificate…",
+    issuedTo: "Awarded to",
+    notFoundTitle: "Certificate unavailable",
+    notFoundText:
+      "This certificate does not exist or has been revoked. Check the link or the QR code.",
+    backHome: "Go to the home page",
+    qrAria: "Certificate QR code",
+    publicNote: "This page only shows the information the organisation authorises to publish.",
+    type: {
+      donante: "Donor",
+      voluntario: "Volunteer",
+      auspiciador: "Sponsor",
+      colaborador: "Contributor",
+      reconocimiento: "Recognition",
+    },
+  },
   share: {
     title: "Share campaign",
     whatsapp: "WhatsApp",

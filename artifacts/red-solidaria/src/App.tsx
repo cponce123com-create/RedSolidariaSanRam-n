@@ -47,6 +47,8 @@ const AdminLedgerAudit = lazy(() => import("./pages/admin/ledger-audit"));
 const AdminInformes = lazy(() => import("./pages/admin/informes"));
 const AdminReportPrint = lazy(() => import("./pages/admin/report-print"));
 const AdminObservations = lazy(() => import("./pages/admin/observations"));
+const AdminCertificates = lazy(() => import("./pages/admin/certificates"));
+const CertificatePage = lazy(() => import("./pages/certificate"));
 const VolunteerStatus = lazy(() => import("./pages/volunteer-status"));
 const AdminReports = lazy(() => import("./pages/admin/reports"));
 const AdminReportDetail = lazy(() => import("./pages/admin/report-detail"));
@@ -187,6 +189,11 @@ function App() {
                     <AdminLedgerAudit />
                   </AdminLayout>
                 </Route>
+                <Route path="/admin/certificados">
+                  <AdminLayout>
+                    <AdminCertificates />
+                  </AdminLayout>
+                </Route>
                 {/* Fuera del layout: la impresión sale limpia (sin menú lateral). */}
                 <Route path="/admin/informes/:id">
                   <AdminReportPrint />
@@ -274,6 +281,13 @@ function App() {
                 <Route path="/campanas">
                   <MainLayout>
                     <Campaigns />
+                  </MainLayout>
+                </Route>
+                {/* Certificado público: es lo que abre el QR. Se llega solo por el
+                    enlace o el código, nunca desde la navegación. */}
+                <Route path="/certificados/:code">
+                  <MainLayout>
+                    <CertificatePage />
                   </MainLayout>
                 </Route>
                 <Route path="/casos-urgentes">
