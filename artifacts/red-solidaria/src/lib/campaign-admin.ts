@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { ApiError, errorMessage, readErrorMessage } from "@/lib/api-error";
 
 /**
  * Cliente del ciclo de vida de campañas (Fase 1 del Prompt Maestro).
@@ -7,7 +8,13 @@ import type { QueryClient } from "@tanstack/react-query";
  * cliente generado por Orval, así que se llaman directamente. Todos exigen
  * sesión de administrador (cookie) y devuelven `{ error, message }` en fallo:
  * aquí se convierte ese mensaje REAL en el texto que ve el administrador.
+ *
+ * El error de API y el lector de mensajes viven en `lib/api-error` (compartidos
+ * con el panel de donantes); se re-exporta el alias de campaña para no romper
+ * los imports existentes.
  */
+
+export { ApiError as CampaignApiError, errorMessage };
 
 export type CampaignStatus =
   | "draft"
@@ -15,39 +22,6 @@ export type CampaignStatus =
   | "paused"
   | "completed"
   | "archived";
-
-export class CampaignApiError extends Error {
-  readonly status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = "CampaignApiError";
-    this.status = status;
-  }
-}
-
-async function readErrorMessage(res: Response): Promise<string> {
-  try {
-    const body: unknown = await res.json();
-    if (body && typeof body === "object") {
-      const candidate = body as { message?: unknown; error?: unknown };
-      if (typeof candidate.message === "string" && candidate.message.trim()) {
-        return candidate.message;
-      }
-      if (typeof candidate.error === "string" && candidate.error.trim()) {
-        return candidate.error;
-      }
-    }
-  } catch {
-    // cuerpo no-JSON: se usa el mensaje genérico
-  }
-  return `No se pudo completar la operación (HTTP ${res.status})`;
-}
-
-/** Mensaje legible para cualquier error de mutación. */
-export function errorMessage(err: unknown, fallback = "Error inesperado"): string {
-  if (err instanceof Error && err.message.trim()) return err.message;
-  return fallback;
-}
 
 export async function setCampaignStatus(
   id: number,
@@ -59,7 +33,7 @@ export async function setCampaignStatus(
     credentials: "include",
     body: JSON.stringify({ status }),
   });
-  if (!res.ok) throw new CampaignApiError(res.status, await readErrorMessage(res));
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
 }
 
 /** Elimina permanentemente un borrador (el backend rechaza con 409 si no lo es). */
@@ -68,7 +42,7 @@ export async function deleteCampaignDraft(id: number): Promise<void> {
     method: "DELETE",
     credentials: "include",
   });
-  if (!res.ok) throw new CampaignApiError(res.status, await readErrorMessage(res));
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
 }
 
 /**
@@ -97,7 +71,7 @@ export async function setProtagonistCampaign(campaignId: number | null): Promise
     credentials: "include",
     body: JSON.stringify({ campaignId }),
   });
-  if (!res.ok) throw new CampaignApiError(res.status, await readErrorMessage(res));
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
 }
 
 export interface SettingEntry {
@@ -119,7 +93,7 @@ export async function saveSetting(entry: SettingEntry): Promise<void> {
       ...(entry.group ? { group: entry.group } : {}),
     }),
   });
-  if (!res.ok) throw new CampaignApiError(res.status, await readErrorMessage(res));
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
 }
 
 /** Guarda varias configuraciones (p. ej. los datos del evento ChocoFest). */

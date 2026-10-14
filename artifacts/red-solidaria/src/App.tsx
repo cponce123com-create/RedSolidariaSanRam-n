@@ -40,6 +40,8 @@ const AdminCampaigns = lazy(() => import("./pages/admin/campaigns"));
 const AdminChocofest = lazy(() => import("./pages/admin/chocofest"));
 const AdminCampaignDetail = lazy(() => import("./pages/admin/campaign-detail"));
 const AdminDonations = lazy(() => import("./pages/admin/donations"));
+const AdminDonors = lazy(() => import("./pages/admin/donors"));
+const AdminDonorDetail = lazy(() => import("./pages/admin/donor-detail"));
 const AdminReports = lazy(() => import("./pages/admin/reports"));
 const AdminReportDetail = lazy(() => import("./pages/admin/report-detail"));
 const AdminAdoptions = lazy(() => import("./pages/admin/adoptions"));
@@ -148,6 +150,16 @@ function App() {
                 <Route path="/admin/donaciones">
                   <AdminLayout>
                     <AdminDonations />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/donantes/:id">
+                  <AdminLayout>
+                    <AdminDonorDetail />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/donantes">
+                  <AdminLayout>
+                    <AdminDonors />
                   </AdminLayout>
                 </Route>
                 <Route path="/admin/reportes/:id">

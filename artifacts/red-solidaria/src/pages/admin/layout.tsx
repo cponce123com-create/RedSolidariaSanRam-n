@@ -2,7 +2,8 @@ import { Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Target, FileText, LogOut, MessageSquare, DollarSign, Menu, X,
-  AlertTriangle, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck, Settings, Sparkles
+  AlertTriangle, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck, Settings, Sparkles,
+  HandHeart
 } from "lucide-react";
 import { useAdminLogout, useGetAdminMe, type AdminUser } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { href: "/admin/chocofest", icon: Sparkles, label: "ChocoFest 2026" },
         ...(isModerator
           ? []
-          : [{ href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" }]),
+          : [
+              { href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" },
+              { href: "/admin/donantes", icon: HandHeart, label: "Donantes" },
+            ]),
         { href: "/admin/reportes", icon: AlertTriangle, label: "Reportes", highlight: true },
         { href: "/admin/adopciones", icon: Dog, label: "Adopciones", animal: true },
         { href: "/admin/voluntarios", icon: Users, label: "Voluntarios" },

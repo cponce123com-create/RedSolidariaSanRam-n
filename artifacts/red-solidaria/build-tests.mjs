@@ -12,6 +12,7 @@ await build({
     "./src/lib/chocofest.ts",
     "./src/lib/inventory.ts",
     "./src/lib/results.ts",
+    "./src/lib/donors-admin.ts",
     "./src/lib/admin-access.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",
