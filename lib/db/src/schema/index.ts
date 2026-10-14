@@ -22,3 +22,4 @@ export * from "./admin-users";
 export * from "./settings";
 export * from "./audit-logs";
 export * from "./supervisor-observations";
+export * from "./volunteer-teams";

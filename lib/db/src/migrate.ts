@@ -247,6 +247,58 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON volunteers (public_token) WHERE public_token IS NOT NULL;
     `,
   },
+  {
+    name: "014_volunteer_teams_participation.sql",
+    sql: `
+      -- Fase 5: equipos y PARTICIPACIÓN del voluntariado. ADITIVA Y REVERSIBLE:
+      --   rollback = DROP TABLE volunteer_participations;
+      --              DROP TABLE volunteer_team_members;
+      --              DROP TABLE volunteer_teams;
+      CREATE TABLE IF NOT EXISTS volunteer_teams (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        description text,
+        color text,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamp NOT NULL DEFAULT now(),
+        updated_at timestamp NOT NULL DEFAULT now()
+      );
+
+      -- Nombre de equipo único (sin distinguir mayúsculas).
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_volunteer_teams_name
+        ON volunteer_teams (lower(name));
+
+      CREATE TABLE IF NOT EXISTS volunteer_team_members (
+        id serial PRIMARY KEY,
+        volunteer_id integer NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
+        team_id integer NOT NULL REFERENCES volunteer_teams(id) ON DELETE CASCADE,
+        role text,
+        joined_at timestamp NOT NULL DEFAULT now(),
+        left_at timestamp
+      );
+
+      -- Un voluntario no puede estar dos veces ACTIVO en el mismo equipo.
+      -- Las pertenencias cerradas (left_at) no participan del índice.
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_volunteer_team_active
+        ON volunteer_team_members (volunteer_id, team_id) WHERE left_at IS NULL;
+
+      CREATE TABLE IF NOT EXISTS volunteer_participations (
+        id serial PRIMARY KEY,
+        volunteer_id integer NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
+        campaign_id integer REFERENCES campaigns(id) ON DELETE SET NULL,
+        activity_type text NOT NULL,
+        title text NOT NULL,
+        description text,
+        hours real,
+        participated_at timestamp NOT NULL,
+        recorded_by text,
+        created_at timestamp NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_volunteer_participations_volunteer
+        ON volunteer_participations (volunteer_id, participated_at DESC);
+    `,
+  },
 ];
 
 /**

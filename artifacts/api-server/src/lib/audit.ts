@@ -23,6 +23,9 @@ export const AUDIT_ACTIONS = {
   volunteerStatusChanged: "VOLUNTEER_STATUS_CHANGED",
   volunteerApproved: "VOLUNTEER_APPROVED",
   volunteerRejected: "VOLUNTEER_REJECTED",
+  volunteerTeamAssigned: "VOLUNTEER_TEAM_ASSIGNED",
+  volunteerTeamLeft: "VOLUNTEER_TEAM_LEFT",
+  volunteerParticipationRecorded: "VOLUNTEER_PARTICIPATION_RECORDED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -49,6 +52,9 @@ const ACTION_LABEL: Record<string, string> = {
   [AUDIT_ACTIONS.volunteerStatusChanged]: "Estado de postulación cambiado",
   [AUDIT_ACTIONS.volunteerApproved]: "Voluntario aprobado",
   [AUDIT_ACTIONS.volunteerRejected]: "Postulación descartada",
+  [AUDIT_ACTIONS.volunteerTeamAssigned]: "Voluntario asignado a un equipo",
+  [AUDIT_ACTIONS.volunteerTeamLeft]: "Voluntario retirado de un equipo",
+  [AUDIT_ACTIONS.volunteerParticipationRecorded]: "Participación registrada",
 };
 
 export function auditActionLabel(action: string): string {

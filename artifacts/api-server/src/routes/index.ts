@@ -27,6 +27,7 @@ import settingsRouter from "./settings";
 import auditLogsRouter from "./audit-logs";
 import reportsRouter from "./reports";
 import supervisorRouter from "./supervisor";
+import volunteerTeamsRouter from "./volunteer-teams";
 import uploadsRouter from "./uploads";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
