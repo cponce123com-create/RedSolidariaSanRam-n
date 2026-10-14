@@ -90,6 +90,65 @@ if [ "$USE_CASE_INDEXES" -lt 6 ]; then
   exit 1
 fi
 
+echo "== 4b. Restricciones de estado (DB-08) y updated_at automático (DB-10) =="
+STATUS_CHECKS="$(psql_c "SELECT count(*) FROM pg_constraint WHERE contype='c' AND conname IN ('donations_status_check','campaigns_status_check','pets_status_check','volunteers_status_check','adoption_requests_status_check','community_reports_status_check','campaign_movements_kind_check')")"
+echo "   restricciones de estado (DB-08): $STATUS_CHECKS/7"
+if [ "$STATUS_CHECKS" -lt 7 ]; then
+  echo "   FAIL - faltan restricciones de estado"
+  exit 1
+fi
+
+# El seed del API corre en paralelo al arranque: se espera a que haya datos
+# REALES antes de probar las restricciones contra ellos (no se prueba en vacío).
+SEEDED_CAMPAIGN=""
+SEEDED_SETTING="0"
+for _ in $(seq 1 30); do
+  SEEDED_CAMPAIGN="$(psql_c "SELECT id FROM campaigns ORDER BY id LIMIT 1")"
+  SEEDED_SETTING="$(psql_c "SELECT count(*) FROM settings WHERE key = 'org_name'")"
+  if [ -n "$SEEDED_CAMPAIGN" ] && [ "$SEEDED_SETTING" = "1" ]; then break; fi
+  sleep 0.5
+done
+if [ -z "$SEEDED_CAMPAIGN" ]; then
+  echo "   FAIL - no hay campañas sembradas para probar la restricción de estado"
+  exit 1
+fi
+
+BAD_STATUS="$(psql_c "UPDATE campaigns SET status='estado_invalido' WHERE id=$SEEDED_CAMPAIGN" 2>&1 || true)"
+if echo "$BAD_STATUS" | grep -qi "campaigns_status_check"; then
+  echo "   ok   - la base RECHAZA un estado inválido (CHECK activo en escrituras nuevas)"
+else
+  echo "   FAIL - la base aceptó un estado inválido: $BAD_STATUS"
+  exit 1
+fi
+
+GOOD_STATUS="$(psql_c "UPDATE campaigns SET status=status WHERE id=$SEEDED_CAMPAIGN RETURNING status")"
+if [ -n "$GOOD_STATUS" ]; then
+  echo "   ok   - un estado válido se sigue aceptando (campaña #$SEEDED_CAMPAIGN sigue en '$GOOD_STATUS')"
+else
+  echo "   FAIL - la base rechazó un estado válido"
+  exit 1
+fi
+
+UPDATED_TRIGGERS="$(psql_c "SELECT count(*) FROM pg_trigger WHERE tgname IN ('trg_donors_updated_at','trg_volunteer_teams_updated_at','trg_pets_updated_at','trg_community_reports_updated_at','trg_settings_updated_at','trg_volunteers_updated_at')")"
+echo "   disparadores de updated_at (DB-10): $UPDATED_TRIGGERS/6"
+if [ "$UPDATED_TRIGGERS" -lt 6 ]; then
+  echo "   FAIL - faltan disparadores de updated_at"
+  exit 1
+fi
+
+if [ "$SEEDED_SETTING" != "1" ]; then
+  echo "   FAIL - no hay configuración sembrada para probar updated_at"
+  exit 1
+fi
+psql_c "UPDATE settings SET value = value WHERE key = 'org_name'" >/dev/null
+FRESH_UPDATED="$(psql_c "SELECT count(*) FROM settings WHERE key = 'org_name' AND updated_at > now() - interval '10 seconds'")"
+if [ "$FRESH_UPDATED" -ge 1 ] 2>/dev/null; then
+  echo "   ok   - updated_at se actualiza solo al modificar una fila ($FRESH_UPDATED fila/s recién tocada/s)"
+else
+  echo "   FAIL - updated_at no se actualizó automáticamente ($FRESH_UPDATED)"
+  exit 1
+fi
+
 echo "== 5. Flujo funcional completo por HTTP =="
 node "$REPO/artifacts/api-server/tests/e2e/flow.mjs" "http://127.0.0.1:$APIPORT"
 FLOW_STATUS=$?

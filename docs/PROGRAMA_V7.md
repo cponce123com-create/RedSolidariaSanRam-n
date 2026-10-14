@@ -668,3 +668,57 @@ artifacts/red-solidaria/tests/vitest/admin-layout-gate.test.tsx   6 pruebas de c
 artifacts/red-solidaria/src/pages/admin/layout.tsx               usa el gate + estados
 artifacts/red-solidaria/build-tests.mjs                          entry point del módulo
 ```
+
+---
+
+## 14. Incremento V7-12 — Integridad en la base: estados y `updated_at` (DB-08 y DB-10) · CERRADO
+
+### 14.1 Qué faltaba
+
+- **DB-08:** los `status` eran columnas de texto **sin ninguna restricción**. La aplicación
+  validaba, pero la base no: nada impedía guardar `'estado_invalido'` desde un script, una
+  migración manual o un error de programación.
+- **DB-10:** `updated_at` no se actualizaba solo; cada ruta tenía que acordarse de escribirlo.
+
+### 14.2 Qué se implementó (migración 022, aditiva)
+
+- **7 restricciones `CHECK ... NOT VALID`** con los valores que **ya** aceptan los esquemas de
+  la aplicación (contrastados con los `z.enum` y las libs de ciclo de vida, no inventados):
+
+  | Tabla | Valores aceptados |
+  |---|---|
+  | `donations.status` | pending, approved, rejected, reconciled |
+  | `campaigns.status` | draft, active, paused, completed, archived, **inactive** (heredado) |
+  | `pets.status` | available, adopted, in-process, reviewing, inactive |
+  | `volunteers.status` | pending, reviewing, approved, contacted, rejected |
+  | `adoption_requests.status` | pending, approved, rejected, in-process |
+  | `community_reports.status` | pending, reviewing, approved, rejected, converted, archived |
+  | `campaign_movements.kind` | ingreso, gasto |
+
+- **`NOT VALID` a propósito:** las filas existentes **no** se revisan (una migración no puede
+  fallar por datos históricos) y **las escrituras nuevas sí se comprueban** desde ya. Para
+  endurecer más adelante queda documentado en la propia migración:
+  `SELECT status, count(*) FROM <tabla> GROUP BY status;` y
+  `ALTER TABLE <tabla> VALIDATE CONSTRAINT <nombre>;`.
+- **6 disparadores `BEFORE UPDATE`** que mantienen `updated_at` (donors, volunteer_teams, pets,
+  community_reports, settings, volunteers): la base lo garantiza aunque la aplicación lo olvide.
+- `inactive` en `campaigns` se mantiene porque el panel lo cuenta como finalizada; excluirlo
+  dejaría esas filas antiguas **imposibles de editar** (cualquier UPDATE las revisa).
+
+### 14.3 Verificación (E2E contra PostgreSQL real)
+
+- **7/7 restricciones** presentes y **la base RECHAZA** `status='estado_invalido'` sobre una
+  campaña real (error con el nombre de la restricción), mientras **un estado válido se sigue
+  aceptando**.
+- **6/6 disparadores** y `updated_at` **se actualiza solo** al modificar una fila: se provoca el
+  UPDATE y se mide la frescura del valor.
+- 22 migraciones aplicadas e **idempotentes** en el segundo arranque; flujo HTTP **41/41**;
+  `api-server` **329/329**; typecheck **0**.
+
+### 14.4 Nota honesta de la verificación
+
+La propia prueba descubrió dos cosas del esquema real que la revisión no había visto
+(`campaigns` tiene `description` y `start_date` NOT NULL) y se cambió el enfoque a un `UPDATE`
+sobre una fila sembrada; además el seed del API es **asíncrono** respecto al arranque, así que
+el chequeo ahora **espera a que haya datos** antes de medir y falla si no los hay, en lugar de
+probar en vacío y dar un falso verde.

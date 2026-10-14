@@ -511,3 +511,28 @@ en blanco).
 build **OK**. Las 6 pruebas de componente fijan el comportamiento observable (500 y fallo de
 red no redirigen; rol sin permiso se explica; la carga se ve; el 401 no muestra pantallas de
 error; con sesión válida se renderiza el panel).
+
+---
+
+## 24. Apéndice — Incremento V7-12 (DB-08 y DB-10)
+
+**Completado.** La integridad de los estados y de `updated_at` ya no depende de que la
+aplicación se acuerde: la base lo garantiza.
+
+- **DB-08 — 7 restricciones `CHECK ... NOT VALID`** (`donations`, `campaigns`, `pets`,
+  `volunteers`, `adoption_requests`, `community_reports` y `campaign_movements.kind`) con los
+  valores que **ya** aceptaban los esquemas de la aplicación. `NOT VALID` deja intactas las
+  filas históricas y comprueba **todas las escrituras nuevas**; el endurecimiento posterior
+  (`VALIDATE CONSTRAINT`) queda documentado dentro de la migración.
+- **DB-10 — 6 disparadores** que mantienen `updated_at` automáticamente en las seis tablas que
+  lo tienen (`donors`, `volunteer_teams`, `pets`, `community_reports`, `settings`,
+  `volunteers`).
+
+**Verificado contra PostgreSQL real:** la base **rechaza** un `status` inválido (error con el
+nombre de la restricción) y **acepta** los válidos; `updated_at` se actualiza solo al modificar
+una fila; 22 migraciones idempotentes; flujo HTTP 41/41; `api-server` 329/329; typecheck 0.
+
+**Hallazgo de la propia prueba (y corrección):** `campaigns` tiene columnas NOT NULL
+(`description`, `start_date`) que obligaron a cambiar el enfoque a un `UPDATE` sobre una fila
+sembrada, y el seed del API es asíncrono, así que la comprobación **espera a que existan
+datos** antes de medir (antes habría dado un falso verde probando en vacío).

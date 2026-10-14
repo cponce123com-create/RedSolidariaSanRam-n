@@ -478,6 +478,90 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON donations (campaign_id, status, created_at DESC);
     `,
   },
+  {
+    name: "022_status_checks_and_updated_at.sql",
+    sql: `
+      -- DB-08 + DB-10 (V7-12): integridad que la base debe garantizar por sí
+      -- misma, sin depender de que la aplicación se acuerde.
+      --
+      -- DB-08: los estados eran columnas de texto SIN restricción. Ahora cada
+      -- tabla declara sus valores válidos con un CHECK ... NOT VALID:
+      --   - NOT VALID significa que las filas YA existentes NO se revisan (una
+      --     migración no puede fallar por datos históricos), pero las escrituras
+      --     NUEVAS sí se comprueban desde este momento.
+      --   - Los valores son EXACTAMENTE los que aceptan los esquemas de la
+      --     aplicación (zod y las libs de ciclo de vida), no una lista inventada.
+      --   - Para endurecer más adelante, cuando los datos estén limpios:
+      --       SELECT status, count(*) FROM <tabla> GROUP BY status;   -- revisar
+      --       ALTER TABLE <tabla> VALIDATE CONSTRAINT <nombre>;       -- validar
+      --
+      -- \`campaigns\` incluye 'inactive' porque es un valor heredado que el panel
+      -- sigue contando como finalizada; excluirlo dejaría esas filas antiguas
+      -- imposibles de editar (cualquier UPDATE las revisa).
+
+      ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_status_check;
+      ALTER TABLE donations ADD CONSTRAINT donations_status_check
+        CHECK (status IN ('pending','approved','rejected','reconciled')) NOT VALID;
+
+      ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_status_check;
+      ALTER TABLE campaigns ADD CONSTRAINT campaigns_status_check
+        CHECK (status IN ('draft','active','paused','completed','archived','inactive')) NOT VALID;
+
+      ALTER TABLE pets DROP CONSTRAINT IF EXISTS pets_status_check;
+      ALTER TABLE pets ADD CONSTRAINT pets_status_check
+        CHECK (status IN ('available','adopted','in-process','reviewing','inactive')) NOT VALID;
+
+      ALTER TABLE volunteers DROP CONSTRAINT IF EXISTS volunteers_status_check;
+      ALTER TABLE volunteers ADD CONSTRAINT volunteers_status_check
+        CHECK (status IN ('pending','reviewing','approved','contacted','rejected')) NOT VALID;
+
+      ALTER TABLE adoption_requests DROP CONSTRAINT IF EXISTS adoption_requests_status_check;
+      ALTER TABLE adoption_requests ADD CONSTRAINT adoption_requests_status_check
+        CHECK (status IN ('pending','approved','rejected','in-process')) NOT VALID;
+
+      ALTER TABLE community_reports DROP CONSTRAINT IF EXISTS community_reports_status_check;
+      ALTER TABLE community_reports ADD CONSTRAINT community_reports_status_check
+        CHECK (status IN ('pending','reviewing','approved','rejected','converted','archived')) NOT VALID;
+
+      ALTER TABLE campaign_movements DROP CONSTRAINT IF EXISTS campaign_movements_kind_check;
+      ALTER TABLE campaign_movements ADD CONSTRAINT campaign_movements_kind_check
+        CHECK (kind IN ('ingreso','gasto')) NOT VALID;
+
+      -- DB-10: updated_at no se actualizaba solo. Con estos disparadores la base
+      -- lo mantiene aunque la aplicación lo olvide (varias rutas ya lo hacían a
+      -- mano; esto es la garantía, no una dependencia).
+      CREATE OR REPLACE FUNCTION set_updated_at() RETURNS trigger AS $fn$
+      BEGIN
+        NEW.updated_at = now();
+        RETURN NEW;
+      END;
+      $fn$ LANGUAGE plpgsql;
+
+      DROP TRIGGER IF EXISTS trg_donors_updated_at ON donors;
+      CREATE TRIGGER trg_donors_updated_at BEFORE UPDATE ON donors
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_volunteer_teams_updated_at ON volunteer_teams;
+      CREATE TRIGGER trg_volunteer_teams_updated_at BEFORE UPDATE ON volunteer_teams
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_pets_updated_at ON pets;
+      CREATE TRIGGER trg_pets_updated_at BEFORE UPDATE ON pets
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_community_reports_updated_at ON community_reports;
+      CREATE TRIGGER trg_community_reports_updated_at BEFORE UPDATE ON community_reports
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_settings_updated_at ON settings;
+      CREATE TRIGGER trg_settings_updated_at BEFORE UPDATE ON settings
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+      DROP TRIGGER IF EXISTS trg_volunteers_updated_at ON volunteers;
+      CREATE TRIGGER trg_volunteers_updated_at BEFORE UPDATE ON volunteers
+        FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+    `,
+  },
 ];
 
 /**

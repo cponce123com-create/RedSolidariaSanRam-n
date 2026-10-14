@@ -25,6 +25,7 @@ No se usan porcentajes de avance.
 | Bloqueo de 2FA por ORIGEN + cuenta (SEC-03) | **IMPLEMENTADO Y PROBADO** | `lib/two-factor-lockout.ts`, `routes/admin-2fa.ts` | `two-factor-lockout.test.mjs` (11): dos orígenes no comparten bloqueo, el escape hatch limpia todos los orígenes |
 | Gate único de `/admin` verificado por barrido (SEC-08) | **IMPLEMENTADO Y PROBADO** | `routes/index.ts`, `tests/admin-gate-sweep.test.mjs` | 22 rutas GET + 6 escrituras → 401 sin sesión; rutas públicas no bloqueadas; el login no lo intercepta el gate |
 | Errores de infraestructura no enmascarados como 400 (API-06) | **IMPLEMENTADO Y PROBADO** | 9 routers (`donations`, `news`, `campaign-evidence`, `campaign-expenses`, `testimonials`, `admin`, `campaign-images`, `campaign-updates`, `contact`, `stats`) | **13 bloques** corregidos: la validación (Zod) sigue siendo 400 y cualquier otro fallo pasa a 500. E2E: 3 cuerpos inválidos → `400 validation_error` contra el servidor real |
+| Estados validados por la propia base (DB-08) y `updated_at` automático (DB-10) | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (022) | E2E contra base real: **7/7** restricciones `CHECK ... NOT VALID`, la base **rechaza** un estado inválido y **acepta** los válidos; **6/6** disparadores y `updated_at` se actualiza solo |
 | **Verificación del libro contable (cadena de hashes)** | **IMPLEMENTADO Y PROBADO** | `lib/ledger.ts`, `routes/campaign-movements.ts` | `ledger.test.mjs`, `ledger-chain.test.mjs`; endpoints públicos `/movements/verify` y `/ledger/root` |
 | **Informe administrativo de integridad del libro** | **IMPLEMENTADO Y PROBADO** | `lib/ledger-audit.ts`, `routes/ledger-audit.ts`, `pages/admin/ledger-audit.tsx` | `ledger-audit.test.mjs` (11) + `ledger-audit-auth.test.mjs` (2) + página `/admin/libro` |
 | Restricción real del libro en producción (`RESTRICT`) | **BLOQUEADO** | `docs/migraciones/010_low_risk.sql` | **B-1**: requiere autorización (hoy la API lo impide, la base no) |
@@ -121,11 +122,11 @@ No se usan porcentajes de avance.
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
 | Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **329/329** (incluye barrido del gate, SEC-03 y filtros del panel) |
-| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **153/153** + **23/23** |
+| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **165/165** + **29/29** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
-| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–021) | Verificado contra **PostgreSQL 17.7 real**: 21 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
-| E2E con PostgreSQL real (flujo completo) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **41/41** comprobaciones en verde contra una base real: campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad y validación de cuerpos inválidos (API-06) |
+| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–022) | Verificado contra **PostgreSQL 17.7 real**: 22 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
+| E2E con PostgreSQL real (flujo completo + esquema) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **41/41** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos) **+ 5 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido) y disparadores de `updated_at` |
 | Lint automatizado | **PENDIENTE** | — | No hay script de lint en el proyecto |
 | Respaldo y recuperación documentados | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `docs/MIGRACIONES_Y_RESPALDOS.md` | Documentado; sin ensayo de restauración en este entorno |
 
