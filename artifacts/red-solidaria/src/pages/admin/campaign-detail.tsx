@@ -23,8 +23,12 @@ import {
   useCreateLeftover,
   useUpdateLeftover,
   useDeleteLeftover,
-  useCampaignTransparency
+  useCampaignTransparency,
+  useAdminCampaignBudgets,
+  useCreateBudget,
+  useDeleteBudget
 } from "@/hooks/use-phase3";
+import { buildBudget, campaignBalance } from "@/lib/budget";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,6 +145,20 @@ const leftoverSchema = z
     path: ["usedQty"],
   });
 
+/**
+ * Partida de presupuesto por categoría (Fase 2.5).
+ *
+ * Es una PREVISIÓN administrada: el gasto real vive en los gastos de la campaña
+ * (única fuente del dinero gastado) y el cruce entre ambos lo hace la función
+ * pura `buildBudget`, así que aquí no se guarda ningún saldo.
+ */
+const budgetSchema = z.object({
+  category: z.string().min(3, "Categoría requerida"),
+  plannedAmount: z.coerce.number().min(0, "El monto no puede ser negativo"),
+  notes: z.string().optional(),
+  isPublic: z.boolean().default(true),
+});
+
 export default function AdminCampaignDetail() {
   const { id } = useParams();
   const campaignId = Number(id);
@@ -179,6 +197,11 @@ export default function AdminCampaignDetail() {
   const createLeftover = useCreateLeftover(campaignId);
   const updateLeftover = useUpdateLeftover(campaignId);
   const deleteLeftover = useDeleteLeftover(campaignId);
+
+  // Presupuesto por categoría (Fase 2.5): previsión administrada por rubro.
+  const { data: budgets } = useAdminCampaignBudgets(campaignId);
+  const createBudget = useCreateBudget(campaignId);
+  const deleteBudget = useDeleteBudget(campaignId);
 
   const infoForm = useForm<z.infer<typeof infoSchema>>({
     resolver: zodResolver(infoSchema),
@@ -222,6 +245,11 @@ export default function AdminCampaignDetail() {
       notes: "",
       isPublic: true,
     },
+  });
+
+  const budgetForm = useForm<z.infer<typeof budgetSchema>>({
+    resolver: zodResolver(budgetSchema),
+    defaultValues: { category: "", plannedAmount: 0, notes: "", isPublic: true },
   });
 
   useEffect(() => {
@@ -347,7 +375,44 @@ export default function AdminCampaignDetail() {
     );
   };
 
+  const onBudgetSubmit = (values: z.infer<typeof budgetSchema>) => {
+    // `plannedAmount` es una PREVISIÓN: el gasto real lo aportan los gastos de la
+    // campaña. Si el backend rechaza la partida (categoría duplicada, monto
+    // inválido…), se muestra su mensaje real.
+    createBudget.mutate(
+      {
+        category: values.category,
+        plannedAmount: values.plannedAmount,
+        notes: values.notes,
+        isPublic: values.isPublic,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: "Partida presupuestada" });
+          budgetForm.reset({ category: "", plannedAmount: 0, notes: "", isPublic: true });
+        },
+        onError: (err) => {
+          toast({
+            title: "No se pudo guardar la partida",
+            description: errorMessage(err),
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  };
+
   if (isLoading || !campaign) return <div className="p-8 flex justify-center"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div></div>;
+
+  // Presupuesto por categoría y saldo (Fase 2.5) con las MISMAS funciones puras
+  // que usa el sitio público: el gasto sale de los gastos de la campaña, nunca
+  // de una copia guardada en la partida.
+  const budgetOverview = buildBudget(budgets, expenses);
+  const balance = campaignBalance(
+    campaign.raised ?? 0,
+    budgetOverview.totals.spent,
+    campaign.goal,
+  );
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto" data-testid="admin-campaign-detail">
@@ -775,6 +840,146 @@ export default function AdminCampaignDetail() {
                 )}
               </TableBody>
             </Table>
+          </div>
+
+          {/* Presupuesto por categoría (Fase 2.5): previsión administrada frente a
+              los gastos reales. El gasto NO se copia aquí: se cruza por categoría
+              con `buildBudget`, la misma función pura que usa el sitio público. */}
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-sm" data-testid="budget-panel">
+            <h3 className="font-display font-bold text-xl mb-2">Presupuesto por categoría</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Cuánto teníamos previsto por rubro frente a los gastos registrados. Es una previsión:
+              el dinero gastado sale siempre de los gastos de esta campaña, así que no hay dos
+              cifras posibles.
+            </p>
+
+            <Form {...budgetForm}>
+              <form onSubmit={budgetForm.handleSubmit(onBudgetSubmit)} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div className="md:col-span-6">
+                    <FormField control={budgetForm.control} name="category" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Categoría</FormLabel>
+                        <FormControl><Input placeholder="alimentación, transporte, materiales..." className="bg-secondary/30 rounded-xl" {...field} /></FormControl>
+                        <p className="text-xs text-muted-foreground">Debe coincidir con la categoría de los gastos para poder cruzarlos.</p>
+                        <FormMessage/>
+                      </FormItem>
+                    )} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <FormField control={budgetForm.control} name="plannedAmount" render={({ field }) => (
+                      <FormItem><FormLabel>Monto previsto (S/)</FormLabel><FormControl><Input type="number" step="0.01" min="0" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    )} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <FormField control={budgetForm.control} name="notes" render={({ field }) => (
+                      <FormItem><FormLabel>Notas (opcional)</FormLabel><FormControl><Input placeholder="Detalle de la partida" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
+                    )} />
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-secondary/30 rounded-xl p-4 border border-border">
+                  <FormField control={budgetForm.control} name="isPublic" render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 space-y-0">
+                      <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                      <div className="space-y-0.5"><FormLabel className="cursor-pointer">Visible en el sitio público</FormLabel><p className="text-xs text-muted-foreground">Se publica en la sección de presupuesto del evento</p></div>
+                    </FormItem>
+                  )} />
+                  <Button type="submit" disabled={createBudget.isPending} className="rounded-xl px-8 shadow-md hover-elevate w-full md:w-auto">
+                    <Save className="w-4 h-4 mr-2" /> Guardar partida
+                  </Button>
+                </div>
+              </form>
+            </Form>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Previsto</p>
+                <p className="text-lg font-display font-bold">S/ {budgetOverview.totals.planned.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Gastado</p>
+                <p className="text-lg font-display font-bold">S/ {budgetOverview.totals.spent.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</p>
+              </div>
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Saldo previsto</p>
+                <p className={`text-lg font-display font-bold ${budgetOverview.totals.remaining < 0 ? "text-destructive" : ""}`}>
+                  S/ {budgetOverview.totals.remaining.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div className="bg-secondary/30 rounded-xl p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Saldo general</p>
+                <p className={`text-lg font-display font-bold ${balance.balance < 0 ? "text-destructive" : ""}`}>
+                  S/ {balance.balance.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {balance.goalProgress.hasTarget
+                    ? `Recaudado S/ ${balance.raised.toLocaleString("es-PE")} · ${balance.goalProgress.percent}% de la meta`
+                    : "Sin meta de recaudación definida"}
+                </p>
+              </div>
+            </div>
+
+            {budgetOverview.totals.exceededRows > 0 && (
+              <p className="text-sm text-destructive mt-4">
+                {budgetOverview.totals.exceededRows} partida(s) excedida(s): el gasto supera lo previsto.
+              </p>
+            )}
+
+            <div className="mt-6" data-testid="budget-table">
+              {budgetOverview.rows.length > 0 ? (
+                <Table>
+                  <TableHeader className="bg-secondary/50">
+                    <TableRow>
+                      <TableHead>Categoría</TableHead>
+                      <TableHead>Previsto</TableHead>
+                      <TableHead>Gastado</TableHead>
+                      <TableHead>Saldo</TableHead>
+                      <TableHead>Avance</TableHead>
+                      <TableHead className="text-center">Visibilidad</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {budgetOverview.rows.map(row => {
+                      const rowId = row.id;
+                      return (
+                        <TableRow key={row.key}>
+                          <TableCell className="font-medium">
+                            {row.category}
+                            {row.notes ? <p className="text-xs text-muted-foreground font-normal">{row.notes}</p> : null}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">S/ {row.planned.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</TableCell>
+                          <TableCell className="whitespace-nowrap">S/ {row.spent.toLocaleString("es-PE", { maximumFractionDigits: 2 })}</TableCell>
+                          <TableCell className={`font-bold whitespace-nowrap ${row.remaining < 0 ? "text-destructive" : "text-primary"}`}>
+                            S/ {row.remaining.toLocaleString("es-PE", { maximumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {row.progress.hasTarget ? `${row.progress.percent}%` : "Sin partida"}
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-muted-foreground">
+                            {rowId === undefined ? "—" : row.isPublic ? "Público" : "Oculto"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {rowId === undefined ? (
+                              <span className="text-xs text-muted-foreground">Presupuesta esta categoría</span>
+                            ) : (
+                              <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => { if(confirm(`¿Eliminar la partida de «${row.category}»? Los gastos registrados NO se borran.`)) deleteBudget.mutate(rowId) }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p className="py-8 text-center text-muted-foreground">
+                  Aún no hay partidas de presupuesto. Registra cuánto prevéis por categoría para poder compararlo con los gastos reales.
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}

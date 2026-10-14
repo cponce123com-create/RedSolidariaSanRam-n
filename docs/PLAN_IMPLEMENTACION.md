@@ -52,19 +52,15 @@ Correcciones:
 - **Claves separadas admin/público** (RC-S9): revisado; el riesgo queda neutralizado por `private, no-store` con sesión y la invalidación por entidad. **Decisión documentada, sin cambios.**
 - **Pruebas de integración con base real** (borrado `204`, `409` por dependencias, limpieza del protagonista al archivar): requieren una base PostgreSQL accesible; en este contenedor las suites usan un `DATABASE_URL` ficticio, así que se ejecutan en el entorno de despliegue. **Trasladado al incremento 16.**
 
-## Incremento 3 — Fase 2: ChocoFest 2026 como campaña principal 🟡 PARCIAL (3A completado)
+## Incremento 3 — Fase 2: ChocoFest 2026 como campaña principal 🟡 CASI COMPLETA (3A y 3B cerrados)
 
-**3A — cerrado:** portada verificada (identidad → bloque protagonista, solo si está publicada y vigente), modelo de bienes e insumos del evento con **metas por producto** y **flujo recibido/usado** (migración 015 aditiva, sin una tabla por producto), panel de registro con validación cruzada, inventario público agrupado por producto con avance de meta y estado «sin meta definida» cuando no hay meta aprobada. Detalle en `docs/ESTADO_IMPLEMENTACION.md` §5.
+**3A — cerrado:** portada verificada (identidad → bloque protagonista, solo si está publicada y vigente), modelo de bienes e insumos del evento con **metas por producto** y **flujo recibido/usado** (migración 015 aditiva, sin una tabla por producto), panel de registro con validación cruzada, inventario público agrupado por producto con avance de meta y estado «sin meta definida» cuando no hay meta aprobada.
 
-**3B — pendiente:**
-- Presupuesto por categoría (meta, donaciones verificadas, gastos aprobados, saldo y avance).
-- Programa de actividades con responsables (hoy el cronograma son novedades).
-- Estado de organización calculado con datos reales (el checklist tiene un punto fijo en `false`).
-- Regalos asociados a su donante y a la evidencia de entrega.
-- Composición de canastas y meta de canastas preparadas/entregadas.
-- Información del evento editable ampliada: fecha, objetivos, galería, responsables.
+**3B — cerrado:** **presupuesto por categoría** (migración 016 aditiva): previsión administrada por rubro cruzada con los gastos reales mediante la función pura `buildBudget`, con saldo por rubro, saldo general, avance frente a la meta y una fila «Sin presupuesto asignado» para que ningún gasto quede oculto. Panel dentro de la pestaña de gastos y sección pública de presupuesto. Detalle en `docs/ESTADO_IMPLEMENTACION.md` §5 y §6.
 
-**Regla de datos:** las metas se cargan desde el panel cuando la organización las aprueba. No se introduce ninguna cifra inventada.
+**3C — pendiente:** programa de actividades con responsables; estado de organización calculado con datos reales; regalos ligados a su donante y a la evidencia de entrega; composición de canastas; información del evento ampliada (objetivos, fecha, responsables).
+
+**Regla de datos:** las metas y los montos se cargan desde el panel cuando la organización los aprueba. No se introduce ninguna cifra inventada.
 
 ## Incremento 4 — Fase 3: sistema profesional de donantes
 

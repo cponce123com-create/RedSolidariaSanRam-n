@@ -161,15 +161,50 @@ artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts   etiquetas nuevas
 
 `api-server` **272/272** · `red-solidaria` **97/97** node:test (+7) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
 
-## 6. Próximos pasos (incremento 3B — Fase 2, resto)
+## 6. Incremento 3B (Fase 2, cierre) — cerrado
 
-1. **Presupuesto por categoría:** meta de recaudación por categoría, donaciones verificadas, gastos aprobados, saldo y avance (reutiliza `campaign_expenses.category` y `campaigns.goal`).
-2. **Programa de actividades y responsables:** hoy el «cronograma» son novedades; falta un programa estructurado con responsables por actividad.
-3. **Estado de organización real:** el checklist de preparación del panel tiene un punto (`cronograma`) fijado en `false`; debe calcularse con datos reales.
-4. **Regalos con donante y evidencia de entrega:** asociar cada bien a su donante y a la evidencia de entrega (reutiliza `donations` en especie y `campaign_evidence`).
-5. **Canastas:** composición por canasta y meta de canastas preparadas/entregadas.
+### 6.1 Presupuesto por categoría, saldo y avance
 
-**Dependencia de datos:** las **metas** (niños, raciones, juguetes, canastas, presupuesto) las carga la organización desde el panel. No se ha introducido ninguna cifra inventada: mientras no existan, la interfaz muestra «sin meta definida» y el avance se calcula solo con lo realmente registrado.
+**Migración 016 (aditiva).** Crea `campaign_budgets` (campaña, categoría, monto previsto, notas, visibilidad) con índice único `(campaign_id, lower(category))`: una sola partida por categoría y campaña, sin duplicados. No modifica ninguna tabla existente.
+
+- **Una sola fuente de verdad por cifra:** lo previsto vive en `campaign_budgets`, el dinero gastado sigue viviendo **solo** en `campaign_expenses`, y el saldo se **deriva** (nunca se guarda) con la función pura `buildBudget` (`src/lib/budget.ts`).
+- **Cruce tolerante:** la categoría se compara ignorando mayúsculas, acentos y espacios (`categoryKey`), y todo gasto cuya categoría no tenga partida aparece en la fila **«Sin presupuesto asignado»**: ningún gasto queda oculto ni se descuadra el total.
+- **Saldo general y avance** (`campaignBalance`): recaudado confirmado − gastado, y avance frente a la meta de recaudación reutilizando `goalProgress`. Si no hay meta aprobada, la interfaz muestra «Sin meta de recaudación definida» en lugar de un porcentaje inventado.
+- **Panel:** dentro de la pestaña «Gastos» (mismo asunto, sin pestaña nueva) hay ahora un bloque de presupuesto con formulario de partidas, tarjetas de previsto/gastado/saldo previsto/saldo general, aviso de partidas excedidas y tabla con previsto, gastado, saldo, avance y visibilidad. Al crear una partida duplicada el backend responde `409` con el motivo y el panel lo muestra.
+- **Sitio público:** sección «Presupuesto y gastos» con previsión, gasto **publicado** (el sitio nunca muestra gastos privados), saldo por rubro y saldo general; los rubros sin partida se rotulan como tales.
+- **API:** `GET /campaigns/:id/budgets` (público, solo `is_public`), `GET /admin/campaigns/:id/budgets`, `POST`, `PUT` (con merge) y `DELETE`, con validación de mensajes accionables y `409` por categoría duplicada.
+
+### 6.2 Archivos del incremento 3B
+
+```
+lib/db/src/migrate.ts                                  migración 016 (aditiva)
+lib/db/src/schema/campaign-budgets.ts                  tabla de presupuesto por categoría
+lib/db/src/schema/index.ts                             export del esquema
+artifacts/api-server/src/routes/campaign-budgets.ts     CRUD con validación y 409 por duplicado
+artifacts/api-server/src/routes/index.ts                registro del router
+artifacts/api-server/build-tests.mjs                    router añadido a las pruebas
+artifacts/api-server/tests/campaign-budgets-auth.test.mjs  +7 pruebas (auth, gate, validación)
+artifacts/red-solidaria/src/lib/budget.ts               buildBudget, categoryKey, campaignBalance
+artifacts/red-solidaria/tests/budget.test.mjs           +7 pruebas
+artifacts/red-solidaria/src/hooks/use-phase3.ts         hooks de presupuesto (panel y público)
+artifacts/red-solidaria/src/pages/admin/campaign-detail.tsx  bloque de presupuesto en la pestaña de gastos
+artifacts/red-solidaria/src/pages/chocofest-2026.tsx    sección pública de presupuesto
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts    8 etiquetas nuevas
+```
+
+### 6.3 Verificación del incremento 3B
+
+`api-server` **279/279** (+7) · `red-solidaria` **104/104** node:test (+7) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
+
+### 6.4 Lo que queda de la Fase 2 (incremento 3C)
+
+1. **Programa de actividades con responsables** (hoy el «cronograma» son novedades).
+2. **Estado de organización real:** el checklist del panel tiene un punto (`cronograma`) fijado en `false`; debe calcularse con datos reales.
+3. **Regalos asociados a su donante y a la evidencia de entrega** (reutiliza `donations` en especie y `campaign_evidence`).
+4. **Composición de canastas** (productos por canasta) y meta de canastas preparadas/entregadas.
+5. **Información del evento ampliada:** objetivos, fecha y responsables editables desde el panel.
+
+**Dependencia de datos:** las cifras (metas de niños, raciones, juguetes, canastas y montos presupuestados) las carga la organización desde el panel. No se ha introducido ninguna cifra inventada: mientras no existan, la interfaz muestra «sin meta definida» y el avance se calcula solo con lo realmente registrado.
 
 ## 7. Riesgos y bloqueos
 

@@ -1241,6 +1241,15 @@ export const es = {
     itemRemaining: "Disponible",
     itemGoal: "Meta",
     itemNoGoal: "Sin meta definida todavía.",
+    sectionBudget: "Presupuesto y gastos",
+    budgetPlanned: "Presupuestado",
+    budgetSpent: "Gastado (publicado)",
+    budgetRemaining: "Saldo del presupuesto",
+    budgetUnbudgeted: "Sin presupuesto asignado",
+    budgetEmpty: "Aún no se ha publicado el presupuesto por categorías.",
+    budgetNote:
+      "El presupuesto es una previsión por rubro; los gastos publicados son la única fuente del dinero gastado y se rinden en el libro contable.",
+    balanceLabel: "Saldo general",
     inventoryNote:
       "El inventario incluye chocolatada y raciones, juguetes y canastas de víveres. La valorización estimada es informativa y no se suma al dinero recaudado.",
     resultsCountLabel: "Evidencias publicadas",
