@@ -40,6 +40,11 @@ import {
   resolveEventDetails,
 } from "@/lib/chocofest";
 import { usePublicSettings } from "@/hooks/use-public-settings";
+import {
+  formatItemAmount,
+  formatQuantity,
+  summarizeInventory,
+} from "@/lib/inventory";
 
 /** Encabezado de sección homogéneo para toda la página. */
 function Section({
@@ -158,6 +163,10 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   // configurado se usan los textos de trabajo marcados como provisionales.
   const { data: settings } = usePublicSettings();
   const details = resolveEventDetails(settings);
+  // Inventario y bienes (chocolatada, juguetes, canastas de víveres): reutiliza
+  // los "sobrantes" públicos de la campaña, ya incluidos en la transparencia.
+  const inventory = transparency?.publicLeftovers ?? [];
+  const inventorySummary = summarizeInventory(inventory);
 
   const goal = campaign.goal || 0;
   const raised = campaign.raised || 0;
@@ -349,10 +358,46 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
               )}
             </Section>
 
-            {/* 6. Donaciones en especie */}
-            <Section id="especie" icon={<Gift className="w-5 h-5" />} title={t("chocofest.sectionInKind")}>
-              <EmptyBox text={t("chocofest.emptyInKind")} />
-              <p className="text-xs text-muted-foreground mt-3">{t("chocofest.inKindNote")}</p>
+            {/* 6. Inventario y donaciones en especie */}
+            <Section id="especie" icon={<Gift className="w-5 h-5" />} title={t("chocofest.sectionInventory")}>
+              {inventory.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-4 mb-4">
+                    <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.inventoryLinesLabel")}
+                      </div>
+                      <div className="font-bold text-foreground">{inventorySummary.lines}</div>
+                    </div>
+                    <div className="bg-secondary/50 px-4 py-2 rounded-xl border border-border/50">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.inventoryUnitsLabel")}
+                      </div>
+                      <div className="font-bold text-foreground">
+                        {formatQuantity(inventorySummary.totalQuantity)}
+                      </div>
+                    </div>
+                  </div>
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {inventory.map((item) => (
+                      <li key={item.id} className="bg-card border border-border rounded-2xl p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-semibold text-foreground">{item.item}</p>
+                          <span className="font-bold text-primary whitespace-nowrap">
+                            {formatItemAmount(item)}
+                          </span>
+                        </div>
+                        {item.notes ? (
+                          <p className="text-xs text-muted-foreground mt-1">{item.notes}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <EmptyBox text={t("chocofest.emptyInventory")} />
+              )}
+              <p className="text-xs text-muted-foreground mt-3">{t("chocofest.inventoryNote")}</p>
             </Section>
 
             {/* 7. Voluntariado */}

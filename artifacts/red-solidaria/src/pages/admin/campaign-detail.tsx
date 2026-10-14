@@ -332,7 +332,7 @@ export default function AdminCampaignDetail() {
             {tab === "updates" && <><MessageSquarePlus className="w-4 h-4"/> Novedades</>}
             {tab === "gastos" && <><Receipt className="w-4 h-4"/> Gastos (F3)</>}
             {tab === "evidencias" && <><Camera className="w-4 h-4"/> Evidencias (F3)</>}
-            {tab === "sobrantes" && <><PackageOpen className="w-4 h-4"/> Sobrantes</>}
+            {tab === "sobrantes" && <><PackageOpen className="w-4 h-4"/> Inventario y bienes</>}
           </button>
         ))}
       </div>

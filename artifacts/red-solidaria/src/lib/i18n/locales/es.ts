@@ -1228,6 +1228,12 @@ export const es = {
     eventPlaceLabel: "Lugar del evento",
     eventScheduleLabel: "Horario",
     eventDateLabel: "Fecha del evento",
+    sectionInventory: "Inventario y donaciones en especie",
+    inventoryLinesLabel: "Líneas de inventario",
+    inventoryUnitsLabel: "Unidades registradas",
+    emptyInventory: "Aún no se ha publicado el inventario de la campaña.",
+    inventoryNote:
+      "El inventario incluye chocolatada y raciones, juguetes y canastas de víveres. La valorización estimada es informativa y no se suma al dinero recaudado.",
   },
   adminChocofest: {
     title: "ChocoFest 2026",

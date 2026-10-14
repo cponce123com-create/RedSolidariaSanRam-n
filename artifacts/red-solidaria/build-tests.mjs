@@ -10,6 +10,7 @@ await build({
   entryPoints: [
     "./src/lib/campaign-urgency.ts",
     "./src/lib/chocofest.ts",
+    "./src/lib/inventory.ts",
     "./src/lib/admin-access.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",
