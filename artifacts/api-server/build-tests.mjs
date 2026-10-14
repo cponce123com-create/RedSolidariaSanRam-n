@@ -34,6 +34,7 @@ await build({
     "./src/lib/csp.ts",
     "./src/lib/ledger.ts",
     "./src/lib/ledger-audit.ts",
+    "./src/lib/ledger-regularization.ts",
     "./src/lib/donation-reconcile.ts",
     "./src/lib/pg-errors.ts",
     "./src/lib/campaign-lifecycle.ts",
