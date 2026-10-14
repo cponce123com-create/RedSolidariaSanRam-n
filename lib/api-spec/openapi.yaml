@@ -985,6 +985,9 @@ components:
         status:
           type: string
           enum: [pending, approved, reconciled, rejected]
+        collaborationType:
+          type: string
+          enum: [dinero, productos, servicios, logistica]
         adminNote:
           type: string
           nullable: true
@@ -997,6 +1000,7 @@ components:
         - email
         - amount
         - paymentMethod
+        - collaborationType
         - anonymous
         - status
         - createdAt
@@ -1018,8 +1022,12 @@ components:
           nullable: true
         amount:
           type: number
+        collaborationType:
+          type: string
+          enum: [dinero, productos, servicios, logistica]
         paymentMethod:
           type: string
+          nullable: true
           enum: [yape, plin, transfer, card, cash, other]
         message:
           type: string
@@ -1030,7 +1038,7 @@ components:
           type: boolean
         donorType:
           type: string
-          enum: [individual, familia, empresa, anonimo]
+          enum: [individual, familia, empresa, organizacion, anonimo]
         receiptUrl:
           type: string
           nullable: true
@@ -1051,7 +1059,6 @@ components:
         - lastName
         - email
         - amount
-        - paymentMethod
         - anonymous
 
     CampaignDonor:

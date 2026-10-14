@@ -140,7 +140,9 @@ router.get("/campaigns", async (req, res) => {
     const rows = await db
       .select({
         campaign: campaignsTable,
-        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
+        // Una donación en especie (valor estimado 0) no es un aporte de dinero:
+        // no cuenta como donante en las cifras de recaudación.
+        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} in ('approved','reconciled') and ${donationsTable.amount} > 0)::int`,
         raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled')), 0)::float8`,
       })
       .from(campaignsTable)
@@ -173,7 +175,9 @@ router.get("/campaigns/:id", async (req, res) => {
     const [row] = await db
       .select({
         campaign: campaignsTable,
-        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
+        // Una donación en especie (valor estimado 0) no es un aporte de dinero:
+        // no cuenta como donante en las cifras de recaudación.
+        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} in ('approved','reconciled') and ${donationsTable.amount} > 0)::int`,
         raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled')), 0)::float8`,
       })
       .from(campaignsTable)
@@ -214,6 +218,9 @@ router.get("/campaigns/:id/donors", async (req, res) => {
       // Un dinero conciliado sigue siendo dinero confirmado: la lista pública
       // de donantes debe incluir AMBOS estados.
       inArray(donationsTable.status, [...CONFIRMED_DONATION_STATUSES]),
+      // Es la lista de aportes de DINERO: una donación en especie (valor 0) no
+      // aparece como "S/ 0" ni se cuenta en el total de donantes.
+      sql`${donationsTable.amount} > 0`,
     );
 
     // count(*)::int → pg devuelve int4 como number (count nativo viene como string)

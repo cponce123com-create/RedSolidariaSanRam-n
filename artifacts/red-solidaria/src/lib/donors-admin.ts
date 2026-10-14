@@ -10,19 +10,74 @@ import { invalidateEntities } from "@/lib/query-invalidation";
  * presentación y la invalidación de caché.
  */
 
-export type DonorType = "individual" | "familia" | "empresa" | "anonimo";
+export type DonorType = "individual" | "familia" | "empresa" | "organizacion" | "anonimo";
 
-export const DONOR_TYPES: DonorType[] = ["individual", "familia", "empresa", "anonimo"];
+export const DONOR_TYPES: DonorType[] = [
+  "individual",
+  "familia",
+  "empresa",
+  "organizacion",
+  "anonimo",
+];
 
 export const DONOR_TYPE_LABEL: Record<DonorType, string> = {
   individual: "Persona",
   familia: "Familia",
   empresa: "Empresa",
+  organizacion: "Organización",
   anonimo: "Anónimo",
 };
 
 export function donorTypeLabel(type: string): string {
   return DONOR_TYPE_LABEL[type as DonorType] ?? type;
+}
+
+// ─── Tipos de colaboración (espejo de la API) ────────────────────────────────
+
+/**
+ * QUÉ aporta el donante. Solo `dinero` implica monto mínimo y comprobante de
+ * pago: una donación en especie (productos, servicios, apoyo logístico) se
+ * registra con `paymentMethod: "other"` y un valor estimado que puede ser 0.
+ * Contrato espejo de `artifacts/api-server/src/lib/donor-identity.ts`.
+ */
+export const COLLABORATION_TYPES = ["dinero", "productos", "servicios", "logistica"] as const;
+export type CollaborationType = (typeof COLLABORATION_TYPES)[number];
+
+export const DEFAULT_COLLABORATION_TYPE: CollaborationType = "dinero";
+
+export function isCollaborationType(value: unknown): value is CollaborationType {
+  return (
+    typeof value === "string" &&
+    (COLLABORATION_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Tipo por defecto. Un valor ausente o desconocido se interpreta como dinero:
+ * las donaciones previas al incremento eran dinero y no se reinterpretan.
+ */
+export function normalizeCollaborationType(value: unknown): CollaborationType {
+  return isCollaborationType(value) ? value : DEFAULT_COLLABORATION_TYPE;
+}
+
+export const COLLABORATION_TYPE_LABEL: Record<CollaborationType, string> = {
+  dinero: "Dinero",
+  productos: "Productos",
+  servicios: "Servicios",
+  logistica: "Apoyo logístico",
+};
+
+/** Etiqueta legible del tipo de colaboración; valor desconocido → tal cual. */
+export function collaborationTypeLabel(type: string): string {
+  return COLLABORATION_TYPE_LABEL[type as CollaborationType] ?? type;
+}
+
+/**
+ * Solo una colaboración de dinero exige monto mínimo y método de pago.
+ * Tolerante con filas antiguas sin el campo: ausente/null se considera dinero.
+ */
+export function isMoneyCollaboration(type: unknown): boolean {
+  return normalizeCollaborationType(type) === "dinero";
 }
 
 export const DONATION_STATUS_LABEL: Record<string, string> = {
@@ -74,6 +129,8 @@ export interface DonorDonation {
   lastName: string;
   amount: number;
   paymentMethod: string;
+  /** Tipo de colaboración declarado (la API siempre lo devuelve). */
+  collaborationType: string;
   status: string;
   anonymous: boolean;
   createdAt: string | null;

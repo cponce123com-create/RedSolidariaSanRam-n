@@ -146,6 +146,12 @@ export const GetCampaignDonationsResponseItem = zod.object({
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
+  collaborationType: zod.enum([
+    "dinero",
+    "productos",
+    "servicios",
+    "logistica",
+  ]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -259,19 +265,17 @@ export const CreateDonationBody = zod.object({
   email: zod.string(),
   phone: zod.string().nullish(),
   amount: zod.number(),
-  paymentMethod: zod.enum([
-    "yape",
-    "plin",
-    "transfer",
-    "card",
-    "cash",
-    "other",
-  ]),
+  collaborationType: zod
+    .enum(["dinero", "productos", "servicios", "logistica"])
+    .optional(),
+  paymentMethod: zod
+    .enum(["yape", "plin", "transfer", "card", "cash", "other"])
+    .nullish(),
   message: zod.string().nullish(),
   anonymous: zod.boolean(),
   publicProof: zod.boolean().optional(),
   donorType: zod
-    .enum(["individual", "familia", "empresa", "anonimo"])
+    .enum(["individual", "familia", "empresa", "organizacion", "anonimo"])
     .optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
@@ -306,6 +310,12 @@ export const GetDonationsResponseItem = zod.object({
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
+  collaborationType: zod.enum([
+    "dinero",
+    "productos",
+    "servicios",
+    "logistica",
+  ]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -334,6 +344,12 @@ export const GetDonationResponse = zod.object({
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
+  collaborationType: zod.enum([
+    "dinero",
+    "productos",
+    "servicios",
+    "logistica",
+  ]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -366,6 +382,12 @@ export const UpdateDonationStatusResponse = zod.object({
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
+  collaborationType: zod.enum([
+    "dinero",
+    "productos",
+    "servicios",
+    "logistica",
+  ]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });

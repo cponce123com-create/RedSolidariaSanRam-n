@@ -13,5 +13,6 @@ export const CreateDonationInputDonorType = {
   individual: "individual",
   familia: "familia",
   empresa: "empresa",
+  organizacion: "organizacion",
   anonimo: "anonimo",
 } as const;

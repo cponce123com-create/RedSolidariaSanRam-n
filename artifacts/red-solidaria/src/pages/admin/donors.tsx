@@ -96,7 +96,7 @@ export default function AdminDonors() {
         <div>
           <h1 className="text-3xl font-bold font-display">Donantes</h1>
           <p className="text-muted-foreground mt-1">
-            Perfiles de personas, familias y empresas. Información privada del panel.
+            Perfiles de personas, familias, empresas y organizaciones. Información privada del panel.
           </p>
         </div>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>

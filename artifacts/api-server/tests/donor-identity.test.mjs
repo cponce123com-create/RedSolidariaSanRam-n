@@ -3,24 +3,37 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
+  COLLABORATION_TYPES,
+  DEFAULT_COLLABORATION_TYPE,
   DONOR_TYPES,
   DONATION_STATUSES,
   canReconcile,
+  collaborationRequiresAmount,
   donationDedupKey,
   donorTypeLabel,
   findDuplicateGroups,
+  isCollaborationType,
   isDonationStatus,
   isDonorType,
+  normalizeCollaborationType,
   normalizeEmail,
   reconcileBlockReason,
 } = await import("./dist/lib/donor-identity.mjs");
 
-test("tipos de donante: se reconocen los cuatro del modelo", () => {
-  assert.deepEqual([...DONOR_TYPES], ["individual", "familia", "empresa", "anonimo"]);
+test("tipos de donante: se reconocen los cinco del modelo", () => {
+  assert.deepEqual([...DONOR_TYPES], [
+    "individual",
+    "familia",
+    "empresa",
+    "organizacion",
+    "anonimo",
+  ]);
   for (const t of DONOR_TYPES) assert.equal(isDonorType(t), true);
+  assert.equal(isDonorType("organizacion"), true);
   assert.equal(isDonorType("ong"), false);
   assert.equal(isDonorType(null), false);
   assert.equal(donorTypeLabel("familia"), "Familia");
+  assert.equal(donorTypeLabel("organizacion"), "Organización");
   assert.equal(donorTypeLabel("otro"), "otro");
 });
 
@@ -107,4 +120,32 @@ test("findDuplicateGroups: sin duplicados devuelve lista vacía", () => {
     ]),
     [],
   );
+});
+
+test("tipos de colaboración: dinero/productos/servicios/logística", () => {
+  assert.deepEqual(
+    [...COLLABORATION_TYPES],
+    ["dinero", "productos", "servicios", "logistica"],
+  );
+  for (const t of COLLABORATION_TYPES) assert.equal(isCollaborationType(t), true);
+  assert.equal(isCollaborationType("trueque"), false);
+  assert.equal(isCollaborationType(null), false);
+  assert.equal(isCollaborationType(undefined), false);
+  assert.equal(DEFAULT_COLLABORATION_TYPE, "dinero");
+  // Valor desconocido o ausente → dinero (nunca deja sin monto/comprobante a
+  // una donación que sí lo exigía).
+  assert.equal(normalizeCollaborationType("productos"), "productos");
+  assert.equal(normalizeCollaborationType("trueque"), "dinero");
+  assert.equal(normalizeCollaborationType(undefined), "dinero");
+  assert.equal(normalizeCollaborationType(null), "dinero");
+  assert.equal(normalizeCollaborationType(42), "dinero");
+  // Solo el dinero exige monto (y comprobante de pago).
+  assert.equal(collaborationRequiresAmount("dinero"), true);
+  assert.equal(collaborationRequiresAmount("productos"), false);
+  assert.equal(collaborationRequiresAmount("servicios"), false);
+  assert.equal(collaborationRequiresAmount("logistica"), false);
+  // Un valor desconocido o ausente se normaliza a "dinero" (default seguro),
+  // así que también exige monto.
+  assert.equal(collaborationRequiresAmount("trueque"), true);
+  assert.equal(collaborationRequiresAmount(undefined), true);
 });

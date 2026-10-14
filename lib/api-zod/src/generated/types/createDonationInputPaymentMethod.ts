@@ -7,7 +7,8 @@
  */
 
 export type CreateDonationInputPaymentMethod =
-  (typeof CreateDonationInputPaymentMethod)[keyof typeof CreateDonationInputPaymentMethod];
+  | (typeof CreateDonationInputPaymentMethod)[keyof typeof CreateDonationInputPaymentMethod]
+  | null;
 
 export const CreateDonationInputPaymentMethod = {
   yape: "yape",

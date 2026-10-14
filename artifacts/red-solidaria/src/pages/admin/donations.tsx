@@ -19,6 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
 import { useReconcileDonation } from "@/hooks/use-donors-admin";
 import { invalidateDonationQueries } from "@/lib/query-invalidation";
+import { collaborationTypeLabel, isMoneyCollaboration } from "@/lib/donors-admin";
 
 type FilterStatus = "all" | "pending" | "approved" | "rejected" | "reconciled";
 
@@ -47,7 +48,7 @@ export default function AdminDonations() {
     apiFilterStatus ? { status: apiFilterStatus } : undefined
   );
 
-  // Búsqueda local por donante, email, campaña o método
+  // Búsqueda local por donante, email, campaña, método o tipo de colaboración
   const query = search.trim().toLowerCase();
   const filteredDonations = (donations ?? []).filter((d) => {
     if (!query) return true;
@@ -56,7 +57,10 @@ export default function AdminDonations() {
       donor.includes(query) ||
       (d.email ?? "").toLowerCase().includes(query) ||
       (d.campaignTitle ?? "").toLowerCase().includes(query) ||
-      (d.paymentMethod ?? "").toLowerCase().includes(query)
+      (d.paymentMethod ?? "").toLowerCase().includes(query) ||
+      (d.collaborationType ? collaborationTypeLabel(d.collaborationType) : "")
+        .toLowerCase()
+        .includes(query)
     );
   });
 
@@ -363,8 +367,27 @@ export default function AdminDonations() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="font-bold text-foreground">S/ {Number(d.amount ?? 0).toLocaleString()}</div>
-                    <Badge variant="outline" className="text-[10px] mt-1 uppercase px-1.5">{d.paymentMethod}</Badge>
+                    {/* En especie no hay importe cobrado: se muestra el valor
+                        estimado (si lo declararon) o que no hay ninguno. */}
+                    {isMoneyCollaboration(d.collaborationType) ? (
+                      <div className="font-bold text-foreground">
+                        S/ {Number(d.amount ?? 0).toLocaleString()}
+                      </div>
+                    ) : Number(d.amount ?? 0) > 0 ? (
+                      <div className="font-bold text-foreground">
+                        S/ {Number(d.amount).toLocaleString()}{" "}
+                        <span className="text-xs font-normal text-muted-foreground">est.</span>
+                      </div>
+                    ) : (
+                      <div className="font-medium text-muted-foreground">Sin valor estimado</div>
+                    )}
+                    <Badge variant="outline" className="text-[10px] mt-1 px-1.5">
+                      {isMoneyCollaboration(d.collaborationType) ? (
+                        <span className="uppercase">{d.paymentMethod}</span>
+                      ) : (
+                        collaborationTypeLabel(d.collaborationType)
+                      )}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1 items-start">

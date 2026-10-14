@@ -12,6 +12,10 @@ export const donationsTable = pgTable("donations", {
   phone: text("phone"),
   amount: money("amount").notNull(),
   paymentMethod: text("payment_method").notNull(),
+  // Fase 3: QUÉ aporta el donante (dinero, productos, servicios, apoyo
+  // logístico). Solo `dinero` tiene método de pago y comprobante; una donación
+  // en especie se registra con `other` y un valor estimado (puede ser 0).
+  collaborationType: text("collaboration_type").notNull().default("dinero"),
   message: text("message"),
   anonymous: boolean("anonymous").notNull().default(false),
   // El donante decide si su comprobante se muestra al público

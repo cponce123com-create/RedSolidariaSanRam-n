@@ -5,6 +5,7 @@
  * Red Solidaria San Ramón API
  * OpenAPI spec version: 0.2.0
  */
+import type { DonationCollaborationType } from "./donationCollaborationType";
 import type { DonationStatus } from "./donationStatus";
 
 export interface Donation {
@@ -23,6 +24,7 @@ export interface Donation {
   receiptUrl?: string | null;
   receiptNote?: string | null;
   status: DonationStatus;
+  collaborationType: DonationCollaborationType;
   adminNote?: string | null;
   createdAt: string;
 }

@@ -7,7 +7,11 @@ import {
   donorsTable,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
-import { isDonorType, normalizeEmail } from "../lib/donor-identity";
+import {
+  isDonorType,
+  normalizeCollaborationType,
+  normalizeEmail,
+} from "../lib/donor-identity";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
 import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
@@ -157,7 +161,11 @@ router.post("/donations", donationLimiter, async (req, res) => {
           email: data.email,
           phone: data.phone ?? null,
           amount: data.amount,
-          paymentMethod: data.paymentMethod,
+          // Una donación en especie no tiene método de pago; "other" es la
+          // convención ya usada por las donaciones históricas en especie
+          // (ver src/lib/chocofest-2025-data.ts).
+          paymentMethod: data.paymentMethod ?? "other",
+          collaborationType: normalizeCollaborationType(data.collaborationType),
           message: data.message ?? null,
           anonymous: data.anonymous ?? false,
           publicProof: data.publicProof ?? false,
@@ -249,6 +257,7 @@ router.get("/donations", ...adminOnly, async (req, res) => {
         d.receipt_url,
         d.receipt_note,
         d.status,
+        d.collaboration_type,
         d.admin_note,
         d.created_at,
         c.title AS campaign_title
@@ -310,11 +319,12 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
         throw new DonationTransitionError(existing.status, status);
       }
 
-      // Hallazgo API-05: no aprobar una donación digital sin comprobante.
+      // Hallazgo API-05: no aprobar una donación digital sin comprobante. Una
+      // donación en especie nunca exige comprobante.
       if (
         status === "approved" &&
         existing.status !== "approved" &&
-        approvalRequiresProof(existing.paymentMethod)
+        approvalRequiresProof(existing.paymentMethod, existing.collaborationType)
       ) {
         const [proof] = await tx
           .select({ id: donationProofsTable.id })
@@ -334,7 +344,14 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
 
       // Ledger Trust Pay: solo en la transición → approved (la unicidad
       // source_type+source_id del ledger protege contra duplicados).
-      if (updated.campaignId != null && existing.status !== "approved" && status === "approved") {
+      // Una donación en especie con valor estimado 0 no aporta nada al libro y
+      // el libro es append-only: un movimiento de 0 sería ruido permanente.
+      if (
+        updated.campaignId != null &&
+        existing.status !== "approved" &&
+        status === "approved" &&
+        toSafeAmount(updated.amount) > 0
+      ) {
         await appendMovement(tx, updated.campaignId, {
           kind: "ingreso",
           amount: toSafeAmount(updated.amount),
@@ -405,6 +422,7 @@ router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
         d.receipt_url,
         d.receipt_note,
         d.status,
+        d.collaboration_type,
         d.admin_note,
         d.created_at,
         c.title AS campaign_title
@@ -544,6 +562,7 @@ async function formatDonation(
     phone: d.phone,
     amount,
     paymentMethod: d.paymentMethod,
+    collaborationType: d.collaborationType,
     message: d.message,
     anonymous: d.anonymous,
     publicProof: d.publicProof,
@@ -579,6 +598,7 @@ function formatDonationRow(r: Record<string, unknown>) {
     phone: r.phone ?? null,
     amount: toSafeAmount(r.amount),
     paymentMethod: r.payment_method ?? "",
+    collaborationType: r.collaboration_type ?? "dinero",
     message: r.message ?? null,
     anonymous: r.anonymous ?? false,
     publicProof: r.public_proof ?? false,

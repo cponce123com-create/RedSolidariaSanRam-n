@@ -358,6 +358,45 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON campaign_leftovers (donor_id);
     `,
   },
+  {
+    name: "018_donations_collaboration_type.sql",
+    sql: `
+      -- Fase 3: tipo de colaboración de la donación (dinero, productos,
+      -- servicios, apoyo logístico). ADITIVA y reversible (DROP COLUMN
+      -- deshace). Las donaciones anteriores quedan como 'dinero': es lo que
+      -- eran, no se reinterpreta ningún registro histórico.
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS collaboration_type text NOT NULL DEFAULT 'dinero';
+
+      CREATE INDEX IF NOT EXISTS idx_donations_collaboration
+        ON donations (collaboration_type);
+
+      -- Donaciones en especie ya registradas: la convención histórica era monto
+      -- 0 con método "other" (ver src/lib/chocofest-2025-data.ts). Se
+      -- reclasifican para que no aparezcan como "S/ 0" en la lista pública de
+      -- donantes ni inflen el conteo de aportes de dinero. El monto 0 nunca
+      -- fue válido para una donación pública de dinero (mínimo S/ 5).
+      UPDATE donations SET collaboration_type = 'productos'
+        WHERE collaboration_type = 'dinero' AND amount = 0 AND payment_method = 'other';
+
+      -- Normalización de los tipos de donante a los valores canónicos del
+      -- modelo (que ahora incluye 'organizacion'). El formulario público y el
+      -- panel solo escriben valores canónicos, así que en la práctica esto es
+      -- una red de seguridad para datos importados. Es idempotente: una fila
+      -- normalizada no vuelve a coincidir con ningún alias.
+      UPDATE donors SET type = 'organizacion'
+        WHERE lower(type) IN ('ong', 'organización', 'organizacion', 'organization',
+                              'institucion', 'institución', 'institution',
+                              'asociacion', 'asociación', 'fundacion', 'fundación');
+      UPDATE donors SET type = 'individual'
+        WHERE lower(type) IN ('persona', 'person', 'particular');
+      UPDATE donors SET type = 'familia'
+        WHERE lower(type) IN ('family', 'nucleo familiar');
+      UPDATE donors SET type = 'empresa'
+        WHERE lower(type) IN ('company', 'business', 'negocio', 'rse');
+      UPDATE donors SET type = 'anonimo'
+        WHERE lower(type) IN ('anónimo', 'anonymo', 'anonymous', 'anonima', 'anónima');
+    `,
+  },
 ];
 
 /**
