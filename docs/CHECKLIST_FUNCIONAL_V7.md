@@ -125,7 +125,7 @@ No se usan porcentajes de avance.
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
 | Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **330/331** aprobadas (+ **1 `TODO`** de V7-17, que no cuenta como aprobada): incluye barrido del gate, SEC-03, filtros del panel y la detección de datos históricos duplicados |
-| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **165/165** + **29/29** |
+| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **174/174** + **33/33** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
 | Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–023) | Verificado contra **PostgreSQL 17.7 real**: 23 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
