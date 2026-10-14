@@ -184,3 +184,62 @@ artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts 3 mensajes por propósi
 La **mensajería automatizada** (Cloud API oficial, plantillas y consentimiento de contacto)
 queda en el bloqueo **B-4**: necesita credenciales y proveedor aprobado. Lo implementado no
 depende de ellas y no bloquea el despliegue.
+
+---
+
+## 6. Incremento V7-3 — Informe de integridad del libro contable (Fase 1.4) · CERRADO
+
+### 6.1 Qué faltaba
+
+La cadena de hashes ya era verificable (pública: `/campaigns/:id/movements/verify` y
+`/ledger/root`, con anclaje), pero **una cadena íntegra puede estar incompleta**: los datos
+históricos cargados por seed dejaron donaciones aprobadas **sin asiento** (hallazgo DB-09),
+y entonces la verificación dice «íntegra» mientras el libro no cuenta toda la historia.
+Tampoco existía ninguna herramienta administrativa que produjera un informe.
+
+### 6.2 Qué se implementó
+
+- **Lógica pura** (`src/lib/ledger-audit.ts`, 11 pruebas): coteja el libro con sus orígenes y
+  devuelve un informe con cinco bloques — cadena (verificada / rota en el asiento N / raíz),
+  **donaciones confirmadas sin asiento**, **asientos sin origen** (incluye tipos de origen
+  desconocidos), **importes descuadrados** y **asientos en otra campaña** que su origen.
+  `healthy` solo es `true` si la cadena verifica **y** no hay ningún hallazgo.
+  Una donación **pendiente** sin asiento no es un hallazgo: solo se registra al aprobarse.
+- **Ruta administrativa** `GET /admin/ledger/audit` (`requireAdmin` + rate limit), de **solo
+  lectura**: no escribe ni corrige nada, y devuelve además qué se auditó (número de asientos,
+  donaciones confirmadas y gastos) con la fecha del informe, para que un tercero pueda
+  contrastarlo.
+- **Panel**: nueva página «Libro contable» (`/admin/libro`, en el menú solo para
+  administradores, no para moderadores) con el estado global, la cadena, los contadores y una
+  tabla por tipo de hallazgo, con estados vacíos explícitos y botón de actualización. Cierra
+  con la regla de corrección: el libro es append-only y cualquier arreglo es un **asiento
+  compensatorio autorizado y trazable**, nunca una edición.
+
+### 6.3 Archivos
+
+```
+artifacts/api-server/src/lib/ledger-audit.ts              informe puro (5 bloques)
+artifacts/api-server/tests/ledger-audit.test.mjs          +11 pruebas
+artifacts/api-server/src/routes/ledger-audit.ts           GET /admin/ledger/audit (solo lectura)
+artifacts/api-server/tests/ledger-audit-auth.test.mjs     +2 pruebas de autorización (401 / pasa el gate)
+artifacts/api-server/src/routes/index.ts                  registro del router
+artifacts/api-server/build-tests.mjs                      entry points (lib + router)
+artifacts/red-solidaria/src/pages/admin/ledger-audit.tsx  página del informe
+artifacts/red-solidaria/src/App.tsx                       ruta /admin/libro
+artifacts/red-solidaria/src/pages/admin/layout.tsx        ítem de menú (solo administradores)
+```
+
+### 6.4 Verificación
+
+- `api-server`: **309/309** (+13) · typecheck **0**.
+- `red-solidaria`: **143/143** node:test + **23/23** vitest · typecheck **0**.
+- Build de producción **OK** · migraciones: ninguna nueva (el informe no necesita esquema).
+- Cobertura de pruebas: cadena rota, DB-09, donación pendiente (no es hallazgo), asiento sin
+  origen, tipo de origen desconocido, importes descuadrados, equivalencia `100` vs `"100.00"`
+  y `0.1+0.2` vs `0.3`, asiento en otra campaña y caso vacío.
+
+### 6.5 Nota operativa
+
+El informe lee el libro completo (es su naturaleza). Si el libro creciera mucho, la consulta
+se puede paginar por rango de `id` sin cambiar el contrato del informe; se documenta como
+mejora futura, no como bloqueo.

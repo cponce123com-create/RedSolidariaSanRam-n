@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   LayoutDashboard, Target, FileText, LogOut, MessageSquare, DollarSign, Menu, X,
   AlertTriangle, Dog, Users, Building2, Quote, HelpCircle, ShieldCheck, Settings, Sparkles,
-  HandHeart, FileSpreadsheet, ClipboardList, UsersRound
+  HandHeart, FileSpreadsheet, ClipboardList, UsersRound, BookOpen
 } from "lucide-react";
 import { useAdminLogout, useGetAdminMe, type AdminUser } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               { href: "/admin/donaciones", icon: DollarSign, label: "Donaciones" },
               { href: "/admin/donantes", icon: HandHeart, label: "Donantes" },
               { href: "/admin/auditoria", icon: ShieldCheck, label: "Auditoría" },
+              { href: "/admin/libro", icon: BookOpen, label: "Libro contable" },
               { href: "/admin/informes", icon: FileSpreadsheet, label: "Informes" },
               { href: "/admin/observaciones", icon: ClipboardList, label: "Observaciones" },
             ]),

@@ -43,6 +43,7 @@ const AdminDonations = lazy(() => import("./pages/admin/donations"));
 const AdminDonors = lazy(() => import("./pages/admin/donors"));
 const AdminDonorDetail = lazy(() => import("./pages/admin/donor-detail"));
 const AdminAudit = lazy(() => import("./pages/admin/audit"));
+const AdminLedgerAudit = lazy(() => import("./pages/admin/ledger-audit"));
 const AdminInformes = lazy(() => import("./pages/admin/informes"));
 const AdminReportPrint = lazy(() => import("./pages/admin/report-print"));
 const AdminObservations = lazy(() => import("./pages/admin/observations"));
@@ -179,6 +180,11 @@ function App() {
                 <Route path="/admin/auditoria">
                   <AdminLayout>
                     <AdminAudit />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/libro">
+                  <AdminLayout>
+                    <AdminLedgerAudit />
                   </AdminLayout>
                 </Route>
                 {/* Fuera del layout: la impresión sale limpia (sin menú lateral). */}
