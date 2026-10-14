@@ -6,14 +6,23 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
  * - administrador: operaciones completas (campañas, donaciones, gastos, stats).
  * - moderador: gestión de contenido y comunidad (campañas, reportes, adopciones,
  *   noticias, mensajes, etc.), SIN acceso a dinero ni sistema.
+ * - supervisor: SOLO CONSULTA. Revisa donaciones, informes y auditoría y puede
+ *   dejar observaciones, pero NO modifica dinero, campañas ni configuración.
  */
 export const ROLES = {
   SUPERADMIN: "superadmin",
   ADMIN: "administrador",
   MODERATOR: "moderador",
+  SUPERVISOR: "supervisor",
 } as const;
 
 export type AdminRole = (typeof ROLES)[keyof typeof ROLES];
+
+/**
+ * Roles con permiso de CONSULTA sobre la información contable y de auditoría.
+ * El superadmin siempre pasa (ver `hasRole`).
+ */
+export const READ_ROLES: string[] = [ROLES.ADMIN, ROLES.SUPERVISOR];
 
 /**
  * Verifica que el usuario de sesión tenga alguno de los roles permitidos.

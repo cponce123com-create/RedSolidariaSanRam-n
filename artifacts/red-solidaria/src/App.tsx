@@ -45,6 +45,7 @@ const AdminDonorDetail = lazy(() => import("./pages/admin/donor-detail"));
 const AdminAudit = lazy(() => import("./pages/admin/audit"));
 const AdminInformes = lazy(() => import("./pages/admin/informes"));
 const AdminReportPrint = lazy(() => import("./pages/admin/report-print"));
+const AdminObservations = lazy(() => import("./pages/admin/observations"));
 const AdminReports = lazy(() => import("./pages/admin/reports"));
 const AdminReportDetail = lazy(() => import("./pages/admin/report-detail"));
 const AdminAdoptions = lazy(() => import("./pages/admin/adoptions"));
@@ -177,6 +178,11 @@ function App() {
                 <Route path="/admin/informes">
                   <AdminLayout>
                     <AdminInformes />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/observaciones">
+                  <AdminLayout>
+                    <AdminObservations />
                   </AdminLayout>
                 </Route>
                 <Route path="/admin/reportes/:id">

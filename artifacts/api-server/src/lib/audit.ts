@@ -18,6 +18,8 @@ export const AUDIT_ACTIONS = {
   campaignDeleted: "CAMPAIGN_DELETED",
   donorCreated: "DONOR_CREATED",
   donorUpdated: "DONOR_UPDATED",
+  observationCreated: "OBSERVATION_CREATED",
+  observationResolved: "OBSERVATION_RESOLVED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -26,6 +28,7 @@ export const AUDIT_RESOURCES = {
   donations: "donations",
   campaigns: "campaigns",
   donors: "donors",
+  observations: "observations",
 } as const;
 
 const ACTION_LABEL: Record<string, string> = {
@@ -37,6 +40,8 @@ const ACTION_LABEL: Record<string, string> = {
   [AUDIT_ACTIONS.campaignDeleted]: "Borrador de campaña eliminado",
   [AUDIT_ACTIONS.donorCreated]: "Donante creado",
   [AUDIT_ACTIONS.donorUpdated]: "Donante actualizado",
+  [AUDIT_ACTIONS.observationCreated]: "Observación de supervisión registrada",
+  [AUDIT_ACTIONS.observationResolved]: "Observación de supervisión atendida",
 };
 
 export function auditActionLabel(action: string): string {

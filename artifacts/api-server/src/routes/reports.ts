@@ -2,12 +2,13 @@ import { Router, type IRouter, type Response } from "express";
 import { db, donationsTable, campaignMovementsTable } from "@workspace/db";
 import { and, desc, eq, type SQL } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
-import { requireRole, ROLES } from "../middleware/roles";
+import { requireRole, READ_ROLES } from "../middleware/roles";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { csvFilename, toCsvDocument, type CsvColumn } from "../lib/csv";
 
 // Los informes contables son PRIVADOS (incluyen datos personales del donante).
-const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
+// El supervisor tiene CONSULTA (es su función), nunca escritura.
+const readRoles = [requireAdmin, requireRole(...READ_ROLES)];
 
 const router: IRouter = Router();
 
@@ -43,7 +44,7 @@ function parseCampaignId(value: unknown): number | null {
  */
 router.get(
   "/admin/reports/donations.csv",
-  ...adminOnly,
+  ...readRoles,
   adminActionLimiter,
   async (req, res) => {
     try {
@@ -99,7 +100,7 @@ router.get(
  */
 router.get(
   "/admin/reports/movements.csv",
-  ...adminOnly,
+  ...readRoles,
   adminActionLimiter,
   async (req, res) => {
     try {

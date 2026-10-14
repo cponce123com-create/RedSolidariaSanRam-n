@@ -198,6 +198,31 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       END $$;
     `,
   },
+  {
+    name: "012_supervisor_observations.sql",
+    sql: `
+      -- Fase 4: observaciones de supervisión (rol de SOLO CONSULTA). ADITIVA Y
+      -- REVERSIBLE:
+      --   rollback = DROP TABLE supervisor_observations;
+      --
+      -- La observación es un ANEXO: nunca modifica el registro observado. La
+      -- resolución (marcar como atendida) la registra un administrador.
+      CREATE TABLE IF NOT EXISTS supervisor_observations (
+        id serial PRIMARY KEY,
+        entity_type text NOT NULL,
+        entity_id text NOT NULL,
+        body text NOT NULL,
+        author_id text,
+        author_username text,
+        resolved_at timestamp,
+        resolved_by text,
+        created_at timestamp NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_supervisor_observations_entity
+        ON supervisor_observations (entity_type, entity_id);
+    `,
+  },
 ];
 
 /**

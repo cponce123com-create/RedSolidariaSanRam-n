@@ -2,13 +2,14 @@ import { Router, type IRouter } from "express";
 import { db, auditLogsTable } from "@workspace/db";
 import { and, desc, eq, ilike, type SQL } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
-import { requireRole, ROLES } from "../middleware/roles";
+import { requireRole, READ_ROLES } from "../middleware/roles";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { toIsoSafe } from "../lib/date-format";
 import { redactSensitiveDetails } from "../lib/audit";
 
 // El registro de auditoría es PRIVADO (datos de quién hizo qué).
-const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
+// El supervisor tiene CONSULTA (es su función), nunca escritura.
+const readRoles = [requireAdmin, requireRole(...READ_ROLES)];
 
 const router: IRouter = Router();
 
@@ -19,7 +20,7 @@ const router: IRouter = Router();
  * Los `details` se redactan AL LEER (defensa en profundidad: nunca se devuelven
  * contraseñas, tokens ni secretos aunque se hubieran guardado por error).
  */
-router.get("/admin/audit-logs", ...adminOnly, adminActionLimiter, async (req, res) => {
+router.get("/admin/audit-logs", ...readRoles, adminActionLimiter, async (req, res) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
     const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
