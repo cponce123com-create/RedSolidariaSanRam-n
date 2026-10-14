@@ -196,15 +196,23 @@ artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts    8 etiquetas nuevas
 
 `api-server` **279/279** (+7) · `red-solidaria` **104/104** node:test (+7) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
 
-### 6.4 Lo que queda de la Fase 2 (incremento 3C)
+### 6.4 Incremento 3C-1 (estado de organización e información del evento) — cerrado
+
+**Defecto corregido:** el checklist del panel tenía el punto «Cronograma / actualizaciones» **fijado en `false`** (`ready={false}`), así que nunca cambiaba aunque el evento tuviera novedades publicadas: un dato inventado que hacía inútil el semáforo.
+
+- **`eventReadiness` (función pura, `src/lib/chocofest.ts`):** calcula los **12 puntos** con datos reales (publicada, protagonista, presentación, meta, fecha, portada, donaciones, galería, cronograma, transparencia, presupuesto e inventario), devuelve `done`/`total`/`percent`/`ready` y tolera datos ausentes. El panel muestra además «X de 12 secciones listas (Y%)» y una nota de que cada punto se marca solo.
+- **Información del evento ampliada (sin migración):** dos claves nuevas de `settings` — `chocofest_2026_objectives` y `chocofest_2026_organizers` — editables desde el panel y **publicadas** (añadidas a la allowlist explícita del API; por defecto toda clave nueva sigue siendo privada). La página pública muestra los objetivos en la sección de objetivos (si no están definidos no muestra nada, nunca texto inventado) y el equipo responsable en la cabecera del evento en lugar del literal fijo.
+- **Pruebas:** `chocofest-readiness.test.mjs` (8 pruebas, incluida la regresión del cronograma) y la prueba de la allowlist actualizada al contrato de 6 claves.
+
+**Verificación:** `api-server` **279/279** · `red-solidaria` **112/112** node:test (+8) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
+
+### 6.5 Lo que queda de la Fase 2
 
 1. **Programa de actividades con responsables** (hoy el «cronograma» son novedades).
-2. **Estado de organización real:** el checklist del panel tiene un punto (`cronograma`) fijado en `false`; debe calcularse con datos reales.
-3. **Regalos asociados a su donante y a la evidencia de entrega** (reutiliza `donations` en especie y `campaign_evidence`).
-4. **Composición de canastas** (productos por canasta) y meta de canastas preparadas/entregadas.
-5. **Información del evento ampliada:** objetivos, fecha y responsables editables desde el panel.
+2. **Regalos asociados a su donante y a la evidencia de entrega** (reutiliza `donations` en especie y `campaign_evidence`).
+3. **Composición de canastas** (productos por canasta) y meta de canastas preparadas/entregadas.
 
-**Dependencia de datos:** las cifras (metas de niños, raciones, juguetes, canastas y montos presupuestados) las carga la organización desde el panel. No se ha introducido ninguna cifra inventada: mientras no existan, la interfaz muestra «sin meta definida» y el avance se calcula solo con lo realmente registrado.
+**Dependencia de datos:** las cifras (metas de niños, raciones, juguetes, canastas y montos presupuestados) y los textos del evento los carga la organización desde el panel. No se ha introducido ninguna cifra ni texto inventado: mientras no existan, la interfaz muestra «sin meta definida» o no muestra la sección.
 
 ## 7. Riesgos y bloqueos
 

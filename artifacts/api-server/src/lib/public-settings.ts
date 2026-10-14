@@ -18,6 +18,8 @@ export const PUBLIC_SETTING_KEYS = [
   "chocofest_2026_place",
   "chocofest_2026_schedule",
   "chocofest_2026_motto",
+  "chocofest_2026_objectives",
+  "chocofest_2026_organizers",
 ] as const;
 
 const PUBLIC_SETTING_SET: ReadonlySet<string> = new Set<string>(PUBLIC_SETTING_KEYS);

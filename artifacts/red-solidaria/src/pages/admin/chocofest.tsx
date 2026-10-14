@@ -5,9 +5,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCampaigns,
   useGetCampaignImages,
+  useGetCampaignUpdates,
   useCreateCampaign,
   type Campaign,
 } from "@workspace/api-client-react";
+import {
+  useAdminCampaignExpenses,
+  useAdminCampaignBudgets,
+  useAdminCampaignLeftovers,
+} from "@/hooks/use-phase3";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -35,6 +41,7 @@ import {
   CHOCOFEST_SETTING_KEYS,
   PROTAGONIST_SETTING_KEY,
   findChocofest2026,
+  eventReadiness,
   parseProtagonistId,
   resolveEventDetails,
 } from "@/lib/chocofest";
@@ -211,6 +218,12 @@ function CreatePanel() {
 function FoundPanel({ campaign }: { campaign: Campaign }) {
   const { t } = useTranslation();
   const { data: images } = useGetCampaignImages(campaign.id);
+  const { data: updates } = useGetCampaignUpdates(campaign.id);
+  // Contadores reales para el estado de organización: antes el punto del
+  // «cronograma» estaba fijado en `false` aunque hubiera novedades publicadas.
+  const { data: expenses } = useAdminCampaignExpenses(campaign.id);
+  const { data: budgets } = useAdminCampaignBudgets(campaign.id);
+  const { data: items } = useAdminCampaignLeftovers(campaign.id);
   const { data: settings } = usePublicSettings();
   const setProtagonist = useSetProtagonist();
   const saveSettings = useSaveSettings();
@@ -222,20 +235,33 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
   const [place, setPlace] = useState("");
   const [schedule, setSchedule] = useState("");
   const [motto, setMotto] = useState("");
+  const [objectives, setObjectives] = useState("");
+  const [organizers, setOrganizers] = useState("");
 
   // Sincroniza el formulario con lo guardado (una vez cargada la configuración).
   useEffect(() => {
     setPlace(settings?.[CHOCOFEST_SETTING_KEYS.place] ?? "");
     setSchedule(settings?.[CHOCOFEST_SETTING_KEYS.schedule] ?? "");
     setMotto(settings?.[CHOCOFEST_SETTING_KEYS.motto] ?? "");
+    setObjectives(settings?.[CHOCOFEST_SETTING_KEYS.objectives] ?? "");
+    setOrganizers(settings?.[CHOCOFEST_SETTING_KEYS.organizers] ?? "");
   }, [settings]);
 
   const goal = campaign.goal || 0;
   const raised = campaign.raised || 0;
   const progress = goal > 0 ? Math.min(100, Math.round((raised / goal) * 100)) : 0;
-  const hasDonations = (campaign.donorCount ?? 0) > 0;
-  const hasImages = !!images && images.length > 0;
-  const hasGoal = goal > 0;
+
+  // Estado de organización: cada punto se deriva de lo que existe de verdad.
+  const readiness = eventReadiness({
+    campaign,
+    isProtagonist,
+    donationCount: campaign.donorCount ?? 0,
+    imageCount: images?.length ?? 0,
+    updateCount: updates?.length ?? 0,
+    expenseCount: expenses?.length ?? 0,
+    budgetCount: budgets?.length ?? 0,
+    itemCount: items?.length ?? 0,
+  });
 
   const saveDetails = () => {
     saveSettings.mutate([
@@ -255,6 +281,18 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
         key: CHOCOFEST_SETTING_KEYS.motto,
         value: motto,
         label: "Lema ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: CHOCOFEST_SETTING_KEYS.objectives,
+        value: objectives,
+        label: "Objetivos del evento ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: CHOCOFEST_SETTING_KEYS.organizers,
+        value: organizers,
+        label: "Equipo responsable del evento ChocoFest 2026",
         group: "chocofest",
       },
     ]);
@@ -371,6 +409,30 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
               className="rounded-xl mt-1"
             />
           </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="cf-objectives">{t("adminChocofest.detailsObjectives")}</Label>
+            <Input
+              id="cf-objectives"
+              value={objectives}
+              onChange={(e) => setObjectives(e.target.value)}
+              className="rounded-xl mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("adminChocofest.detailsObjectivesHint")}
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="cf-organizers">{t("adminChocofest.detailsOrganizers")}</Label>
+            <Input
+              id="cf-organizers"
+              value={organizers}
+              onChange={(e) => setOrganizers(e.target.value)}
+              className="rounded-xl mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              {t("adminChocofest.detailsOrganizersHint")}
+            </p>
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -430,21 +492,47 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
         </div>
       </div>
 
-      {/* Estado de las secciones */}
+      {/* Estado de las secciones: cada punto se calcula con datos reales, así que
+          el semáforo sirve de verdad para saber qué falta (Fase 2.1). */}
       <div>
-        <h3 className="text-lg font-bold text-foreground mb-3">{t("adminChocofest.readinessTitle")}</h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Readiness label={t("adminChocofest.checkPresentation")} ready={!!campaign.description} />
-          <Readiness label={t("adminChocofest.checkGoal")} ready={hasGoal} />
-          <Readiness label={t("adminChocofest.checkDonations")} ready={hasDonations} />
-          <Readiness label={t("adminChocofest.checkGallery")} ready={hasImages} />
-          <Readiness
-            label={t("adminChocofest.checkTimeline")}
-            ready={false}
-            hint={t("adminChocofest.pending")}
-          />
-          <Readiness label={t("adminChocofest.checkTransparency")} ready={hasDonations} />
+        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+          <h3 className="text-lg font-bold text-foreground">{t("adminChocofest.readinessTitle")}</h3>
+          <p className="text-sm text-muted-foreground">
+            {readiness.ready
+              ? t("adminChocofest.readinessReady")
+              : t("adminChocofest.readinessProgress", {
+                  done: readiness.done,
+                  total: readiness.total,
+                  percent: readiness.percent,
+                })}
+          </p>
         </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {readiness.checks.map((check) => (
+            <Readiness
+              key={check.key}
+              label={t(
+                ({
+                  published: "adminChocofest.checkPublished",
+                  protagonist: "adminChocofest.checkProtagonist",
+                  presentation: "adminChocofest.checkPresentation",
+                  goal: "adminChocofest.checkGoal",
+                  dates: "adminChocofest.checkDates",
+                  cover: "adminChocofest.checkCover",
+                  donations: "adminChocofest.checkDonations",
+                  gallery: "adminChocofest.checkGallery",
+                  timeline: "adminChocofest.checkTimeline",
+                  transparency: "adminChocofest.checkTransparency",
+                  budget: "adminChocofest.checkBudget",
+                  inventory: "adminChocofest.checkInventory",
+                } as Record<string, string>)[check.key] ?? "adminChocofest.pending",
+              )}
+              ready={check.ok}
+              hint={check.ok ? undefined : t("adminChocofest.pending")}
+            />
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">{t("adminChocofest.readinessNote")}</p>
       </div>
     </div>
   );

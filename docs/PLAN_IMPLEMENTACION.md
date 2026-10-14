@@ -58,9 +58,11 @@ Correcciones:
 
 **3B — cerrado:** **presupuesto por categoría** (migración 016 aditiva): previsión administrada por rubro cruzada con los gastos reales mediante la función pura `buildBudget`, con saldo por rubro, saldo general, avance frente a la meta y una fila «Sin presupuesto asignado» para que ningún gasto quede oculto. Panel dentro de la pestaña de gastos y sección pública de presupuesto. Detalle en `docs/ESTADO_IMPLEMENTACION.md` §5 y §6.
 
-**3C — pendiente:** programa de actividades con responsables; estado de organización calculado con datos reales; regalos ligados a su donante y a la evidencia de entrega; composición de canastas; información del evento ampliada (objetivos, fecha, responsables).
+**3C-1 — cerrado:** **estado de organización con datos reales** (se elimina el punto del checklist fijado en `false`; ahora los 12 puntos se derivan de la base de datos, con progreso «X de 12») e **información del evento ampliada** (objetivos y equipo responsable editables desde el panel y publicados con allowlist explícita; la página pública no muestra nada si aún no se han definido). Detalle en `docs/ESTADO_IMPLEMENTACION.md` §6.4.
 
-**Regla de datos:** las metas y los montos se cargan desde el panel cuando la organización los aprueba. No se introduce ninguna cifra inventada.
+**3C-2 — pendiente:** programa de actividades con responsables; regalos ligados a su donante y a la evidencia de entrega; composición de canastas y meta de preparadas/entregadas.
+
+**Regla de datos:** las metas y los textos del evento se cargan desde el panel cuando la organización los aprueba. No se introduce ninguna cifra ni texto inventado.
 
 ## Incremento 4 — Fase 3: sistema profesional de donantes
 

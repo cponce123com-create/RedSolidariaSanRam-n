@@ -254,7 +254,7 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
               {t("chocofest.provisionalMottoLabel")}: {details.motto}
             </p>
             <p className="text-sm text-muted-foreground">
-              {CHOCOFEST_2026.organizer} · {details.place}
+              {details.organizers} · {details.place}
             </p>
           </div>
 
@@ -292,6 +292,13 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
 
             {/* 3. Objetivo y metas */}
             <Section id="objetivo" icon={<Target className="w-5 h-5" />} title={t("chocofest.sectionGoal")}>
+              {/* Objetivos editables desde el panel. Si la organización aún no los
+                  ha definido no se muestra nada: nunca se inventa texto. */}
+              {details.objectives ? (
+                <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed mb-5">
+                  {details.objectives}
+                </p>
+              ) : null}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="bg-secondary/50 rounded-2xl p-5 border border-border/50">
                   <div className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-1">
