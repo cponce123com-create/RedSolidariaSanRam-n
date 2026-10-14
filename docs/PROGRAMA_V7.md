@@ -876,3 +876,40 @@ lib/db/src/migrate.ts                        migración 023 (11 claves foráneas
 artifacts/api-server/src/routes/pets.ts      borrado de mascota con solicitudes → 409
 artifacts/api-server/tests/e2e/run-e2e.sh    verificación (existencia + rechazo real de una referencia inválida)
 ```
+
+---
+
+## 18. Incremento V7-18 — La campaña de referencia de 2024, fuera (cierra V7-17) · CERRADO
+
+### 18.1 La decisión
+
+La organización confirmó que **no existe** una campaña «Chocolatada Navideña 2024»: era material
+**de referencia**. La única campaña real es **ChocoFest 2025**. Por tanto el problema de V7-17 no
+se corrige: **se elimina**.
+
+### 18.2 Qué se hizo
+
+- **Eliminados**: `chocolatada-2024-data.ts` (el dataset con las donaciones copiadas de 2025), sus
+  dos pruebas (la de contrato y la de contaminación, que ya no tiene objeto) y el importador
+  `scripts/src/apply-chocolatada-2024.ts` (con su entrada en `package.json`).
+- **`seed.ts`**: quitadas las **9 referencias** (el bloque de imports, la entrada en
+  `CAMPAIGN_IMAGES`, la campaña en el insert, la búsqueda por título y los 5 bloques de
+  donaciones / novedades / galería / gastos / evidencias). **Cero referencias restantes** en
+  código, comprobado con `grep`.
+- La prueba `TODO` de V7-17 **desaparece con el dataset**, así que la suite vuelve a estar **sin
+  pendientes**.
+
+### 18.3 Verificación
+
+- `api-server`: **324/324**, **0 `TODO`**, 0 errores de tipo; libs y scripts, **0** errores.
+- **E2E COMPLETO: OK** contra PostgreSQL real, con un efecto visible en los datos: las donaciones
+  confirmadas sembradas pasan de **112 a 60**, y el hueco real de DB-09 (donaciones confirmadas
+  sin asiento) baja de **111 a 59**. Es decir: **el número anterior incluía las 52 donaciones
+  falsas**.
+
+### 18.4 Limpieza en bases ya existentes
+
+El código ya no crea esa campaña, pero **una base que ya la tenga** (producción) la seguirá
+mostrando. En `docs/MIGRACIONES_Y_RESPALDOS.md` queda el procedimiento con sus reglas de
+seguridad: respaldo previo, informe antes de borrar y, sobre todo, **no tocar el ledger** (es
+append-only: borrar asientos rompería la cadena de hashes).

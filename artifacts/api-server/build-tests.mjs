@@ -26,7 +26,6 @@ await build({
     "./src/lib/donation-validation.ts",
     "./src/lib/funding.ts",
     "./src/lib/dashboard-filters.ts",
-    "./src/lib/chocolatada-2024-data.ts",
     "./src/lib/chocofest-2025-data.ts",
     "./src/lib/totp.ts",
     "./src/lib/two-factor-lockout.ts",

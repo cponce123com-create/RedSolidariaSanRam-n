@@ -3,12 +3,11 @@
 **Rama:** `feat/implementacion-integral-2026` · **Fecha:** 14 de octubre de 2026
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
-**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 330/331 ·
+**Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 324/324 ·
 `red-solidaria` 174/174 node:test + 33/33 vitest · typecheck 0 en libs/API/frontend/scripts ·
 build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 41/41 contra
 PostgreSQL real**).
-Hay **1 prueba marcada `TODO`** (V7-17: falta la hoja real de 2024) que **no** cuenta como
-aprobada.
+Sin pruebas pendientes (`TODO`).
 No se usan porcentajes de avance.
 
 ---
@@ -33,7 +32,7 @@ No se usan porcentajes de avance.
 | Restricción real del libro en producción (`RESTRICT`) | **IMPLEMENTADO Y PROBADO** | `docs/migraciones/010_low_risk.sql`, `lib/db/src/migrate.ts` | **Aplicada en producción el 2026-10-13** con respaldo previo y autorización explícita (registrada en `drizzle_migrations`); borrar una campaña con asientos responde 409 |
 | Claves foráneas ausentes (DB-04) | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (023), `routes/pets.ts` | **11/11** claves `NOT VALID` con `ON DELETE` por caso; E2E contra base real: **rechaza** una donación con `campaign_id=999999` y acepta las válidas; borrar una mascota con solicitudes → 409 |
 | Donaciones confirmadas sin asiento (DB-09) | **PARCIAL** | — | **Detectadas** por el informe de V7-3; la regularización es una decisión contable |
-| Datos históricos de la Chocolatada 2024 | **BLOQUEADO** | `lib/chocolatada-2024-data.ts`, `tests/chocolatada-2024-contamination.test.mjs` | **V7-17**: el bloque de donaciones es una **copia del de 2025** (mismo total S/. 2,818.5 y fechas de 2025). No se corrige sin la hoja real de 2024 porque **no se inventan datos**: el bloque lleva una advertencia y una prueba `TODO` que lo mantiene visible (`# todo 1`) |
+| Campaña de referencia de 2024 | **IMPLEMENTADO Y PROBADO** | `lib/seed.ts`, `scripts/` | **RESUELTO en V7-18**: la organización confirmó que esa campaña no existe (era referencia); dataset, sus 2 pruebas e importador **eliminados** y las **9 referencias** del seed quitadas (0 restantes en código). Suite **324/324 sin `TODO`** y E2E OK: donaciones sembradas 112→60 y el hueco real de DB-09 es **59**, no 111 |
 
 ## 2. Integración admin ↔ frontend (Fase 2)
 
@@ -124,13 +123,13 @@ No se usan porcentajes de avance.
 
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
-| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **330/331** aprobadas (+ **1 `TODO`** de V7-17, que no cuenta como aprobada): incluye barrido del gate, SEC-03, filtros del panel y la detección de datos históricos duplicados |
+| Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **324/324** (sin pendientes): incluye barrido del gate, SEC-03, filtros del panel, datasets históricos y las claves foráneas |
 | Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **174/174** + **33/33** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
 | Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–023) | Verificado contra **PostgreSQL 17.7 real**: 23 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
 | E2E con PostgreSQL real (flujo + esquema + restauración) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **41/41** comprobaciones del flujo contra una base real (campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad, cuerpos inválidos) **+ 10 de esquema**: migraciones, restricciones de estado (rechazo real de un valor inválido), disparadores de `updated_at` y **claves foráneas** (rechazo real de una referencia inexistente) **+ ensayo de respaldo y restauración** (la base se destruye y se restaura; datos idénticos y **cadena del libro verificada**) |
-| Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (113 donaciones, 1 asiento, 22 claves, 23 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
+| Respaldo y recuperación | **IMPLEMENTADO Y PROBADO** | `docs/MIGRACIONES_Y_RESPALDOS.md`, `tests/e2e/run-e2e.sh` | Ensayo real: `pg_dump` → base destruida → restaurada solo desde el respaldo → mismos conteos (61 donaciones, 1 asiento, 22 claves, 23 migraciones), API arranca sin re-migrar y **la cadena de hashes sigue íntegra** |
 
 ## 10. Bloqueos que esperan decisión
 

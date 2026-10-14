@@ -66,22 +66,16 @@ todo lo que queda bloqueado por decisiones de negocio o credenciales externas:
   verificado contra base real (rechaza `campaign_id=999999`) y el borrado de una mascota con
   solicitudes responde **409**.
 
-- **V7-17 / datos históricos de 2024:** el bloque de donaciones de
-  `artifacts/api-server/src/lib/chocolatada-2024-data.ts` es una **copia** del de
-  `chocofest-2025-data.ts`: los donantes, los importes y el **total (S/. 2,818.5)** coinciden uno
-  a uno, los comentarios de fecha de ese fichero dicen `── 4/12/2025 ──` y su helper `iso` usa
-  `Date.UTC(2025, 11, day)`. **Impacto:** la campaña «Chocolatada Navideña 2024» publica las
-  donaciones de 2025 y con fechas de 2025; los gastos, las evidencias y las imágenes **sí** son
-  propios de 2024 (verificado con una prueba), así que el problema está acotado a las donaciones.
-  **Encontrado al cerrar B-5**, verificando una duda que la auditoría había dejado abierta (su
-  refutación inicial usó un `grep` sobre literales que no existen en esos ficheros). **No se han
-  tocado los datos:** no hay hoja fuente de 2024 en el repositorio, este proyecto no inventa
-  datos históricos y sustituir el bloque alteraría cifras publicadas, lo que es una decisión de
-  la organización. **Qué sí se ha hecho:** una advertencia al principio del bloque, una prueba
-  `TODO` que compara las huellas de ambos datasets y deja el problema visible en cada ejecución
-  sin romper la suite (`# pass 330 · # fail 0 · # todo 1`), y una segunda prueba que confirma
-  que los gastos **sí** difieren. **Para cerrarlo:** el informe real de la Chocolatada 2024;
-  entonces la prueba `TODO` pasa a ser una comprobación normal.
+- **V7-17 / datos históricos de 2024:** ✅ **RESUELTO en V7-18.** El bloque de donaciones de
+  `chocolatada-2024-data.ts` era una **copia** del de `chocofest-2025-data.ts` (mismos donantes,
+  importes y total S/. 2,818.5, y fechas de 2025 dentro del fichero de 2024). La organización
+  confirmó que **esa campaña no existe**: era material de referencia, y la única real es
+  **ChocoFest 2025**. Por eso no se corrigió el dataset: **se eliminó** (dataset, sus dos pruebas
+  y el importador), junto con las 9 referencias del `seed`. Efecto medible en el E2E: las
+  donaciones confirmadas sembradas pasan de 112 a 60 y el hueco real de DB-09 baja de 111 a
+  **59** (el número anterior incluía las 52 donaciones falsas). La suite queda en **324/324 sin
+  `TODO`**. Para bases ya existentes, el procedimiento de limpieza (con respaldo previo y sin
+  tocar el ledger) está en `docs/MIGRACIONES_Y_RESPALDOS.md`.
 - **API-06:** el patrón `catch → 400 validation_error` enmascara fallos de infraestructura
   como si fueran errores del cliente (dificulta el diagnóstico). **Pendiente (V7-4).**
 - **SEC-01:** la cookie de sesión usa `secure` solo con `NODE_ENV==='production'`; tras un

@@ -17,14 +17,6 @@ import {
   adminUsersTable,
 } from "@workspace/db";
 import {
-  CHOCOLATADA_2024_CAMPAIGN,
-  CHOCOLATADA_2024_DONATIONS,
-  CHOCOLATADA_2024_EVIDENCE,
-  CHOCOLATADA_2024_EXPENSES,
-  CHOCOLATADA_2024_IMAGES,
-  CHOCOLATADA_2024_UPDATES,
-} from "./chocolatada-2024-data";
-import {
   CHOCOLATADA_2025_CAMPAIGN,
   CHOCOLATADA_2025_DONATIONS,
   CHOCOLATADA_2025_EVIDENCE,
@@ -46,7 +38,6 @@ const u = (id: string, w = 1200) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=80`;
 
 const CAMPAIGN_IMAGES: Record<string, string> = {
-  "Chocolatada Navideña 2024": u("photo-1512909006721-3d6018887383", 1600),
   "Chocofest 2025": u("photo-1512909006721-3d6018887383", 1600),
   "Campaña Escolar 2025": u("photo-1503676260728-1c00da094a0b", 1600),
   "Rescate Animal San Ramón": u("photo-1548199973-03cce0bbc87b", 1600),
@@ -169,7 +160,6 @@ async function seedCampaigns() {
   if (await isEmpty("campaigns")) {
     logger.info("Seeding campaigns...");
     await db.insert(campaignsTable).values([
-      CHOCOLATADA_2024_CAMPAIGN,
       CHOCOLATADA_2025_CAMPAIGN,
       {
         title: "Campaña Escolar 2025",
@@ -693,7 +683,6 @@ async function campaignIdByTitle(title: string): Promise<number | null> {
 }
 
 async function seedCampaignMedia() {
-  const chocolatada = await campaignIdByTitle("Chocolatada Navideña 2024");
   const chocolatada2025 = await campaignIdByTitle("Chocofest 2025");
   const escolar = await campaignIdByTitle("Campaña Escolar 2025");
   const rescate = await campaignIdByTitle("Rescate Animal San Ramón");
@@ -714,10 +703,6 @@ async function seedCampaignMedia() {
       status: "approved" | "pending";
       createdAt?: Date;
     }> = [
-      // Donaciones reales de la Chocolatada Navideña 2024 (informe en vivo de
-      // donaciones, Google Sheets). La lista completa vive en
-      // ./chocolatada-2024-data.ts (fuente única de verdad).
-      ...CHOCOLATADA_2024_DONATIONS.map((d) => ({ ...d, campaignId: chocolatada })),
       // Donaciones reales de Chocofest 2025. Fuente única: ./chocofest-2025-data.ts.
       ...CHOCOLATADA_2025_DONATIONS.map((d) => ({ ...d, campaignId: chocolatada2025 })),
       { campaignId: escolar, firstName: "Pedro", lastName: "Alvarado", email: "pedro.alvarado@example.com", amount: 200, paymentMethod: "transfer", message: "Para que ningún niño deje el aula", anonymous: false, publicProof: true, status: "approved" },
@@ -734,11 +719,6 @@ async function seedCampaignMedia() {
   if (await isEmpty("campaign_updates")) {
     logger.info("Seeding campaign updates...");
     const updates: Array<{ campaignId: number; title: string; content: string }> = [];
-    if (chocolatada) {
-      updates.push(
-        ...CHOCOLATADA_2024_UPDATES.map((u) => ({ campaignId: chocolatada, ...u })),
-      );
-    }
     if (chocolatada2025) {
       updates.push(
         ...CHOCOLATADA_2025_UPDATES.map((u) => ({ campaignId: chocolatada2025, ...u })),
@@ -762,11 +742,6 @@ async function seedCampaignMedia() {
   if (await isEmpty("campaign_images")) {
     logger.info("Seeding campaign gallery...");
     const images: Array<{ campaignId: number; imageUrl: string; caption: string }> = [];
-    if (chocolatada) {
-      images.push(
-        ...CHOCOLATADA_2024_IMAGES.map((img) => ({ campaignId: chocolatada, ...img })),
-      );
-    }
     if (chocolatada2025) {
       images.push(
         ...CHOCOLATADA_2025_IMAGES.map((img) => ({ campaignId: chocolatada2025, ...img })),
@@ -799,11 +774,6 @@ async function seedCampaignMedia() {
       receiptUrl: string | null;
       isPublic: boolean;
     }> = [];
-    if (chocolatada) {
-      expenses.push(
-        ...CHOCOLATADA_2024_EXPENSES.map((e) => ({ campaignId: chocolatada, ...e })),
-      );
-    }
     if (chocolatada2025) {
       expenses.push(
         ...CHOCOLATADA_2025_EXPENSES.map((e) => ({ campaignId: chocolatada2025, ...e })),
@@ -837,11 +807,6 @@ async function seedCampaignMedia() {
       date: string;
       isPublic: boolean;
     }> = [];
-    if (chocolatada) {
-      evidence.push(
-        ...CHOCOLATADA_2024_EVIDENCE.map((ev) => ({ campaignId: chocolatada, ...ev })),
-      );
-    }
     if (chocolatada2025) {
       evidence.push(
         ...CHOCOLATADA_2025_EVIDENCE.map((ev) => ({ campaignId: chocolatada2025, ...ev })),

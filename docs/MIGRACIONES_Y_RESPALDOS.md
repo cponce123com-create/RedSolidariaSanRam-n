@@ -166,3 +166,60 @@ real, y queda documentado aquí y en el propio arnés.
 **Nota sobre DB-05 / DB-06 (del ensayo anterior):** los cambios de tipo (`text`→`date`,
 `real`→`numeric`) **cambian el contrato de la API** —`numeric` se serializa como string— así que
 exigen ajuste en la capa de consulta antes de migrar.
+
+---
+
+## 12. Eliminar de una base existente la campaña de referencia de 2024 (V7-18)
+
+El código ya **no** crea la campaña «Chocolatada Navideña 2024» (era material de referencia, no
+una campaña real; ver V7-17/V7-18), pero una base que ya la tenga —**producción**— la seguirá
+mostrando. Procedimiento, en este orden y con estas reglas:
+
+1. **Respaldo completo antes de nada** (`pg_dump -Fc`) y, si se puede, ensayo en el clon.
+2. **Informe primero** (no borra nada): cuántas filas dependen de esa campaña.
+
+```sql
+-- 1) Localizar la campaña (por título).
+SELECT id, title, status, featured FROM campaigns WHERE title = 'Chocolatada Navideña 2024';
+
+-- 2) Informe de dependencias (sustituir :id por el id anterior).
+SELECT 'donations'      AS tabla, count(*) FROM donations          WHERE campaign_id = :id
+UNION ALL SELECT 'movements',  count(*) FROM campaign_movements   WHERE campaign_id = :id
+UNION ALL SELECT 'expenses',   count(*) FROM campaign_expenses    WHERE campaign_id = :id
+UNION ALL SELECT 'evidence',   count(*) FROM campaign_evidence    WHERE campaign_id = :id
+UNION ALL SELECT 'images',     count(*) FROM campaign_images      WHERE campaign_id = :id
+UNION ALL SELECT 'updates',    count(*) FROM campaign_updates     WHERE campaign_id = :id
+UNION ALL SELECT 'leftovers',  count(*) FROM campaign_leftovers   WHERE campaign_id = :id
+UNION ALL SELECT 'budgets',    count(*) FROM campaign_budgets     WHERE campaign_id = :id
+UNION ALL SELECT 'reports',    count(*) FROM community_reports    WHERE campaign_id = :id;
+```
+
+3. **REGLA CRÍTICA: no tocar el ledger.** Si el informe devuelve `movements > 0`, **PARAR** y
+   consultar: el libro es *append-only* y borrar asientos **rompería la cadena de hashes**. Esos
+   movimientos se regularizan con un asiento compensatorio, nunca borrando.
+   (En el caso de 2024 no debería haberlos: esas donaciones se sembraron **sin** asiento, que es
+   precisamente el hueco DB-09.)
+4. **Borrar en una transacción**, hijos primero (las claves foráneas son `RESTRICT`), y la
+   campaña al final. Los `community_reports` que apunten a ella se quedan con el vínculo a
+   `NULL` solos (`ON DELETE SET NULL`), así que **no** se pierden.
+
+```sql
+BEGIN;
+DELETE FROM donation_proofs
+ WHERE donation_id IN (SELECT id FROM donations WHERE campaign_id = :id);
+DELETE FROM donations          WHERE campaign_id = :id;
+DELETE FROM campaign_expenses  WHERE campaign_id = :id;
+DELETE FROM campaign_evidence  WHERE campaign_id = :id;
+DELETE FROM campaign_images    WHERE campaign_id = :id;
+DELETE FROM campaign_updates   WHERE campaign_id = :id;
+DELETE FROM campaign_leftovers WHERE campaign_id = :id;
+DELETE FROM campaign_budgets   WHERE campaign_id = :id;
+DELETE FROM campaigns          WHERE id = :id;
+COMMIT;
+```
+
+5. **Verificar después:** la campaña ya no aparece en `/api/campaigns` ni en la portada, y
+   `GET /api/admin/ledger/audit` sigue informando la cadena **íntegra**.
+6. **Nota sobre donantes:** las fichas de `donors` **no** se tocan (pueden tener historial real
+   de otras campañas). Si alguna queda sin donaciones, es una decisión de la organización
+   consolidarla o no.
