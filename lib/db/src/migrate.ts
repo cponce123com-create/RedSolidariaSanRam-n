@@ -422,6 +422,28 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       ON CONFLICT (key) DO NOTHING;
     `,
   },
+  {
+    name: "020_event_results_settings.sql",
+    sql: `
+      -- Fase 4.3 (V7-8): rendición de resultados del evento. Los datos que solo
+      -- la organización puede declarar —beneficiarios atendidos, actividades
+      -- realizadas, resumen y destino de los sobrantes— pasan a ser configuración
+      -- editable y pública (es información de rendición de cuentas).
+      --
+      -- Mismo patrón que la 019: solo escribe si \`settings\` YA tiene contenido,
+      -- para no romper el seed de una base nueva. Idempotente.
+      INSERT INTO settings (key, value, label, "group")
+      SELECT v.key, v.value, v.label, v."group"
+      FROM (VALUES
+        ('chocofest_2026_results_beneficiaries', '', 'ChocoFest 2026: beneficiarios atendidos (agregado)', 'chocofest'),
+        ('chocofest_2026_results_activities', '', 'ChocoFest 2026: actividades realizadas (una por línea: hora | título | responsable)', 'chocofest'),
+        ('chocofest_2026_results_summary', '', 'ChocoFest 2026: resumen de la rendición de cuentas', 'chocofest'),
+        ('chocofest_2026_results_leftovers_destination', '', 'ChocoFest 2026: destino de los recursos sobrantes', 'chocofest')
+      ) AS v(key, value, label, "group")
+      WHERE EXISTS (SELECT 1 FROM settings)
+      ON CONFLICT (key) DO NOTHING;
+    `,
+  },
 ];
 
 /**

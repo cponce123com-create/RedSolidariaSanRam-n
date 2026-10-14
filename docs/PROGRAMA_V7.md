@@ -451,3 +451,70 @@ bash artifacts/api-server/tests/e2e/run-e2e.sh
 
 Requiere los binarios de PostgreSQL documentados en `docs/ROADMAP.md`. El script imprime
 cada comprobación con `ok`/`FAIL` y termina con `E2E COMPLETO: OK` o el número de fallos.
+
+---
+
+## 10. Incremento V7-8 — Rendición de resultados del evento (Fase 4.3) · CERRADO
+
+### 10.1 Qué faltaba
+
+El evento ya publicaba **dinero** (panel de transparencia), **bienes** (inventario con flujo
+recibido/entregado), **presupuesto**, **programa** y **evidencias**. Lo que no existía era el
+**informe de rendición** que lo reúne, ni los datos que solo la organización puede declarar:
+beneficiarios atendidos (dato agregado), actividades **realizadas**, resumen de la rendición y
+destino posterior de los recursos sobrantes.
+
+### 10.2 Qué se implementó
+
+- **Lógica pura** (`src/lib/event-results.ts`, 10 pruebas): `assembleEventResults` reúne el
+  informe con **cifras reales** y **datos declarados**:
+  - dinero: ingresos, gastos y saldo conciliados (los de la transparencia);
+  - bienes: recibidos, entregados y sobrantes con `resolveStock`, **la misma regla** que el
+    inventario público (una fila antigua sin flujo cuenta como recibida y no entregada);
+  - actividades: planificadas frente a realizadas, reutilizando `parseProgram` (mismo formato
+    que el programa, una actividad por línea);
+  - beneficiarios: entero declarado, o `null` si no se declaró (nunca un cero inventado);
+  - resumen y destino de los sobrantes;
+  - `hasAnything`: la sección no se muestra si no hay nada que rendir.
+  **Los bienes nunca se suman al dinero**: son rendiciones separadas y así se publican.
+- **4 claves públicas nuevas** (allowlist) + seed + **migración 020**, con el mismo patrón
+  idempotente de la 019 (solo escribe si `settings` ya tiene contenido, para no romper el seed
+  de una base nueva).
+- **Página pública del evento**: la sección «Resultados y cierre» incorpora el informe
+  (dinero, bienes, beneficiarios, actividades realizadas con el conteo frente al programa,
+  resumen y destino de sobrantes) y muestra **«aún no declarado por la organización»** donde no
+  hay dato, en lugar de un cero que parecería real.
+- **Editable desde el panel**: las claves viven en el grupo `chocofest`, así que aparecen en la
+  configuración con sus etiquetas sin tocar la interfaz del panel.
+
+### 10.3 Archivos
+
+```
+artifacts/red-solidaria/src/lib/event-results.ts            informe puro (cifras + declarado)
+artifacts/red-solidaria/tests/event-results.test.mjs        10 pruebas
+artifacts/red-solidaria/src/pages/chocofest-2026.tsx        informe dentro de «Resultados y cierre»
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts     13 etiquetas nuevas (es/en)
+artifacts/red-solidaria/build-tests.mjs                     entry point del módulo
+artifacts/api-server/src/lib/public-settings.ts             +4 claves públicas
+artifacts/api-server/src/lib/seed.ts                        claves sembradas (grupo chocofest)
+artifacts/api-server/tests/public-settings.test.mjs         contrato de la allowlist
+lib/db/src/migrate.ts                                       migración 020 (aditiva, idempotente)
+artifacts/api-server/tests/e2e/run-e2e.sh                   verifica las 4 claves en base real
+```
+
+### 10.4 Verificación
+
+- `red-solidaria`: **153/153** node:test (+10) + **23/23** vitest · typecheck **0**.
+- `api-server`: **329/329** · typecheck **0**.
+- **E2E contra PostgreSQL real: `E2E COMPLETO: OK`** con **20 migraciones** aplicadas y
+  **4 claves** de rendición de resultados presentes en la base tras el seed.
+- Casos cubiertos: flujo de bienes (con y sin flujo registrado, nunca por debajo de cero),
+  beneficiarios (declarado, con separadores de miles, inválido → `null`), informe completo,
+  informe vacío (`hasAnything: false`), saldo derivado y dinero sin transparencia cargada.
+
+### 10.5 Nota de diseño
+
+No se creó ninguna tabla nueva: el módulo reutiliza el patrón de configuración del evento y los
+datos que ya existen (transparencia, inventario, programa). Así el informe no puede
+desincronizarse de las cifras que el sitio ya publica, y el módulo es reutilizable para
+futuros eventos cambiando las claves.

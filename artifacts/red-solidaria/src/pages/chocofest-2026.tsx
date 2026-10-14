@@ -42,6 +42,7 @@ import {
   parseProgram,
   resolveEventDetails,
 } from "@/lib/chocofest";
+import { RESULTS_SETTING_KEYS, assembleEventResults } from "@/lib/event-results";
 import { usePublicSettings } from "@/hooks/use-public-settings";
 import {
   formatItemAmount,
@@ -194,6 +195,16 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   // gastos PUBLICADOS — el sitio público nunca muestra gastos privados — y saldo
   // general con el mismo monto recaudado que muestra la sección de avance.
   const { data: budgetLines } = usePublicCampaignBudgets(campaign.id);
+  // Rendición de resultados del evento (Fase 4.3): reúne el dinero de la
+  // transparencia, los bienes con su flujo recibido/entregado, las actividades y
+  // los datos que solo la organización puede declarar. Nada se inventa: lo no
+  // declarado se muestra como «aún no declarado», nunca como un cero.
+  const eventResults = assembleEventResults({
+    transparency,
+    inventory,
+    plannedActivities: program,
+    results: settings,
+  });
   const budgetOverview = buildBudget(budgetLines, transparency?.publicExpenses ?? []);
   const balance = campaignBalance(
     campaign.raised ?? 0,
@@ -719,6 +730,130 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
 
             {/* 13. Resultados y rendición final */}
             <Section id="resultados" icon={<Sparkles className="w-5 h-5" />} title={t("chocofest.sectionResults")}>
+              {/* Fase 4.3: informe de rendición de resultados. Las cifras salen de
+                  los registros del sistema (dinero de la transparencia y bienes del
+                  inventario); lo demás lo declara la organización, y lo que no está
+                  declarado se dice así en lugar de mostrar un cero. */}
+              {eventResults.hasAnything && (
+                <>
+                  <p className="text-sm text-muted-foreground mb-5">{t("chocofest.resultsIntro")}</p>
+
+                  {eventResults.money.available && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                      {[
+                        { label: t("chocofest.resultsIncome"), value: eventResults.money.income },
+                        { label: t("chocofest.resultsSpent"), value: eventResults.money.spent },
+                        { label: t("chocofest.resultsBalance"), value: eventResults.money.balance },
+                      ].map((tile) => (
+                        <div
+                          key={tile.label}
+                          className="bg-card border border-border rounded-2xl p-4"
+                          data-testid="event-results-money"
+                        >
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                            {tile.label}
+                          </div>
+                          <div className="text-xl font-display font-bold text-foreground">
+                            {tile.value === null
+                              ? t("chocofest.resultsNotDeclared")
+                              : `S/ ${tile.value.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {eventResults.goods.lines > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                      {[
+                        { label: t("chocofest.resultsGoodsReceived"), value: eventResults.goods.received },
+                        { label: t("chocofest.resultsGoodsDelivered"), value: eventResults.goods.distributed },
+                        { label: t("chocofest.resultsGoodsRemaining"), value: eventResults.goods.remaining },
+                      ].map((tile) => (
+                        <div
+                          key={tile.label}
+                          className="bg-card border border-border rounded-2xl p-4"
+                          data-testid="event-results-goods"
+                        >
+                          <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                            {tile.label}
+                          </div>
+                          <div className="text-xl font-display font-bold text-foreground">
+                            {formatQuantity(tile.value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div className="bg-card border border-border rounded-2xl p-4" data-testid="event-results-beneficiaries">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.resultsBeneficiaries")}
+                      </div>
+                      <div className="text-xl font-display font-bold text-foreground">
+                        {eventResults.beneficiaries === null
+                          ? t("chocofest.resultsNotDeclared")
+                          : eventResults.beneficiaries.toLocaleString("es-PE")}
+                      </div>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-4" data-testid="event-results-activities">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.resultsActivities")}
+                      </div>
+                      <div className="text-xl font-display font-bold text-foreground">
+                        {eventResults.activities.done > 0
+                          ? eventResults.activities.planned > 0
+                            ? t("chocofest.resultsActivitiesCount", {
+                                done: eventResults.activities.done,
+                                planned: eventResults.activities.planned,
+                              })
+                            : eventResults.activities.done
+                          : t("chocofest.resultsNotDeclared")}
+                      </div>
+                    </div>
+                  </div>
+
+                  {eventResults.activities.doneList.length > 0 && (
+                    <ol className="space-y-2 mb-6">
+                      {eventResults.activities.doneList.map((activity, index) => (
+                        <li
+                          key={`${activity.title}-${index}`}
+                          className="bg-secondary/40 border border-border/50 rounded-xl px-4 py-2 text-sm flex flex-wrap gap-x-3"
+                        >
+                          {activity.time && <span className="font-mono text-muted-foreground">{activity.time}</span>}
+                          <span className="font-medium text-foreground">{activity.title}</span>
+                          {activity.responsible && (
+                            <span className="text-muted-foreground">· {activity.responsible}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+
+                  {eventResults.summary && (
+                    <p className="text-sm text-foreground whitespace-pre-line mb-6" data-testid="event-results-summary">
+                      {eventResults.summary}
+                    </p>
+                  )}
+
+                  {eventResults.leftoversDestination && (
+                    <div
+                      className="bg-secondary/50 border border-border/50 rounded-2xl p-4 mb-6"
+                      data-testid="event-results-leftovers"
+                    >
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">
+                        {t("chocofest.resultsLeftoversDestination")}
+                      </div>
+                      <p className="text-sm text-foreground whitespace-pre-line">
+                        {eventResults.leftoversDestination}
+                      </p>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-muted-foreground mb-5">{t("chocofest.resultsNotes")}</p>
+                </>
+              )}
               {resultsSummary.total > 0 ? (
                 <>
                   <div className="flex flex-wrap gap-4 mb-4">

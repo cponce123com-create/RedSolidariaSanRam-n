@@ -24,6 +24,11 @@ const EXPECTED_PUBLIC_KEYS = [
   "chocofest_2026_objectives",
   "chocofest_2026_organizers",
   "chocofest_2026_program",
+  // Rendición de resultados del evento (Fase 4.3): se publica a propósito.
+  "chocofest_2026_results_beneficiaries",
+  "chocofest_2026_results_activities",
+  "chocofest_2026_results_summary",
+  "chocofest_2026_results_leftovers_destination",
 ];
 
 test("allowlist: contiene las claves que consume el sitio público", () => {

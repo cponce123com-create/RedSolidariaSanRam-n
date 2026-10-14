@@ -95,6 +95,12 @@ if [ "$WHATSAPP_KEYS" -lt 5 ]; then
   echo "   FAIL - faltan claves de configuración de WhatsApp"
   FLOW_STATUS=1
 fi
+RESULTS_KEYS="$(psql_c "SELECT count(*) FROM settings WHERE key LIKE 'chocofest_2026_results_%'")"
+echo "   claves de rendición de resultados (tras el seed): $RESULTS_KEYS"
+if [ "$RESULTS_KEYS" -lt 4 ]; then
+  echo "   FAIL - faltan claves de la rendición de resultados del evento"
+  FLOW_STATUS=1
+fi
 SEEDED_CONFIRMED="$(psql_c "SELECT count(*) FROM donations WHERE status IN ('approved','reconciled')")"
 SEEDED_MOVEMENTS="$(psql_c "SELECT count(*) FROM campaign_movements")"
 echo "   donaciones confirmadas: $SEEDED_CONFIRMED · asientos en el libro: $SEEDED_MOVEMENTS"

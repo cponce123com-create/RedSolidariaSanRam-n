@@ -4,8 +4,9 @@
 **Estados:** `IMPLEMENTADO Y PROBADO` · `IMPLEMENTADO SIN PRUEBA COMPLETA` · `PARCIAL` ·
 `PENDIENTE` · `BLOQUEADO`
 **Evidencia de validación:** pruebas ejecutadas en este entorno (`api-server` 329/329 ·
-`red-solidaria` 143/143 node:test + 23/23 vitest · typecheck 0 en libs/API/frontend/scripts ·
-build de producción OK · `pnpm audit --prod` 0 vulnerabilidades).
+`red-solidaria` 153/153 node:test + 23/23 vitest · typecheck 0 en libs/API/frontend/scripts ·
+build de producción OK · `pnpm audit --prod` 0 vulnerabilidades · **E2E 38/38 contra
+PostgreSQL real**).
 No se usan porcentajes de avance.
 
 ---
@@ -65,7 +66,7 @@ No se usan porcentajes de avance.
 | Composición y cobertura de canastas | **IMPLEMENTADO Y PROBADO** | `lib/baskets.ts` | `baskets.test.mjs` |
 | Vinculación bien ↔ donante ↔ evidencia | **IMPLEMENTADO Y PROBADO** | `routes/campaign-leftovers.ts` | `leftovers-auth.test.mjs` |
 | Colaboraciones en especie separadas de la recaudación monetaria | **IMPLEMENTADO Y PROBADO** | `lib/funding.ts`, `lib/donors-admin.ts` | `funding.test.mjs`, `donors-admin.test.mjs` |
-| **Rendición de resultados del evento (4.3)** | **PENDIENTE** | — | Sección nueva de resultados/balance final |
+| **Rendición de resultados del evento (4.3)** | **IMPLEMENTADO Y PROBADO** | `src/lib/event-results.ts`, `pages/chocofest-2026.tsx`, `migrate.ts` (020) | `event-results.test.mjs` (10) + E2E contra base real con las 4 claves de la migración 020 verificadas |
 | Patrocinios con estados de negociación | **PENDIENTE** | — | Relacionado con B-6 |
 
 ## 5. Donantes, voluntarios y auspiciadores (Fase 5)
@@ -120,10 +121,10 @@ No se usan porcentajes de avance.
 | Funcionalidad | Estado | Archivos | Evidencia |
 |---|---|---|---|
 | Suite de API (permisos, financieras, campañas) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/**` | **329/329** (incluye barrido del gate, SEC-03 y filtros del panel) |
-| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **143/143** + **23/23** |
+| Suite de frontend (node:test + vitest) | **IMPLEMENTADO Y PROBADO** | `artifacts/red-solidaria/tests/**` | **153/153** + **23/23** |
 | Validación de tipos en todo el monorepo | **IMPLEMENTADO Y PROBADO** | `tsconfig*.json` | 0 errores (libs, API, frontend, scripts) |
 | Compilación de producción | **IMPLEMENTADO Y PROBADO** | `build.mjs`, `vite.config.ts` | Build OK (API + SPA) |
-| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–019) | Verificado contra **PostgreSQL 17.7 real**: 19 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
+| Migraciones aditivas e idempotentes | **IMPLEMENTADO Y PROBADO** | `lib/db/src/migrate.ts` (001–020) | Verificado contra **PostgreSQL 17.7 real**: 20 migraciones aplicadas y **no duplicadas** en el segundo arranque (`tests/e2e/run-e2e.sh`) |
 | E2E con PostgreSQL real (flujo completo) | **IMPLEMENTADO Y PROBADO** | `artifacts/api-server/tests/e2e/run-e2e.sh`, `flow.mjs` | **38/38** comprobaciones en verde contra una base real: campaña, donaciones, comprobante, libro y cadena, archivado, filtros, informe de integridad |
 | Lint automatizado | **PENDIENTE** | — | No hay script de lint en el proyecto |
 | Respaldo y recuperación documentados | **IMPLEMENTADO SIN PRUEBA COMPLETA** | `docs/MIGRACIONES_Y_RESPALDOS.md` | Documentado; sin ensayo de restauración en este entorno |

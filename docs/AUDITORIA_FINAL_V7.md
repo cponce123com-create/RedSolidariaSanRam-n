@@ -411,3 +411,32 @@ producción. La migración 010 sigue siendo necesaria allí, pero **no** para de
 
 **Estado de la Fase 9:** migraciones y E2E pasan de *pendiente* a **implementado y probado**.
 Sigue pendiente el **lint automatizado** (no existe script de lint en el proyecto).
+
+---
+
+## 20. Apéndice — Incremento V7-8 (rendición de resultados del evento, Fase 4.3)
+
+**Completado.** El evento ya publicaba dinero, bienes, presupuesto, programa y evidencias; lo
+que faltaba era el **informe que lo reúne** y los datos que solo la organización puede
+declarar (beneficiarios atendidos, actividades realizadas, resumen y destino de los sobrantes).
+
+- **Lógica pura** `src/lib/event-results.ts` (10 pruebas): cifras reales (dinero de la
+  transparencia; bienes con la regla única `resolveStock`) + datos declarados opcionales, con
+  `null` explícito cuando no se declararon (nunca un cero que parecería real). **Los bienes no
+  se suman al dinero.**
+- **4 claves públicas** nuevas (allowlist) + seed + **migración 020** idempotente, editables
+  desde el panel (grupo `chocofest`).
+- **Página pública del evento**: el informe se muestra dentro de «Resultados y cierre»
+  (dinero, bienes recibidos/entregados/sobrantes, beneficiarios, actividades realizadas frente
+  al programa, resumen y destino de sobrantes), con «aún no declarado por la organización»
+  donde no hay dato.
+- **Sin tablas nuevas**: reutiliza el patrón de configuración del evento y los datos
+  existentes, así que el informe no puede desincronizarse de lo que el sitio ya publica.
+
+**Contadores actualizados:** `red-solidaria` **153/153** (+10) + **23/23**, `api-server`
+**329/329**, typecheck **0** en libs/API/frontend/scripts, build **OK**, y **E2E 38/38 contra
+PostgreSQL real** con **20 migraciones** aplicadas.
+
+**Estado de la Fase 4 tras este incremento:** la rendición de resultados queda cerrada. Sigue
+**pendiente** el modelo de **patrocinios con estados de negociación** (relacionado con el
+bloqueo B-6).
