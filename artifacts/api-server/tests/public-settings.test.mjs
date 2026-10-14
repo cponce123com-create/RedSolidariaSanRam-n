@@ -16,6 +16,7 @@ const EXPECTED_PUBLIC_KEYS = [
   "chocofest_2026_motto",
   "chocofest_2026_objectives",
   "chocofest_2026_organizers",
+  "chocofest_2026_program",
 ];
 
 test("allowlist: contiene las claves que consume el sitio público", () => {

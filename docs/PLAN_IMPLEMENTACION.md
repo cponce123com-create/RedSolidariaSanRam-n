@@ -60,7 +60,9 @@ Correcciones:
 
 **3C-1 — cerrado:** **estado de organización con datos reales** (se elimina el punto del checklist fijado en `false`; ahora los 12 puntos se derivan de la base de datos, con progreso «X de 12») e **información del evento ampliada** (objetivos y equipo responsable editables desde el panel y publicados con allowlist explícita; la página pública no muestra nada si aún no se han definido). Detalle en `docs/ESTADO_IMPLEMENTACION.md` §6.4.
 
-**3C-2 — pendiente:** programa de actividades con responsables; regalos ligados a su donante y a la evidencia de entrega; composición de canastas y meta de preparadas/entregadas.
+**3C-2 — cerrado:** **programa de actividades con responsables**, guardado como configuración del evento (`chocofest_2026_program`, sin migración) e interpretado por un parser puro y tolerante (`parseProgram`/`serializeProgram`): editable desde el panel y publicado en el cronograma de la página del evento; si aún no hay programa no se muestra nada.
+
+**3C-3 — pendiente:** regalos ligados a su donante y a la evidencia de entrega; composición de canastas y meta de preparadas/entregadas.
 
 **Regla de datos:** las metas y los textos del evento se cargan desde el panel cuando la organización los aprueba. No se introduce ninguna cifra ni texto inventado.
 

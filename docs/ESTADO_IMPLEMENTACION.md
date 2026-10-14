@@ -206,11 +206,21 @@ artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts    8 etiquetas nuevas
 
 **Verificación:** `api-server` **279/279** · `red-solidaria` **112/112** node:test (+8) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
 
-### 6.5 Lo que queda de la Fase 2
+### 6.5 Incremento 3C-2 (programa de actividades con responsables) — cerrado
 
-1. **Programa de actividades con responsables** (hoy el «cronograma» son novedades).
-2. **Regalos asociados a su donante y a la evidencia de entrega** (reutiliza `donations` en especie y `campaign_evidence`).
-3. **Composición de canastas** (productos por canasta) y meta de canastas preparadas/entregadas.
+El «cronograma» de la página eran solo las novedades publicadas: no existía un programa estructurado con hora y responsable.
+
+- **Sin migración ni endpoint nuevo:** el programa se guarda en la clave de configuración `chocofest_2026_program` (una actividad por línea, formato `hora | título | responsable`), porque es un dato de presentación corto y `settings` ya es la fuente de verdad de la información del evento. La clave se añadió a la **allowlist explícita** del API.
+- **Parser puro y tolerante (`parseProgram` / `serializeProgram`):** nunca lanza; acepta líneas sin hora o sin responsable, ignora vacías y comentarios (`#`), normaliza espacios, recorta longitudes (hora 20, título 120, responsable 80), limita a 40 actividades y descarta líneas sin título. Así un texto mal escrito **no puede romper la página pública**.
+- **Panel:** campo de programa en «Datos del evento» con el formato documentado en línea; se guarda junto al resto de datos (lugar, horario, lema, objetivos, equipo responsable).
+- **Página pública:** el programa se muestra al inicio de la sección de cronograma con hora, actividad y responsable. Si no se ha definido, **no se muestra nada** (nunca se inventa un programa).
+
+**Verificación:** `api-server` **279/279** · `red-solidaria` **120/120** node:test (+8) + **22/22** vitest · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
+
+### 6.6 Lo que queda de la Fase 2
+
+1. **Regalos asociados a su donante y a la evidencia de entrega** (reutiliza `donations` en especie y `campaign_evidence`).
+2. **Composición de canastas** (productos por canasta) y meta de canastas preparadas/entregadas.
 
 **Dependencia de datos:** las cifras (metas de niños, raciones, juguetes, canastas y montos presupuestados) y los textos del evento los carga la organización desde el panel. No se ha introducido ninguna cifra ni texto inventado: mientras no existan, la interfaz muestra «sin meta definida» o no muestra la sección.
 

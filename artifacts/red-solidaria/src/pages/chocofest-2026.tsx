@@ -37,7 +37,9 @@ import { DonationModal } from "@/components/shared/DonationModal";
 import {
   CHOCOFEST_2026,
   CHOCOFEST_2026_PATH,
+  CHOCOFEST_PROGRAM_SETTING_KEY,
   findChocofest2026,
+  parseProgram,
   resolveEventDetails,
 } from "@/lib/chocofest";
 import { usePublicSettings } from "@/hooks/use-public-settings";
@@ -168,6 +170,9 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
   // configurado se usan los textos de trabajo marcados como provisionales.
   const { data: settings } = usePublicSettings();
   const details = resolveEventDetails(settings);
+  // Programa de actividades con responsables: texto editable desde el panel,
+  // interpretado por el parser puro (tolerante a líneas incompletas).
+  const program = parseProgram(settings?.[CHOCOFEST_PROGRAM_SETTING_KEY]);
   // Inventario y bienes (chocolatada, juguetes, canastas de víveres): reutiliza
   // los "sobrantes" públicos de la campaña, ya incluidos en la transparencia.
   const inventory = transparency?.publicLeftovers ?? [];
@@ -549,6 +554,29 @@ function ChocofestContent({ campaign }: { campaign: Campaign }) {
 
             {/* 9. Cronograma de actividades */}
             <Section id="cronograma" icon={<Calendar className="w-5 h-5" />} title={t("chocofest.sectionTimeline")}>
+              {/* Programa estructurado (hora · actividad · responsable) definido
+                  desde el panel. Si aún no se ha definido, no se muestra nada:
+                  nunca se inventa un programa. */}
+              {program.length > 0 ? (
+                <ol className="space-y-3 mb-6">
+                  {program.map((activity, index) => (
+                    <li
+                      key={`${activity.time}-${activity.title}-${index}`}
+                      className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-baseline gap-x-3 gap-y-1"
+                    >
+                      {activity.time ? (
+                        <span className="font-display font-bold text-primary whitespace-nowrap">
+                          {activity.time}
+                        </span>
+                      ) : null}
+                      <span className="font-semibold text-foreground">{activity.title}</span>
+                      {activity.responsible ? (
+                        <span className="text-sm text-muted-foreground">· {activity.responsible}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
               {loadingUpdates ? (
                 <div className="h-20 flex items-center justify-center text-muted-foreground">{t("common.loading")}</div>
               ) : updates && updates.length > 0 ? (

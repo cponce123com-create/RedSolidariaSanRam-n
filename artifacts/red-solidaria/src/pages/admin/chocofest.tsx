@@ -38,6 +38,7 @@ import {
 import {
   CHOCOFEST_2026,
   CHOCOFEST_2026_PATH,
+  CHOCOFEST_PROGRAM_SETTING_KEY,
   CHOCOFEST_SETTING_KEYS,
   PROTAGONIST_SETTING_KEY,
   findChocofest2026,
@@ -237,6 +238,7 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
   const [motto, setMotto] = useState("");
   const [objectives, setObjectives] = useState("");
   const [organizers, setOrganizers] = useState("");
+  const [program, setProgram] = useState("");
 
   // Sincroniza el formulario con lo guardado (una vez cargada la configuración).
   useEffect(() => {
@@ -245,6 +247,7 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
     setMotto(settings?.[CHOCOFEST_SETTING_KEYS.motto] ?? "");
     setObjectives(settings?.[CHOCOFEST_SETTING_KEYS.objectives] ?? "");
     setOrganizers(settings?.[CHOCOFEST_SETTING_KEYS.organizers] ?? "");
+    setProgram(settings?.[CHOCOFEST_PROGRAM_SETTING_KEY] ?? "");
   }, [settings]);
 
   const goal = campaign.goal || 0;
@@ -293,6 +296,12 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
         key: CHOCOFEST_SETTING_KEYS.organizers,
         value: organizers,
         label: "Equipo responsable del evento ChocoFest 2026",
+        group: "chocofest",
+      },
+      {
+        key: CHOCOFEST_PROGRAM_SETTING_KEY,
+        value: program,
+        label: "Programa de actividades ChocoFest 2026",
         group: "chocofest",
       },
     ]);
@@ -431,6 +440,23 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
             />
             <p className="text-xs text-muted-foreground mt-1">
               {t("adminChocofest.detailsOrganizersHint")}
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="cf-program">Programa de actividades</Label>
+            {/* Una actividad por línea: `hora | título | responsable`. La hora y el
+                responsable son opcionales; se publica tal cual en el cronograma. */}
+            <textarea
+              id="cf-program"
+              value={program}
+              onChange={(e) => setProgram(e.target.value)}
+              rows={4}
+              placeholder={"16:00 | Entrega de regalos | Equipo de voluntarios\n17:00 | Chocolatada | Equipo de cocina"}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm mt-1 font-mono"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Una actividad por línea: <code>hora | título | responsable</code>. La hora y el
+              responsable son opcionales; si aún no hay programa, no se muestra nada en la web.
             </p>
           </div>
         </div>
