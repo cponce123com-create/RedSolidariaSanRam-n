@@ -43,7 +43,7 @@ router.get("/admin/dashboard", async (req, res) => {
     db.execute(sql`
       SELECT COALESCE(SUM(amount), 0)::float8 AS total_raised
       FROM donations
-      WHERE status = 'approved'
+      WHERE status IN ('approved','reconciled')
     `),
     db.execute(sql`SELECT COALESCE(SUM(amount), 0)::float8 AS total_spent FROM campaign_expenses`),
     db.execute(sql`SELECT COUNT(*) FILTER (WHERE status = 'available')::int AS available FROM pets`),

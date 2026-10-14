@@ -12,7 +12,7 @@ import {
   settings,
   insertCampaignSchema,
 } from "@workspace/db";
-import { eq, and, sql, desc, notInArray, type SQL } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, notInArray, type SQL } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { toIsoSafe } from "../lib/date-format";
@@ -29,6 +29,7 @@ import {
   transitionError,
   type CampaignDependencies,
 } from "../lib/campaign-lifecycle";
+import { CONFIRMED_DONATION_STATUSES } from "../lib/donor-identity";
 
 const router: IRouter = Router();
 
@@ -120,8 +121,8 @@ router.get("/campaigns", async (req, res) => {
     const rows = await db
       .select({
         campaign: campaignsTable,
-        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')::int`,
-        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)::float8`,
+        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
+        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled')), 0)::float8`,
       })
       .from(campaignsTable)
       .leftJoin(donationsTable, eq(donationsTable.campaignId, campaignsTable.id))
@@ -153,8 +154,8 @@ router.get("/campaigns/:id", async (req, res) => {
     const [row] = await db
       .select({
         campaign: campaignsTable,
-        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} = 'approved')::int`,
-        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)::float8`,
+        donorCount: sql<number>`count(${donationsTable.id}) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
+        raisedFromDonations: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled')), 0)::float8`,
       })
       .from(campaignsTable)
       .leftJoin(donationsTable, eq(donationsTable.campaignId, campaignsTable.id))
@@ -191,7 +192,9 @@ router.get("/campaigns/:id/donors", async (req, res) => {
 
     const approved = and(
       eq(donationsTable.campaignId, campaignId),
-      eq(donationsTable.status, "approved"),
+      // Un dinero conciliado sigue siendo dinero confirmado: la lista pública
+      // de donantes debe incluir AMBOS estados.
+      inArray(donationsTable.status, [...CONFIRMED_DONATION_STATUSES]),
     );
 
     // count(*)::int → pg devuelve int4 como number (count nativo viene como string)

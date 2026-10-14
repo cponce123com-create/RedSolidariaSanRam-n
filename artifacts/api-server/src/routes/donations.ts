@@ -201,9 +201,9 @@ router.get("/donations/stats", async (req, res) => {
     const [stats] = await db
       .select({
         totalDonations: sql<number>`count(*)::int`,
-        totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} = 'approved'), 0)::float8`,
+        totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled')), 0)::float8`,
         pendingCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int`,
-        approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'approved')::int`,
+        approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
         totalDonors: sql<number>`count(distinct ${donationsTable.email})::int`,
       })
       .from(donationsTable);

@@ -35,6 +35,7 @@ await build({
     "./src/lib/pg-errors.ts",
     "./src/lib/campaign-lifecycle.ts",
     "./src/lib/donor-identity.ts",
+    "./src/lib/public-settings.ts",
     "./src/routes/stats.ts",
     "./src/routes/sitemap.ts",
     "./src/routes/settings.ts",

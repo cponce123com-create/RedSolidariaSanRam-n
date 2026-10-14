@@ -4,15 +4,15 @@ import { settings } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { requireRole, ROLES } from "../middleware/roles";
 import { PROTAGONIST_SETTING_KEY } from "../lib/campaign-lifecycle";
+import { filterPublicSettings } from "../lib/public-settings";
 
 const router = Router();
 
-// GET /settings — public (returns key-value map)
+// GET /settings — público: SOLO las claves de la allowlist (Fase 4). Cualquier
+// configuración nueva queda PRIVADA por defecto; el panel usa /admin/settings.
 router.get("/settings", async (_req, res) => {
   const rows = await db.select().from(settings).orderBy(settings.group, settings.key);
-  const map: Record<string, string> = {};
-  for (const r of rows) map[r.key] = r.value ?? "";
-  res.json(map);
+  res.json(filterPublicSettings(rows));
 });
 
 // GET /admin/settings — admin (full rows with metadata)

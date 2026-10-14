@@ -46,6 +46,18 @@ export function isDonationStatus(value: unknown): value is DonationStatus {
   );
 }
 
+/**
+ * Estados que cuentan como DINERO CONFIRMADO. `reconciled` es una EVOLUCIÓN de
+ * `approved` (conciliación bancaria), no un estado aparte: los agregados
+ * (recaudado, número de donantes, transparencia, dashboard) deben sumar AMBOS.
+ * Omitir `reconciled` haría que el total BAJARA al conciliar una donación.
+ */
+export const CONFIRMED_DONATION_STATUSES = ["approved", "reconciled"] as const;
+
+export function isConfirmedDonationStatus(status: string): boolean {
+  return (CONFIRMED_DONATION_STATUSES as readonly string[]).includes(status);
+}
+
 // ─── Conciliación bancaria trazable ──────────────────────────────────────────
 
 /**

@@ -39,8 +39,8 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       await Promise.all([
         db.execute(sql`
           SELECT
-            COALESCE(SUM(amount) FILTER (WHERE status = 'approved'), 0)::float8 AS total_raised,
-            COUNT(*) FILTER (WHERE status = 'approved')::int AS donor_count
+            COALESCE(SUM(amount) FILTER (WHERE status IN ('approved','reconciled')), 0)::float8 AS total_raised,
+            COUNT(*) FILTER (WHERE status IN ('approved','reconciled'))::int AS donor_count
           FROM donations
           WHERE campaign_id = ${campaignId}
         `),
