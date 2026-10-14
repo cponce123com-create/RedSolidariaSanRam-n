@@ -1,6 +1,13 @@
 import { Router, type IRouter } from "express";
-import { db, donationsTable, campaignsTable, donationProofsTable } from "@workspace/db";
+import {
+  db,
+  donationsTable,
+  campaignsTable,
+  donationProofsTable,
+  donorsTable,
+} from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
+import { isDonorType, normalizeEmail } from "../lib/donor-identity";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
 import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
@@ -97,10 +104,54 @@ router.post("/donations", donationLimiter, async (req, res) => {
     // Valores explícitos: `status` lo fija el servidor (el cliente no puede
     // spoofearlo) y los booleanos sin valor caen a su default de la DB.
     const donation = await db.transaction(async (tx) => {
+      // Perfil de donante (Fase 3): se vincula —o se crea— por correo
+      // normalizado. El correo es obligatorio en el schema, así que siempre hay
+      // identidad. "Anónimo" significa no mostrar el nombre en público, NO
+      // ausencia de registro interno.
+      const donorEmail = normalizeEmail(data.email);
+      let donorId: number | null = null;
+      if (donorEmail) {
+        const [found] = await tx
+          .select({ id: donorsTable.id })
+          .from(donorsTable)
+          .where(sql`lower(${donorsTable.email}) = ${donorEmail}`);
+        if (found) {
+          donorId = found.id;
+          // Solo se actualiza el tipo si el donante lo declara explícitamente.
+          if (isDonorType(data.donorType)) {
+            await tx
+              .update(donorsTable)
+              .set({ type: data.donorType, updatedAt: new Date() })
+              .where(eq(donorsTable.id, donorId));
+          }
+        } else {
+          const [created] = await tx
+            .insert(donorsTable)
+            .values({
+              type: isDonorType(data.donorType) ? data.donorType : "individual",
+              name: `${data.firstName} ${data.lastName}`.trim(),
+              email: data.email,
+            })
+            .onConflictDoNothing()
+            .returning({ id: donorsTable.id });
+          if (created) {
+            donorId = created.id;
+          } else {
+            // Carrera con otra donación simultánea del mismo correo.
+            const [again] = await tx
+              .select({ id: donorsTable.id })
+              .from(donorsTable)
+              .where(sql`lower(${donorsTable.email}) = ${donorEmail}`);
+            donorId = again?.id ?? null;
+          }
+        }
+      }
+
       const [row] = await tx
         .insert(donationsTable)
         .values({
           campaignId: data.campaignId ?? null,
+          donorId,
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,

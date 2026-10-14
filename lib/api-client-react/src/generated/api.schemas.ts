@@ -92,6 +92,7 @@ export type DonationStatus =
 export const DonationStatus = {
   pending: "pending",
   approved: "approved",
+  reconciled: "reconciled",
   rejected: "rejected",
 } as const;
 
@@ -127,6 +128,16 @@ export const CreateDonationInputPaymentMethod = {
   other: "other",
 } as const;
 
+export type CreateDonationInputDonorType =
+  (typeof CreateDonationInputDonorType)[keyof typeof CreateDonationInputDonorType];
+
+export const CreateDonationInputDonorType = {
+  individual: "individual",
+  familia: "familia",
+  empresa: "empresa",
+  anonimo: "anonimo",
+} as const;
+
 export interface CreateDonationInput {
   campaignId?: number | null;
   firstName: string;
@@ -138,6 +149,7 @@ export interface CreateDonationInput {
   message?: string | null;
   anonymous: boolean;
   publicProof?: boolean;
+  donorType?: CreateDonationInputDonorType;
   receiptUrl?: string | null;
   receiptNote?: string | null;
   proofImageUrl?: string | null;
@@ -339,6 +351,7 @@ export type GetDonationsStatus =
 export const GetDonationsStatus = {
   pending: "pending",
   approved: "approved",
+  reconciled: "reconciled",
   rejected: "rejected",
 } as const;
 

@@ -330,7 +330,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, approved, rejected]
+            enum: [pending, approved, reconciled, rejected]
       responses:
         "200":
           description: List of donations
@@ -984,7 +984,7 @@ components:
           nullable: true
         status:
           type: string
-          enum: [pending, approved, rejected]
+          enum: [pending, approved, reconciled, rejected]
         adminNote:
           type: string
           nullable: true
@@ -1028,6 +1028,9 @@ components:
           type: boolean
         publicProof:
           type: boolean
+        donorType:
+          type: string
+          enum: [individual, familia, empresa, anonimo]
         receiptUrl:
           type: string
           nullable: true

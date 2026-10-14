@@ -17,8 +17,9 @@ import { CheckCircle, XCircle, Search, ExternalLink, Image as ImageIcon, UploadC
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
+import { useReconcileDonation } from "@/hooks/use-donors-admin";
 
-type FilterStatus = "all" | "pending" | "approved" | "rejected";
+type FilterStatus = "all" | "pending" | "approved" | "rejected" | "reconciled";
 
 export default function AdminDonations() {
   const [filter, setFilter] = useState<FilterStatus>("all");
@@ -33,6 +34,7 @@ export default function AdminDonations() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const updateStatus = useUpdateDonationStatus();
+  const reconcile = useReconcileDonation();
   const addProof = useAddDonationProof();
 
   // Fetch stats unconditionally
@@ -171,16 +173,18 @@ export default function AdminDonations() {
     }
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     pending: "bg-yellow-500 hover:bg-yellow-600 text-white",
     approved: "bg-accent hover:bg-accent text-white",
-    rejected: "bg-destructive hover:bg-destructive text-white"
+    rejected: "bg-destructive hover:bg-destructive text-white",
+    reconciled: "bg-emerald-600 hover:bg-emerald-700 text-white"
   };
 
-  const statusLabels = {
+  const statusLabels: Record<string, string> = {
     pending: "Pendiente",
     approved: "Aprobada",
-    rejected: "Rechazada"
+    rejected: "Rechazada",
+    reconciled: "Conciliada"
   };
 
   // Formato defensivo: un createdAt corrupto/nulo no debe tumbar la página
@@ -222,7 +226,7 @@ export default function AdminDonations() {
       {/* Filters + Search */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
         <div className="flex gap-2 bg-secondary/50 p-1.5 rounded-xl inline-flex">
-          {(["all", "pending", "approved", "rejected"] as const).map(tab => (
+          {(["all", "pending", "approved", "rejected", "reconciled"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setFilter(tab)}
@@ -430,6 +434,20 @@ export default function AdminDonations() {
                       >
                         <XCircle className="w-4 h-4" />
                       </Button>
+                      {d.status === 'approved' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-10 rounded-lg text-emerald-600 border-emerald-600/20 hover:bg-emerald-600/10 hover:text-emerald-700"
+                          disabled={reconcile.isPending}
+                          onClick={() => reconcile.mutate(d.id)}
+                          title="Conciliar con el banco"
+                          data-testid="btn-reconcile-donation"
+                        >
+                          {reconcile.isPending && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                          Conciliar
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

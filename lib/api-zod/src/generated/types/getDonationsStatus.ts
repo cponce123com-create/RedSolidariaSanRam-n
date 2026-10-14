@@ -12,5 +12,6 @@ export type GetDonationsStatus =
 export const GetDonationsStatus = {
   pending: "pending",
   approved: "approved",
+  reconciled: "reconciled",
   rejected: "rejected",
 } as const;

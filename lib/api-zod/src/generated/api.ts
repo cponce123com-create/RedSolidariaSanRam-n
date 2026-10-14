@@ -145,7 +145,7 @@ export const GetCampaignDonationsResponseItem = zod.object({
   publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
-  status: zod.enum(["pending", "approved", "rejected"]),
+  status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -270,6 +270,9 @@ export const CreateDonationBody = zod.object({
   message: zod.string().nullish(),
   anonymous: zod.boolean(),
   publicProof: zod.boolean().optional(),
+  donorType: zod
+    .enum(["individual", "familia", "empresa", "anonimo"])
+    .optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
   proofImageUrl: zod.string().nullish(),
@@ -282,7 +285,9 @@ export const CreateDonationBody = zod.object({
  */
 export const GetDonationsQueryParams = zod.object({
   campaignId: zod.coerce.number().optional(),
-  status: zod.enum(["pending", "approved", "rejected"]).optional(),
+  status: zod
+    .enum(["pending", "approved", "reconciled", "rejected"])
+    .optional(),
 });
 
 export const GetDonationsResponseItem = zod.object({
@@ -300,7 +305,7 @@ export const GetDonationsResponseItem = zod.object({
   publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
-  status: zod.enum(["pending", "approved", "rejected"]),
+  status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -328,7 +333,7 @@ export const GetDonationResponse = zod.object({
   publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
-  status: zod.enum(["pending", "approved", "rejected"]),
+  status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });
@@ -360,7 +365,7 @@ export const UpdateDonationStatusResponse = zod.object({
   publicProof: zod.boolean().optional(),
   receiptUrl: zod.string().nullish(),
   receiptNote: zod.string().nullish(),
-  status: zod.enum(["pending", "approved", "rejected"]),
+  status: zod.enum(["pending", "approved", "reconciled", "rejected"]),
   adminNote: zod.string().nullish(),
   createdAt: zod.string(),
 });

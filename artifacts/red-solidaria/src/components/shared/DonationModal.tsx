@@ -16,6 +16,8 @@ import { CreditCard, Landmark, Phone, Heart, CheckCircle2, ChevronRight, Chevron
 import confetti from "canvas-confetti";
 import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
 
+type DonorType = "individual" | "familia" | "empresa" | "anonimo";
+
 type DonationFormValues = {
   amount: number;
   paymentMethod: "yape" | "plin" | "transfer" | "card" | "cash" | "other";
@@ -26,6 +28,7 @@ type DonationFormValues = {
   lastName: string;
   email: string;
   phone?: string;
+  donorType: DonorType;
   receiptNote?: string;
 };
 
@@ -72,6 +75,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
     lastName: z.string().min(2, t("donation.requiredLastName")),
     email: z.string().email(t("donation.invalidEmail")),
     phone: z.string().optional(),
+    donorType: z.enum(["individual", "familia", "empresa", "anonimo"]).default("individual"),
     receiptNote: z.string().optional(),
   });
 
@@ -87,12 +91,14 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
       lastName: "",
       email: "",
       phone: "",
+      donorType: "individual",
       receiptNote: "",
     },
   });
 
   const paymentMethod = form.watch("paymentMethod");
   const amount = form.watch("amount");
+  const donorTypeValue = form.watch("donorType");
   const requiresReceipt = ["yape", "plin", "transfer"].includes(paymentMethod);
 
   const triggerConfetti = () => {
@@ -395,6 +401,29 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                   <FormField control={form.control} name="phone" render={({ field }) => (
                     <FormItem><FormLabel>{t("donation.phoneOptional")}</FormLabel><FormControl><Input type="tel" className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
+                </div>
+
+                {/* Tipo de donante: identifica el perfil (privado) para el
+                    historial del panel. No cambia el monto ni el comprobante. */}
+                <div className="mt-6">
+                  <p className="text-base font-semibold block mb-3">{t("donation.donorTypeLabel")}</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { value: "individual" as const, label: t("donation.donorTypeIndividual") },
+                      { value: "familia" as const, label: t("donation.donorTypeFamilia") },
+                      { value: "empresa" as const, label: t("donation.donorTypeEmpresa") },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => form.setValue("donorType", opt.value)}
+                        aria-pressed={donorTypeValue === opt.value}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${donorTypeValue === opt.value ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-card text-muted-foreground hover:border-primary/40"}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {requiresReceipt && (

@@ -23,6 +23,7 @@ export * from "./createCampaignInput";
 export * from "./createCampaignInputStatus";
 export * from "./createCampaignUpdateInput";
 export * from "./createDonationInput";
+export * from "./createDonationInputDonorType";
 export * from "./createDonationInputPaymentMethod";
 export * from "./createNewsInput";
 export * from "./createTestimonialInput";

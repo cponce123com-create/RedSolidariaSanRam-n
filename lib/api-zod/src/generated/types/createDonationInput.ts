@@ -5,6 +5,7 @@
  * Red Solidaria San Ramón API
  * OpenAPI spec version: 0.2.0
  */
+import type { CreateDonationInputDonorType } from "./createDonationInputDonorType";
 import type { CreateDonationInputPaymentMethod } from "./createDonationInputPaymentMethod";
 
 export interface CreateDonationInput {
@@ -18,6 +19,7 @@ export interface CreateDonationInput {
   message?: string | null;
   anonymous: boolean;
   publicProof?: boolean;
+  donorType?: CreateDonationInputDonorType;
   receiptUrl?: string | null;
   receiptNote?: string | null;
   proofImageUrl?: string | null;

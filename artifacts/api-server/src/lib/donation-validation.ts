@@ -40,6 +40,9 @@ export const donationInputSchema = z.object({
   message: z.string().trim().max(1000).nullish(),
   anonymous: z.boolean().nullish(),
   publicProof: z.boolean().nullish(),
+  // Tipo de donante declarado en el formulario público (identidad del perfil).
+  // Mismos valores que DONOR_TYPES de lib/donor-identity.ts.
+  donorType: z.enum(["individual", "familia", "empresa", "anonimo"]).nullish(),
   receiptNote: z.string().trim().max(200).nullish(),
 });
 // Sin .strict(): los campos extra del body se ignoran. `status` NO está en el
