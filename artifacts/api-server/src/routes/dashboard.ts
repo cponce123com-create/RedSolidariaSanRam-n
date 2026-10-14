@@ -7,6 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, gte, sql, desc, count, sum } from "drizzle-orm";
 import { toSafeAmount } from "../lib/amount-format";
+import { campaignFunding } from "../lib/funding";
 
 const router = Router();
 
@@ -40,10 +41,20 @@ router.get("/admin/dashboard", async (req, res) => {
         COUNT(*) FILTER (WHERE status IN ('completed', 'inactive'))::int AS completed
       FROM campaigns
     `),
+    // Recaudación global conciliada (Fase 3.1): el verificado es la suma de
+    // donaciones confirmadas; el histórico solo cuenta para campañas que no
+    // tienen ninguna donación registrada, así un importe nunca se duplica.
     db.execute(sql`
-      SELECT COALESCE(SUM(amount), 0)::float8 AS total_raised
-      FROM donations
-      WHERE status IN ('approved','reconciled')
+      SELECT
+        COALESCE((SELECT SUM(amount) FROM donations WHERE status IN ('approved','reconciled')), 0)::float8 AS verified,
+        COALESCE((
+          SELECT SUM(c.raised) FROM campaigns c
+          WHERE c.raised > 0
+            AND NOT EXISTS (
+              SELECT 1 FROM donations d
+              WHERE d.campaign_id = c.id AND d.status IN ('approved','reconciled')
+            )
+        ), 0)::float8 AS historical
     `),
     db.execute(sql`SELECT COALESCE(SUM(amount), 0)::float8 AS total_spent FROM campaign_expenses`),
     db.execute(sql`SELECT COUNT(*) FILTER (WHERE status = 'available')::int AS available FROM pets`),
@@ -62,7 +73,25 @@ router.get("/admin/dashboard", async (req, res) => {
       GROUP BY TO_CHAR(created_at, 'YYYY-MM')
       ORDER BY month ASC
     `),
-    db.select().from(campaignsTable).orderBy(desc(campaignsTable.raised)).limit(5),
+    // Top de campañas con la MISMA regla de conciliación que el sitio público
+    // (Fase 3.1). Antes ordenaba por la columna manual `raised`, así que el
+    // panel podía destacar campañas con cifras distintas de las publicadas.
+    db.execute(sql`
+      SELECT title, goal, status, historical, verified
+      FROM (
+        SELECT
+          c.title,
+          COALESCE(c.raised, 0)::float8 AS historical,
+          c.goal,
+          c.status,
+          COALESCE(SUM(d.amount) FILTER (WHERE d.status IN ('approved','reconciled')), 0)::float8 AS verified
+        FROM campaigns c
+        LEFT JOIN donations d ON d.campaign_id = c.id
+        GROUP BY c.id
+      ) t
+      ORDER BY (CASE WHEN t.verified > 0 THEN t.verified ELSE t.historical END) DESC
+      LIMIT 5
+    `),
     db.execute(sql`
       SELECT category, SUM(amount)::float8 AS total, COUNT(*)::int AS count
       FROM campaign_expenses
@@ -75,10 +104,13 @@ router.get("/admin/dashboard", async (req, res) => {
 
   // SUM sobre numeric devuelve string desde pg; Number() normaliza.
   const [campaignRow] = campaignStats.rows as [{ total: number; active: number; completed: number }?];
-  const [donationRow] = donationStats.rows as [{ total_raised: number }?];
+  const [donationRow] = donationStats.rows as [{ verified: number; historical: number }?];
   const [expenseRow] = expenseStats.rows as [{ total_spent: number }?];
   const [petRow] = petStats.rows as [{ available: number }?];
-  const totalRaised = Number(donationRow?.total_raised ?? 0);
+  // Misma regla de conciliación que el sitio público (Fase 3.1): suma de
+  // donaciones confirmadas + histórico SOLO de las campañas sin donaciones
+  // registradas. Nunca el máximo de dos cifras solapadas.
+  const funding = campaignFunding(donationRow?.historical, donationRow?.verified);
   const totalSpent = Number(expenseRow?.total_spent ?? 0);
 
   return res.json({
@@ -86,9 +118,13 @@ router.get("/admin/dashboard", async (req, res) => {
       totalCampaigns: campaignRow?.total ?? 0,
       activeCampaigns: campaignRow?.active ?? 0,
       completedCampaigns: campaignRow?.completed ?? 0,
-      totalRaised,
+      // `totalRaised` se conserva por compatibilidad y equivale al conciliado.
+      totalRaised: funding.reconciledRaised,
+      verifiedRaised: funding.verifiedRaised,
+      historicalRaised: funding.historicalRaised,
+      historicalCounted: funding.historicalCounted,
       totalSpent,
-      balance: totalRaised - totalSpent,
+      balance: funding.reconciledRaised - totalSpent,
       pendingReports: pendingReports[0]?.count ?? 0,
       pendingAdoptions: pendingAdoptions[0]?.count ?? 0,
       pendingVolunteers: pendingVolunteers[0]?.count ?? 0,
@@ -101,12 +137,24 @@ router.get("/admin/dashboard", async (req, res) => {
         total: Number(r.total),
         count: Number(r.count),
       })),
-      topCampaigns: topCampaigns.map(c => ({
-        title: c.title.length > 30 ? c.title.slice(0, 30) + "…" : c.title,
-        raised: c.raised,
-        goal: c.goal,
-        status: c.status,
-      })),
+      topCampaigns: (
+        topCampaigns.rows as {
+          title: string;
+          goal: number | string;
+          status: string;
+          historical: number | string;
+          verified: number | string;
+        }[]
+      ).map((c) => {
+        // Misma regla de conciliación que el sitio público (Fase 3.1).
+        const funding = campaignFunding(c.historical, c.verified);
+        return {
+          title: c.title.length > 30 ? c.title.slice(0, 30) + "…" : c.title,
+          raised: funding.reconciledRaised,
+          goal: toSafeAmount(c.goal),
+          status: c.status,
+        };
+      }),
       expensesByCategory: expensesByCategory.rows.map((r: any) => ({
         category: r.category,
         total: Number(r.total),

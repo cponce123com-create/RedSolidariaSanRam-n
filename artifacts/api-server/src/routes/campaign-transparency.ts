@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { toSafeAmount } from "../lib/amount-format";
+import { campaignFunding } from "../lib/funding";
 import { toIsoSafe } from "../lib/date-format";
 import { formatExpense } from "./campaign-expenses";
 import { formatEvidence } from "./campaign-evidence";
@@ -115,7 +116,11 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       { leftover_count: number; public_leftover_count: number }?,
     ];
 
-    const totalRaised = Number(donationRow?.total_raised ?? 0);
+    // Recaudación conciliada (Fase 3.1): el panel público y la ficha de la
+    // campaña deben publicar la MISMA cifra. Antes aquí solo se sumaban las
+    // donaciones, así que una campaña con recaudación histórica mostraba 0.
+    const funding = campaignFunding(campaign.raised, donationRow?.total_raised);
+    const totalRaised = funding.reconciledRaised;
     const totalSpent = Number(expenseRow?.total_spent ?? 0);
     const publicSpent = Number(expenseRow?.public_spent ?? 0);
     const goal = campaign.goal || 0;
@@ -125,9 +130,15 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       title: campaign.title,
       goal,
       totalRaised,
+      verifiedRaised: funding.verifiedRaised,
+      historicalRaised: funding.historicalRaised,
+      historicalCounted: funding.historicalCounted,
       totalSpent,
       publicSpent,
       balance: totalRaised - totalSpent,
+      // Fecha de la consulta: los datos se leen en vivo de la base, así que el
+      // panel puede mostrar cuándo se actualizó por última vez (Fase 3.2).
+      updatedAt: new Date().toISOString(),
       donorCount: donationRow?.donor_count ?? 0,
       executionPercent: goal > 0 ? Math.min(100, Math.round((totalSpent / goal) * 100)) : 0,
       raisedPercent: goal > 0 ? Math.min(100, Math.round((totalRaised / goal) * 100)) : 0,

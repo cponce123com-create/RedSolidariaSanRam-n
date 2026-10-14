@@ -27,6 +27,9 @@ export interface Campaign {
   imageUrl?: string | null;
   goal: number;
   raised: number;
+  verifiedRaised: number;
+  historicalRaised: number;
+  historicalCounted: boolean;
   donorCount: number;
   status: CampaignStatus;
   featured: boolean;

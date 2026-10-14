@@ -7,6 +7,14 @@ export interface TransparencyData {
   title: string;
   goal: number;
   totalRaised: number;
+  /** Suma de donaciones confirmadas (fuente verificable). */
+  verifiedRaised: number;
+  /** Importe histórico registrado a mano en la campaña. */
+  historicalRaised: number;
+  /** true si el histórico cuenta (no hay donaciones registradas). */
+  historicalCounted: boolean;
+  /** ISO de la consulta: los datos se leen en vivo de la base. */
+  updatedAt: string;
   totalSpent: number;
   publicSpent: number;
   balance: number;

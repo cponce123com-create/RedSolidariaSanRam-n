@@ -14,6 +14,13 @@
 export const PUBLIC_SETTING_KEYS = [
   // Portada: campaña protagonista (identificador estable).
   "protagonist_campaign_id",
+  // Contacto por WhatsApp (Fase 7): número y mensajes predefinidos editables.
+  // Son datos que se muestran en el sitio (enlaces wa.me), no secretos.
+  "org_whatsapp",
+  "whatsapp_message_general",
+  "whatsapp_message_donation",
+  "whatsapp_message_volunteer",
+  "whatsapp_message_sponsor",
   // Evento ChocoFest 2026: datos editables que se muestran al público.
   "chocofest_2026_place",
   "chocofest_2026_schedule",

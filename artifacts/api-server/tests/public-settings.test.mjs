@@ -11,6 +11,13 @@ const { PUBLIC_SETTING_KEYS, filterPublicSettings, isPublicSettingKey } = await 
 // contrato, y cualquier clave nueva queda privada hasta añadirla aquí.
 const EXPECTED_PUBLIC_KEYS = [
   "protagonist_campaign_id",
+  // Contacto por WhatsApp (Fase 7): el número se publica en los enlaces wa.me
+  // del sitio, así que es público; los mensajes predefinidos también (texto).
+  "org_whatsapp",
+  "whatsapp_message_general",
+  "whatsapp_message_donation",
+  "whatsapp_message_volunteer",
+  "whatsapp_message_sponsor",
   "chocofest_2026_place",
   "chocofest_2026_schedule",
   "chocofest_2026_motto",
@@ -25,6 +32,15 @@ test("allowlist: contiene las claves que consume el sitio público", () => {
   }
   assert.equal(PUBLIC_SETTING_KEYS.length, EXPECTED_PUBLIC_KEYS.length);
   assert.deepEqual([...PUBLIC_SETTING_KEYS].sort(), [...EXPECTED_PUBLIC_KEYS].sort());
+});
+
+test("allowlist: el WhatsApp es público, pero el resto del contacto sigue privado", () => {
+  // El número de WhatsApp se publica a propósito (enlaces wa.me del sitio).
+  assert.equal(isPublicSettingKey("org_whatsapp"), true);
+  // Teléfono, correo, dirección y cuentas bancarias NO se publican por la API.
+  for (const key of ["org_phone", "org_email", "org_address", "donation_bcp", "donation_yape"]) {
+    assert.equal(isPublicSettingKey(key), false, `${key} NO debería ser pública`);
+  }
 });
 
 test("allowlist: el resto de configuraciones son PRIVADAS por defecto", () => {

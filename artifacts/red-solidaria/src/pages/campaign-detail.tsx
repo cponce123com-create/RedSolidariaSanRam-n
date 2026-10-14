@@ -272,6 +272,22 @@ export default function CampaignDetail() {
                         <Users className="w-4 h-4" /> {t("campaignDetail.donorCount", { count: campaign.donorCount })}
                       </div>
                     </div>
+                    {/* Fase 3.1: la recaudación se concilia. Si la campaña tiene un
+                        importe histórico registrado a mano, se explica si cuenta
+                        o si solo es referencia, en vez de mezclarlo en silencio. */}
+                    {campaign.historicalCounted ? (
+                      <p className="mt-3 text-xs text-muted-foreground" data-testid="funding-historical-counted">
+                        {t("campaignDetail.fundingHistoricalCounted", {
+                          amount: campaign.historicalRaised.toLocaleString("es-PE", { minimumFractionDigits: 0 }),
+                        })}
+                      </p>
+                    ) : campaign.historicalRaised > 0 ? (
+                      <p className="mt-3 text-xs text-muted-foreground" data-testid="funding-historical-reference">
+                        {t("campaignDetail.fundingHistoricalReference", {
+                          amount: campaign.historicalRaised.toLocaleString("es-PE", { minimumFractionDigits: 0 }),
+                        })}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-4 mb-8 bg-secondary/50 rounded-2xl p-4 border border-border/50">

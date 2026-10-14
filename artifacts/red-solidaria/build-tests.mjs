@@ -23,6 +23,7 @@ await build({
     "./src/lib/budget.ts",
     "./src/lib/baskets.ts",
     "./src/lib/admin-access.ts",
+    "./src/lib/whatsapp.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",
   ],

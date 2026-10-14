@@ -45,6 +45,9 @@ export const en: TranslationSchema = {
   whatsapp: {
     aria: "Contact us on WhatsApp",
     message: "Hi, I would like more information about how to help.",
+    messageDonation: "Hi, I would like to make a donation to Red Solidaria San Ramón.",
+    messageVolunteer: "Hi, I would like to volunteer at Red Solidaria San Ramón.",
+    messageSponsor: "Hi, I would like to sponsor or donate goods to Red Solidaria San Ramón.",
   },
   mobileNav: {
     home: "Home",
@@ -421,6 +424,10 @@ export const en: TranslationSchema = {
     startDate: "Start Date",
     endDate: "End Date",
     closedCampaign: "Campaign Closed",
+    fundingHistoricalCounted:
+      "Includes S/ {{amount}} of recorded historical fundraising, with no donations recorded on the platform yet.",
+    fundingHistoricalReference:
+      "Campaign historical record: S/ {{amount}} (reference only; not added because donations are already recorded and it would be double counted).",
     shareDescription: "Support this charity campaign in San Ramón, Chanchamayo.",
     shareQr: "Share QR",
     percentTransparent: "100% Transparent",
@@ -632,6 +639,7 @@ export const en: TranslationSchema = {
   },
   campaignTransparency: {
     loading: "Loading transparency data...",
+    updatedAt: "Last updated: {{date}}",
     unavailableTitle: "Information unavailable",
     unavailableDescription:
       "We could not load the transparency panel for this campaign.",
