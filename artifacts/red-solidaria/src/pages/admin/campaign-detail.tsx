@@ -10,6 +10,7 @@ import {
   useCreateCampaignUpdate,
   useDeleteCampaignUpdate
 } from "@workspace/api-client-react";
+import { useDonors } from "@/hooks/use-donors-admin";
 import { 
   useAdminCampaignExpenses, 
   useCreateExpense, 
@@ -136,6 +137,7 @@ const leftoverSchema = z
     targetQty: z.coerce.number().min(0, "La meta no puede ser negativa").optional(),
     receivedQty: z.coerce.number().min(0, "La cantidad recibida no puede ser negativa"),
     usedQty: z.coerce.number().min(0, "La cantidad usada no puede ser negativa").default(0),
+    composition: z.string().optional(),
     unit: z.string().optional(),
     notes: z.string().optional(),
     isPublic: z.boolean().default(true),
@@ -171,6 +173,9 @@ export default function AdminCampaignDetail() {
   const { data: updates } = useGetCampaignUpdates(campaignId);
   const { data: expenses } = useAdminCampaignExpenses(campaignId);
   const { data: evidence } = useAdminCampaignEvidence(campaignId);
+  // Donantes del panel (ids reales de donante) para vincular cada bien con quien
+  // lo donó, y evidencias de la campaña para la entrega (migración 017).
+  const { data: donors } = useDonors();
   const { data: leftovers } = useAdminCampaignLeftovers(campaignId);
 
   const updateCampaign = useUpdateCampaign();
@@ -346,6 +351,7 @@ export default function AdminCampaignDetail() {
         targetQty: values.targetQty ?? null,
         receivedQty: values.receivedQty,
         usedQty: values.usedQty,
+        composition: values.composition,
         unit: values.unit,
         notes: values.notes,
         isPublic: values.isPublic,
@@ -359,6 +365,7 @@ export default function AdminCampaignDetail() {
             targetQty: undefined,
             receivedQty: 0,
             usedQty: 0,
+            composition: "",
             unit: "",
             notes: "",
             isPublic: true,
@@ -1173,6 +1180,25 @@ export default function AdminCampaignDetail() {
                   )} />
                 </div>
 
+                <FormField control={leftoverForm.control} name="composition" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Composición (solo canastas)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Arroz | 2 kg   ·   Aceite | 1 l   ·   Frijol | 1 kg"
+                        rows={3}
+                        className="bg-secondary/30 rounded-xl font-mono"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Una línea por producto: <code>producto | cantidad unidad</code>. Con esto la web
+                      calcula cuántas canastas COMPLETAS se pueden armar hoy y qué insumo falta.
+                    </p>
+                    <FormMessage/>
+                  </FormItem>
+                )} />
+
                 <FormField control={leftoverForm.control} name="notes" render={({ field }) => (
                   <FormItem><FormLabel>Destino / Notas</FormLabel><FormControl><Textarea placeholder="Ej. entregados en la comunidad, en custodia, valorizados... (informativo: no se suma al dinero recaudado)" className="bg-secondary/30 rounded-xl" {...field} /></FormControl><FormMessage/></FormItem>
                 )} />
@@ -1219,6 +1245,47 @@ export default function AdminCampaignDetail() {
                         {lo.notes ? (
                           <p className="text-xs text-muted-foreground font-normal">{lo.notes}</p>
                         ) : null}
+                        {/* Trazabilidad del bien (migración 017): quién lo donó y con
+                            qué evidencia se entregó. El PUT hace merge en el servidor,
+                            así que cambiar solo estos campos no borra el resto. */}
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          <select
+                            value={lo.donorId ?? ""}
+                            onChange={(e) =>
+                              updateLeftover.mutate({
+                                id: lo.id,
+                                data: { donorId: e.target.value ? Number(e.target.value) : null },
+                              })
+                            }
+                            aria-label="Donante del bien"
+                            className="h-8 max-w-[190px] rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+                          >
+                            <option value="">Sin donante asignado</option>
+                            {(donors ?? []).map((donor) => (
+                              <option key={donor.id} value={donor.id}>
+                                {donor.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={lo.evidenceId ?? ""}
+                            onChange={(e) =>
+                              updateLeftover.mutate({
+                                id: lo.id,
+                                data: { evidenceId: e.target.value ? Number(e.target.value) : null },
+                              })
+                            }
+                            aria-label="Evidencia de entrega"
+                            className="h-8 max-w-[210px] rounded-lg border border-border bg-background px-2 text-xs text-foreground"
+                          >
+                            <option value="">Sin evidencia asociada</option>
+                            {(evidence ?? []).map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {INVENTORY_CATEGORY_LABEL[normalizeCategory(lo.category)]}

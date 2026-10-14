@@ -16,11 +16,22 @@ import { CreditCard, Landmark, Phone, Heart, CheckCircle2, ChevronRight, Chevron
 import confetti from "canvas-confetti";
 import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
 
-type DonorType = "individual" | "familia" | "empresa" | "anonimo";
+type PaymentMethod = "yape" | "plin" | "transfer" | "card" | "cash" | "other";
+type DonorType = "individual" | "familia" | "empresa" | "organizacion" | "anonimo";
+type CollaborationType = "dinero" | "productos" | "servicios" | "logistica";
+
+/** Clave i18n de cada tipo de colaboración (para etiquetas en el selector/resumen). */
+const COLLABORATION_LABEL_KEY: Record<CollaborationType, string> = {
+  dinero: "donation.collaborationDinero",
+  productos: "donation.collaborationProductos",
+  servicios: "donation.collaborationServicios",
+  logistica: "donation.collaborationLogistica",
+};
 
 type DonationFormValues = {
+  collaborationType: CollaborationType;
   amount: number;
-  paymentMethod: "yape" | "plin" | "transfer" | "card" | "cash" | "other";
+  paymentMethod?: PaymentMethod;
   message?: string;
   anonymous: boolean;
   publicProof: boolean;
@@ -57,31 +68,60 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
 
   // Schema de validación con mensajes traducidos (se reconstruye por render:
   // es barato y mantiene los mensajes sincronizados con el idioma activo).
-  const donationSchema = z.object({
-    amount: z
-      .coerce
-      .number()
-      .min(5, t("donation.minAmount"))
-      // Épsilon: 5.01*100 = 500.99999999999994 en float64; comparación exacta
-      // rechazaría montos legítimos con centavos (50.01, 10.10, ...).
-      .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8, t("donation.twoDecimals")),
-    paymentMethod: z.enum(["yape", "plin", "transfer", "card", "cash", "other"], {
-      required_error: t("donation.selectMethod"),
-    }),
-    message: z.string().optional(),
-    anonymous: z.boolean().default(false),
-    publicProof: z.boolean().default(false),
-    firstName: z.string().min(2, t("donation.requiredName")),
-    lastName: z.string().min(2, t("donation.requiredLastName")),
-    email: z.string().email(t("donation.invalidEmail")),
-    phone: z.string().optional(),
-    donorType: z.enum(["individual", "familia", "empresa", "anonimo"]).default("individual"),
-    receiptNote: z.string().optional(),
-  });
+  const donationSchema = z
+    .object({
+      collaborationType: z
+        .enum(["dinero", "productos", "servicios", "logistica"])
+        .default("dinero"),
+      // Monto (dinero) o valor estimado (especie). En especie puede quedar
+      // vacío: z.coerce.number() convierte "" en 0 y el mínimo es 0.
+      amount: z
+        .coerce
+        .number()
+        .min(0, t("donation.minAmount"))
+        // Épsilon: 5.01*100 = 500.99999999999994 en float64; comparación exacta
+        // rechazaría montos legítimos con centavos (50.01, 10.10, ...).
+        .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8, t("donation.twoDecimals")),
+      // Solo las donaciones de dinero exigen método de pago (ver superRefine).
+      paymentMethod: z
+        .enum(["yape", "plin", "transfer", "card", "cash", "other"])
+        .optional(),
+      message: z.string().optional(),
+      anonymous: z.boolean().default(false),
+      publicProof: z.boolean().default(false),
+      firstName: z.string().min(2, t("donation.requiredName")),
+      lastName: z.string().min(2, t("donation.requiredLastName")),
+      email: z.string().email(t("donation.invalidEmail")),
+      phone: z.string().optional(),
+      donorType: z
+        .enum(["individual", "familia", "empresa", "organizacion", "anonimo"])
+        .default("individual"),
+      receiptNote: z.string().optional(),
+    })
+    // Monto mínimo (S/ 5) y método de pago SOLO para colaboraciones de dinero:
+    // una donación en especie es válida con valor estimado 0 y sin método.
+    .superRefine((data, ctx) => {
+      if (data.collaborationType !== "dinero") return;
+      if (!(data.amount >= 5)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["amount"],
+          message: t("donation.minAmount"),
+        });
+      }
+      if (!data.paymentMethod) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["paymentMethod"],
+          message: t("donation.selectMethod"),
+        });
+      }
+    });
 
   const form = useForm<DonationFormValues>({
     resolver: zodResolver(donationSchema),
     defaultValues: {
+      collaborationType: "dinero",
       amount: 50,
       paymentMethod: "yape",
       message: "",
@@ -96,10 +136,25 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
     },
   });
 
+  const collaborationType = form.watch("collaborationType");
+  const isMoney = collaborationType === "dinero";
   const paymentMethod = form.watch("paymentMethod");
   const amount = form.watch("amount");
+  const estimatedValue = Number(amount) || 0;
   const donorTypeValue = form.watch("donorType");
-  const requiresReceipt = ["yape", "plin", "transfer"].includes(paymentMethod);
+  const requiresReceipt =
+    isMoney && paymentMethod != null && ["yape", "plin", "transfer"].includes(paymentMethod);
+
+  // Cambiar el tipo de colaboración reajusta la UI: en especie el valor es un
+  // estimado opcional (0 por defecto) y no se piden monto ni método de pago.
+  const handleCollaborationChange = (value: CollaborationType) => {
+    form.setValue("collaborationType", value);
+    if (value !== "dinero") form.setValue("amount", 0);
+    if (value === "dinero" && !(Number(form.getValues("amount")) >= 5)) {
+      form.setValue("amount", 50);
+    }
+    form.clearErrors(["amount", "paymentMethod"]);
+  };
 
   const triggerConfetti = () => {
     const duration = 3 * 1000;
@@ -164,10 +219,13 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
   };
 
   const onSubmit = (data: DonationFormValues) => {
+    const money = data.collaborationType === "dinero";
     createDonation.mutate(
       {
         data: {
           ...data,
+          // En especie no hay método de pago real: la API exige "other".
+          paymentMethod: money ? data.paymentMethod ?? "other" : "other",
           campaignId: campaignId || null,
           proofImageUrl: proofUrl,
           proofPublicId,
@@ -249,12 +307,38 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
               
               {/* STEP 1 */}
               <div className={step === 1 ? "block" : "hidden"}>
+                {/* Tipo de colaboración: dinero o especie (productos, servicios,
+                    apoyo logístico). Define si se piden monto y método de pago. */}
+                <div className="mb-8">
+                  <p className="text-base font-semibold block mb-3">{t("donation.collaborationLabel")}</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {([
+                      { value: "dinero" as const, label: t("donation.collaborationDinero") },
+                      { value: "productos" as const, label: t("donation.collaborationProductos") },
+                      { value: "servicios" as const, label: t("donation.collaborationServicios") },
+                      { value: "logistica" as const, label: t("donation.collaborationLogistica") },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleCollaborationChange(opt.value)}
+                        aria-pressed={collaborationType === opt.value}
+                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${collaborationType === opt.value ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-card text-muted-foreground hover:border-primary/40"}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <FormField
                   control={form.control}
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-base font-semibold">{t("donation.amountLabel")}</FormLabel>
+                      <FormLabel className="text-base font-semibold">
+                        {isMoney ? t("donation.amountLabel") : t("donation.estimatedValueLabel")}
+                      </FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 
@@ -263,24 +347,36 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                           {...field} 
                         />
                       </FormControl>
-                      <div className="flex flex-wrap gap-2 mt-3 justify-center">
-                        {[20, 50, 100, 200, 500].map(val => (
-                          <Button
-                            key={val}
-                            type="button"
-                            variant={amount === val ? "default" : "outline"}
-                            className={`rounded-xl ${amount === val ? 'shadow-md' : ''}`}
-                            onClick={() => form.setValue("amount", val)}
-                          >
-                            S/ {val}
-                          </Button>
-                        ))}
-                      </div>
+                      {isMoney && (
+                        <div className="flex flex-wrap gap-2 mt-3 justify-center">
+                          {[20, 50, 100, 200, 500].map(val => (
+                            <Button
+                              key={val}
+                              type="button"
+                              variant={amount === val ? "default" : "outline"}
+                              className={`rounded-xl ${amount === val ? 'shadow-md' : ''}`}
+                              onClick={() => form.setValue("amount", val)}
+                            >
+                              S/ {val}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {!isMoney && (
+                  <div className="mt-6 p-5 border border-primary/20 bg-primary/5 rounded-2xl">
+                    <div className="flex items-center gap-2 text-primary font-medium">
+                      <Heart className="w-5 h-5" /> {t("donation.inKindTitle")}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">{t("donation.inKindHint")}</p>
+                  </div>
+                )}
+
+                {isMoney && (
                 <div className="mt-8">
                   <p className="text-base font-semibold block mb-4">{t("donation.paymentMethod")}</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -337,6 +433,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
 
                   </div>
                 </div>
+                )}
 
                 <div className="mt-8 space-y-4">
                   <FormField
@@ -407,11 +504,12 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                     historial del panel. No cambia el monto ni el comprobante. */}
                 <div className="mt-6">
                   <p className="text-base font-semibold block mb-3">{t("donation.donorTypeLabel")}</p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {([
                       { value: "individual" as const, label: t("donation.donorTypeIndividual") },
                       { value: "familia" as const, label: t("donation.donorTypeFamilia") },
                       { value: "empresa" as const, label: t("donation.donorTypeEmpresa") },
+                      { value: "organizacion" as const, label: t("donation.donorTypeOrganizacion") },
                     ]).map((opt) => (
                       <button
                         key={opt.value}
@@ -432,7 +530,7 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                       <Landmark className="w-5 h-5" /> {t("donation.proofTitle")}
                     </div>
                     <p className="text-sm text-muted-foreground -mt-2">
-                      {t("donation.proofHint", { method: paymentMethod === "transfer" ? t("donation.transfer") : paymentMethod.toUpperCase() })}
+                      {t("donation.proofHint", { method: paymentMethod === "transfer" ? t("donation.transfer") : (paymentMethod ?? "").toUpperCase() })}
                     </p>
 
                     <FormField control={form.control} name="receiptNote" render={({ field }) => (
@@ -517,13 +615,19 @@ export function DonationModal({ open, onClose, campaignId, campaignTitle }: Dona
                 <div className="mt-8 bg-secondary rounded-2xl p-5 border border-border">
                   <h4 className="font-semibold mb-3 flex items-center gap-2"><Heart className="w-4 h-4 text-primary"/> {t("donation.summary")}</h4>
                   <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">{t("donation.amount")}</span>
-                    <span className="font-bold text-lg">S/ {amount}</span>
+                    <span className="text-muted-foreground">{t("donation.collaborationLabelShort")}</span>
+                    <span className="font-medium">{t(COLLABORATION_LABEL_KEY[collaborationType])}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">{t("donation.method")}</span>
-                    <span className="capitalize font-medium">{paymentMethod}</span>
+                    <span className="text-muted-foreground">{isMoney ? t("donation.amount") : t("donation.estimatedValueLabel")}</span>
+                    <span className="font-bold text-lg">{isMoney ? `S/ ${amount}` : estimatedValue > 0 ? `S/ ${estimatedValue}` : t("donation.noEstimatedValue")}</span>
                   </div>
+                  {isMoney && paymentMethod && (
+                    <div className="flex justify-between items-center text-sm mb-2">
+                      <span className="text-muted-foreground">{t("donation.method")}</span>
+                      <span className="capitalize font-medium">{paymentMethod}</span>
+                    </div>
+                  )}
                   {campaignTitle && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">{t("donation.campaign")}</span>

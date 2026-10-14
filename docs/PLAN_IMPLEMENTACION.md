@@ -64,7 +64,8 @@ Correcciones:
 
 **3C-3 — pendiente (diseño listo en `docs/ESTADO_IMPLEMENTACION.md` §6.6):**
 - *Meta de canastas y preparadas/entregadas*: **ya cubierto** por el modelo del 3A (categoría `canastas` con `targetQty`/`receivedQty`/`usedQty`).
-- *Composición por canasta*: migración 017 aditiva (`composition` en `campaign_leftovers`) + parser puro tolerante + función pura de **cobertura** (cuántas canastas completas se pueden armar y qué insumo limita).
+- *Composición por canasta*: ✅ **hecho en el 3C-3a** — migración 017 aditiva (`composition` en `campaign_leftovers`), parser puro tolerante (`parseComposition`/`serializeComposition`), campo en la pestaña de bienes del panel y visualización pública.
+- *Cobertura de canastas*: ✅ **hecho en el 3C-3a** — función pura `basketCoverage` que dice cuántas canastas COMPLETAS se pueden armar hoy con el stock real y qué insumo limita; se muestra en la sección pública de inventario.
 - *Regalos ligados a su donante y a la evidencia de entrega*: migración 017 aditiva (`donor_id`, `evidence_id` opcionales con `ON DELETE SET NULL`) reutilizando las listas de donantes y evidencias que ya existen.
 - *UI*: composición y selectores en la pestaña de bienes del panel; en la web, composición por canasta y «canastas preparables».
 
@@ -72,11 +73,13 @@ Correcciones:
 
 ## Incremento 4 — Fase 3: sistema profesional de donantes
 
-- Unificación de tipos (persona, familia, empresa, organización, anónimo) reutilizando el panel de donantes y `donor-identity`.
-- Tipos de colaboración: Yape, transferencia, productos, servicios, apoyo logístico.
-- Estados completos con `reverted` trazable; las pendientes nunca cuentan como ingreso.
-- Reconocimientos a nombre colectivo («Familia Quispe») sin publicar identidades individuales.
-- Preferencias de privacidad y consentimientos por donante; separación estricta público/privado.
+- ✅ **Unificación de tipos (persona, familia, empresa, organización, anónimo)** reutilizando el panel de donantes y `donor-identity` — hecho en el **4A**.
+- ✅ **Tipos de colaboración: dinero (Yape, transferencia, efectivo), productos, servicios, apoyo logístico** — hecho en el **4A**.
+- Estados completos con `reverted` trazable; las pendientes nunca cuentan como ingreso — **pendiente (4B)**.
+- Reconocimientos a nombre colectivo («Familia Quispe») sin publicar identidades individuales — **pendiente (4C)**.
+- Preferencias de privacidad y consentimientos por donante; separación estricta público/privado — **pendiente (4C)**.
+
+**4A — cerrado (tipos de colaboración y tipo de donante «organización»):** migración **018** aditiva (columna `collaboration_type` con default `dinero` para no reinterpretar el histórico, índice, normalización de los tipos de donante legados y reclasificación de las donaciones en especie ya registradas) y contrato puro `COLLABORATION_TYPES` en `donor-identity` con espejo en el frontend. El formulario público pregunta **qué** se dona: solo el dinero exige monto mínimo (S/ 5), método de pago y comprobante; una donación en especie se registra con valor estimado opcional (puede ser 0) y `paymentMethod: "other"`, y no genera un movimiento de 0 en el libro contable (que es append-only). El panel muestra el tipo de colaboración y el valor estimado, y las cifras públicas de dinero (recaudado, conteo de donantes y lista pública de donantes) dejan de contar los aportes en especie como «S/ 0». Detalle en `docs/ESTADO_IMPLEMENTACION.md` §7.
 
 ## Incremento 5 — Fase 4: certificados digitales con QR
 

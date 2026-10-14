@@ -63,6 +63,7 @@ function formatDonationSummary(d: typeof donationsTable.$inferSelect) {
     lastName: d.lastName,
     amount: toSafeAmount(d.amount),
     paymentMethod: d.paymentMethod,
+    collaborationType: d.collaborationType,
     status: d.status,
     anonymous: d.anonymous,
     createdAt: toIsoSafe(d.createdAt),

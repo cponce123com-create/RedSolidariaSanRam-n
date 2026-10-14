@@ -5,6 +5,7 @@
  * Red Solidaria San Ramón API
  * OpenAPI spec version: 0.2.0
  */
+import type { CreateDonationInputCollaborationType } from "./createDonationInputCollaborationType";
 import type { CreateDonationInputDonorType } from "./createDonationInputDonorType";
 import type { CreateDonationInputPaymentMethod } from "./createDonationInputPaymentMethod";
 
@@ -15,7 +16,8 @@ export interface CreateDonationInput {
   email: string;
   phone?: string | null;
   amount: number;
-  paymentMethod: CreateDonationInputPaymentMethod;
+  collaborationType?: CreateDonationInputCollaborationType;
+  paymentMethod?: CreateDonationInputPaymentMethod;
   message?: string | null;
   anonymous: boolean;
   publicProof?: boolean;

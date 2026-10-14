@@ -21,6 +21,7 @@ await build({
     "./src/lib/query-keys.ts",
     "./src/lib/query-invalidation.ts",
     "./src/lib/budget.ts",
+    "./src/lib/baskets.ts",
     "./src/lib/admin-access.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",

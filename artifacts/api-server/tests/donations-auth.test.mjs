@@ -166,3 +166,11 @@ test("POST /api/donations con comprobante de host no-Cloudinary → 400 (flujo d
     assert.equal(res.status, 400);
   });
 });
+
+test("POST /api/donations con tipo de colaboración inválido → 400 (schema Zod antes de DB)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await postDonation(base, { ...VALID_BODY, collaborationType: "trueque" });
+    assert.equal(res.status, 400);
+  });
+});

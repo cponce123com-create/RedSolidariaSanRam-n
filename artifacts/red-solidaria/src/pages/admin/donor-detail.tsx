@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useDonor, useReconcileDonation } from "@/hooks/use-donors-admin";
 import {
+  collaborationTypeLabel,
   donationStatusBadge,
   donationStatusLabel,
   donorTypeLabel,
+  isMoneyCollaboration,
   summarizeDonations,
 } from "@/lib/donors-admin";
 import { formatSafeDate } from "@/lib/i18n/date";
@@ -128,9 +130,17 @@ export default function AdminDonorDetail() {
                     <TableRow key={d.id}>
                       <TableCell className="text-sm text-muted-foreground">#{d.id}</TableCell>
                       <TableCell className="text-right font-bold">
-                        S/ {d.amount.toLocaleString("es-PE")}
+                        {isMoneyCollaboration(d.collaborationType)
+                          ? `S/ ${d.amount.toLocaleString("es-PE")}`
+                          : d.amount > 0
+                            ? `S/ ${d.amount.toLocaleString("es-PE")} est.`
+                            : "—"}
                       </TableCell>
-                      <TableCell className="text-sm">{d.paymentMethod}</TableCell>
+                      <TableCell className="text-sm">
+                        {isMoneyCollaboration(d.collaborationType)
+                          ? d.paymentMethod
+                          : collaborationTypeLabel(d.collaborationType)}
+                      </TableCell>
                       <TableCell>
                         <Badge className={`${donationStatusBadge(d.status)} border-0 shadow-sm`}>
                           {donationStatusLabel(d.status)}

@@ -110,4 +110,29 @@ describe("AdminDonations", () => {
       status: "approved",
     }];
   });
+
+  it("muestra el tipo de colaboración en donaciones en especie (nunca S/ 0)", () => {
+    donationsMock.donations = [{
+      ...donationsMock.donations[0],
+      amount: "0",
+      paymentMethod: "other",
+      collaborationType: "productos",
+      status: "pending",
+    }];
+
+    renderWithProviders(<AdminDonations />);
+
+    // La columna Monto / Método rotula el aporte como productos…
+    expect(screen.getByText("Productos")).toBeInTheDocument();
+    // …y no inventa un importe de cero para una donación en especie.
+    expect(screen.queryByText("S/ 0")).not.toBeInTheDocument();
+    expect(screen.getByText("Sin valor estimado")).toBeInTheDocument();
+
+    // Restaura para no contaminar otros tests
+    donationsMock.donations = [{
+      ...donationsMock.donations[0],
+      id: 1,
+      status: "approved",
+    }];
+  });
 });

@@ -96,6 +96,16 @@ export const DonationStatus = {
   rejected: "rejected",
 } as const;
 
+export type DonationCollaborationType =
+  (typeof DonationCollaborationType)[keyof typeof DonationCollaborationType];
+
+export const DonationCollaborationType = {
+  dinero: "dinero",
+  productos: "productos",
+  servicios: "servicios",
+  logistica: "logistica",
+} as const;
+
 export interface Donation {
   id: number;
   campaignId?: number | null;
@@ -112,12 +122,24 @@ export interface Donation {
   receiptUrl?: string | null;
   receiptNote?: string | null;
   status: DonationStatus;
+  collaborationType: DonationCollaborationType;
   adminNote?: string | null;
   createdAt: string;
 }
 
+export type CreateDonationInputCollaborationType =
+  (typeof CreateDonationInputCollaborationType)[keyof typeof CreateDonationInputCollaborationType];
+
+export const CreateDonationInputCollaborationType = {
+  dinero: "dinero",
+  productos: "productos",
+  servicios: "servicios",
+  logistica: "logistica",
+} as const;
+
 export type CreateDonationInputPaymentMethod =
-  (typeof CreateDonationInputPaymentMethod)[keyof typeof CreateDonationInputPaymentMethod];
+  | (typeof CreateDonationInputPaymentMethod)[keyof typeof CreateDonationInputPaymentMethod]
+  | null;
 
 export const CreateDonationInputPaymentMethod = {
   yape: "yape",
@@ -135,6 +157,7 @@ export const CreateDonationInputDonorType = {
   individual: "individual",
   familia: "familia",
   empresa: "empresa",
+  organizacion: "organizacion",
   anonimo: "anonimo",
 } as const;
 
@@ -145,7 +168,8 @@ export interface CreateDonationInput {
   email: string;
   phone?: string | null;
   amount: number;
-  paymentMethod: CreateDonationInputPaymentMethod;
+  collaborationType?: CreateDonationInputCollaborationType;
+  paymentMethod?: CreateDonationInputPaymentMethod;
   message?: string | null;
   anonymous: boolean;
   publicProof?: boolean;

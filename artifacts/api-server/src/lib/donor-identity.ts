@@ -6,7 +6,13 @@
  * verifican sin base de datos.
  */
 
-export const DONOR_TYPES = ["individual", "familia", "empresa", "anonimo"] as const;
+export const DONOR_TYPES = [
+  "individual",
+  "familia",
+  "empresa",
+  "organizacion",
+  "anonimo",
+] as const;
 export type DonorType = (typeof DONOR_TYPES)[number];
 
 export function isDonorType(value: unknown): value is DonorType {
@@ -19,11 +25,50 @@ const DONOR_TYPE_LABEL: Record<DonorType, string> = {
   individual: "Persona",
   familia: "Familia",
   empresa: "Empresa",
+  organizacion: "Organización",
   anonimo: "Anónimo",
 };
 
 export function donorTypeLabel(type: string): string {
   return isDonorType(type) ? DONOR_TYPE_LABEL[type] : type;
+}
+
+// ─── Tipos de colaboración ───────────────────────────────────────────────────
+
+/**
+ * QUÉ aporta el donante. Solo `dinero` implica monto mínimo y comprobante de
+ * pago: una donación en especie (productos, servicios, apoyo logístico) no
+ * tiene método de pago y su valor es un estimado que puede ser 0.
+ */
+export const COLLABORATION_TYPES = [
+  "dinero",
+  "productos",
+  "servicios",
+  "logistica",
+] as const;
+export type CollaborationType = (typeof COLLABORATION_TYPES)[number];
+
+export function isCollaborationType(value: unknown): value is CollaborationType {
+  return (
+    typeof value === "string" &&
+    (COLLABORATION_TYPES as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * Tipo por defecto. Todo lo anterior a la Fase 3 era dinero, así que un valor
+ * ausente o desconocido se interpreta como dinero (nunca al revés: no se puede
+ * dejar sin monto ni sin comprobante una donación que sí lo exigía).
+ */
+export const DEFAULT_COLLABORATION_TYPE: CollaborationType = "dinero";
+
+export function normalizeCollaborationType(value: unknown): CollaborationType {
+  return isCollaborationType(value) ? value : DEFAULT_COLLABORATION_TYPE;
+}
+
+/** Solo una colaboración de dinero exige monto y comprobante de pago. */
+export function collaborationRequiresAmount(value: unknown): boolean {
+  return normalizeCollaborationType(value) === "dinero";
 }
 
 /** Normaliza un correo: sin espacios y en minúsculas (identidad del donante). */

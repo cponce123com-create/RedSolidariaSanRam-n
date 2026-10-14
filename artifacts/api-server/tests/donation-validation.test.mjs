@@ -93,3 +93,74 @@ test("isValidProofUrl: solo https; con requireCloudinary exige el host de Cloudi
   // Donante: host distinto a Cloudinary → rechazado
   assert.equal(isValidProofUrl("https://example.com/receipt.jpg", { requireCloudinary: true }), false);
 });
+
+// ── Tipo de colaboración: dinero exige monto/comprobante; especie no ────────
+
+test("donationInputSchema: donación en especie aceptada sin método de pago ni monto", () => {
+  const productos = donationInputSchema.safeParse({
+    ...VALID,
+    collaborationType: "productos",
+    amount: 0,
+  });
+  assert.equal(productos.success, true, "productos con amount 0 debería aceptarse");
+
+  const servicios = donationInputSchema.safeParse({
+    ...VALID,
+    collaborationType: "servicios",
+    amount: 0,
+    paymentMethod: undefined,
+  });
+  assert.equal(servicios.success, true, "servicios sin paymentMethod debería aceptarse");
+
+  // amount omitido: en especie el valor es un estimado opcional (cae a 0).
+  const { amount: _omitido, ...sinMonto } = VALID;
+  const logistica = donationInputSchema.safeParse({
+    ...sinMonto,
+    collaborationType: "logistica",
+  });
+  assert.equal(logistica.success, true, "logística sin amount debería aceptarse");
+});
+
+test("donationInputSchema: en especie el monto sigue validándose (negativo / >2 decimales)", () => {
+  assert.equal(
+    donationInputSchema.safeParse({ ...VALID, collaborationType: "productos", amount: -1 }).success,
+    false,
+  );
+  assert.equal(
+    donationInputSchema.safeParse({ ...VALID, collaborationType: "productos", amount: 10.123 }).success,
+    false,
+  );
+});
+
+test("donationInputSchema: dinero exige monto ≥ 5 y método de pago", () => {
+  assert.equal(
+    donationInputSchema.safeParse({ ...VALID, collaborationType: "dinero", amount: 0 }).success,
+    false,
+  );
+  assert.equal(
+    donationInputSchema.safeParse({ ...VALID, collaborationType: "dinero", paymentMethod: undefined }).success,
+    false,
+  );
+  assert.equal(
+    donationInputSchema.safeParse({ ...VALID, collaborationType: "dinero", paymentMethod: null }).success,
+    false,
+  );
+  // Control: el mismo cuerpo sin collaborationType (→ dinero) también falla.
+  assert.equal(donationInputSchema.safeParse({ ...VALID, amount: 0 }).success, false);
+});
+
+test("donationInputSchema: tipo de colaboración desconocido → rechazado", () => {
+  assert.equal(
+    donationInputSchema.safeParse({ ...VALID, collaborationType: "trueque" }).success,
+    false,
+  );
+});
+
+test("approvalRequiresProof: en especie nunca exige comprobante", () => {
+  assert.equal(approvalRequiresProof("yape"), true);
+  assert.equal(approvalRequiresProof("yape", "dinero"), true);
+  assert.equal(approvalRequiresProof("yape", "productos"), false);
+  assert.equal(approvalRequiresProof("transfer", "logistica"), false);
+  assert.equal(approvalRequiresProof("cash", "dinero"), false);
+  assert.equal(approvalRequiresProof("other", "productos"), false);
+});

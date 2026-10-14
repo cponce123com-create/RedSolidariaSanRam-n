@@ -29,6 +29,12 @@ interface ItemPayload {
   targetQty: number | null;
   receivedQty: number | null;
   usedQty: number | null;
+  /** Composición de la canasta: una línea por producto ("arroz | 2 kg"). */
+  composition: string | null;
+  /** Donante del bien (opcional; sin FK estricta, ver migración 017). */
+  donorId: number | null;
+  /** Evidencia de entrega asociada (opcional). */
+  evidenceId: number | null;
 }
 
 type ParseResult =
@@ -111,6 +117,22 @@ function parseItemPayload(body: unknown, campaignId: number): ParseResult {
       targetQty,
       receivedQty,
       usedQty,
+      // Composición de la canasta: texto libre acotado (una línea por producto).
+      composition: optionalText(raw.composition, 600),
+      // Vínculos opcionales: cualquier valor que no sea un entero positivo se
+      // guarda como null en lugar de romper el alta del bien.
+      donorId:
+        typeof raw.donorId === "number" &&
+        Number.isInteger(raw.donorId) &&
+        raw.donorId > 0
+          ? raw.donorId
+          : null,
+      evidenceId:
+        typeof raw.evidenceId === "number" &&
+        Number.isInteger(raw.evidenceId) &&
+        raw.evidenceId > 0
+          ? raw.evidenceId
+          : null,
     },
   };
 }
@@ -269,6 +291,10 @@ export function formatLeftover(e: typeof campaignLeftoversTable.$inferSelect) {
     targetQty: e.targetQty,
     receivedQty: e.receivedQty,
     usedQty: e.usedQty,
+    // Migración 017: composición de canastas y trazabilidad del bien.
+    composition: e.composition,
+    donorId: e.donorId,
+    evidenceId: e.evidenceId,
     createdAt: toIsoSafe(e.createdAt),
   };
 }

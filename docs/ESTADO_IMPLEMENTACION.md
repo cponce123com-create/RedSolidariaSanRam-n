@@ -223,17 +223,71 @@ El «cronograma» de la página eran solo las novedades publicadas: no existía 
 
 **Pendiente real (requiere migración aditiva + ruta + panel + web, como el 3B):**
 
-1. **Composición por canasta.** `ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS composition text;` (migración 017, aditiva y reversible). Una línea por producto: `producto | cantidad unidad`. Parser puro `parseComposition` con el mismo patrón tolerante que `parseProgram` (nunca lanza; ignora líneas vacías; recorta longitudes).
-2. **Cobertura de canastas.** Función pura `basketCoverage(composition, bienes)` que cruza la composición con el stock real (reutilizando `categoryKey`/`resolveStock`) y devuelve **cuántas canastas completas se pueden armar y qué insumo es el limitante**. Es la cifra que hoy no existe y la que evita prometer canastas que no se pueden llenar. Pruebas en `tests/basket-composition.test.mjs`.
-3. **Regalos ligados a su donante y a la evidencia de entrega.** `ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS donor_id integer;` y `... evidence_id integer;` (opcionales, `ON DELETE SET NULL`). El panel ofrece las listas de donantes (`/admin/donors`) y evidencias (`/admin/campaigns/:id/evidence`) que ya existen; la web solo muestra lo autorizado.
-4. **UI:** bloque de composición y selectores de donante/evidencia en la pestaña de bienes del panel; en la web, composición por canasta y «canastas preparables» dentro del grupo canastas.
-5. **Verificación:** mismo pipeline (`typecheck` en libs/API/frontend/scripts, suites de API y frontend, vitest, build) + migración aditiva reversible.
+1. ✅ **Composición por canasta — HECHO (incremento 3C-3a).** Migración **017** aditiva y reversible: `ALTER TABLE campaign_leftovers ADD COLUMN IF NOT EXISTS composition text;` (más `donor_id` y `evidence_id`, ver punto 3). Una línea por producto: `producto | cantidad unidad`. Parser puro `parseComposition` + `serializeComposition` (`src/lib/baskets.ts`), con el mismo patrón tolerante que `parseProgram`: nunca lanza, ignora vacías y comentarios, acepta `2 kg`, `2` y `2,5 kg`, recorta longitudes y limita a 30 insumos. Editable desde la pestaña «Bienes e insumos» del panel (campo «Composición (solo canastas)»).
+2. ✅ **Cobertura de canastas — HECHO (incremento 3C-3a).** Función pura `basketCoverage(composición, bienes)` que cruza la composición con el stock real (reutilizando `resolveStock` y `categoryKey`) y devuelve **cuántas canastas COMPLETAS se pueden armar y qué insumo es el limitante**; si falta un insumo devuelve 0 en lugar de prometer canastas incompletas. La página pública la muestra en la sección de inventario junto al detalle por insumo. 10 pruebas en `tests/baskets.test.mjs`.
+3. ✅ **Juguetes y bienes ligados a su donante y a la evidencia de entrega — HECHO (incremento 3C-3b).** Migración 017: `donor_id` y `evidence_id` opcionales en `campaign_leftovers`. En la tabla de bienes del panel hay un selector de **donante** (listado del panel, con los ids reales de donante) y otro de **evidencia de entrega** (evidencias de la campaña); cambiar solo ese campo no borra el resto del bien porque el `PUT` del API hace merge. Los ids inválidos se normalizan a `null` y la web pública no expone estas referencias (solo el nombre autorizado cuando corresponda).
+4. ✅ **UI — HECHO:** composición y selectores de donante/evidencia en la pestaña de bienes del panel; en la web, composición por canasta y «canastas completas preparables» con el insumo limitante.
+5. ✅ **Verificación — HECHA:** typecheck 0 en libs, API, frontend y scripts; `api-server` 279/279; `red-solidaria` 130/130 node:test + 22/22 vitest; build de producción OK.
 
 **Dependencia de datos:** las cifras (metas de niños, raciones, juguetes, canastas y montos presupuestados) y los textos del evento los carga la organización desde el panel. No se ha introducido ninguna cifra ni texto inventado: mientras no existan, la interfaz muestra «sin meta definida» o no muestra la sección.
 
-## 7. Riesgos y bloqueos
+## 7. Incremento 4A (Fase 3: sistema profesional de donantes) — cerrado
 
-- **R-1 / R-2** (claves foráneas ausentes y doble migrador): ver `docs/AUDITORIA_INICIAL.md` §3. Ningún incremento realizado hasta ahora toca la base de datos.
+### 7.1 Tipos de colaboración: qué se dona, no solo cuánto
+
+Hasta ahora toda donación era dinero: `payment_method` describía el medio de cobro y no existía forma de registrar que una empresa donó **productos**, un profesional donó **horas de servicio** o un transportista aportó **apoyo logístico**. El tipo de colaboración pasa a ser un dato de primera clase.
+
+**Migración 018 (aditiva y reversible).**
+
+- `ALTER TABLE donations ADD COLUMN IF NOT EXISTS collaboration_type text NOT NULL DEFAULT 'dinero'` + índice. El valor por defecto `dinero` **no reinterpreta el histórico**: es lo que esas donaciones eran.
+- **Reclasificación honesta** de las donaciones en especie ya registradas: la convención histórica era **monto 0 con método `other`** (documentada en `src/lib/chocofest-2025-data.ts`), así que esas filas pasan a `productos` en lugar de quedarse como dinero. Un monto 0 nunca fue válido para una donación pública de dinero (mínimo S/ 5).
+- **Normalización de los tipos de donante legados** (`ong`, `institucion`, `asociacion`, `fundacion`, `persona`, …) a los valores canónicos del modelo, que ahora incluye **`organizacion`**. Es idempotente y solo actúa sobre alias que el formulario y el panel nunca escriben: en la práctica es una red de seguridad para datos importados.
+
+**Contrato puro compartido** (`donor-identity` en el API y espejo en `src/lib/donors-admin.ts`): `COLLABORATION_TYPES = [dinero, productos, servicios, logistica]`, `DEFAULT_COLLABORATION_TYPE`, `isCollaborationType`, `normalizeCollaborationType` (lo desconocido es **dinero**, nunca al revés: no se puede dejar sin monto ni sin comprobante una donación que sí los exigía) y `collaborationRequiresAmount`.
+
+**Reglas de negocio en la API (la frontera real, no el formulario):** el monto mínimo de S/ 5 y el método de pago se exigen **solo para dinero**; en especie el monto es un **valor estimado opcional** (0 si no se declara) y el método se guarda como `other`. `approvalRequiresProof(método, tipo)` ya no pide comprobante a una donación en especie: no hay pago que comprobar. Aprobar una donación en especie con valor 0 **no** añade un movimiento al libro contable (que es append-only: un movimiento de 0 sería ruido permanente).
+
+**Ninguna cifra inventada en lo público:** las donaciones en especie dejan de aparecer como «S/ 0» en la lista pública de donantes de la campaña y dejan de contarse como donantes de dinero en el listado, en el detalle de campaña y en el panel de transparencia (`donor_count`). El dinero recaudado no cambia (sumar 0 no suma).
+
+**Interfaz.**
+
+- **Formulario público:** paso 1 con «¿Qué quieres donar?» (Dinero · Productos · Servicios · Apoyo logístico). En especie se ocultan los importes rápidos y los métodos de pago, el campo pasa a «Valor estimado (opcional, S/)» y se explica que el equipo coordinará la entrega; el resumen muestra el tipo de colaboración y «Sin valor estimado» en lugar de un importe falso. El selector de tipo de donante incluye «Organización».
+- **Panel:** la tabla de donaciones muestra el tipo de colaboración y, en especie, el valor estimado (o «Sin valor estimado»); la búsqueda local incluye el tipo; la ficha del donante lo muestra en el historial.
+
+### 7.2 Archivos del incremento 4A
+
+```
+lib/db/src/schema/donations.ts                             columna collaboration_type
+lib/db/src/migrate.ts                                      migración 018 (aditiva)
+lib/api-spec/openapi.yaml                                  Donation/CreateDonationInput (+ clientes regenerados)
+artifacts/api-server/src/lib/donor-identity.ts             DONOR_TYPES con organizacion + contrato de colaboración
+artifacts/api-server/src/lib/donation-validation.ts        schema, MIN_DONATION_AMOUNT, approvalRequiresProof
+artifacts/api-server/src/routes/donations.ts               persistencia, comprobante por tipo, ledger solo si monto > 0
+artifacts/api-server/src/routes/donors.ts                  tipo de colaboración en el historial del donante
+artifacts/api-server/src/routes/campaigns.ts               donantes y lista pública: solo aportes de dinero
+artifacts/api-server/src/routes/campaign-transparency.ts   donor_count solo de dinero
+artifacts/api-server/tests/donor-identity.test.mjs         +contratos de colaboración
+artifacts/api-server/tests/donation-validation.test.mjs    +7 casos (dinero frente a especie)
+artifacts/api-server/tests/donations-auth.test.mjs         +1 caso (tipo de colaboración inválido)
+artifacts/red-solidaria/src/lib/donors-admin.ts            espejo del contrato + etiquetas
+artifacts/red-solidaria/src/components/shared/DonationModal.tsx  selector de colaboración y UI condicional
+artifacts/red-solidaria/src/pages/admin/donations.tsx      tipo de colaboración y valor estimado
+artifacts/red-solidaria/src/pages/admin/donor-detail.tsx   tipo de colaboración en el historial
+artifacts/red-solidaria/src/pages/admin/donors.tsx         descripción con organizaciones
+artifacts/red-solidaria/src/lib/i18n/locales/es.ts|en.ts   11 etiquetas nuevas
+artifacts/red-solidaria/tests/donors-admin.test.mjs        +4 pruebas
+artifacts/red-solidaria/tests/vitest/admin-donations.test.tsx  +1 prueba (especie: nunca «S/ 0»)
+```
+
+### 7.3 Verificación del incremento 4A
+
+`api-server` **286/286** (+7) · `red-solidaria` **133/133** node:test (+4) + **23/23** vitest (+1) · typecheck 0 en libs, API, frontend y scripts · build de producción OK.
+
+**Nota de despliegue:** la migración 018 se aplica al arrancar y es idempotente; no elimina ni reescribe columnas y sus escrituras de datos se limitan a los dos casos documentados arriba (alias de tipo de donante y donaciones en especie).
+
+## 8. Riesgos y bloqueos
+
+- **R-1 / R-2** (claves foráneas ausentes y doble migrador): ver `docs/AUDITORIA_INICIAL.md` §3. Las migraciones de estos incrementos (015–018) son aditivas (`ADD COLUMN` / `CREATE TABLE`) y se aplican al arrancar: ninguna borra columnas ni tablas, y las únicas escrituras de datos (migración 018) están documentadas en §7.1.
 - **Fase 12 (identidad visual)** bloqueada hasta disponer de los archivos oficiales del logo y de Piñito; no se generará ningún diseño sustituto.
 - **Pruebas de integración con base real** (borrado `204`, `409` por dependencias, restauración de respaldos): requieren una base PostgreSQL accesible; en este contenedor las suites usan un `DATABASE_URL` ficticio, por lo que se ejecutarán en el entorno de despliegue (incremento 16).
 - **Producción:** no se ha ejecutado ninguna operación destructiva ni se han modificado datos reales.
