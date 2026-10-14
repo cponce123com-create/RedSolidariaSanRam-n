@@ -87,6 +87,8 @@ interface LedgerAuditReport {
     brokenAt: number | null;
     rootHash: string | null;
     count: number;
+    /** Nº de cadenas (campañas con movimientos) verificadas. */
+    campaigns?: number;
   };
   movementCount: number;
   donationsWithoutMovement: DonationWithoutMovement[];
@@ -280,7 +282,11 @@ export default function AdminLedgerAudit() {
                   {data.chain.verified ? "Verificada" : `Rota en el asiento ${data.chain.brokenAt ?? "?"}`}
                 </Badge>
                 <p className="text-xs text-muted-foreground mt-3 font-mono break-all">
-                  raíz: {data.chain.rootHash ?? "sin raíz (cadena rota o vacía)"}
+                  {data.chain.rootHash
+                    ? `raíz: ${data.chain.rootHash}`
+                    : (data.chain.campaigns ?? 0) > 1
+                      ? `${data.chain.campaigns} cadenas verificadas (una por campaña)`
+                      : "sin raíz (cadena rota o vacía)"}
                 </p>
               </CardContent>
             </Card>

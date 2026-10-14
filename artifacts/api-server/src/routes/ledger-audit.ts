@@ -11,7 +11,7 @@ import { requireRole, ROLES } from "../middleware/roles";
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { logAuditAction } from "../middleware/auth-utils";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
-import { appendMovement, verifyChain } from "../lib/ledger";
+import { appendMovement, verifyCampaignChains } from "../lib/ledger";
 import { auditLedger, type LedgerAuditReport } from "../lib/ledger-audit";
 import {
   planRegularization,
@@ -63,7 +63,8 @@ async function buildAuditReport(): Promise<{
     movements,
     donations: confirmedDonations.map((d) => ({ ...d, confirmed: true })),
     expenses,
-    chain: verifyChain(movements),
+    // La cadena es independiente por campaña: se agrupa antes de verificar.
+    chain: verifyCampaignChains(movements),
   });
 
   return { report, confirmedDonations, expenseCount: expenses.length };
