@@ -59,6 +59,27 @@ function formatVolunteer(v: typeof volunteersTable.$inferSelect) {
   };
 }
 
+/**
+ * DTO PÚBLICO de una postulación de voluntario (V14-02, seguridad).
+ *
+ * `POST /volunteers` es una ruta PÚBLICA y devolvía `formatVolunteer(...)`, que
+ * incluye campos ADMINISTRATIVOS: `adminNotes` (notas internas del equipo) y
+ * `approvedBy` (quién la aprobó). El registro no debe revelar nada de eso.
+ *
+ * Se expone lo mínimo que la persona necesita: su estado y su enlace de seguimiento
+ * (su propio token, que la interfaz usa para mostrarle el enlace).
+ */
+function formatPublicVolunteer(v: typeof volunteersTable.$inferSelect) {
+  return {
+    id: v.id,
+    name: v.name,
+    status: v.status,
+    statusLabel: volunteerStatusLabel(v.status),
+    publicToken: v.publicToken,
+    createdAt: toIsoSafe(v.createdAt),
+  };
+}
+
 // ─── PUBLIC: registro permanente ──────────────────────────────────────────────
 router.post("/volunteers", volunteerLimiter, async (req, res) => {
   try {
@@ -101,7 +122,9 @@ router.post("/volunteers", volunteerLimiter, async (req, res) => {
       })
       .returning();
 
-    return res.status(201).json(formatVolunteer(volunteer));
+    // V14-02: DTO PÚBLICO. Antes se devolvía la ficha administrativa completa, con
+    // `adminNotes` y `approvedBy` incluidos, a una ruta pública.
+    return res.status(201).json(formatPublicVolunteer(volunteer));
   } catch (err) {
     req.log.error({ err }, "Failed to register volunteer");
     return res

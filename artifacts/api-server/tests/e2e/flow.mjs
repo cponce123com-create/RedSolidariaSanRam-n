@@ -1575,6 +1575,110 @@ check(
     String(JSON.stringify(orphanAudit.body ?? {})).includes("EXPENSE_DEMO_PURGED"),
 );
 
+// ── 7decies. PRIVACIDAD PÚBLICA: mascotas y voluntarios (V14, Entrega 1) ─────
+// Dos fugas reales: la ruta pública de mascotas aceptaba cualquier `?status=` y
+// devolvía la fila entera (con los datos de contacto), y el registro público de
+// voluntarios devolvía la ficha administrativa (con `adminNotes` y `approvedBy`).
+const PRIVATE_CONTACT = {
+  contactName: "Contacto Privado E2E",
+  contactPhone: "+51 999 888 777",
+  contactEmail: "contacto-privado-e2e@example.com",
+};
+
+const submittedPet = await call("POST", "/api/pets/submit", {
+  name: `Mascota E2E ${stamp}`,
+  species: "perro",
+  sex: "macho",
+  ageCategory: "adulto",
+  size: "mediano",
+  description: "Ficha enviada por una persona de la comunidad para su revisión.",
+  location: "San Ramón",
+  ...PRIVATE_CONTACT,
+});
+const submittedPetId = submittedPet.body?.id;
+check("la ficha enviada por el público se registra en revisión", submittedPet.status === 201, `status=${submittedPet.status}`);
+check(
+  "la respuesta del envío NO repite los datos de contacto ni marcas internas",
+  submittedPet.body !== undefined &&
+    !("contactName" in submittedPet.body) &&
+    !("contactPhone" in submittedPet.body) &&
+    !("contactEmail" in submittedPet.body) &&
+    !("submittedByPublic" in submittedPet.body),
+  `claves=${JSON.stringify(Object.keys(submittedPet.body ?? {}))}`,
+);
+
+const petNotPublic = await call("GET", `/api/pets/${submittedPetId}`);
+check("una ficha EN REVISIÓN no es consultable públicamente (404)", petNotPublic.status === 404, `status=${petNotPublic.status}`);
+
+const publicListBefore = await call("GET", "/api/pets");
+check(
+  "la ficha en revisión no aparece en el listado público",
+  publicListBefore.status === 200 && !(publicListBefore.body ?? []).some((row) => row.id === submittedPetId),
+);
+
+const manipulatedStatus = await call("GET", "/api/pets?status=reviewing");
+check(
+  "un estado no público se RECHAZA (400): no se puede manipular el filtro",
+  manipulatedStatus.status === 400,
+  `status=${manipulatedStatus.status}`,
+);
+const manipulatedStatus2 = await call("GET", "/api/pets?status=inactive");
+check("tampoco cuela un estado inventado", manipulatedStatus2.status === 400, `status=${manipulatedStatus2.status}`);
+
+// Se publica desde la administración y entonces sí es visible… sin datos privados.
+const publishedPet = await call("PATCH", `/api/admin/pets/${submittedPetId}`, { status: "available" }, { auth: true });
+check("la administración publica la ficha", publishedPet.status === 200, `status=${publishedPet.status}`);
+
+const publicDetail = await call("GET", `/api/pets/${submittedPetId}`);
+check("ya publicada, la ficha se consulta públicamente", publicDetail.status === 200, `status=${publicDetail.status}`);
+check(
+  "el DTO público NO expone contacto ni marcas internas",
+  publicDetail.body !== undefined &&
+    !("contactName" in publicDetail.body) &&
+    !("contactPhone" in publicDetail.body) &&
+    !("contactEmail" in publicDetail.body) &&
+    !("submittedByPublic" in publicDetail.body),
+  `claves=${JSON.stringify(Object.keys(publicDetail.body ?? {}))}`,
+);
+check(
+  "el DTO público SÍ lleva lo que la web necesita",
+  publicDetail.body?.name !== undefined && publicDetail.body?.species !== undefined && publicDetail.body?.status === "available",
+);
+check(
+  "el DTO ADMINISTRATIVO conserva los datos de contacto (para gestionar la adopción)",
+  (await call("GET", `/api/admin/pets/${submittedPetId}`, undefined, { auth: true })).body?.contactPhone ===
+    PRIVATE_CONTACT.contactPhone,
+);
+
+// Voluntarios: el registro público no devuelve campos administrativos.
+const volunteerSignup = await call("POST", "/api/volunteers", {
+  name: `Voluntario E2E ${stamp}`,
+  email: `voluntario-e2e-${stamp}@example.com`,
+  phone: "+51 900 000 000",
+  age: "30",
+  district: "San Ramón",
+  availability: "fines de semana",
+  skills: "logística",
+  interests: "niñez",
+  motivation: "Quiero ayudar en las campañas de la comunidad.",
+});
+check("el registro de voluntario responde 201", volunteerSignup.status === 201, `status=${volunteerSignup.status}`);
+check(
+  "el registro público NO devuelve notas internas ni quién aprobó",
+  volunteerSignup.status === 201 &&
+    volunteerSignup.body !== undefined &&
+    !("adminNotes" in volunteerSignup.body) &&
+    !("approvedBy" in volunteerSignup.body),
+  `status=${volunteerSignup.status} claves=${JSON.stringify(Object.keys(volunteerSignup.body ?? {}))}`,
+);
+check(
+  "el registro público devuelve lo mínimo (estado y enlace de seguimiento)",
+  volunteerSignup.body?.status === "pending" &&
+    typeof volunteerSignup.body?.statusLabel === "string" &&
+    typeof volunteerSignup.body?.publicToken === "string",
+  JSON.stringify({ status: volunteerSignup.body?.status, tieneToken: typeof volunteerSignup.body?.publicToken }),
+);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);
