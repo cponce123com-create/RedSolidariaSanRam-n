@@ -1679,6 +1679,131 @@ check(
   JSON.stringify({ status: volunteerSignup.body?.status, tieneToken: typeof volunteerSignup.body?.publicToken }),
 );
 
+// ── 7undecies. GUARDAS DEL SUPERADMIN (V14, Entrega 1.3) ─────────────────────
+// El panel no puede quedarse sin ningún superadministrador activo, y nadie puede
+// eliminarse a sí mismo. Las reglas están en el SERVIDOR, no en botones.
+const SUPER_GUARD_REASON = "Prueba de las guardas de administración (E2E)";
+
+const createdSuper = await call(
+  "POST",
+  "/api/admin/users",
+  {
+    username: `e2e-super-${stamp}`,
+    password: "E2e-Passw0rd!2026",
+    name: "Superadmin de prueba E2E",
+    role: "superadmin",
+  },
+  { auth: true },
+);
+const createdSuperId = createdSuper.body?.id;
+check("se crea un superadmin de prueba", createdSuper.status === 201 && Number.isInteger(createdSuperId), `status=${createdSuper.status}`);
+
+// Con UN solo superadmin activo en la tabla, las tres operaciones críticas se bloquean.
+const deleteLast = await call("DELETE", `/api/admin/users/${createdSuperId}`, undefined, { auth: true });
+check(
+  "no se puede ELIMINAR al último superadmin activo (409)",
+  deleteLast.status === 409 && deleteLast.body?.code === "last_superadmin",
+  `status=${deleteLast.status} code=${deleteLast.body?.code ?? ""}`,
+);
+
+const deactivateLast = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { active: false },
+  { auth: true },
+);
+check(
+  "no se puede DESACTIVAR al último superadmin activo (409)",
+  deactivateLast.status === 409 && deactivateLast.body?.code === "last_superadmin",
+  `status=${deactivateLast.status} code=${deactivateLast.body?.code ?? ""}`,
+);
+
+const demoteLast = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { role: "administrador" },
+  { auth: true },
+);
+check(
+  "no se puede DEGRADAR al último superadmin activo (409)",
+  demoteLast.status === 409 && demoteLast.body?.code === "last_superadmin",
+  `status=${demoteLast.status} code=${demoteLast.body?.code ?? ""}`,
+);
+
+const invalidRole = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { role: "root" },
+  { auth: true },
+);
+check(
+  "un rol inventado se rechaza (400): no hay escalada a roles inexistentes",
+  invalidRole.status === 400 && invalidRole.body?.code === "invalid_role",
+  `status=${invalidRole.status} code=${invalidRole.body?.code ?? ""}`,
+);
+
+check(
+  "el superadmin protegido sigue existiendo y activo",
+  (await call("GET", "/api/admin/users", undefined, { auth: true })).body?.some?.(
+    (row) => row.id === createdSuperId && row.active === true,
+  ) === true,
+);
+
+// Con DOS superadmins activos, las operaciones vuelven a permitirse: la guarda no es
+// un bloqueo ciego, solo impide quedarse sin ninguno.
+const secondSuper = await call(
+  "POST",
+  "/api/admin/users",
+  {
+    username: `e2e-super2-${stamp}`,
+    password: "E2e-Passw0rd!2026",
+    name: "Segundo superadmin de prueba E2E",
+    role: "superadmin",
+  },
+  { auth: true },
+);
+const secondSuperId = secondSuper.body?.id;
+check("se crea un segundo superadmin", secondSuper.status === 201, `status=${secondSuper.status}`);
+
+const demoteWithBackup = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { role: "administrador" },
+  { auth: true },
+);
+check(
+  "con otro superadmin activo, degradar SÍ se permite",
+  demoteWithBackup.status === 200 && demoteWithBackup.body?.role === "administrador",
+  `status=${demoteWithBackup.status} role=${demoteWithBackup.body?.role ?? ""}`,
+);
+
+const deleteNow = await call("DELETE", `/api/admin/users/${createdSuperId}`, undefined, { auth: true });
+check("y eliminar también se permite", deleteNow.status === 204, `status=${deleteNow.status}`);
+
+const goneAfterDelete = await call("GET", `/api/admin/users`, undefined, { auth: true });
+check(
+  "el usuario eliminado ya no aparece en el listado",
+  !(goneAfterDelete.body ?? []).some((row) => row.id === createdSuperId),
+);
+
+// Limpieza: el que queda es el ÚNICO superadmin activo de la tabla, así que la guarda
+// lo protege hasta el final. Es la mejor prueba de que la regla no tiene rendijas.
+const cleanupSuper = await call("DELETE", `/api/admin/users/${secondSuperId}`, undefined, { auth: true });
+check(
+  "el último superadmin de la tabla sigue protegido hasta el final (409)",
+  cleanupSuper.status === 409 && cleanupSuper.body?.code === "last_superadmin",
+  `status=${cleanupSuper.status} code=${cleanupSuper.body?.code ?? ""}`,
+);
+
+// La revocación de sesiones se registra en la auditoría (prueba de que el camino se
+// ejecuta; la decisión está cubierta por las pruebas puras de las guardas).
+const guardAudit = await call("GET", "/api/admin/audit-logs?limit=100", undefined, { auth: true });
+const guardAuditText = String(JSON.stringify(guardAudit.body ?? {}));
+check(
+  "los cambios administrativos quedan auditados con el rol anterior y las sesiones revocadas",
+  guardAuditText.includes("previousRole") && guardAuditText.includes("revokedSessions"),
+);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);

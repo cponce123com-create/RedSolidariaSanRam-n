@@ -44,6 +44,7 @@ await build({
     "./src/lib/demo-inventory.ts",
     "./src/lib/expense-cleanup.ts",
     "./src/lib/expense-manual-classification.ts",
+    "./src/lib/admin-user-guards.ts",
     "./src/lib/admin-reauth.ts",
     "./src/lib/two-factor-account.ts",
     "./src/lib/asset-cleanup.ts",

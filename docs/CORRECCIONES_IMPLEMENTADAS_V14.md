@@ -96,6 +96,44 @@ ok  el registro público devuelve lo mínimo (estado y enlace de seguimiento)
 | E2E PostgreSQL real | **215 comprobaciones ok, 0 fallos** |
 | Typecheck + build | Sin errores |
 
+### V14-05 · El panel podía quedarse sin ningún superadministrador — CRÍTICA
+
+**Módulo:** Usuarios · **Archivos:** `routes/admin-users.ts`, `lib/admin-user-guards.ts` (nuevo)
+
+**Evidencia (código anterior):** ni el borrado ni la edición comprobaban nada más allá
+de «eres superadmin»:
+
+```ts
+router.delete("/admin/users/:id", async (req, res) => {
+  if (!isSuperAdmin(req)) return res.status(403)...
+  await db.delete(adminUsersTable).where(eq(adminUsersTable.id, userId));
+```
+
+**Impacto:** un superadmin podía **eliminar su propia cuenta** (fuera al instante) o
+**eliminar, desactivar o degradar al último superadmin activo**, dejando el panel sin
+nadie capaz de administrarlo. Bloqueo total y sin recuperación desde la interfaz.
+Además, desactivar a alguien o cambiarle el rol **no revocaba su sesión**: seguía
+trabajando con los permisos antiguos hasta que caducara la cookie.
+
+**Severidad:** Crítica (pérdida de control del panel + permisos obsoletos activos).
+**Corrección aplicada:**
+- `lib/admin-user-guards.ts` (PURA): `guardDeleteAdminUser`, `guardUpdateAdminUser`
+  (`self_deletion`, `self_deactivation`, `last_superadmin`, `invalid_role`) y
+  `shouldRevokeSessions`. Las reglas viven en el **servidor**, no en botones.
+- Ambos handlers se ejecutan dentro de una **transacción con `SELECT ... FOR UPDATE`**
+  que bloquea las filas de administradores: el recuento y la escritura son la misma
+  foto, así que dos peticiones simultáneas no pueden dejar el panel sin superadmin
+  (condición de carrera cubierta).
+- **Revocación de sesiones** (`revokeAdminSessions`, borra las filas de la tabla
+  `session` cuyo `sess->adminUser->>id` coincide) al eliminar, desactivar o cambiar el
+  rol: el efecto es inmediato.
+- Auditoría ampliada: `previousRole`, `revokedSessions` y `revokeReason`.
+- Un rol inventado se rechaza con 400 (no hay escalada a roles inexistentes).
+
+**Prueba:** 12 pruebas puras (`tests/admin-user-guards.test.mjs`) + E2E `7undecies`
+(10 comprobaciones, PostgreSQL real). La guarda saltó incluso contra mi propia prueba de
+limpieza: al quedar un solo superadmin, su borrado devolvió 409.
+
 ## Hallazgos detectados y NO corregidos todavía (con motivo)
 
 ### V14-03 · Enumeración de correos en el registro de voluntarios — MEDIA (requiere decisión)
@@ -122,7 +160,7 @@ se puede endurecer con un límite específico por token/IP en una entrega poster
 
 | Entrega | Estado |
 | --- | --- |
-| **1 · Seguridad crítica** | **Parcial: 1.1 y 1.2 hechos y probados.** Pendiente 1.3 (superadmin: autodesactivación, último superadmin, revocación de sesiones) y 1.4 (auditoría CSRF/CORS/sesiones) |
+| **1 · Seguridad crítica** | **1.1 ✅ 1.2 ✅ 1.3 ✅** · pendiente 1.4 (auditoría de sesiones, CSRF/CORS, IDOR, fuerza bruta sobre login) |
 | 2 · Dashboard, conciliación e integridad financiera | Pendiente |
 | 3 · Certificados PDF y cierre de campañas | Pendiente |
 | 4 · Revisión de los 23 módulos | Pendiente |
