@@ -1,6 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { readErrorMessage } from "@/lib/api-error";
 import { invalidateEntities } from "@/lib/query-invalidation";
+import type {
+  CampaignAnnulmentPreview,
+  CampaignVoidResult,
+  DonationVoidResult,
+} from "@/lib/donation-annulment";
 
 /**
  * Cliente y presentación del panel de DONANTES (Fase 3 del Prompt Maestro).
@@ -85,6 +90,7 @@ export const DONATION_STATUS_LABEL: Record<string, string> = {
   approved: "Aprobada",
   rejected: "Rechazada",
   reconciled: "Conciliada",
+  annulled: "Anulada",
 };
 
 export function donationStatusLabel(status: string): string {
@@ -96,6 +102,8 @@ export const DONATION_STATUS_BADGE: Record<string, string> = {
   approved: "bg-accent hover:bg-accent/90",
   rejected: "bg-destructive hover:bg-destructive/90",
   reconciled: "bg-emerald-600 hover:bg-emerald-700",
+  // Anulada contablemente: gris, para distinguirla de un rechazo administrativo.
+  annulled: "bg-slate-600 hover:bg-slate-700",
 };
 
 export function donationStatusBadge(status: string): string {
@@ -244,6 +252,77 @@ export async function reconcileDonation(id: number): Promise<void> {
 
 export const DONORS_QUERY_KEY = "/api/admin/donors";
 export const DUPLICATES_QUERY_KEY = "/api/admin/donations/duplicates";
+/** Prefijo de la vista previa de anulación por campaña. */
+export const ANNULMENT_QUERY_KEY = "/api/campaigns";
+
+// ─── Anulación contable de donaciones (V7.2.2) ───────────────────────────────
+
+export interface AnnulmentCredentials {
+  /** Contraseña actual del superadmin (reautenticación). */
+  password: string;
+  /** Código TOTP, solo si la cuenta tiene 2FA activo. */
+  totpCode?: string;
+  /** Motivo obligatorio: queda en la auditoría y en el asiento compensatorio. */
+  reason: string;
+}
+
+/**
+ * Anula contablemente UNA donación. Irreversible sobre las cifras: exige
+ * superadmin + reautenticación + motivo. El servidor añade el asiento
+ * compensatorio y devuelve el estado del libro para confirmarlo.
+ */
+export async function voidDonation(
+  id: number,
+  payload: AnnulmentCredentials,
+): Promise<DonationVoidResult> {
+  const res = await fetch(`/api/donations/${id}/void`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    credentials: "include",
+    body: JSON.stringify({
+      confirm: true,
+      reason: payload.reason,
+      password: payload.password,
+      ...(payload.totpCode ? { totpCode: payload.totpCode } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return (await res.json()) as DonationVoidResult;
+}
+
+/** Qué se anularía de una campaña: cuántas, por cuánto y cuáles no se pueden. */
+export async function fetchCampaignAnnulmentPreview(
+  campaignId: number,
+): Promise<CampaignAnnulmentPreview> {
+  const res = await fetch(`/api/campaigns/${campaignId}/donations/void/preview`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return (await res.json()) as CampaignAnnulmentPreview;
+}
+
+/**
+ * Anula EN BLOQUE todas las donaciones confirmadas de una campaña, con un solo
+ * motivo. Es la operación para limpiar por completo una campaña de prueba.
+ */
+export async function voidCampaignDonations(
+  campaignId: number,
+  payload: AnnulmentCredentials,
+): Promise<CampaignVoidResult> {
+  const res = await fetch(`/api/campaigns/${campaignId}/donations/void`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    credentials: "include",
+    body: JSON.stringify({
+      confirm: true,
+      reason: payload.reason,
+      password: payload.password,
+      ...(payload.totpCode ? { totpCode: payload.totpCode } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(await readErrorMessage(res));
+  return (await res.json()) as CampaignVoidResult;
+}
 
 /**
  * Invalida donantes, duplicados y las consultas afectadas por la conciliación

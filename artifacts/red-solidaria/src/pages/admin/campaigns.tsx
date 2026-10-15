@@ -26,11 +26,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { formatSafeDate } from "@/lib/i18n/date";
-import { Plus, Trash2, Edit, Star, Search, Loader2, MoreVertical, ShieldAlert } from "lucide-react";
+import { Plus, Trash2, Edit, Star, Search, Loader2, MoreVertical, ShieldAlert, Undo2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProtagonistToggle } from "@/components/admin/ProtagonistToggle";
 import { CampaignDeletionDialog } from "@/components/admin/CampaignDeletionDialog";
 import { CampaignDemoPurgeDialog } from "@/components/admin/CampaignDemoPurgeDialog";
+import { DonationVoidDialog } from "@/components/admin/DonationVoidDialog";
 import { useCampaignLifecycle } from "@/hooks/use-campaign-lifecycle";
 import {
   campaignStatusBadge,
@@ -38,7 +39,7 @@ import {
   errorMessage,
   invalidateCampaignQueries,
   lifecycleActions,
-  shouldOpenDemoPurgeDialog,
+  shouldOpenAfterMenuClose,
 } from "@/lib/campaign-admin";
 
 const formSchema = z.object({
@@ -94,21 +95,31 @@ export default function AdminCampaigns() {
   const [demoId, setDemoId] = useState<number | null>(null);
   const [demoTitle, setDemoTitle] = useState("");
   // Traspaso menú → diálogo. `openMenuFor` es la campaña cuyo menú «Más acciones»
-  // está abierto y `pendingDemo` la acción elegida que aún no se ha abierto.
+  // está abierto y `pendingAction` la acción elegida que aún no se ha abierto.
   // El diálogo se monta SOLO cuando el menú ya se ha cerrado: si se abren las dos
   // capas modales de Radix en el mismo clic, el foco queda atrapado entre ellas
   // (aviso «aria-hidden» en consola) y el `body` puede quedarse con
   // `pointer-events: none`, con lo que el diálogo se ve pero no responde a
   // ningún clic (no se podía declarar la campaña como DEMO).
   const [openMenuFor, setOpenMenuFor] = useState<number | null>(null);
-  const [pendingDemo, setPendingDemo] = useState<{ id: number; title: string } | null>(null);
+  const [pendingAction, setPendingAction] = useState<
+    { kind: "demo" | "void-donations"; id: number; title: string } | null
+  >(null);
+  // Anulación en bloque de las donaciones confirmadas de la campaña (V7.2.2).
+  const [voidCampaignId, setVoidCampaignId] = useState<number | null>(null);
+  const [voidCampaignTitle, setVoidCampaignTitle] = useState("");
 
   useEffect(() => {
-    if (!shouldOpenDemoPurgeDialog(openMenuFor, pendingDemo) || !pendingDemo) return;
-    setDemoId(pendingDemo.id);
-    setDemoTitle(pendingDemo.title);
-    setPendingDemo(null);
-  }, [openMenuFor, pendingDemo]);
+    if (!shouldOpenAfterMenuClose(openMenuFor, pendingAction) || !pendingAction) return;
+    if (pendingAction.kind === "demo") {
+      setDemoId(pendingAction.id);
+      setDemoTitle(pendingAction.title);
+    } else {
+      setVoidCampaignId(pendingAction.id);
+      setVoidCampaignTitle(pendingAction.title);
+    }
+    setPendingAction(null);
+  }, [openMenuFor, pendingAction]);
   const { data: adminUser } = useGetAdminMe({
     query: { queryKey: ["/api/admin/me"], retry: false },
   });
@@ -181,11 +192,17 @@ export default function AdminCampaigns() {
   };
 
   // Purga definitiva de campañas DEMO: solo desde «Más acciones» y solo para el
-  // superadmin. NO abre el diálogo aquí: deja la intención en `pendingDemo` para
+  // superadmin. NO abre el diálogo aquí: deja la intención en `pendingAction` para
   // que el efecto la abra cuando el menú haya terminado de cerrarse (evita el
   // conflicto de capas modales de Radix descrito arriba).
   const requestDemoPurge = (id: number, title: string) => {
-    setPendingDemo({ id, title });
+    setPendingAction({ kind: "demo", id, title });
+  };
+
+  // Anulación contable en bloque de las donaciones confirmadas de la campaña.
+  // Mismo traspaso diferido que la purga DEMO.
+  const requestVoidDonations = (id: number, title: string) => {
+    setPendingAction({ kind: "void-donations", id, title });
   };
 
   return (
@@ -369,6 +386,13 @@ export default function AdminCampaigns() {
                             <DropdownMenuLabel>Operaciones de superadmin</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
+                              className="gap-2"
+                              onSelect={() => requestVoidDonations(c.id, c.title)}
+                            >
+                              <Undo2 className="w-4 h-4" />
+                              Anular donaciones de la campaña
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               className="gap-2 text-destructive focus:text-destructive"
                               onSelect={() => requestDemoPurge(c.id, c.title)}
                             >
@@ -419,6 +443,15 @@ export default function AdminCampaigns() {
         open={demoId !== null}
         onOpenChange={(next) => {
           if (!next) setDemoId(null);
+        }}
+      />
+
+      <DonationVoidDialog
+        campaignId={voidCampaignId}
+        campaignTitle={voidCampaignTitle}
+        open={voidCampaignId !== null}
+        onOpenChange={(next) => {
+          if (!next) setVoidCampaignId(null);
         }}
       />
     </div>

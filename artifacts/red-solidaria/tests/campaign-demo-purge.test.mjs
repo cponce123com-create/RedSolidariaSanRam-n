@@ -19,7 +19,7 @@ const {
   identifierMatches,
   needsDemoMarking,
   shortHash,
-  shouldOpenDemoPurgeDialog,
+  shouldOpenAfterMenuClose,
   totalOfPlan,
 } = await import("./dist/campaign-demo-purge.mjs");
 
@@ -290,12 +290,12 @@ test("el diálogo DEMO NO se abre mientras el menú sigue abierto", () => {
   // clic, así que no se podía declarar la campaña como DEMO).
   const pending = { id: 7, title: "Rescate Animal San Ramón" };
   assert.equal(
-    shouldOpenDemoPurgeDialog(7, pending),
+    shouldOpenAfterMenuClose(7, pending),
     false,
     "con el menú de la campaña 7 abierto no se abre el diálogo",
   );
   assert.equal(
-    shouldOpenDemoPurgeDialog(9, pending),
+    shouldOpenAfterMenuClose(9, pending),
     false,
     "tampoco si el menú abierto es el de otra campaña",
   );
@@ -303,10 +303,10 @@ test("el diálogo DEMO NO se abre mientras el menú sigue abierto", () => {
 
 test("el diálogo DEMO se abre una vez cerrado el menú y hay acción pendiente", () => {
   const pending = { id: 7, title: "Rescate Animal San Ramón" };
-  assert.equal(shouldOpenDemoPurgeDialog(null, pending), true);
+  assert.equal(shouldOpenAfterMenuClose(null, pending), true);
 });
 
 test("sin acción pendiente no se abre nada (clic en el menú y salir)", () => {
-  assert.equal(shouldOpenDemoPurgeDialog(null, null), false);
-  assert.equal(shouldOpenDemoPurgeDialog(7, null), false);
+  assert.equal(shouldOpenAfterMenuClose(null, null), false);
+  assert.equal(shouldOpenAfterMenuClose(7, null), false);
 });

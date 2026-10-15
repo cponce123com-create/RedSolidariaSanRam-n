@@ -82,6 +82,7 @@ export const DONATION_STATUSES = [
   "approved",
   "rejected",
   "reconciled",
+  "annulled",
 ] as const;
 export type DonationStatus = (typeof DONATION_STATUSES)[number];
 
@@ -89,6 +90,20 @@ export function isDonationStatus(value: unknown): value is DonationStatus {
   return (
     typeof value === "string" && (DONATION_STATUSES as readonly string[]).includes(value)
   );
+}
+
+/**
+ * Estado de ANULACIÓN contable (migración 027). NO es un estado más del flujo
+ * administrativo: es el resultado de una corrección contable autorizada sobre
+ * una donación que YA estaba encadenada en el libro. Se mantiene fuera de
+ * `CONFIRMED_DONATION_STATUSES` a propósito, para que la donación salga de todas
+ * las cifras (recaudado, donantes, transparencia, dashboard) sin tener que
+ * tocar ninguna consulta.
+ */
+export const ANNULLED_DONATION_STATUS = "annulled" as const;
+
+export function isAnnulledDonation(status: string): boolean {
+  return status === ANNULLED_DONATION_STATUS;
 }
 
 /**
@@ -120,6 +135,47 @@ export function reconcileBlockReason(status: string): string | null {
     return `Solo se pueden conciliar donaciones aprobadas. Estado actual: ${status}.`;
   }
   return null;
+}
+
+// ─── Anulación contable (migración 027) ──────────────────────────────────────
+
+/** Longitud mínima del motivo de anulación (queda en la auditoría y en el libro). */
+export const MIN_ANNUL_REASON = 10;
+
+/**
+ * Solo se ANULA una donación CONFIRMADA (aprobada o conciliada): son las únicas
+ * que ya generaron un asiento en el libro y que, por tanto, no se pueden
+ * "rechazar" por la vía normal (la máquina de estados lo prohíbe porque el
+ * ingreso ya está encadenado). Una donación pendiente o rechazada no tiene
+ * asiento: se rechaza con `PUT /donations/:id`, que es la operación correcta.
+ */
+export function canAnnull(status: string): boolean {
+  return status === "approved" || status === "reconciled";
+}
+
+/** Motivo por el que NO se puede anular, o `null` si es posible. */
+export function annulBlockReason(status: string): string | null {
+  if (isAnnulledDonation(status)) {
+    return "La donación ya está anulada.";
+  }
+  if (status === "pending" || status === "rejected") {
+    return `Solo se anulan donaciones confirmadas (aprobadas o conciliadas). Una donación ${status === "pending" ? "pendiente" : "rechazada"} no tiene asiento en el libro: recházala con la acción normal. Estado actual: ${status}.`;
+  }
+  if (!canAnnull(status)) {
+    return `No se puede anular una donación en estado «${status}».`;
+  }
+  return null;
+}
+
+/**
+ * Descripción del ASIENTO COMPENSATORIO que anula el ingreso original. Se
+ * construye aquí (función pura) para que la ruta y los tests usen exactamente el
+ * mismo texto: el hash del asiento cubre la descripción, así que un texto
+ * distinto produciría una cadena distinta.
+ */
+export function annulReversalDescription(donationId: number, reason: string): string {
+  const clean = reason.trim().replace(/\s+/g, " ");
+  return `Anulación contable de la donación #${donationId} — ${clean}`;
 }
 
 // ─── Detección de duplicados probables ───────────────────────────────────────

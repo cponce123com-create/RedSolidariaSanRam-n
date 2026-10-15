@@ -20,11 +20,22 @@ import { asc, desc, eq } from "drizzle-orm";
 /** Hash previo del primer bloque de la cadena. */
 export const GENESIS_PREV = "genesis";
 
+/**
+ * Origen del ASIENTO COMPENSATORIO de una anulación contable (migración 027).
+ *
+ * No puede reutilizar `donation`: la base tiene un índice único por
+ * (`source_type`, `source_id`) precisamente para que un origen genere UN solo
+ * asiento. Con un origen propio, el reverso se enlaza a la MISMA donación (el
+ * informe de integridad lo resuelve contra la tabla de donaciones) sin duplicar
+ * el asiento del ingreso.
+ */
+export const DONATION_REVERSAL_SOURCE = "donation_reversal" as const;
+
 export interface LedgerEntryInput {
   kind: "ingreso" | "gasto";
   amount: number;
   description: string;
-  sourceType: "donation" | "expense";
+  sourceType: "donation" | "expense" | typeof DONATION_REVERSAL_SOURCE;
   sourceId: number;
   createdAt: Date;
 }

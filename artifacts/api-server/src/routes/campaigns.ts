@@ -29,7 +29,7 @@ import { toIsoSafe } from "../lib/date-format";
 import { campaignFunding } from "../lib/funding";
 import { isForeignKeyViolation } from "../lib/pg-errors";
 import { cleanupCloudinaryAssets } from "../lib/asset-cleanup";
-import { verifyChain } from "../lib/ledger";
+import { DONATION_REVERSAL_SOURCE, verifyChain } from "../lib/ledger";
 import { verifySuperadminReauth } from "../lib/admin-reauth";
 import {
   EMPTY_DEMO_PURGE_COUNTS,
@@ -1011,13 +1011,19 @@ async function loadDemoPurgeFacts(
 
   const chain = verifyChain(movementRows);
   const foreignSources = movementRows
-    .filter((movement) =>
-      movement.sourceType === "donation"
-        ? !donationIds.has(movement.sourceId)
-        : movement.sourceType === "expense"
-          ? !expenseIds.has(movement.sourceId)
-          : true,
-    )
+    .filter((movement) => {
+      // El asiento compensatorio de una anulación contable (`donation_reversal`)
+      // tiene como origen la MISMA donación que anula: pertenece a la campaña
+      // igual que su ingreso, así que no es un asiento ajeno.
+      if (
+        movement.sourceType === "donation" ||
+        movement.sourceType === DONATION_REVERSAL_SOURCE
+      ) {
+        return !donationIds.has(movement.sourceId);
+      }
+      if (movement.sourceType === "expense") return !expenseIds.has(movement.sourceId);
+      return true;
+    })
     .map((movement) => ({
       movementId: movement.id,
       sourceType: movement.sourceType,
@@ -1043,9 +1049,16 @@ async function loadDemoPurgeFacts(
   };
 
   const real: DemoPurgeRealSignals = {
+    // Una donación ANULADA contablemente (V7.2.2) no es dinero real: su ingreso
+    // está compensado con un asiento de reverso y su superadministrador la anuló
+    // de forma expresa y auditada. Contarla como «real» bloquearía para siempre
+    // una campaña que ya se limpió a propósito.
     reconciledDonations: donationRows.filter(
-      (row) => row.status === "reconciled" || row.reconciledAt !== null,
+      (row) =>
+        row.status !== "annulled" &&
+        (row.status === "reconciled" || row.reconciledAt !== null),
     ).length,
+    annulledDonations: donationRows.filter((row) => row.status === "annulled").length,
     expensesWithReceipt: expenseRows.filter(
       (row) => typeof row.receiptUrl === "string" && row.receiptUrl.trim().length > 0,
     ).length,

@@ -44,9 +44,13 @@ test("normalizeEmail: recorta espacios y baja a minúsculas", () => {
   assert.equal(normalizeEmail(42), "");
 });
 
-test("estados de donación: incluye 'reconciled' sin migración", () => {
-  assert.deepEqual([...DONATION_STATUSES], ["pending", "approved", "rejected", "reconciled"]);
+test("estados de donación: incluye 'reconciled' sin migración y 'annulled' (027)", () => {
+  assert.deepEqual(
+    [...DONATION_STATUSES],
+    ["pending", "approved", "rejected", "reconciled", "annulled"],
+  );
   assert.equal(isDonationStatus("reconciled"), true);
+  assert.equal(isDonationStatus("annulled"), true);
   assert.equal(isDonationStatus("conciliada"), false);
 });
 

@@ -43,6 +43,7 @@ await build({
     "./src/lib/admin-reauth.ts",
     "./src/lib/asset-cleanup.ts",
     "./src/lib/donor-consent.ts",
+    "./src/lib/donation-annulment.ts",
     "./src/lib/donor-identity.ts",
     "./src/lib/public-settings.ts",
     "./src/lib/audit.ts",

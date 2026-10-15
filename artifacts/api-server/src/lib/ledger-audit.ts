@@ -100,10 +100,34 @@ export interface LedgerAuditReport {
   healthy: boolean;
 }
 
-export const KNOWN_SOURCE_TYPES = ["donation", "expense"] as const;
+/**
+ * Orígenes que el informe sabe resolver. `donation_reversal` es el ASIENTO
+ * COMPENSATORIO de una anulación contable (migración 027): su origen es la
+ * MISMA donación que anula, así que se resuelve contra la tabla de donaciones
+ * (importe y campaña coinciden por construcción y el saldo sigue cuadrando).
+ */
+export const KNOWN_SOURCE_TYPES = ["donation", "expense", "donation_reversal"] as const;
 
 function sourceKey(sourceType: string, sourceId: number): string {
   return `${sourceType}:${sourceId}`;
+}
+
+/**
+ * Resuelve el origen de un asiento. Un tipo desconocido devuelve `undefined`
+ * para que el informe lo señale como asiento huérfano en vez de ignorarlo.
+ */
+function resolveSource(
+  movement: MovementLike,
+  donationsById: Map<number, DonationLike>,
+  expensesById: Map<number, SourceLike>,
+): SourceLike | undefined {
+  if (movement.sourceType === "donation" || movement.sourceType === "donation_reversal") {
+    return donationsById.get(movement.sourceId);
+  }
+  if (movement.sourceType === "expense") {
+    return expensesById.get(movement.sourceId);
+  }
+  return undefined;
 }
 
 export function auditLedger(input: {
@@ -140,12 +164,7 @@ export function auditLedger(input: {
   const campaignMismatches: LedgerAuditReport["campaignMismatches"] = [];
 
   for (const movement of movements) {
-    const source =
-      movement.sourceType === "donation"
-        ? donationsById.get(movement.sourceId)
-        : movement.sourceType === "expense"
-          ? expensesById.get(movement.sourceId)
-          : undefined;
+    const source = resolveSource(movement, donationsById, expensesById);
 
     if (!source) {
       movementsWithoutSource.push({

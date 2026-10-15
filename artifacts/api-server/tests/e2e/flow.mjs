@@ -520,36 +520,291 @@ check(
   `hash=${(purged.body?.manifest?.hash ?? "").slice(0, 12)}`,
 );
 
-// El presupuesto de reautenticación mide SOLO los FALLOS de identidad: el flujo
-// legítimo (declarar DEMO + purgar) no lo consume, pero las contraseñas
-// incorrectas sí. Hasta aquí solo ha habido UN fallo (el 401 de arriba), así que
-// se agotan los cinco con cuatro intentos más y el sexto queda cortado.
-const failedReauth = [];
-for (let i = 0; i < 4; i++) {
-  const res = await call(
-    "POST",
-    `/api/campaigns/${receiptId}/demo-purge`,
-    { confirm: true, identifier: String(receiptId), reason: demoReason, password: "contrasena-incorrecta" },
-    { auth: true },
-  );
-  failedReauth.push(res.status);
-}
-check(
-  "las contraseñas incorrectas devuelven 401 sin gastar el presupuesto del flujo legítimo",
-  failedReauth.every((status) => status === 401),
-  failedReauth.join(","),
+// ── 7quater. Anulación CONTABLE de donaciones (V7.2.2) ───────────────────────
+// Una donación confirmada está encadenada en el libro y la máquina de estados
+// prohíbe volver atrás. Para limpiar una campaña se ANULA: nunca se borra. Lo que
+// se comprueba aquí es lo que de verdad importa: tras anular, el libro sigue
+// CUADRANDO y la purga DEMO deja de estar bloqueada por esa donación.
+//
+// NOTA: el límite de reautenticación (5 fallos / 15 min) se agota al FINAL del
+// ensayo, para no interferir con las operaciones legítimas de esta sección.
+
+const annulCampaign = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `E2E anulación ${stamp}`,
+    description: "Campaña de prueba para la anulación contable de donaciones.",
+    goal: 500,
+    category: "general",
+    startDate: "2026-04-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const annulCampaignId = annulCampaign.body?.id;
+await call("PATCH", `/api/campaigns/${annulCampaignId}/status`, { status: "active" }, { auth: true });
+
+// Donación confirmada Y CONCILIADA con el banco: es el bloqueo que impide purgar.
+const reconciledDonation = await call("POST", "/api/donations", {
+  campaignId: annulCampaignId,
+  firstName: "Prueba",
+  lastName: "Conciliada",
+  email: `conciliada-${donorEmail}`,
+  amount: 60,
+  paymentMethod: "transfer",
+  collaborationType: "dinero",
+  proofImageUrl: "https://res.cloudinary.com/demo/image/upload/v1/annul.jpg",
+  proofPublicId: "e2e/annul",
+});
+const reconciledDonationId = reconciledDonation.body?.id;
+await call("PUT", `/api/donations/${reconciledDonationId}`, { status: "approved" }, { auth: true });
+const reconcileRes = await call(
+  "PATCH",
+  `/api/admin/donations/${reconciledDonationId}/reconcile`,
+  undefined,
+  { auth: true },
+);
+check("la donación queda CONCILIADA con el banco", reconcileRes.status === 200, `status=${reconcileRes.status}`);
+
+await call(
+  "POST",
+  `/api/campaigns/${annulCampaignId}/demo-mark`,
+  { confirm: true, reason: "Campaña de prueba para la anulación contable", password: PASS },
+  { auth: true },
 );
 
-const purgeAfterLimit = await call(
-  "POST",
-  `/api/campaigns/${receiptId}/demo-purge`,
-  { confirm: true, identifier: String(receiptId), reason: demoReason, password: "contrasena-incorrecta" },
+const blockedByReconciled = await call(
+  "GET",
+  `/api/campaigns/${annulCampaignId}/demo-purge/preview`,
+  undefined,
   { auth: true },
 );
 check(
-  "el límite anti fuerza bruta corta la reautenticación tras 5 fallos (429)",
-  purgeAfterLimit.status === 429,
-  `status=${purgeAfterLimit.status}`,
+  "una donación conciliada BLOQUEA la purga DEMO (el caso a resolver)",
+  blockedByReconciled.body?.verdict?.allowed === false &&
+    (blockedByReconciled.body?.verdict?.blockers ?? []).some(
+      (b) => b.code === "reconciled_donations",
+    ),
+  JSON.stringify((blockedByReconciled.body?.verdict?.blockers ?? []).map((b) => b.code)),
+);
+
+const annulPreview = await call(
+  "GET",
+  `/api/campaigns/${annulCampaignId}/donations/void/preview`,
+  undefined,
+  { auth: true },
+);
+check(
+  "la vista previa de anulación identifica la donación conciliada y avisa de que lo está",
+  annulPreview.status === 200 &&
+    annulPreview.body?.plan?.annullable?.length === 1 &&
+    annulPreview.body?.plan?.reconciledCount === 1 &&
+    annulPreview.body?.plan?.totalAmount === 60,
+  JSON.stringify(annulPreview.body?.plan ?? null),
+);
+
+const annulWrongPassword = await call(
+  "POST",
+  `/api/donations/${reconciledDonationId}/void`,
+  { confirm: true, reason: "Donación de prueba conciliada por error", password: "contrasena-incorrecta" },
+  { auth: true },
+);
+check(
+  "anular exige REAUTENTICARSE: contraseña incorrecta → 401",
+  annulWrongPassword.status === 401,
+  `status=${annulWrongPassword.status}`,
+);
+
+const annulReason = "Donación de prueba: la conciliación bancaria fue un error";
+const annulled = await call(
+  "POST",
+  `/api/donations/${reconciledDonationId}/void`,
+  { confirm: true, reason: annulReason, password: PASS },
+  { auth: true },
+);
+check(
+  "la anulación contable responde 200",
+  annulled.status === 200,
+  `status=${annulled.status} ${annulled.body?.message ?? ""}`,
+);
+check(
+  "la donación queda ANULADA con su motivo registrado",
+  annulled.body?.donation?.status === "annulled" &&
+    annulled.body?.donation?.voidReason === annulReason,
+  JSON.stringify(annulled.body?.donation ?? null),
+);
+check(
+  "se añade el ASIENTO COMPENSATORIO al libro",
+  annulled.body?.reversal?.appended === true &&
+    Number.isInteger(annulled.body?.reversal?.movementId),
+  JSON.stringify(annulled.body?.reversal ?? null),
+);
+check(
+  "la cadena de la campaña sigue verificando tras compensar (2 asientos)",
+  annulled.body?.ledger?.verified === true && annulled.body?.ledger?.count === 2,
+  JSON.stringify(annulled.body?.ledger ?? null),
+);
+
+// El libro sigue CUADRADO: es la garantía contable de la anulación.
+const auditAfterAnnul = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
+const annulTotals = (auditAfterAnnul.body?.totals ?? []).find(
+  (t) => t.campaignId === annulCampaignId,
+);
+check(
+  "el libro sigue CUADRADO: 60 de ingreso compensados por 60 de reverso",
+  annulTotals?.ledgerIncome === 60 &&
+    annulTotals?.ledgerExpense === 60 &&
+    annulTotals?.ledgerNet === 0 &&
+    annulTotals?.balanced === true,
+  JSON.stringify(annulTotals ?? null),
+);
+check(
+  "la donación anulada ya NO cuenta como ingreso de la campaña",
+  annulTotals?.sourceIncome === 0 && annulTotals?.sourceNet === 0,
+  JSON.stringify(annulTotals ?? null),
+);
+check(
+  "el informe de integridad sigue sano (sin huérfanos ni descuadres nuevos)",
+  auditAfterAnnul.body?.chain?.verified === true &&
+    (auditAfterAnnul.body?.movementsWithoutSource ?? []).length === 0 &&
+    (auditAfterAnnul.body?.duplicateMovements ?? []).length === 0 &&
+    // Los descuadres del seed (DB-09: donaciones históricas sin asiento) son
+    // preexistentes; lo que se comprueba es que la anulación no añade ninguno.
+    !(auditAfterAnnul.body?.unbalancedCampaigns ?? []).includes(annulCampaignId),
+  JSON.stringify({
+    orphans: (auditAfterAnnul.body?.movementsWithoutSource ?? []).length,
+    unbalanced: auditAfterAnnul.body?.unbalancedCampaigns ?? null,
+  }),
+);
+
+// Y AHORA la purga DEMO deja de estar bloqueada por esa donación.
+const unblocked = await call(
+  "GET",
+  `/api/campaigns/${annulCampaignId}/demo-purge/preview`,
+  undefined,
+  { auth: true },
+);
+check(
+  "tras anular, la purga DEMO deja de estar bloqueada y lo explica",
+  unblocked.body?.verdict?.allowed === true &&
+    (unblocked.body?.verdict?.warnings ?? []).some((w) => w.code === "donations_annulled"),
+  JSON.stringify((unblocked.body?.verdict?.blockers ?? []).map((b) => b.code)),
+);
+
+const annulAgain = await call(
+  "POST",
+  `/api/donations/${reconciledDonationId}/void`,
+  { confirm: true, reason: annulReason, password: PASS },
+  { auth: true },
+);
+check("volver a anular la misma donación → 409 (no duplica el reverso)", annulAgain.status === 409, `status=${annulAgain.status}`);
+
+// Anulación EN BLOQUE: otra campaña con dos donaciones confirmadas.
+const bulkCampaign = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `E2E anulación en bloque ${stamp}`,
+    description: "Campaña de prueba para la anulación en bloque.",
+    goal: 300,
+    category: "general",
+    startDate: "2026-04-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const bulkCampaignId = bulkCampaign.body?.id;
+await call("PATCH", `/api/campaigns/${bulkCampaignId}/status`, { status: "active" }, { auth: true });
+for (const [index, amount] of [30, 45].entries()) {
+  const created = await call("POST", "/api/donations", {
+    campaignId: bulkCampaignId,
+    firstName: "Lote",
+    lastName: `Demo${index}`,
+    email: `lote-${index}-${donorEmail}`,
+    amount,
+    paymentMethod: "transfer",
+    collaborationType: "dinero",
+    proofImageUrl: "https://res.cloudinary.com/demo/image/upload/v1/lote.jpg",
+    proofPublicId: `e2e/lote${index}`,
+  });
+  await call("PUT", `/api/donations/${created.body?.id}`, { status: "approved" }, { auth: true });
+}
+
+const bulkVoid = await call(
+  "POST",
+  `/api/campaigns/${bulkCampaignId}/donations/void`,
+  { confirm: true, reason: "Campaña de prueba: limpiar donaciones ficticias", password: PASS },
+  { auth: true },
+);
+check(
+  "la anulación EN BLOQUE responde 200",
+  bulkVoid.status === 200,
+  `status=${bulkVoid.status} ${bulkVoid.body?.message ?? ""}`,
+);
+check(
+  "anula todas las confirmadas, compensa cada una y suma el importe",
+  bulkVoid.body?.annulled === 2 &&
+    bulkVoid.body?.reversals === 2 &&
+    bulkVoid.body?.totalAmount === 75,
+  JSON.stringify(bulkVoid.body ?? null),
+);
+check(
+  "el libro de esa campaña sigue verificando",
+  bulkVoid.body?.ledger?.verified === true && bulkVoid.body?.ledger?.count === 4,
+  JSON.stringify(bulkVoid.body?.ledger ?? null),
+);
+
+const auditAfterBulk = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
+const bulkTotals = (auditAfterBulk.body?.totals ?? []).find((t) => t.campaignId === bulkCampaignId);
+check(
+  "el lote queda a CERO y cuadrado (75 de ingreso, 75 de reverso)",
+  bulkTotals?.ledgerIncome === 75 &&
+    bulkTotals?.ledgerExpense === 75 &&
+    bulkTotals?.ledgerNet === 0 &&
+    bulkTotals?.sourceNet === 0 &&
+    bulkTotals?.balanced === true,
+  JSON.stringify(bulkTotals ?? null),
+);
+check(
+  "el informe global sigue sano tras la anulación en bloque",
+  auditAfterBulk.body?.chain?.verified === true &&
+    (auditAfterBulk.body?.movementsWithoutSource ?? []).length === 0 &&
+    !(auditAfterBulk.body?.unbalancedCampaigns ?? []).includes(bulkCampaignId),
+  JSON.stringify({
+    orphans: (auditAfterBulk.body?.movementsWithoutSource ?? []).length,
+    unbalanced: auditAfterBulk.body?.unbalancedCampaigns ?? null,
+  }),
+);
+
+// Auditoría externa de la corrección contable.
+const annulAudit = await call(
+  "GET",
+  "/api/admin/audit-logs?action=DONATION_ANNULLED&resource=donations",
+  undefined,
+  { auth: true },
+);
+check(
+  "la anulación individual queda en el registro de auditoría con su motivo",
+  Array.isArray(annulAudit.body) &&
+    annulAudit.body.some(
+      (row) => row.resourceId === String(reconciledDonationId) && row.details?.reason === annulReason,
+    ),
+  `registros=${Array.isArray(annulAudit.body) ? annulAudit.body.length : "?"}`,
+);
+const bulkAudit = await call(
+  "GET",
+  "/api/admin/audit-logs?action=DONATION_ANNULLED&resource=campaigns",
+  undefined,
+  { auth: true },
+);
+check(
+  "la anulación en bloque queda auditada con su recuento y su importe",
+  Array.isArray(bulkAudit.body) &&
+    bulkAudit.body.some(
+      (row) => row.resourceId === String(bulkCampaignId) && row.details?.count === 2,
+    ),
+  `registros=${Array.isArray(bulkAudit.body) ? bulkAudit.body.length : "?"}`,
 );
 
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
@@ -826,6 +1081,27 @@ const revokeAgain = await call(
   { auth: true },
 );
 check("no se puede revocar dos veces (409)", revokeAgain.status === 409, `status=${revokeAgain.status}`);
+
+// ── Límite anti fuerza bruta de la reautenticación ───────────────────────────
+// Se deja para el FINAL a propósito: el presupuesto es de 5 fallos por usuario
+// cada 15 minutos, así que agotarlo antes rompería las operaciones legítimas de
+// las secciones anteriores. Solo cuentan los FALLOS de identidad (401): el flujo
+// legítimo (declarar DEMO, purgar, anular) no lo consume.
+const reauthAttempts = [];
+for (let i = 0; i < 6; i++) {
+  const res = await call(
+    "POST",
+    `/api/campaigns/${receiptId}/demo-purge`,
+    { confirm: true, identifier: String(receiptId), reason: demoReason, password: "contrasena-incorrecta" },
+    { auth: true },
+  );
+  reauthAttempts.push(res.status);
+}
+check(
+  "el límite anti fuerza bruta corta la reautenticación tras 5 fallos (429)",
+  reauthAttempts.includes(401) && reauthAttempts[reauthAttempts.length - 1] === 429,
+  reauthAttempts.join(","),
+);
 
 console.log("");
 if (failures === 0) {

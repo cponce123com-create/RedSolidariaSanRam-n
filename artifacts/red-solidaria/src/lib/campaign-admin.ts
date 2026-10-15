@@ -373,7 +373,7 @@ export {
   identifierMatches,
   needsDemoMarking,
   shortHash,
-  shouldOpenDemoPurgeDialog,
+  shouldOpenAfterMenuClose,
   totalOfPlan,
 } from "./campaign-demo-purge";
 export type {
