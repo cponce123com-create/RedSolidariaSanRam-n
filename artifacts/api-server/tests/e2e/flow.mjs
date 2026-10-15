@@ -520,15 +520,34 @@ check(
   `hash=${(purged.body?.manifest?.hash ?? "").slice(0, 12)}`,
 );
 
-// La SEXTA petición con reautenticación ya no pasa: el límite protege el endpoint.
+// El presupuesto de reautenticación mide SOLO los FALLOS de identidad: el flujo
+// legítimo (declarar DEMO + purgar) no lo consume, pero las contraseñas
+// incorrectas sí. Hasta aquí solo ha habido UN fallo (el 401 de arriba), así que
+// se agotan los cinco con cuatro intentos más y el sexto queda cortado.
+const failedReauth = [];
+for (let i = 0; i < 4; i++) {
+  const res = await call(
+    "POST",
+    `/api/campaigns/${receiptId}/demo-purge`,
+    { confirm: true, identifier: String(receiptId), reason: demoReason, password: "contrasena-incorrecta" },
+    { auth: true },
+  );
+  failedReauth.push(res.status);
+}
+check(
+  "las contraseñas incorrectas devuelven 401 sin gastar el presupuesto del flujo legítimo",
+  failedReauth.every((status) => status === 401),
+  failedReauth.join(","),
+);
+
 const purgeAfterLimit = await call(
   "POST",
-  `/api/campaigns/${demoId}/demo-purge`,
-  { confirm: true, identifier: String(demoId), reason: demoReason, password: PASS },
+  `/api/campaigns/${receiptId}/demo-purge`,
+  { confirm: true, identifier: String(receiptId), reason: demoReason, password: "contrasena-incorrecta" },
   { auth: true },
 );
 check(
-  "el límite anti fuerza bruta corta la reautenticación tras 5 intentos (429)",
+  "el límite anti fuerza bruta corta la reautenticación tras 5 fallos (429)",
   purgeAfterLimit.status === 429,
   `status=${purgeAfterLimit.status}`,
 );

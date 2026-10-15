@@ -219,9 +219,9 @@ ID real depende del entorno y **no se ha leído ni modificado** el de producció
 
 | Suite | Comando | Resultado |
 | --- | --- | --- |
-| API (unitaria + HTTP) | `pnpm --filter @workspace/api-server test` | **500 / 500 ok** (450 previas + 26 de lógica pura + 24 de autorización) |
-| Frontend (pura) | `pnpm --filter @workspace/red-solidaria test` | **203 / 203 ok** (188 previas + 15 nuevas) |
-| E2E real (PostgreSQL 17.7) | `bash artifacts/api-server/tests/e2e/run-e2e.sh` | **E2E COMPLETO: OK** — 97 comprobaciones `ok`, 0 fallos |
+| API (unitaria + HTTP) | `pnpm --filter @workspace/api-server test` | **501 / 501 ok** (450 previas + 26 de lógica pura + 24 de autorización + 1 del límite de reautenticación) |
+| Frontend (pura) | `pnpm --filter @workspace/red-solidaria test` | **206 / 206 ok** (188 previas + 18 nuevas) |
+| E2E real (PostgreSQL 17.7) | `bash artifacts/api-server/tests/e2e/run-e2e.sh` | **E2E COMPLETO: OK** — 103 comprobaciones `ok`, 0 fallos |
 | Typecheck | `tsc` en `lib/db`, `api-server`, `red-solidaria`, `scripts` | Sin errores |
 | Build | `build.mjs` (API) y `vite build` (frontend) | Sin errores |
 
@@ -258,7 +258,40 @@ Cobertura nueva destacada:
    libro se hace desde el informe de integridad (`/admin/libro`), con evidencia
    documental; es una operación distinta y también auditada.
 4. **Retirar la marca DEMO** de una campaña real marcada por error: `DELETE
-   /campaigns/:id/demo-mark` (auditado).
+   /campaigns/:id/demo-mark` (auditado), disponible en el propio diálogo como
+   **«Retirar declaración DEMO»**.
+
+## 11bis. Corrección V7.2.1 — «no podía declarar la campaña como DEMO»
+
+Al probarlo en el navegador aparecieron dos defectos reales (el aviso
+`Blocked aria-hidden…` de la consola era ruido benigno de Radix, pero señalaba el
+primero):
+
+1. **Conflicto de capas modales.** El diálogo se abría desde el `onSelect` del menú
+   «Más acciones», montando dos capas modales de Radix en el mismo clic. Radix
+   gestiona por capa el foco y el `pointer-events` del `body`, y las dos se
+   pisaban: el diálogo se veía pero podía quedar sin responder a ningún clic.
+   **Arreglo:** el menú pasa a estado controlado y el diálogo se abre **solo
+   cuando el menú ya se ha cerrado del todo** (efecto + `onOpenChange`), con la
+   regla aislada en `shouldOpenDemoPurgeDialog` (pura y con pruebas).
+2. **Límite de reautenticación mal calibrado.** `reauthLimiter` contaba **toda**
+   petición, incluido el propio flujo legítimo (declarar DEMO y después purgar) y
+   los despistes al escribir la contraseña: con 5 peticiones cualesquiera el
+   endpoint quedaba en **429 durante 15 minutos** y el superadmin veía el diálogo
+   sin poder completarlo. **Arreglo:** solo consumen presupuesto los **fallos de
+   identidad (401)** (`requestWasSuccessful` + `skipSuccessfulRequests`); un 409
+   de bloqueo o un 400 de validación tampoco gastan el presupuesto. Los 5 intentos
+   fallidos siguen cortando la fuerza bruta.
+   *Nota:* `requestWasSuccessful` **solo** se evalúa si `skipSuccessfulRequests`
+   está activo; con ambos flags en `false` el descuento no se ejecuta y el
+   contador vuelve a medir toda petición. Lo detectó la prueba de regresión.
+3. **Errores invisibles.** Un fallo del servidor solo se mostraba como *toast*: si
+   pasaba desapercibido, el botón parecía no hacer nada. **Arreglo:** el diálogo
+   muestra el mensaje real del servidor **en línea**, junto a los botones.
+
+Pruebas añadidas para fijar las regresiones: `reauthLimiter` (los aciertos y los
+409 no gastan presupuesto; el sexto 401 devuelve 429) y
+`shouldOpenDemoPurgeDialog` (el diálogo no se abre con un menú abierto).
 
 ## 12. Archivos
 

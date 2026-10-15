@@ -19,6 +19,7 @@ const {
   identifierMatches,
   needsDemoMarking,
   shortHash,
+  shouldOpenDemoPurgeDialog,
   totalOfPlan,
 } = await import("./dist/campaign-demo-purge.mjs");
 
@@ -278,4 +279,34 @@ test("identifierMatches exige el identificador exacto (con espacios tolerados)",
 
 test("el mínimo del motivo coincide con el que exige el servidor", () => {
   assert.equal(MIN_DEMO_REASON, 10);
+});
+
+// ─── Traspaso menú «Más acciones» → diálogo ──────────────────────────────────
+
+test("el diálogo DEMO NO se abre mientras el menú sigue abierto", () => {
+  // Regresión: abrirlo desde el onSelect del menú monta dos capas modales de
+  // Radix en el mismo clic; el foco queda atrapado entre ellas y el `body` puede
+  // quedarse con pointer-events:none (el diálogo se ve pero no responde a ningún
+  // clic, así que no se podía declarar la campaña como DEMO).
+  const pending = { id: 7, title: "Rescate Animal San Ramón" };
+  assert.equal(
+    shouldOpenDemoPurgeDialog(7, pending),
+    false,
+    "con el menú de la campaña 7 abierto no se abre el diálogo",
+  );
+  assert.equal(
+    shouldOpenDemoPurgeDialog(9, pending),
+    false,
+    "tampoco si el menú abierto es el de otra campaña",
+  );
+});
+
+test("el diálogo DEMO se abre una vez cerrado el menú y hay acción pendiente", () => {
+  const pending = { id: 7, title: "Rescate Animal San Ramón" };
+  assert.equal(shouldOpenDemoPurgeDialog(null, pending), true);
+});
+
+test("sin acción pendiente no se abre nada (clic en el menú y salir)", () => {
+  assert.equal(shouldOpenDemoPurgeDialog(null, null), false);
+  assert.equal(shouldOpenDemoPurgeDialog(7, null), false);
 });

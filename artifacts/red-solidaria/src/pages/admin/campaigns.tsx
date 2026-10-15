@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import {
   useGetAdminMe,
@@ -38,6 +38,7 @@ import {
   errorMessage,
   invalidateCampaignQueries,
   lifecycleActions,
+  shouldOpenDemoPurgeDialog,
 } from "@/lib/campaign-admin";
 
 const formSchema = z.object({
@@ -92,6 +93,22 @@ export default function AdminCampaigns() {
   // análisis y la confirmación viven en `CampaignDemoPurgeDialog`.
   const [demoId, setDemoId] = useState<number | null>(null);
   const [demoTitle, setDemoTitle] = useState("");
+  // Traspaso menú → diálogo. `openMenuFor` es la campaña cuyo menú «Más acciones»
+  // está abierto y `pendingDemo` la acción elegida que aún no se ha abierto.
+  // El diálogo se monta SOLO cuando el menú ya se ha cerrado: si se abren las dos
+  // capas modales de Radix en el mismo clic, el foco queda atrapado entre ellas
+  // (aviso «aria-hidden» en consola) y el `body` puede quedarse con
+  // `pointer-events: none`, con lo que el diálogo se ve pero no responde a
+  // ningún clic (no se podía declarar la campaña como DEMO).
+  const [openMenuFor, setOpenMenuFor] = useState<number | null>(null);
+  const [pendingDemo, setPendingDemo] = useState<{ id: number; title: string } | null>(null);
+
+  useEffect(() => {
+    if (!shouldOpenDemoPurgeDialog(openMenuFor, pendingDemo) || !pendingDemo) return;
+    setDemoId(pendingDemo.id);
+    setDemoTitle(pendingDemo.title);
+    setPendingDemo(null);
+  }, [openMenuFor, pendingDemo]);
   const { data: adminUser } = useGetAdminMe({
     query: { queryKey: ["/api/admin/me"], retry: false },
   });
@@ -164,11 +181,11 @@ export default function AdminCampaigns() {
   };
 
   // Purga definitiva de campañas DEMO: solo desde «Más acciones» y solo para el
-  // superadmin. El diálogo muestra el análisis de seguridad antes de permitir
-  // cualquier confirmación.
-  const openDemoPurge = (id: number, title: string) => {
-    setDemoId(id);
-    setDemoTitle(title);
+  // superadmin. NO abre el diálogo aquí: deja la intención en `pendingDemo` para
+  // que el efecto la abra cuando el menú haya terminado de cerrarse (evita el
+  // conflicto de capas modales de Radix descrito arriba).
+  const requestDemoPurge = (id: number, title: string) => {
+    setPendingDemo({ id, title });
   };
 
   return (
@@ -333,7 +350,10 @@ export default function AdminCampaigns() {
                         <Trash2 className="w-3.5 h-3.5" /> Gestionar
                       </Button>
                       {isSuperadmin && (
-                        <DropdownMenu>
+                        <DropdownMenu
+                          open={openMenuFor === c.id}
+                          onOpenChange={(next) => setOpenMenuFor(next ? c.id : null)}
+                        >
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
@@ -350,7 +370,7 @@ export default function AdminCampaigns() {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="gap-2 text-destructive focus:text-destructive"
-                              onSelect={() => openDemoPurge(c.id, c.title)}
+                              onSelect={() => requestDemoPurge(c.id, c.title)}
                             >
                               <ShieldAlert className="w-4 h-4" />
                               Eliminar campaña DEMO

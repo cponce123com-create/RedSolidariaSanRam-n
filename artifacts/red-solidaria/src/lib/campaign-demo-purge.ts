@@ -278,3 +278,24 @@ export function shortHash(hash: string | null | undefined): string {
   if (!hash) return "—";
   return hash.length > 16 ? `${hash.slice(0, 12)}…` : hash;
 }
+
+// ─── Traspaso del menú «Más acciones» al diálogo ─────────────────────────────
+
+/**
+ * ¿Procede abrir el diálogo de purga? Solo cuando NO queda ningún menú «Más
+ * acciones» abierto.
+ *
+ * Regresión cubierta (V7.2): abrir el diálogo desde el `onSelect` del menú monta
+ * DOS capas modales de Radix en el mismo clic. Radix gestiona por capa el foco y
+ * el `pointer-events` del `body`, y las dos se pisan: la consola avisa de
+ * «Blocked aria-hidden on an element because its descendant retained focus» y el
+ * `body` puede quedarse con `pointer-events: none`, con lo que el diálogo se ve
+ * pero NO responde a ningún clic (no se puede declarar la campaña como DEMO).
+ * Por eso se espera a que el menú termine de cerrarse y solo entonces se abre.
+ */
+export function shouldOpenDemoPurgeDialog(
+  openMenuFor: number | null,
+  pending: { id: number } | null,
+): boolean {
+  return openMenuFor === null && pending !== null;
+}

@@ -63,9 +63,17 @@ export const adminActionLimiter = rateLimit({
 });
 
 // Reautenticación de operaciones IRREVERSIBLES (purga de campañas DEMO).
-// Presupuesto muy estrecho por usuario admin: una sesión robada no puede usar el
+// Presupuesto estrecho por usuario admin: una sesión robada no puede usar el
 // endpoint como oráculo para adivinar la contraseña del superadmin. Es
 // independiente del presupuesto general de acciones administrativas.
+//
+// IMPORTANTE (corrección V7.2): solo consumen presupuesto los FALLOS DE
+// IDENTIDAD (401). Antes contaba TODA petición, así que el propio flujo legítimo
+// —declarar la campaña DEMO y después purgarla, más cualquier despiste al
+// escribir la contraseña— agotaba los 5 intentos y dejaba el endpoint en 429
+// durante 15 minutos: el superadmin veía el diálogo pero no podía completarlo.
+// Un bloqueo de purga (409) o un dato inválido (400) tampoco son intentos de
+// adivinar la contraseña, así que no deben gastar el presupuesto.
 export const reauthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 5,
@@ -74,13 +82,20 @@ export const reauthLimiter = rateLimit({
     const ip = ipKeyGenerator(req.ip ?? "unknown");
     return admin ? `reauth:${admin.id}` : `reauth-ip:${ip}`;
   },
+  // Se descuenta el intento salvo que la respuesta sea 401 (identidad no
+  // verificada): el contador mide intentos fallidos de reautenticación.
+  // OJO: express-rate-limit solo evalúa `requestWasSuccessful` si además está
+  // activo `skipSuccessfulRequests` (o `skipFailedRequests`); con ambos en false
+  // el descuento no se ejecuta y el contador volvería a medir TODA petición.
+  requestWasSuccessful: (_req, res) => res.statusCode !== 401,
+  skipSuccessfulRequests: true,
   message: {
     error: "too_many_attempts",
-    message: "Demasiados intentos de reautenticación. Espera 15 minutos e inténtalo de nuevo.",
+    message:
+      "Demasiados intentos fallidos de reautenticación. Espera 15 minutos e inténtalo de nuevo.",
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false,
 });
 
 export const contactLimiter = rateLimit({

@@ -128,3 +128,50 @@ test("adoptionLimiter: POST /api/pets/:id/adopt bloquea con 429 tras 5 solicitud
   "/api/pets/1/adopt",
   6,
 ));
+
+// ── reauthLimiter: solo gastan presupuesto los FALLOS de identidad (401) ──────
+
+// Regresión V7.2: el limitador contaba TODA petición, así que el propio flujo
+// legítimo (declarar la campaña DEMO y después purgarla) más un par de despistes
+// agotaba los 5 intentos y dejaba el endpoint en 429 durante 15 minutos: el
+// superadmin no podía completar la declaración.
+test("reauthLimiter: los aciertos y los rechazos NO son intentos fallidos de contraseña", async () => {
+  const express = (await import("express")).default;
+  const mod = await import("./dist/middleware/rate-limit.mjs?reauthrl=" + Date.now());
+
+  const app = express();
+  app.use((req, _res, next) => {
+    // El keyGenerator agrupa por admin de sesión; sin sesión usa la IP.
+    req.session = { adminUser: { id: 42, username: "tester", role: "superadmin" } };
+    next();
+  });
+  app.use("/api", mod.reauthLimiter);
+  // 200 = reautenticación correcta · 401 = contraseña incorrecta ·
+  // 409 = purga bloqueada por el análisis (no es un intento de adivinar nada).
+  app.post("/api/ok", (_req, res) => res.status(200).json({ ok: true }));
+  app.post("/api/bad", (_req, res) => res.status(401).json({ error: "unauthorized" }));
+  app.post("/api/blocked", (_req, res) => res.status(409).json({ error: "conflict" }));
+
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+  try {
+    const base = `http://127.0.0.1:${port}`;
+    const post = async (path) => (await fetch(`${base}${path}`, { method: "POST" })).status;
+
+    // El flujo legítimo cabe muchas veces: 10 aciertos y 10 bloqueos no gastan
+    // presupuesto (antes, 5 peticiones cualesquiera ya dejaban 429).
+    for (let i = 0; i < 10; i++) assert.equal(await post("/api/ok"), 200);
+    for (let i = 0; i < 10; i++) assert.equal(await post("/api/blocked"), 409);
+
+    // Cinco contraseñas incorrectas sí consumen el presupuesto…
+    for (let i = 0; i < 5; i++) assert.equal(await post("/api/bad"), 401);
+
+    // …y el sexto intento fallido queda cortado.
+    assert.equal(await post("/api/bad"), 429);
+    // Una vez bloqueado, ni siquiera un acierto pasa.
+    assert.equal(await post("/api/ok"), 429);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
