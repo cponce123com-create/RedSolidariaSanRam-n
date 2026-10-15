@@ -807,6 +807,196 @@ check(
   `registros=${Array.isArray(bulkAudit.body) ? bulkAudit.body.length : "?"}`,
 );
 
+// ── 7quinquies. 2FA del superadmin de respaldo por variables de entorno ───────
+// El superadmin de entorno (ADMIN_USERNAME, sesión id 0) no tiene fila en
+// admin_users, así que /admin/2fa/* le respondía 404 («Usuario no encontrado») y
+// quedaba SIEMPRE solo con contraseña. Como app.ts exige esas variables en
+// producción, el panel tenía una entrada sin segundo factor. Ahora su secreto vive
+// en su propia tabla y el código se exige en el login y en las operaciones
+// irreversibles.
+//
+// El código TOTP se calcula aquí con una implementación PROPIA (RFC 6238) para no
+// reutilizar la del servidor: si la del servidor estuviera mal, reutilizarla haría
+// pasar la prueba igualmente.
+const { createHmac } = await import("node:crypto");
+
+function base32Decode(secret) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const clean = String(secret).toUpperCase().replace(/=+$/, "").replace(/\s+/g, "");
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (const char of clean) {
+    const index = alphabet.indexOf(char);
+    if (index === -1) continue;
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return Buffer.from(bytes);
+}
+
+function totpCode(secret, atMs = Date.now(), stepSeconds = 30, digits = 6) {
+  const counter = Math.floor(atMs / 1000 / stepSeconds);
+  const message = Buffer.alloc(8);
+  message.writeUInt32BE(Math.floor(counter / 2 ** 32), 0);
+  message.writeUInt32BE(counter >>> 0, 4);
+  const hmac = createHmac("sha1", base32Decode(secret)).update(message).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const binary =
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+  return String(binary % 10 ** digits).padStart(digits, "0");
+}
+
+const statusBefore = await call("GET", "/api/admin/2fa/status", undefined, { auth: true });
+check(
+  "el superadmin de entorno consulta su 2FA (antes daba 404)",
+  statusBefore.status === 200 &&
+    statusBefore.body?.enabled === false &&
+    statusBefore.body?.envAccount === true,
+  `status=${statusBefore.status} ${JSON.stringify(statusBefore.body ?? null)}`,
+);
+
+const setup2fa = await call("POST", "/api/admin/2fa/setup", undefined, { auth: true });
+check(
+  "CONFIGURAR 2FA en el superadmin de entorno ya funciona (antes 404)",
+  setup2fa.status === 200 &&
+    typeof setup2fa.body?.secret === "string" &&
+    String(setup2fa.body?.otpauthUri ?? "").startsWith("otpauth://totp/"),
+  `status=${setup2fa.status} ${setup2fa.body?.message ?? ""}`,
+);
+const envSecret = setup2fa.body?.secret ?? "";
+check("el secreto generado es válido para el autenticador (base32)", envSecret.length >= 16, `len=${envSecret.length}`);
+
+// El secreto NO puede filtrarse por los endpoints genéricos de configuración.
+const settingsDump = await call("GET", "/api/admin/settings", undefined, { auth: true });
+check(
+  "el secreto TOTP NO se filtra por /admin/settings (tabla propia, no settings)",
+  settingsDump.status === 200 && !settingsDump.text.includes(envSecret),
+);
+
+const verifyWrong = await call("POST", "/api/admin/2fa/verify", { code: "000000" }, { auth: true });
+check("un código incorrecto no activa el 2FA (401)", verifyWrong.status === 401, `status=${verifyWrong.status}`);
+
+const verifyOk = await call("POST", "/api/admin/2fa/verify", { code: totpCode(envSecret) }, { auth: true });
+check(
+  "el 2FA del superadmin de entorno queda ACTIVO",
+  verifyOk.status === 200,
+  `status=${verifyOk.status} ${verifyOk.body?.message ?? ""}`,
+);
+
+const statusAfter = await call("GET", "/api/admin/2fa/status", undefined, { auth: true });
+check("el estado pasa a activo", statusAfter.body?.enabled === true, JSON.stringify(statusAfter.body ?? null));
+
+// El login del superadmin de entorno ahora exige el segundo factor.
+const loginPending = await call("POST", "/api/admin/login", { username: USER, password: PASS });
+check(
+  "el login del superadmin de entorno exige el código 2FA",
+  loginPending.status === 200 &&
+    loginPending.body?.twoFactorRequired === true &&
+    loginPending.body?.userId === 0,
+  JSON.stringify(loginPending.body ?? null),
+);
+
+const loginBadCode = await call("POST", "/api/admin/2fa/login", { userId: 0, code: "000000" });
+check("el paso 2 con código incorrecto → 401", loginBadCode.status === 401, `status=${loginBadCode.status}`);
+
+const loginGoodCode = await call(
+  "POST",
+  "/api/admin/2fa/login",
+  { userId: 0, code: totpCode(envSecret) },
+  { auth: true },
+);
+check(
+  "el paso 2 con el código correcto abre sesión de superadmin",
+  loginGoodCode.status === 200 &&
+    loginGoodCode.body?.user?.role === "superadmin" &&
+    loginGoodCode.body?.user?.id === 0,
+  JSON.stringify(loginGoodCode.body ?? null),
+);
+const meAfter2fa = await call("GET", "/api/admin/me", undefined, { auth: true });
+check(
+  "la sesión abierta en el paso 2 es válida",
+  meAfter2fa.status === 200 && meAfter2fa.body?.role === "superadmin",
+  JSON.stringify(meAfter2fa.body ?? null),
+);
+
+// La reautenticación de operaciones irreversibles también exige el código.
+const reauthNoCode = await call(
+  "POST",
+  `/api/campaigns/${annulCampaignId}/demo-mark`,
+  { confirm: true, reason: "Prueba de reautenticación con 2FA activo", password: PASS },
+  { auth: true },
+);
+check(
+  "una operación irreversible exige el CÓDIGO además de la contraseña",
+  reauthNoCode.status === 401 && reauthNoCode.body?.code === "totp_required",
+  `status=${reauthNoCode.status} code=${reauthNoCode.body?.code ?? ""}`,
+);
+
+const reauthWithCode = await call(
+  "POST",
+  `/api/campaigns/${annulCampaignId}/demo-mark`,
+  {
+    confirm: true,
+    reason: "Prueba de reautenticación con 2FA activo",
+    password: PASS,
+    totpCode: totpCode(envSecret),
+  },
+  { auth: true },
+);
+check(
+  "con contraseña + código la operación irreversible se autoriza",
+  reauthWithCode.status === 200,
+  `status=${reauthWithCode.status} ${reauthWithCode.body?.message ?? ""}`,
+);
+
+// Desactivación: vuelve al estado inicial y deja de ser una vía de entrada.
+const disableWrong = await call("POST", "/api/admin/2fa/disable", { code: "000000" }, { auth: true });
+check("desactivar con código incorrecto → 401", disableWrong.status === 401, `status=${disableWrong.status}`);
+
+const disableOk = await call(
+  "POST",
+  "/api/admin/2fa/disable",
+  { code: totpCode(envSecret) },
+  { auth: true },
+);
+check("desactivar con el código correcto → 200", disableOk.status === 200, `status=${disableOk.status}`);
+
+const statusFinal = await call("GET", "/api/admin/2fa/status", undefined, { auth: true });
+check("el 2FA vuelve a estar desactivado", statusFinal.body?.enabled === false, JSON.stringify(statusFinal.body ?? null));
+
+const loginPlain = await call("POST", "/api/admin/login", { username: USER, password: PASS });
+check(
+  "sin 2FA el login del superadmin de entorno vuelve a ser solo con contraseña",
+  loginPlain.status === 200 && loginPlain.body?.success === true,
+  JSON.stringify(loginPlain.body ?? null),
+);
+
+const loginAfterDisable = await call("POST", "/api/admin/2fa/login", {
+  userId: 0,
+  code: totpCode(envSecret),
+});
+check(
+  "desactivado, un código válido ya NO abre sesión por sí solo (401)",
+  loginAfterDisable.status === 401,
+  `status=${loginAfterDisable.status}`,
+);
+
+// La sesión del ensayo sigue siendo válida: lo que sigue depende de ella.
+const sessionStillValid = await call("GET", "/api/admin/me", undefined, { auth: true });
+check(
+  "la sesión del ensayo sigue válida tras todo el ciclo de 2FA",
+  sessionStillValid.status === 200,
+  `status=${sessionStillValid.status}`,
+);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);

@@ -219,9 +219,9 @@ ID real depende del entorno y **no se ha leído ni modificado** el de producció
 
 | Suite | Comando | Resultado |
 | --- | --- | --- |
-| API (unitaria + HTTP) | `pnpm --filter @workspace/api-server test` | **535 / 535 ok** |
+| API (unitaria + HTTP) | `pnpm --filter @workspace/api-server test` | **550 / 550 ok** |
 | Frontend (pura) | `pnpm --filter @workspace/red-solidaria test` | **215 / 215 ok** |
-| E2E real (PostgreSQL 17.7) | `bash artifacts/api-server/tests/e2e/run-e2e.sh` | **E2E COMPLETO: OK** — 122 comprobaciones `ok`, 0 fallos |
+| E2E real (PostgreSQL 17.7) | `bash artifacts/api-server/tests/e2e/run-e2e.sh` | **E2E COMPLETO: OK** — 141 comprobaciones `ok`, 0 fallos |
 | Typecheck | `tsc` en `lib/db`, `api-server`, `red-solidaria`, `scripts` | Sin errores |
 | Build | `build.mjs` (API) y `vite build` (frontend) | Sin errores |
 
@@ -344,12 +344,61 @@ purga deja de estar bloqueada, repetir la anulación da 409 y el lote (2 donacio
 libro son el hallazgo **DB-09 preexistente** (donaciones históricas del seed sin
 asiento), no un efecto de la anulación.
 
+## 11quater. 2FA del superadmin de respaldo (V7.2.3)
+
+**El problema.** `POST /admin/2fa/setup` devolvía **404 «Usuario no encontrado»** al
+superadministrador de respaldo (`ADMIN_USERNAME`/`ADMIN_PASSWORD`, sesión `id: 0`):
+su secreto TOTP vive en una columna de `admin_users` y esa cuenta **no tiene fila**.
+El 404 era correcto pero engañoso, y el efecto de fondo era peor: como `app.ts`
+**exige** esas variables en producción, el panel tenía siempre una entrada protegida
+**solo por contraseña**, así que activar 2FA en un usuario de tabla no protegía del
+todo.
+
+**Dónde vive el secreto.** En una tabla propia, `env_superadmin_2fa` (una sola fila,
+garantizada por `CHECK (id = 1)`). **No** en la tabla `settings`: `GET /api/admin/settings`
+devuelve *todas* las claves y el panel las pinta en pantalla, y
+`PUT /api/admin/settings/:key` sobrescribe cualquiera; guardarlo ahí expondría el
+segundo factor. Con tabla propia el secreto es **inalcanzable por construcción**
+desde los endpoints genéricos de configuración (el E2E lo comprueba: el secreto no
+aparece en `/admin/settings`).
+
+**Qué se exige ahora** (mismo contrato que el flujo de tabla, sin ramas duplicadas
+en la interfaz):
+
+| Momento | Comportamiento |
+| --- | --- |
+| Login, paso 1 | `POST /admin/login` con la contraseña correcta responde `twoFactorRequired: true` + `userId: 0` (antes abría sesión directamente). |
+| Login, paso 2 | `POST /admin/2fa/login` con `{ userId: 0, code }`; el código se valida contra el secreto y abre la sesión. Comparte el bloqueo anti fuerza bruta (5 intentos por origen+cuenta, 15 min). |
+| Operaciones irreversibles | La reautenticación (purga DEMO, declaración DEMO, anulación contable) exige **contraseña + código**; sin código responde 401 con `code: "totp_required"`. |
+| Ajustes | `setup` / `verify` / `disable` / `status` funcionan para esta cuenta. `status` añade `envAccount` y `disabledByEnv` para que el panel explique el caso. |
+
+**Recuperación si se pierde el autenticador** (no hay fila que otro superadmin pueda
+resetear desde el panel):
+
+1. Definir **`ENV_SUPERADMIN_2FA_DISABLED=1`** y reiniciar el servicio: su 2FA se
+   ignora en el login *y* en la reautenticación (el código deja de ser una vía de
+   entrada por sí solo). Entra con la contraseña, desactiva el 2FA desde
+   `/admin/configuracion` y quita la variable.
+2. O directamente en la base: `UPDATE env_superadmin_2fa SET enabled = false, secret = NULL;`
+
+La primera opción no debilita nada: quien puede cambiar variables de entorno ya
+controla el despliegue entero.
+
+**Verificado en el E2E** (`7quinquies`, con una implementación TOTP propia para no
+reutilizar la del servidor): el estado responde 200 con `envAccount: true`; `setup`
+genera el secreto (antes 404); el secreto no se filtra por `/admin/settings`; un
+código incorrecto no activa; el código correcto activa; el login exige el segundo
+factor; el paso 2 rechaza el código incorrecto y abre sesión con el correcto; una
+operación irreversible responde 401 `totp_required` sin código y 200 con él;
+`disable` funciona y, una vez desactivado, un código válido ya no abre sesión.
+
 ## 12. Archivos
 
 **Base de datos**
 - `lib/db/src/schema/campaigns.ts` — columnas `is_demo`, `demo_marked_at`, `demo_marked_by` (excluidas del schema de inserción: anti mass-assignment).
 - `lib/db/src/schema/campaign-purge-backups.ts` — respaldo/manifiesto (nuevo).
-- `lib/db/src/schema/index.ts`, `lib/db/src/migrate.ts` — export y migración `026`.
+- `lib/db/src/schema/index.ts`, `lib/db/src/migrate.ts` — export y migraciones `026`, `027` y `028`.
+- `lib/db/src/schema/env-superadmin-2fa.ts` — 2FA del superadmin de respaldo (nuevo).
 
 **API**
 - `lib/campaign-demo-purge.ts` — análisis, validación, snapshot y sello SHA-256 (puro).
@@ -358,13 +407,15 @@ asiento), no un efecto de la anulación.
 - `lib/ledger.ts` — origen `donation_reversal` (asiento compensatorio).
 - `lib/ledger-audit.ts` — resuelve el asiento compensatorio contra su donación.
 - `lib/superadmin-credentials.ts` — credenciales del superadmin de entorno (extraídas de `routes/admin.ts`).
-- `lib/admin-reauth.ts` — reautenticación (contraseña + TOTP).
+- `lib/admin-reauth.ts` — reautenticación (contraseña + TOTP, también para la cuenta de entorno).
+- `lib/two-factor-account.ts` — abstracción común de las dos cuentas 2FA + política pura (nuevo).
 - `lib/audit.ts` — acciones y etiquetas nuevas.
 - `middleware/rate-limit.ts` — `reauthLimiter`.
 - `routes/campaigns.ts` — purga DEMO y análisis.
 - `routes/donations.ts` — anulación individual, vista previa y en bloque.
 - `routes/ledger-audit.ts` — informe con todas las donaciones (para resolver el reverso).
-- `routes/admin.ts` — usa el módulo compartido de credenciales.
+- `routes/admin.ts` — usa el módulo compartido de credenciales y exige el 2FA de la cuenta de entorno en el login.
+- `routes/admin-2fa.ts` — 2FA de las dos formas de cuenta (tabla y entorno).
 - `build-tests.mjs` — nuevos puntos de entrada.
 
 **Frontend**
@@ -376,7 +427,7 @@ asiento), no un efecto de la anulación.
 - `src/components/admin/DonationVoidDialog.tsx` — diálogo de anulación (nuevo).
 - `src/components/admin/DonationVoidAction.tsx` — acción «Anular» por fila (nuevo).
 - `src/components/ui/dropdown-menu.tsx` — menú «Más acciones» (nuevo).
-- `src/pages/admin/campaigns.tsx`, `src/pages/admin/donations.tsx`.
+- `src/pages/admin/campaigns.tsx`, `src/pages/admin/donations.tsx`, `src/pages/admin/settings.tsx` (nota de la cuenta de entorno y aviso del escape hatch).
 
 **Contrato**
 - `lib/api-spec/openapi.yaml` — `annulled` en los enums de estado de donación.
@@ -388,6 +439,8 @@ asiento), no un efecto de la anulación.
 - `artifacts/api-server/tests/donation-annulment.test.mjs`
 - `artifacts/api-server/tests/donation-void-auth.test.mjs`
 - `artifacts/api-server/tests/rate-limit.test.mjs` (límite de reautenticación)
-- `artifacts/api-server/tests/e2e/flow.mjs` — secciones `7ter` y `7quater`
+- `artifacts/api-server/tests/two-factor-account.test.mjs`
+- `artifacts/api-server/tests/admin-2fa-env.test.mjs`
+- `artifacts/api-server/tests/e2e/flow.mjs` — secciones `7ter`, `7quater` y `7quinquies`
 - `artifacts/red-solidaria/tests/campaign-demo-purge.test.mjs`
 - `artifacts/red-solidaria/tests/donation-annulment.test.mjs`

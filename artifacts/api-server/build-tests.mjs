@@ -41,6 +41,7 @@ await build({
     "./src/lib/campaign-lifecycle.ts",
     "./src/lib/campaign-demo-purge.ts",
     "./src/lib/admin-reauth.ts",
+    "./src/lib/two-factor-account.ts",
     "./src/lib/asset-cleanup.ts",
     "./src/lib/donor-consent.ts",
     "./src/lib/donation-annulment.ts",

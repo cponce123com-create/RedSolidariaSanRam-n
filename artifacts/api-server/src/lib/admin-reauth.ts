@@ -6,6 +6,10 @@ import {
   isEnvSuperadminUsername,
   verifyEnvSuperadminPassword,
 } from "./superadmin-credentials";
+import {
+  envTwoFactorActive,
+  readEnvSuperadminTwoFactor,
+} from "./two-factor-account";
 
 /**
  * Reautenticación del superadministrador (V7.2).
@@ -56,9 +60,27 @@ export async function verifySuperadminReauth(input: ReauthInput): Promise<Reauth
       };
     }
     const valid = await verifyEnvSuperadminPassword(password);
-    return valid
-      ? { ok: true }
-      : { ok: false, code: "reauth_failed", message: "Contraseña incorrecta." };
+    if (!valid) {
+      return { ok: false, code: "reauth_failed", message: "Contraseña incorrecta." };
+    }
+
+    // 2FA del superadmin de respaldo (migración 028). Antes esta cuenta solo
+    // demostraba la contraseña, así que las operaciones irreversibles quedaban
+    // con un único factor aunque tuviera 2FA activado.
+    const twoFactor = await readEnvSuperadminTwoFactor();
+    if (envTwoFactorActive(twoFactor) && twoFactor.secret) {
+      const code = typeof input.totpCode === "string" ? input.totpCode.trim() : "";
+      if (!verifyTOTP(twoFactor.secret, code)) {
+        return {
+          ok: false,
+          code: "totp_required",
+          message:
+            "Introduce el código de 6 dígitos de tu aplicación de autenticación para confirmar la operación.",
+        };
+      }
+    }
+
+    return { ok: true };
   }
 
   const [row] = await db

@@ -8,6 +8,10 @@ import {
   isEnvSuperadminUsername,
   verifyEnvSuperadminPassword,
 } from "../lib/superadmin-credentials";
+import {
+  ENV_SUPERADMIN_ID,
+  envSuperadminTwoFactorRequired,
+} from "../lib/two-factor-account";
 import { establishAdminSession } from "../lib/session-security";
 
 const router: IRouter = Router();
@@ -100,7 +104,31 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       const isValid = await verifyEnvSuperadminPassword(password);
       
       if (isValid) {
-        const user = { id: 0, username, name: "Superadmin", role: "superadmin" };
+        // 2FA del superadmin de respaldo (migración 028): su secreto no cabe en
+        // `admin_users` (no tiene fila), así que vive en `env_superadmin_2fa`.
+        // Antes esta cuenta quedaba SIEMPRE solo con contraseña y, como app.ts
+        // exige sus variables en producción, el panel tenía una entrada sin
+        // segundo factor. Se devuelve el mismo contrato que el flujo de tabla
+        // (`twoFactorRequired` + userId) para que el paso 2 sea el mismo.
+        if (await envSuperadminTwoFactorRequired()) {
+          await logAuditAction({
+            userId: 0,
+            username,
+            action: "LOGIN_2FA_PENDING",
+            resource: "admin_users",
+            ipAddress: req.ip || req.connection?.remoteAddress || null,
+            userAgent: req.get("user-agent") || null,
+            details: { success: true, source: "env_superadmin" },
+          });
+          return res.json({
+            success: false,
+            twoFactorRequired: true,
+            userId: ENV_SUPERADMIN_ID,
+            message: "Se requiere el código de verificación",
+          });
+        }
+
+        const user = { id: ENV_SUPERADMIN_ID, username, name: "Superadmin", role: "superadmin" };
         await establishAdminSession(req, user);
         
         // Audit log

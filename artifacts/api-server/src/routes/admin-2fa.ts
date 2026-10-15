@@ -7,6 +7,14 @@ import { adminActionLimiter, loginLimiter } from "../middleware/rate-limit";
 import { logAuditAction } from "../middleware/auth-utils";
 import { buildOtpauthUri, generateSecret, verifyTOTP } from "../lib/totp";
 import { establishAdminSession } from "../lib/session-security";
+import { ENV_SUPERADMIN_USERNAME } from "../lib/superadmin-credentials";
+import {
+  ENV_SUPERADMIN_ID,
+  envTwoFactorActive,
+  isEnvTwoFactorDisabledByEnv,
+  readEnvSuperadminTwoFactor,
+  resolveTwoFactorAccount,
+} from "../lib/two-factor-account";
 import {
   clearFailedAttempts,
   clearFailedAttemptsForUser,
@@ -37,6 +45,55 @@ function uaOf(req: any): string | null {
   return req.get("user-agent") || null;
 }
 
+/** Cuenta que debe superar el paso 2 del login, sea fila de tabla o entorno. */
+interface LoginChallenge {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+  secret: string;
+  isEnvAccount: boolean;
+}
+
+/**
+ * Resuelve el reto de 2FA a partir del `userId` que devolvió el paso 1. Cubre las
+ * DOS formas de superadministrador: una fila de `admin_users` y el superadmin de
+ * respaldo por variables de entorno (`id: 0`), cuyo secreto vive en
+ * `env_superadmin_2fa`. Devuelve `null` si la cuenta no existe, está inactiva o
+ * no tiene 2FA: en todos esos casos la respuesta es el mismo 401 genérico, para
+ * no revelar el estado de una cuenta.
+ */
+async function resolveLoginChallenge(userId: number): Promise<LoginChallenge | null> {
+  if (userId === ENV_SUPERADMIN_ID) {
+    const state = await readEnvSuperadminTwoFactor();
+    // El escape hatch inutiliza también ESTE camino: si el operador declaró que
+    // se ignore el 2FA del entorno, un código no debe abrir sesión por sí solo.
+    if (!envTwoFactorActive(state) || !state.secret) return null;
+    return {
+      id: ENV_SUPERADMIN_ID,
+      username: ENV_SUPERADMIN_USERNAME,
+      name: "Superadmin",
+      role: "superadmin",
+      secret: state.secret,
+      isEnvAccount: true,
+    };
+  }
+
+  const [user] = await db
+    .select()
+    .from(adminUsersTable)
+    .where(eq(adminUsersTable.id, userId));
+  if (!user || !user.active || !user.twoFactorEnabled || !user.twoFactorSecret) return null;
+  return {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    secret: user.twoFactorSecret,
+    isEnvAccount: false,
+  };
+}
+
 // ─── POST /admin/2fa/login — paso 2 del login (contraseña OK + 2FA activo) ───
 router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
   const parsed = twoFactorLoginSchema.safeParse(req.body);
@@ -64,27 +121,27 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
   }
 
   try {
-    const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, userId));
-    if (!user || !user.active || !user.twoFactorEnabled || !user.twoFactorSecret) {
+    const challenge = await resolveLoginChallenge(userId);
+    if (!challenge) {
       return res.status(401).json({ error: "unauthorized", message: "Código incorrecto" });
     }
 
-    if (!verifyTOTP(user.twoFactorSecret, code)) {
+    if (!verifyTOTP(challenge.secret, code)) {
       await logAuditAction({
-        userId: user.id,
-        username: user.username,
+        userId: challenge.id,
+        username: challenge.username,
         action: "LOGIN_2FA_FAILED",
         resource: "admin_users",
         ipAddress: ipOf(req),
         userAgent: uaOf(req),
-        details: { reason: "invalid_totp" },
+        details: { reason: "invalid_totp", envAccount: challenge.isEnvAccount },
       });
 
       const { locked, remainingMs } = registerFailedAttempt(lockoutKeyForRequest);
       if (locked) {
         await logAuditAction({
-          userId: user.id,
-          username: user.username,
+          userId: challenge.id,
+          username: challenge.username,
           action: "LOGIN_2FA_LOCKED",
           resource: "admin_users",
           ipAddress: ipOf(req),
@@ -106,29 +163,40 @@ router.post("/admin/2fa/login", loginLimiter, async (req, res) => {
 
     // Verificación correcta: se limpia el contador de ESA clave (origen + cuenta).
     clearFailedAttempts(lockoutKeyForRequest);
-    await db.update(adminUsersTable).set({ lastLoginAt: new Date() }).where(eq(adminUsersTable.id, user.id));
+    // El superadmin de entorno no tiene fila: no hay último login que anotar.
+    if (!challenge.isEnvAccount) {
+      await db
+        .update(adminUsersTable)
+        .set({ lastLoginAt: new Date() })
+        .where(eq(adminUsersTable.id, challenge.id));
+    }
 
     await establishAdminSession(req, {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      role: user.role,
+      id: challenge.id,
+      username: challenge.username,
+      name: challenge.name,
+      role: challenge.role,
     });
 
     await logAuditAction({
-      userId: user.id,
-      username: user.username,
+      userId: challenge.id,
+      username: challenge.username,
       action: "LOGIN",
       resource: "admin_users",
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
-      details: { success: true, twoFactor: true },
+      details: { success: true, twoFactor: true, envAccount: challenge.isEnvAccount },
     });
 
     return res.json({
       success: true,
       message: "Login exitoso",
-      user: { id: user.id, username: user.username, name: user.name, role: user.role },
+      user: {
+        id: challenge.id,
+        username: challenge.username,
+        name: challenge.name,
+        role: challenge.role,
+      },
     });
   } catch (err) {
     req.log.error({ err }, "2FA login failed");
@@ -141,28 +209,32 @@ router.post("/admin/2fa/setup", requireAdmin, adminActionLimiter, async (req, re
   const admin = req.session.adminUser;
   if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
   try {
-    const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, admin.id));
-    if (!user) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
-    if (user.twoFactorEnabled) {
+    // Cubre las dos formas de cuenta: fila de admin_users o superadmin de entorno
+    // (id 0, secreto en env_superadmin_2fa). Antes el de entorno recibía un 404
+    // engañoso («Usuario no encontrado») y no podía tener 2FA.
+    const account = await resolveTwoFactorAccount(admin);
+    if (!account) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
+    const state = await account.state();
+    if (state.enabled) {
       return res.status(400).json({ error: "validation_error", message: "2FA ya está activo. Desactívalo primero para regenerar el secreto." });
     }
 
     const secret = generateSecret();
-    await db.update(adminUsersTable).set({ twoFactorSecret: secret }).where(eq(adminUsersTable.id, user.id));
+    await account.saveSecret(secret);
 
     await logAuditAction({
-      userId: user.id,
-      username: user.username,
+      userId: account.id,
+      username: account.username,
       action: "TWO_FACTOR_SETUP",
       resource: "admin_users",
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
-      details: { generated: true },
+      details: { generated: true, envAccount: account.isEnvAccount },
     });
 
     return res.json({
       secret,
-      otpauthUri: buildOtpauthUri(secret, user.username, ISSUER),
+      otpauthUri: buildOtpauthUri(secret, account.username, ISSUER),
     });
   } catch (err) {
     req.log.error({ err }, "2FA setup failed");
@@ -179,37 +251,39 @@ router.post("/admin/2fa/verify", requireAdmin, adminActionLimiter, async (req, r
   if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
 
   try {
-    const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, admin.id));
-    if (!user || !user.twoFactorSecret) {
+    const account = await resolveTwoFactorAccount(admin);
+    if (!account) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
+    const state = await account.state();
+    if (!state.secret) {
       return res.status(400).json({ error: "validation_error", message: "Primero genera el secreto (setup)" });
     }
-    if (user.twoFactorEnabled) {
+    if (state.enabled) {
       return res.status(400).json({ error: "validation_error", message: "2FA ya está activo" });
     }
 
-    if (!verifyTOTP(user.twoFactorSecret, code)) {
+    if (!verifyTOTP(state.secret, code)) {
       await logAuditAction({
-        userId: user.id,
-        username: user.username,
+        userId: account.id,
+        username: account.username,
         action: "TWO_FACTOR_VERIFY_FAILED",
         resource: "admin_users",
         ipAddress: ipOf(req),
         userAgent: uaOf(req),
-        details: { reason: "invalid_totp" },
+        details: { reason: "invalid_totp", envAccount: account.isEnvAccount },
       });
       return res.status(401).json({ error: "unauthorized", message: "Código incorrecto" });
     }
 
-    await db.update(adminUsersTable).set({ twoFactorEnabled: true }).where(eq(adminUsersTable.id, user.id));
+    await account.enable();
 
     await logAuditAction({
-      userId: user.id,
-      username: user.username,
+      userId: account.id,
+      username: account.username,
       action: "TWO_FACTOR_ENABLED",
       resource: "admin_users",
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
-      details: { enabled: true },
+      details: { enabled: true, envAccount: account.isEnvAccount },
     });
 
     return res.json({ success: true, message: "2FA activado correctamente" });
@@ -228,38 +302,40 @@ router.post("/admin/2fa/disable", requireAdmin, adminActionLimiter, async (req, 
   if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
 
   try {
-    const [user] = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, admin.id));
-    if (!user || !user.twoFactorSecret || !user.twoFactorEnabled) {
+    const account = await resolveTwoFactorAccount(admin);
+    if (!account) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
+    const state = await account.state();
+    if (!state.secret || !state.enabled) {
       return res.status(400).json({ error: "validation_error", message: "2FA no está activo" });
     }
 
-    if (!verifyTOTP(user.twoFactorSecret, code)) {
+    if (!verifyTOTP(state.secret, code)) {
       await logAuditAction({
-        userId: user.id,
-        username: user.username,
+        userId: account.id,
+        username: account.username,
         action: "TWO_FACTOR_DISABLE_FAILED",
         resource: "admin_users",
         ipAddress: ipOf(req),
         userAgent: uaOf(req),
-        details: { reason: "invalid_totp" },
+        details: { reason: "invalid_totp", envAccount: account.isEnvAccount },
       });
       return res.status(401).json({ error: "unauthorized", message: "Código incorrecto" });
     }
 
-    await db.update(adminUsersTable).set({ twoFactorSecret: null, twoFactorEnabled: false }).where(eq(adminUsersTable.id, user.id));
+    await account.clear();
 
     // Al desactivar 2FA con código válido se reinicia el contador de lockout de
     // la cuenta en TODOS los orígenes (la clave es compuesta).
-    clearFailedAttemptsForUser(user.id);
+    clearFailedAttemptsForUser(account.id);
 
     await logAuditAction({
-      userId: user.id,
-      username: user.username,
+      userId: account.id,
+      username: account.username,
       action: "TWO_FACTOR_DISABLED",
       resource: "admin_users",
       ipAddress: ipOf(req),
       userAgent: uaOf(req),
-      details: { enabled: false },
+      details: { enabled: false, envAccount: account.isEnvAccount },
     });
 
     return res.json({ success: true, message: "2FA desactivado" });
@@ -312,12 +388,17 @@ router.get("/admin/2fa/status", requireAdmin, async (_req, res) => {
   const admin = _req.session.adminUser;
   if (!admin) return res.status(401).json({ error: "unauthorized", message: "Sesión no autenticada" });
   try {
-    const [user] = await db
-      .select({ twoFactorEnabled: adminUsersTable.twoFactorEnabled })
-      .from(adminUsersTable)
-      .where(eq(adminUsersTable.id, admin.id));
-    if (!user) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
-    return res.json({ enabled: user.twoFactorEnabled });
+    const account = await resolveTwoFactorAccount(admin);
+    if (!account) return res.status(404).json({ error: "not_found", message: "Usuario no encontrado" });
+    const state = await account.state();
+    return res.json({
+      enabled: state.enabled,
+      // Metadatos para que el panel explique el caso sin exponer nada sensible:
+      // que es la cuenta de respaldo por variables de entorno (su recuperación es
+      // distinta) y si el operador la ha desactivado con el escape hatch.
+      envAccount: account.isEnvAccount,
+      disabledByEnv: account.isEnvAccount && isEnvTwoFactorDisabledByEnv(),
+    });
   } catch (err) {
     _req.log.error({ err }, "2FA status failed");
     return res.status(500).json({ error: "server_error", message: "Error al consultar 2FA" });
