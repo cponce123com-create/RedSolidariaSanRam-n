@@ -822,6 +822,40 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
       INSERT INTO env_superadmin_2fa (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
     `,
   },
+  {
+    name: "029_expense_classifications.sql",
+    sql: `
+      -- V11: clasificación MANUAL de un gasto (DEMO / real / pendiente).
+      --
+      -- Por qué: la clave ajena de campaign_expenses.campaign_id se añadió con
+      -- NOT VALID (migración 025), así que PostgreSQL no revisó las filas que ya
+      -- existían. En producción eso deja gastos que apuntan a campañas
+      -- desaparecidas, y sin una declaración explícita del superadmin quedaban
+      -- bloqueados para siempre (no hay campaña que los declare DEMO).
+      --
+      -- SIN CLAVE FORÁNEA a campaign_expenses A PROPÓSITO: la clasificación debe
+      -- SOBREVIVIR al borrado del gasto, porque es la prueba de por qué se destruyó.
+      --
+      -- ADITIVA: una tabla nueva; no toca ninguna otra.
+      CREATE TABLE IF NOT EXISTS expense_classifications (
+        id serial PRIMARY KEY,
+        expense_id integer NOT NULL,
+        classification text NOT NULL,
+        reason text NOT NULL,
+        evidence text,
+        classified_by text,
+        classified_by_id text,
+        created_at timestamp NOT NULL DEFAULT now(),
+        updated_at timestamp NOT NULL DEFAULT now(),
+        CONSTRAINT expense_classifications_expense_unique UNIQUE (expense_id),
+        CONSTRAINT expense_classifications_value_check
+          CHECK (classification IN ('demo','real','pending'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_expense_classifications_expense
+        ON expense_classifications (expense_id);
+    `,
+  },
 ];
 
 /**

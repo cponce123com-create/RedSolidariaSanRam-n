@@ -1381,6 +1381,200 @@ check(
   String(JSON.stringify(auditAfterExpenses.body ?? {})).includes("EXPENSE_DEMO_PURGED"),
 );
 
+// ── 7nonies. GASTOS HUÉRFANOS: clasificación manual y eliminación (V11) ──────
+// PRUEBA DE ACEPTACIÓN: un gasto huérfano (su campaña ya no existe) debe poder
+// clasificarse como DEMO y eliminarse, moviendo el dashboard en su importe exacto.
+//
+// Los dos huérfanos los crea el propio runner (`run-e2e.sh`) con psql, porque las
+// claves ajenas impiden crearlos por la API: la FK de
+// `campaign_expenses.campaign_id` se añadió con NOT VALID (migración 025) y
+// PostgreSQL no revisó las filas anteriores. Así se reproduce la condición real de
+// producción. Aquí solo se localizan por su descripción.
+const orphanTable = await call("GET", "/api/admin/maintenance/expenses", undefined, { auth: true });
+const orphanDemoRow = (orphanTable.body?.expenses ?? []).find(
+  (row) => row.isOrphan === true && /hu\u00e9rfano DEMO/i.test(row.description),
+);
+const orphanRealRow = (orphanTable.body?.expenses ?? []).find(
+  (row) => row.isOrphan === true && /hu\u00e9rfano real/i.test(row.description),
+);
+const orphanDemoId = orphanDemoRow?.id;
+const orphanRealId = orphanRealRow?.id;
+check(
+  "se localizan los gastos huérfanos de prueba (su campaña no existe)",
+  Number.isInteger(orphanDemoId) &&
+    Number.isInteger(orphanRealId) &&
+    orphanDemoRow?.campaignExists === false,
+  `ids=${orphanDemoId}/${orphanRealId}`,
+);
+
+// ─── 1. Huérfano SIN clasificación: bloqueado ───────────────────────────────
+const findOrphan = (id) => (orphanTable.body?.expenses ?? []).find((row) => row.id === id);
+check(
+  "un gasto huérfano sin clasificar queda en REVISIÓN MANUAL (bloqueado)",
+  findOrphan(orphanDemoId)?.action === "review" &&
+    findOrphan(orphanDemoId)?.deletable === false &&
+    (findOrphan(orphanDemoId)?.blockers ?? []).includes("orphan_expense"),
+  `action=${findOrphan(orphanDemoId)?.action} blockers=${JSON.stringify(findOrphan(orphanDemoId)?.blockers ?? null)}`,
+);
+
+const orphanPurgeBlocked = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/purge",
+  { ids: [orphanDemoId], confirm: true, reason: EXP_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "intentar eliminar un huérfano sin clasificar se rechaza (409)",
+  orphanPurgeBlocked.status === 409 && orphanPurgeBlocked.body?.code === "expenses_not_deletable",
+  `status=${orphanPurgeBlocked.status}`,
+);
+
+// ─── 2. Clasificación manual: DEMO (desbloquea) y REAL (protege) ────────────
+const classifyDemo = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/classify",
+  {
+    ids: [orphanDemoId],
+    classification: "demo",
+    reason: "Gasto de prueba de la campaña de adopciones que ya se eliminó",
+    evidence: "Respaldo: captura del panel de desarrollo",
+    password: PASS,
+  },
+  { auth: true },
+);
+check(
+  "el huérfano se clasifica como DEMO con motivo y evidencia",
+  classifyDemo.status === 200 && classifyDemo.body?.classified === 1 && classifyDemo.body?.classificationLabel === "DEMO confirmado",
+  `status=${classifyDemo.status} body=${JSON.stringify(classifyDemo.body?.classificationLabel ?? null)}`,
+);
+check(
+  "la clasificación cambia la acción disponible en la MISMA respuesta",
+  (classifyDemo.body?.expenses ?? []).some(
+    (row) => row.id === orphanDemoId && row.action === "delete" && row.deletable === true,
+  ),
+  JSON.stringify((classifyDemo.body?.expenses ?? []).map((row) => `${row.id}:${row.action}`)),
+);
+
+const classifyReal = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/classify",
+  {
+    ids: [orphanRealId],
+    classification: "real",
+    reason: "Corresponde a una compra auténtica con boleta en papel",
+    password: PASS,
+  },
+  { auth: true },
+);
+check("el segundo huérfano se clasifica como REAL", classifyReal.status === 200, `status=${classifyReal.status}`);
+
+// ─── 3. Persistencia: se lee de PostgreSQL en peticiones nuevas ─────────────
+const orphanTableAfter = await call("GET", "/api/admin/maintenance/expenses", undefined, { auth: true });
+const findOrphanAfter = (id) => (orphanTableAfter.body?.expenses ?? []).find((row) => row.id === id);
+check(
+  "la clasificación PERSISTE (petición nueva, sin caché) y desbloquea la eliminación",
+  findOrphanAfter(orphanDemoId)?.action === "delete" &&
+    findOrphanAfter(orphanDemoId)?.deletable === true &&
+    findOrphanAfter(orphanDemoId)?.manualClassification?.classification === "demo" &&
+    findOrphanAfter(orphanDemoId)?.manualClassification?.classifiedBy === USER,
+  `action=${findOrphanAfter(orphanDemoId)?.action} manual=${JSON.stringify(findOrphanAfter(orphanDemoId)?.manualClassification ?? null)}`,
+);
+check(
+  "un huérfano clasificado REAL queda protegido (no se destruye)",
+  findOrphanAfter(orphanRealId)?.deletable === false &&
+    findOrphanAfter(orphanRealId)?.classification === "real" &&
+    findOrphanAfter(orphanRealId)?.action === "regularize",
+  `action=${findOrphanAfter(orphanRealId)?.action} deletable=${findOrphanAfter(orphanRealId)?.deletable}`,
+);
+
+const orphanRealPurge = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/purge",
+  { ids: [orphanRealId], confirm: true, reason: EXP_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "eliminar el huérfano clasificado REAL se rechaza (409)",
+  orphanRealPurge.status === 409,
+  `status=${orphanRealPurge.status}`,
+);
+
+// ─── 4. La protección manda sobre la declaración manual ────────────────────
+const chocofestExpense = (orphanTableAfter.body?.expenses ?? []).find(
+  (row) => row.campaignId === seededChocofest?.id && row.hasLedgerEntry === false,
+);
+if (chocofestExpense) {
+  await call(
+    "POST",
+    "/api/admin/maintenance/expenses/classify",
+    { ids: [chocofestExpense.id], classification: "demo", reason: "Prueba: la protección debe mandar", password: PASS },
+    { auth: true },
+  );
+  const chocoAfter = await call("GET", "/api/admin/maintenance/expenses", undefined, { auth: true });
+  const chocoRow = (chocoAfter.body?.expenses ?? []).find((row) => row.id === chocofestExpense.id);
+  check(
+    "declarar DEMO un gasto de ChocoFest NO lo hace eliminable (protección intacta)",
+    chocoRow?.deletable === false && chocoRow?.protectedCampaign === true,
+    `deletable=${chocoRow?.deletable} protected=${chocoRow?.protectedCampaign}`,
+  );
+} else {
+  check("no hay gastos sin asiento en ChocoFest para probar la protección", true);
+}
+
+// ─── 5. Eliminación real + dashboard ──────────────────────────────────────
+const dashBeforeOrphan = await call("GET", "/api/admin/dashboard", undefined, { auth: true });
+const spentBeforeOrphan = dashBeforeOrphan.body?.summary?.totalSpent;
+
+const orphanPurge = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/purge",
+  { ids: [orphanDemoId], confirm: true, reason: EXP_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "el huérfano clasificado DEMO SE ELIMINA de verdad",
+  orphanPurge.status === 200 &&
+    orphanPurge.body?.deleted?.deletedExpenses === 1 &&
+    orphanPurge.body?.comparison?.matchesPurged === true &&
+    (orphanPurge.body?.deleted?.backupIds ?? []).length === 1,
+  `status=${orphanPurge.status} deleted=${JSON.stringify(orphanPurge.body?.deleted ?? null)}`,
+);
+
+const orphanGone = await call("GET", `/api/admin/maintenance/expenses/${orphanDemoId}`, undefined, { auth: true });
+check("el gasto huérfano ya NO existe en PostgreSQL (404)", orphanGone.status === 404, `status=${orphanGone.status}`);
+
+const orphanTableFinal = await call("GET", "/api/admin/maintenance/expenses", undefined, { auth: true });
+check(
+  "desaparece de la tabla del gestor",
+  !(orphanTableFinal.body?.expenses ?? []).some((row) => row.id === orphanDemoId),
+);
+
+const dashAfterOrphan = await call("GET", "/api/admin/dashboard", undefined, { auth: true });
+check(
+  "el total de gastos del dashboard baja EXACTAMENTE S/ 1200.00",
+  round2(dashAfterOrphan.body?.summary?.totalSpent) === round2(round2(spentBeforeOrphan) - 1200),
+  `antes=${spentBeforeOrphan} después=${dashAfterOrphan.body?.summary?.totalSpent}`,
+);
+check(
+  "el saldo del dashboard sube exactamente S/ 1200.00",
+  round2(dashAfterOrphan.body?.summary?.balance) ===
+    round2(round2(dashBeforeOrphan.body?.summary?.balance) + 1200),
+  `antes=${dashBeforeOrphan.body?.summary?.balance} después=${dashAfterOrphan.body?.summary?.balance}`,
+);
+
+const orphanLedger = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
+check(
+  "el libro sigue consistente (cadena verificada, sin huérfanos nuevos)",
+  orphanLedger.body?.chain?.verified === true && (orphanLedger.body?.movementsWithoutSource ?? []).length === 0,
+);
+
+const orphanAudit = await call("GET", "/api/admin/audit-logs?limit=100", undefined, { auth: true });
+check(
+  "la clasificación y la purga quedan auditadas",
+  String(JSON.stringify(orphanAudit.body ?? {})).includes("EXPENSE_CLASSIFIED") &&
+    String(JSON.stringify(orphanAudit.body ?? {})).includes("EXPENSE_DEMO_PURGED"),
+);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);
