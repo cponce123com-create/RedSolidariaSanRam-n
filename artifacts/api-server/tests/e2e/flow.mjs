@@ -1124,6 +1124,263 @@ check(
   `zero=${JSON.stringify(ledgerReport.body?.zeroAmountMovements ?? null)}`,
 );
 
+// ── 7octies. GASTOS DEMO: eliminación real y dashboard actualizado (V10.1) ───
+// PRUEBA DE ACEPTACIÓN: eliminar un gasto DEMO debe modificar la base y mover los
+// totales del dashboard exactamente en su importe.
+const EXP_REASON = "Verificación E2E: gastos ficticios de la campaña de prueba";
+
+const expCampaign = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `Gastos DEMO E2E ${stamp}`,
+    description: "Campaña de prueba para la eliminación de gastos ficticios.",
+    goal: 500,
+    category: "general",
+    startDate: "2026-01-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const expCampaignId = expCampaign.body?.id;
+check("se crea la campaña de prueba de gastos", expCampaign.status === 201 && Number.isInteger(expCampaignId), `status=${expCampaign.status}`);
+
+const expMarked = await call(
+  "POST",
+  `/api/campaigns/${expCampaignId}/demo-mark`,
+  { confirm: true, reason: EXP_REASON, password: PASS },
+  { auth: true },
+);
+check("la campaña de gastos se declara DEMO", expMarked.status === 200, `status=${expMarked.status}`);
+
+// Gasto ficticio SIN asiento (privado: no se encadena).
+const noLedgerExpense = await call(
+  "POST",
+  `/api/campaigns/${expCampaignId}/expenses`,
+  { description: "Gasto ficticio sin asiento (E2E)", amount: 120, date: "2026-04-01", category: "materiales", isPublic: false },
+  { auth: true },
+);
+// Gasto ficticio CON asiento (público: queda encadenado).
+const withLedgerExpense = await call(
+  "POST",
+  `/api/campaigns/${expCampaignId}/expenses`,
+  { description: "Gasto ficticio con asiento (E2E)", amount: 80, date: "2026-04-02", category: "transporte", isPublic: true },
+  { auth: true },
+);
+const noLedgerId = noLedgerExpense.body?.id;
+const withLedgerId = withLedgerExpense.body?.id;
+check("se crean los dos gastos de prueba", noLedgerExpense.status === 201 && withLedgerExpense.status === 201, `status=${noLedgerExpense.status}/${withLedgerExpense.status}`);
+
+// Gasto REAL (documento propio) en una campaña NO declarada DEMO.
+const realCampaign = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `Real E2E ${stamp}`,
+    description: "Campaña de prueba con un gasto auténtico.",
+    goal: 500,
+    category: "general",
+    startDate: "2026-01-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const realCampaignId = realCampaign.body?.id;
+const realExpense = await call(
+  "POST",
+  `/api/campaigns/${realCampaignId}/expenses`,
+  {
+    description: "Gasto real con boleta (E2E)",
+    amount: 45,
+    date: "2026-04-03",
+    category: "general",
+    isPublic: false,
+    receiptUrl: "https://res.cloudinary.com/redsolidaria/image/upload/v1/boleta-e2e.jpg",
+    receiptType: "boleta",
+  },
+  { auth: true },
+);
+const realExpenseId = realExpense.body?.id;
+check("se crea el gasto auténtico", realExpense.status === 201, `status=${realExpense.status}`);
+
+// ─── Diagnóstico: el gestor distingue los cuatro casos ──────────────────────
+const expenseTable = await call("GET", "/api/admin/maintenance/expenses", undefined, { auth: true });
+const findExpense = (id) => (expenseTable.body?.expenses ?? []).find((row) => row.id === id);
+check("el gestor de gastos responde 200 con la tabla completa", expenseTable.status === 200 && Array.isArray(expenseTable.body?.expenses), `status=${expenseTable.status}`);
+check(
+  "un gasto ficticio SIN asiento se propone para eliminación definitiva",
+  findExpense(noLedgerId)?.action === "delete" && findExpense(noLedgerId)?.deletable === true,
+  `action=${findExpense(noLedgerId)?.action}`,
+);
+check(
+  "un gasto ficticio CON asiento se propone para purga controlada",
+  findExpense(withLedgerId)?.action === "purge_with_ledger" && findExpense(withLedgerId)?.deletable === true,
+  `action=${findExpense(withLedgerId)?.action} movs=${JSON.stringify(findExpense(withLedgerId)?.ledgerMovements ?? null)}`,
+);
+check(
+  "un gasto REAL con documento propio NO es eliminable (se corrige, no se borra)",
+  findExpense(realExpenseId)?.deletable === false &&
+    findExpense(realExpenseId)?.action === "regularize" &&
+    findExpense(realExpenseId)?.conservationObligation === true,
+  `action=${findExpense(realExpenseId)?.action} blockers=${JSON.stringify(findExpense(realExpenseId)?.blockers ?? null)}`,
+);
+check(
+  "los gastos de la campaña protegida quedan en revisión manual",
+  (expenseTable.body?.expenses ?? [])
+    .filter((row) => row.campaignId === seededChocofest?.id)
+    .every((row) => row.deletable === false && row.protectedCampaign === true),
+);
+check(
+  "el resumen del gestor informa de eliminables, con asiento y huérfanos",
+  typeof expenseTable.body?.summary?.deletableCount === "number" &&
+    typeof expenseTable.body?.summary?.withLedger === "number" &&
+    typeof expenseTable.body?.summary?.orphans === "number",
+  JSON.stringify(expenseTable.body?.summary ?? null),
+);
+
+const expenseDetail = await call("GET", `/api/admin/maintenance/expenses/${withLedgerId}`, undefined, { auth: true });
+check(
+  "el diagnóstico individual informa de sus dependencias y de la cadena",
+  expenseDetail.status === 200 &&
+    expenseDetail.body?.hasLedgerEntry === true &&
+    expenseDetail.body?.ledgerMovements?.length === 1 &&
+    expenseDetail.body?.chainVerifiedAfterRemoval === true,
+  `status=${expenseDetail.status} body=${JSON.stringify(expenseDetail.body?.ledgerMovements ?? null)}`,
+);
+
+const orphanScan = await call("GET", "/api/admin/maintenance/orphans", undefined, { auth: true });
+check(
+  "el diagnóstico de huérfanos responde 200 (0 es un resultado válido)",
+  orphanScan.status === 200 && Array.isArray(orphanScan.body?.expenses) && Array.isArray(orphanScan.body?.donations),
+  `status=${orphanScan.status}`,
+);
+
+// ─── Un gasto real NO se elimina por la puerta de atrás ────────────────────
+const refuseReal = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/purge",
+  { ids: [realExpenseId], confirm: true, reason: EXP_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "eliminar un gasto REAL se rechaza (409) y no se toca",
+  refuseReal.status === 409 && refuseReal.body?.code === "expenses_not_deletable",
+  `status=${refuseReal.status} code=${refuseReal.body?.code ?? ""}`,
+);
+
+const refuseDeleteRoute = await call("DELETE", `/api/campaigns/${realCampaignId}/expenses/${realExpenseId}`, undefined, { auth: true });
+check(
+  "el DELETE de la ruta de gastos también rechaza un gasto real (409)",
+  refuseDeleteRoute.status === 409,
+  `status=${refuseDeleteRoute.status} code=${refuseDeleteRoute.body?.code ?? ""}`,
+);
+
+// ─── Vista previa ──────────────────────────────────────────────────────────
+const expPreview = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/purge",
+  { ids: [noLedgerId, withLedgerId], preview: true },
+  { auth: true },
+);
+check(
+  "la vista previa dice exactamente qué se borraría",
+  expPreview.status === 200 &&
+    expPreview.body?.plan?.totals?.expenses === 2 &&
+    expPreview.body?.plan?.totals?.amount === 200 &&
+    expPreview.body?.plan?.totals?.movements === 1,
+  `status=${expPreview.status} totals=${JSON.stringify(expPreview.body?.plan?.totals ?? null)}`,
+);
+
+// ─── ANTES ─────────────────────────────────────────────────────────────────
+const dashBeforeExpenses = await call("GET", "/api/admin/dashboard", undefined, { auth: true });
+const spentBefore = dashBeforeExpenses.body?.summary?.totalSpent;
+const balanceBefore = dashBeforeExpenses.body?.summary?.balance;
+const checkBefore = await call("GET", "/api/admin/maintenance/financial-check", undefined, { auth: true });
+check("la comprobación financiera previa responde 200", checkBefore.status === 200, `status=${checkBefore.status}`);
+
+// ─── EJECUCIÓN ─────────────────────────────────────────────────────────────
+const expPurge = await call(
+  "POST",
+  "/api/admin/maintenance/expenses/purge",
+  { ids: [noLedgerId, withLedgerId], confirm: true, reason: EXP_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "la eliminación se ejecuta y cuadra con lo purgado",
+  expPurge.status === 200 &&
+    expPurge.body?.deleted?.deletedExpenses === 2 &&
+    expPurge.body?.deleted?.deletedMovements === 1 &&
+    expPurge.body?.comparison?.matchesPurged === true,
+  `status=${expPurge.status} deleted=${JSON.stringify(expPurge.body?.deleted ?? null)} matches=${expPurge.body?.comparison?.matchesPurged}`,
+);
+check(
+  "se creó el respaldo verificable de la purga",
+  Array.isArray(expPurge.body?.deleted?.backupIds) && expPurge.body.deleted.backupIds.length === 1,
+  JSON.stringify(expPurge.body?.deleted?.backupIds ?? null),
+);
+
+// ─── DESPUÉS: la base cambió de verdad ─────────────────────────────────────
+const campaignExpensesAfter = await call("GET", `/api/campaigns/${expCampaignId}/expenses`, undefined, { auth: true });
+check(
+  "los gastos purgados YA NO existen en la base",
+  campaignExpensesAfter.status === 200 &&
+    !(campaignExpensesAfter.body ?? []).some((row) => row.id === noLedgerId || row.id === withLedgerId),
+  `ids=${JSON.stringify((campaignExpensesAfter.body ?? []).map((row) => row.id))}`,
+);
+
+const deletedExpenseDelete = await call("DELETE", `/api/campaigns/${expCampaignId}/expenses/${noLedgerId}`, undefined, { auth: true });
+check("borrar un gasto ya purgado responde 404 (no existe)", deletedExpenseDelete.status === 404, `status=${deletedExpenseDelete.status}`);
+
+const realStillThere = await call("GET", `/api/campaigns/${realCampaignId}/expenses`, undefined, { auth: true });
+const managerAfterPurge = await call("GET", "/api/admin/maintenance/expenses", undefined, { auth: true });
+check(
+  "el gasto auténtico SIGUE en la base (visto desde el gestor de mantenimiento)",
+  (managerAfterPurge.body?.expenses ?? []).some((row) => row.id === realExpenseId) &&
+    (realStillThere.body ?? []).length === 0,
+  `gestor=${JSON.stringify((managerAfterPurge.body?.expenses ?? []).filter((r) => r.id === realExpenseId).map((r) => r.id))} · vista pública=${JSON.stringify((realStillThere.body ?? []).map((r) => r.id))}`,
+);
+
+// ─── El dashboard refleja el borrado ───────────────────────────────────────
+const dashAfterExpenses = await call("GET", "/api/admin/dashboard", undefined, { auth: true });
+const spentAfter = dashAfterExpenses.body?.summary?.totalSpent;
+const balanceAfter = dashAfterExpenses.body?.summary?.balance;
+const round2 = (value) => Math.round(Number(value ?? 0) * 100) / 100;
+check(
+  "el total de gastos del dashboard baja EXACTAMENTE lo eliminado",
+  round2(spentAfter) === round2(round2(spentBefore) - 200),
+  `antes=${spentBefore} después=${spentAfter}`,
+);
+check(
+  "el saldo del dashboard sube exactamente lo eliminado",
+  round2(balanceAfter) === round2(round2(balanceBefore) + 200),
+  `antes=${balanceBefore} después=${balanceAfter}`,
+);
+
+const expenseTableAfter = await call("GET", "/api/admin/maintenance/expenses", undefined, { auth: true });
+check(
+  "los gastos purgados desaparecen del gestor",
+  !(expenseTableAfter.body?.expenses ?? []).some((row) => row.id === noLedgerId || row.id === withLedgerId),
+);
+
+// ─── Integridad: cadena, huérfanos y auditoría ─────────────────────────────
+const ledgerAfterExpenses = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
+check(
+  "la cadena del libro sigue verificando tras retirar el asiento de prueba",
+  ledgerAfterExpenses.body?.chain?.verified === true,
+  `verified=${ledgerAfterExpenses.body?.chain?.verified}`,
+);
+check(
+  "no quedan asientos huérfanos tras la purga",
+  (ledgerAfterExpenses.body?.movementsWithoutSource ?? []).length === 0,
+  JSON.stringify(ledgerAfterExpenses.body?.movementsWithoutSource ?? null),
+);
+
+const auditAfterExpenses = await call("GET", "/api/admin/audit-logs?limit=100", undefined, { auth: true });
+check(
+  "la purga de gastos queda registrada en la auditoría",
+  String(JSON.stringify(auditAfterExpenses.body ?? {})).includes("EXPENSE_DEMO_PURGED"),
+);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);

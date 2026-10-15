@@ -1,8 +1,14 @@
 import { Router, type IRouter } from "express";
-import { db, campaignExpensesTable, insertCampaignExpenseSchema } from "@workspace/db";
+import { db, campaignExpensesTable, campaignMovementsTable, campaignsTable, insertCampaignExpenseSchema } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
+import { diagnoseExpense } from "../lib/expense-cleanup";
+import { isOwnDocument } from "../lib/demo-classification";
+import { readProtectedCampaignIds } from "../lib/protected-campaigns";
+import { toSafeAmount } from "../lib/amount-format";
+import { logAuditAction } from "../middleware/auth-utils";
+import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 
 // Dinero: solo administrador o superadmin.
 const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
@@ -106,6 +112,45 @@ router.put(
       const campaignId = Number(req.params.id);
       const expenseId = Number(req.params.expenseId);
       const data = insertCampaignExpenseSchema.parse({ ...req.body, campaignId });
+
+      const [existing] = await db
+        .select()
+        .from(campaignExpensesTable)
+        .where(
+          and(
+            eq(campaignExpensesTable.id, expenseId),
+            eq(campaignExpensesTable.campaignId, campaignId),
+          ),
+        );
+      if (!existing) return res.status(404).json({ error: "not_found", message: "Expense not found" });
+
+      // V10.1: un gasto CONTABILIZADO no se puede editar en lo que el asiento
+      // firmó (importe, fecha y categoría van en el hash de la cadena). Cambiarlos
+      // dejaría el libro descuadrado sin dejar rastro. Para corregirlo hay que
+      // anular y volver a registrar.
+      const [entry] = await db
+        .select({ id: campaignMovementsTable.id })
+        .from(campaignMovementsTable)
+        .where(
+          and(
+            eq(campaignMovementsTable.sourceType, "expense"),
+            eq(campaignMovementsTable.sourceId, expenseId),
+          ),
+        );
+      if (
+        entry &&
+        (Number(data.amount) !== toSafeAmount(existing.amount) ||
+          data.date !== existing.date ||
+          data.category !== existing.category)
+      ) {
+        return res.status(409).json({
+          error: "conflict",
+          code: "expense_counted",
+          movementId: entry.id,
+          message: `Este gasto está contabilizado (asiento #${entry.id}): su importe, fecha y categoría no se pueden cambiar sin descuadrar el libro. Anúlalo y registra el correcto.`,
+        });
+      }
+
       const [expense] = await db
         .update(campaignExpensesTable)
         .set(data)
@@ -124,21 +169,103 @@ router.put(
   },
 );
 
+// ─── DELETE: eliminar un gasto ───────────────────────────────────────────────
+// V10.1: antes era un borrado ciego disponible para cualquier administrador y sin
+// comprobar el libro. Ahora se DIAGNOSTICA el gasto (misma lógica pura que el
+// gestor de mantenimiento) y solo se permite destruir lo que es ficticio:
+//
+//   · ficticio SIN asiento        → 204 (eliminación definitiva).
+//   · ficticio CON asiento        → 409: la retirada del asiento exige respaldo y
+//     verificación de la cadena → se hace desde Mantenimiento → Gastos DEMO.
+//   · real sin asiento            → 409: se corrige (le falta el asiento), no se borra.
+//   · real contabilizado          → 409: se anula con asiento compensatorio.
+//   · campaña protegida (ChocoFest)→ 409: se conserva.
 router.delete(
   "/campaigns/:id/expenses/:expenseId",
-  ...adminOnly,
+  requireAdmin,
+  requireRole(ROLES.SUPERADMIN),
   adminActionLimiter,
   async (req, res) => {
     try {
       const campaignId = Number(req.params.id);
       const expenseId = Number(req.params.expenseId);
+
+      const [expense] = await db
+        .select()
+        .from(campaignExpensesTable)
+        .where(
+          and(
+            eq(campaignExpensesTable.id, expenseId),
+            eq(campaignExpensesTable.campaignId, campaignId),
+          ),
+        );
+      if (!expense) {
+        return res.status(404).json({ error: "not_found", message: "El gasto no existe" });
+      }
+
+      const [[campaign], movements, protectedCampaignIds] = await Promise.all([
+        db.select().from(campaignsTable).where(eq(campaignsTable.id, campaignId)),
+        db
+          .select()
+          .from(campaignMovementsTable)
+          .where(eq(campaignMovementsTable.campaignId, campaignId)),
+        readProtectedCampaignIds(),
+      ]);
+
+      const diagnosis = diagnoseExpense({
+        expense,
+        campaign: campaign
+          ? { id: campaign.id, title: campaign.title, status: campaign.status, isDemo: campaign.isDemo === true }
+          : null,
+        // Misma regla que el inventario: declarada DEMO o documento propio.
+        classification:
+          campaign?.isDemo === true ? "demo" : isOwnDocument(expense.receiptUrl) ? "real" : "pending",
+        protectedCampaignIds,
+        campaignMovements: movements,
+      });
+
+      if (!diagnosis.deletable) {
+        return res.status(409).json({
+          error: "conflict",
+          code: diagnosis.action === "purge_with_ledger" ? "requires_controlled_purge" : "not_deletable",
+          action: diagnosis.action,
+          actionLabel: diagnosis.actionLabel,
+          blockers: diagnosis.blockers,
+          message: `${diagnosis.actionLabel}: ${diagnosis.reasons.join(" ")}`,
+          hint:
+            diagnosis.action === "purge_with_ledger"
+              ? "Usa Mantenimiento → Gastos DEMO: hace respaldo verificable y comprueba la cadena."
+              : "No se destruye: corrige o anula el gasto según su estado contable.",
+        });
+      }
+
       await db
         .delete(campaignExpensesTable)
-        .where(and(eq(campaignExpensesTable.id, expenseId), eq(campaignExpensesTable.campaignId, campaignId)));
-      res.status(204).send();
+        .where(
+          and(
+            eq(campaignExpensesTable.id, expenseId),
+            eq(campaignExpensesTable.campaignId, campaignId),
+          ),
+        );
+
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.expenseDemoPurged,
+        resource: AUDIT_RESOURCES.campaigns,
+        resourceId: String(expenseId),
+        details: {
+          campaignId,
+          amount: expense.amount,
+          description: expense.description,
+          action: diagnosis.action,
+          reason: typeof req.body?.reason === "string" ? req.body.reason.trim() : null,
+        },
+      });
+
+      return res.status(204).send();
     } catch (err) {
       req.log.error({ err }, "Failed to delete campaign expense");
-      res.status(500).json({ error: "server_error", message: "Failed to delete expense" });
+      return res.status(500).json({ error: "server_error", message: "Failed to delete expense" });
     }
   },
 );

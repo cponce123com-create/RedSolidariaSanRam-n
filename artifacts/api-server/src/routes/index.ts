@@ -33,6 +33,7 @@ import volunteerTeamsRouter from "./volunteer-teams";
 import uploadsRouter from "./uploads";
 import certificatesRouter from "./certificates";
 import maintenanceRouter from "./maintenance";
+import maintenanceExpensesRouter from "./maintenance-expenses";
 import { requireAdmin } from "../middleware/require-admin";
 import { adminActionLimiter } from "../middleware/rate-limit";
 
@@ -80,6 +81,7 @@ router.use(faqRouter);
 router.use(adminUsersRouter);
 router.use(settingsRouter);
 router.use(maintenanceRouter);
+router.use(maintenanceExpensesRouter);
 router.use(uploadsRouter);
 
 export default router;
