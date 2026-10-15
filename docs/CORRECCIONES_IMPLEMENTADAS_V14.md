@@ -201,6 +201,40 @@ y los informes pueden ahora declarar sobre qué fechas están calculadas las cif
 | 2.2 Libro contable | **Ya completado en V9.1**: estados `empty`/`healthy`/`issues`, asientos de importe cero, asientos huérfanos, cadenas por campaña |
 | 2.3 Cierre financiero de campañas | **Pendiente: módulo nuevo.** Requiere decisiones funcionales (ver informe) |
 
+### V14-08 · Cierre financiero de campañas (módulo nuevo) — ALTA
+
+**Módulo:** Campañas · **Archivos:** `lib/campaign-closure.ts` (puro),
+`routes/campaign-closure.ts`, `routes/campaign-expenses.ts`, migración **030**
+
+**Qué faltaba:** no existía ninguna forma de cerrar financieramente una campaña: los
+gastos y las donaciones se podían seguir tocando para siempre, sin acto de cierre ni
+bloqueo posterior.
+
+**DECISIONES QUE TOMÉ** (documentadas en el código, `CLOSURE_DECISIONS`):
+
+| # | Decisión | Motivo |
+| --- | --- | --- |
+| D1 | El cierre es un **evento fechado y firmado con historial append-only** (tabla `campaign_closures`), no un campo de estado | Reabrir no borra la prueba de que se cerró ni quién lo autorizó; el informe queda congelado con su SHA-256 |
+| D2 | **Bloquea** solo lo que rompe la contabilidad (cadena sin verificar, asientos huérfanos). Lo pendiente (gasto sin comprobante, donación sin asiento) **avisa** y queda como **salvedad** | Obligar a un estado perfecto empujaría a falsear los datos; cerrar «con salvedades» es la verdad de muchas campañas |
+| D3 | **Cerrar**: administrador o superadmin con reautenticación. **Reabrir**: solo superadmin con reautenticación y motivo | Reabrir rompe el histórico |
+| D4 | Tras el cierre se bloquean **alta, edición y borrado de gastos**; los **asientos compensatorios siguen permitidos** | Prohibir corregir un error no lo arregla: lo esconde |
+| D5 | El informe se expone como **JSON con su SHA-256 verificable**; el PDF llega con la Entrega 3 | No duplicar el motor de PDF |
+
+**API:** `GET /admin/campaigns/:id/closure` (revisión previa con las 10 comprobaciones),
+`POST .../closure` (cerrar), `POST .../closure/reopen` (reabrir),
+`GET .../closure/report` (informe congelado + verificación del sello).
+
+**El bloqueo es real, no un botón deshabilitado:** `assertCampaignOpen` se aplica con un
+`router.use` a todas las escrituras de gastos de la campaña. Ante un fallo al comprobar
+el estado **se rechaza la escritura** (503), en vez de dejar pasar una modificación a
+ciegas.
+
+**Prueba:** 15 pruebas puras (`tests/campaign-closure.test.mjs`) + E2E `7duodecies`
+(13 comprobaciones, PostgreSQL real): las 10 revisiones, el cierre firmado con su hash,
+**409 `campaign_closed` al intentar escribir tras el cierre**, las lecturas siguen
+funcionando, no se puede cerrar dos veces, el informe verifica su sello, la reapertura
+devuelve la escritura y el historial conserva el cierre anterior.
+
 ## Hallazgos detectados y NO corregidos todavía (con motivo)
 
 ### V14-03 · Enumeración de correos en el registro de voluntarios — MEDIA (requiere decisión)
@@ -228,7 +262,7 @@ se puede endurecer con un límite específico por token/IP en una entrega poster
 | Entrega | Estado |
 | --- | --- |
 | **1 · Seguridad crítica** | **✅ 1.1, 1.2, 1.3 y 1.4 completadas y probadas** |
-| 2 · Dashboard, conciliación e integridad financiera | Pendiente |
+| 2 · Dashboard, conciliación e integridad financiera | **✅ 2.1 auditada · 2.2 ya cerrada en V9.1 · 2.3 cierre financiero implementado** |
 | 3 · Certificados PDF y cierre de campañas | Pendiente |
 | 4 · Revisión de los 23 módulos | Pendiente |
 | 5 · UX/UI, centro de control y herramientas | Pendiente |

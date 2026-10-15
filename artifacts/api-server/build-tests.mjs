@@ -46,6 +46,7 @@ await build({
     "./src/lib/expense-manual-classification.ts",
     "./src/lib/admin-user-guards.ts",
     "./src/lib/csrf-origin.ts",
+    "./src/lib/campaign-closure.ts",
     "./src/lib/admin-reauth.ts",
     "./src/lib/two-factor-account.ts",
     "./src/lib/asset-cleanup.ts",
