@@ -1575,6 +1575,14 @@ check(
     String(JSON.stringify(orphanAudit.body ?? {})).includes("EXPENSE_DEMO_PURGED"),
 );
 
+check(
+  "el panel declara la SEMÁNTICA de fechas de sus cifras (V14-2.1)",
+  dashboardNow.body?.filters?.dateSemantics?.donations?.includes("created_at") &&
+    dashboardNow.body?.filters?.dateSemantics?.expenses?.includes("date") &&
+    typeof dashboardNow.body?.filters?.dateSemantics?.note === "string",
+  JSON.stringify(dashboardNow.body?.filters?.dateSemantics ?? null),
+);
+
 // ── 7decies. PRIVACIDAD PÚBLICA: mascotas y voluntarios (V14, Entrega 1) ─────
 // Dos fugas reales: la ruta pública de mascotas aceptaba cualquier `?status=` y
 // devolvía la fila entera (con los datos de contacto), y el registro público de
@@ -1802,6 +1810,150 @@ const guardAuditText = String(JSON.stringify(guardAudit.body ?? {}));
 check(
   "los cambios administrativos quedan auditados con el rol anterior y las sesiones revocadas",
   guardAuditText.includes("previousRole") && guardAuditText.includes("revokedSessions"),
+);
+
+// ── 7duodecies. CIERRE FINANCIERO DE CAMPAÑA (V14, Entrega 2.3) ──────────────
+// Un cierre es un acto contable: se revisa, se firma con su motivo y a partir de ahí
+// la contabilidad de esa campaña queda BLOQUEADA de verdad en el servidor.
+const CLOSE_REASON = "Cierre del ejercicio de la campaña de prueba (E2E)";
+
+const closeCampaign = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `Cierre E2E ${stamp}`,
+    description: "Campaña de prueba para el cierre financiero.",
+    goal: 1000,
+    category: "general",
+    startDate: "2026-01-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const closeCampaignId = closeCampaign.body?.id;
+check("se crea la campaña que se va a cerrar", closeCampaign.status === 201 && Number.isInteger(closeCampaignId), `status=${closeCampaign.status}`);
+
+const closurePreview = await call("GET", `/api/admin/campaigns/${closeCampaignId}/closure`, undefined, { auth: true });
+check(
+  "la revisión previa devuelve las DIEZ comprobaciones del procedimiento",
+  closurePreview.status === 200 && closurePreview.body?.report?.checklist?.length === 10,
+  `status=${closurePreview.status} items=${closurePreview.body?.report?.checklist?.length ?? 0}`,
+);
+check(
+  "una campaña sin discrepancias contables se puede cerrar",
+  closurePreview.body?.report?.canClose === true && closurePreview.body?.state?.closed === false,
+  `canClose=${closurePreview.body?.report?.canClose}`,
+);
+
+const closeNoReason = await call(
+  "POST",
+  `/api/admin/campaigns/${closeCampaignId}/closure`,
+  { confirm: true, reason: "corto", password: PASS },
+  { auth: true },
+);
+check("cerrar sin motivo suficiente se rechaza (400)", closeNoReason.status === 400 && closeNoReason.body?.code === "reason_required", `status=${closeNoReason.status}`);
+
+const closed = await call(
+  "POST",
+  `/api/admin/campaigns/${closeCampaignId}/closure`,
+  { confirm: true, reason: CLOSE_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "el cierre se firma con su motivo y su hash",
+  closed.status === 201 && typeof closed.body?.manifestHash === "string" && closed.body.manifestHash.length === 64 && Number.isInteger(closed.body?.closureId),
+  `status=${closed.status} hash=${String(closed.body?.manifestHash ?? "").slice(0, 12)}…`,
+);
+check(
+  "el cierre informa de las cifras congeladas y de sus salvedades",
+  typeof closed.body?.figures?.balance === "number" && typeof closed.body?.withSalvedades === "boolean",
+  JSON.stringify(closed.body?.figures ?? null),
+);
+
+// EL BLOQUEO: con el cierre firmado, la contabilidad de esa campaña no se toca.
+const writeAfterClose = await call(
+  "POST",
+  `/api/campaigns/${closeCampaignId}/expenses`,
+  { description: "Gasto después del cierre (E2E)", amount: 50, date: "2026-05-01", category: "general" },
+  { auth: true },
+);
+check(
+  "tras el cierre NO se puede registrar un gasto (409 campaign_closed)",
+  writeAfterClose.status === 409 && writeAfterClose.body?.code === "campaign_closed",
+  `status=${writeAfterClose.status} code=${writeAfterClose.body?.code ?? ""}`,
+);
+
+const readAfterClose = await call("GET", `/api/campaigns/${closeCampaignId}/expenses`, undefined, { auth: true });
+check(
+  "las LECTURAS siguen funcionando con la campaña cerrada",
+  readAfterClose.status === 200,
+  `status=${readAfterClose.status}`,
+);
+
+const closeAgain = await call(
+  "POST",
+  `/api/admin/campaigns/${closeCampaignId}/closure`,
+  { confirm: true, reason: CLOSE_REASON, password: PASS },
+  { auth: true },
+);
+check("no se puede cerrar dos veces (409 already_closed)", closeAgain.status === 409 && closeAgain.body?.code === "already_closed", `status=${closeAgain.status}`);
+
+const closureReport = await call("GET", `/api/admin/campaigns/${closeCampaignId}/closure/report`, undefined, { auth: true });
+check(
+  "el informe congelado VERIFICA su sello SHA-256",
+  closureReport.status === 200 && closureReport.body?.manifestVerified === true,
+  `status=${closureReport.status} verificado=${closureReport.body?.manifestVerified}`,
+);
+check(
+  "el informe conserva quién lo firmó y por qué",
+  closureReport.body?.closedBy === USER && closureReport.body?.reason === CLOSE_REASON,
+  `firmado por=${closureReport.body?.closedBy ?? ""}`,
+);
+
+// Reabrir: solo superadmin, con reautenticación y motivo.
+const reopenNoConfirm = await call(
+  "POST",
+  `/api/admin/campaigns/${closeCampaignId}/closure/reopen`,
+  { reason: "Faltó registrar una boleta del último gasto", password: PASS },
+  { auth: true },
+);
+check("reabrir exige confirmación explícita (400)", reopenNoConfirm.status === 400, `status=${reopenNoConfirm.status}`);
+
+const reopened = await call(
+  "POST",
+  `/api/admin/campaigns/${closeCampaignId}/closure/reopen`,
+  { confirm: true, reason: "Faltó registrar una boleta del último gasto", password: PASS },
+  { auth: true },
+);
+check("el superadmin reabre la campaña", reopened.status === 200, `status=${reopened.status}`);
+
+const writeAfterReopen = await call(
+  "POST",
+  `/api/campaigns/${closeCampaignId}/expenses`,
+  { description: "Gasto tras reabrir (E2E)", amount: 50, date: "2026-05-01", category: "general" },
+  { auth: true },
+);
+check(
+  "tras reabrir, la contabilidad vuelve a admitir escrituras",
+  writeAfterReopen.status === 201,
+  `status=${writeAfterReopen.status}`,
+);
+
+const stateAfterReopen = await call("GET", `/api/admin/campaigns/${closeCampaignId}/closure`, undefined, { auth: true });
+check(
+  "el historial conserva el cierre anterior (append-only) y el estado actual es abierto",
+  stateAfterReopen.body?.state?.closed === false &&
+    stateAfterReopen.body?.state?.closureCount === 1 &&
+    stateAfterReopen.body?.state?.reopeningCount === 1 &&
+    stateAfterReopen.body?.state?.history?.length === 2,
+  JSON.stringify(stateAfterReopen.body?.state ?? null),
+);
+
+const closureAudit = await call("GET", "/api/admin/audit-logs?limit=100", undefined, { auth: true });
+const closureAuditText = String(JSON.stringify(closureAudit.body ?? {}));
+check(
+  "el cierre y la reapertura quedan auditados con su motivo",
+  closureAuditText.includes("CAMPAIGN_CLOSED") && closureAuditText.includes("CAMPAIGN_REOPENED"),
 );
 
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────

@@ -9,14 +9,52 @@ import { readProtectedCampaignIds } from "../lib/protected-campaigns";
 import { toSafeAmount } from "../lib/amount-format";
 import { logAuditAction } from "../middleware/auth-utils";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
-
-// Dinero: solo administrador o superadmin.
-const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
 import { adminActionLimiter } from "../middleware/rate-limit";
 import { toIsoSafe } from "../lib/date-format";
 import { appendMovement } from "../lib/ledger";
+import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
 
 const router: IRouter = Router();
+
+// Dinero: solo administrador o superadmin.
+const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
+
+/**
+ * V14-2.3: una campaña con CIERRE FINANCIERO FIRMADO no admite escrituras contables.
+ *
+ * Se aplica de una vez a las tres rutas de gastos con un `router.use` con el mismo
+ * patrón: solo intercepta los métodos que CAMBIAN estado (las lecturas siguen
+ * funcionando, que es lo que necesita el panel para consultar). El motivo del bloqueo
+ * lo explica `closedCampaignError()`, que incluye la salida: reabrir (superadmin) o
+ * registrar un asiento compensatorio.
+ */
+router.use("/campaigns/:id/expenses", async (req, res, next) => {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    next();
+    return;
+  }
+  const campaignId = Number(req.params.id);
+  if (!Number.isInteger(campaignId) || campaignId <= 0) {
+    next();
+    return;
+  }
+  try {
+    if (await isCampaignClosed(campaignId)) {
+      res.status(409).json(closedCampaignError());
+      return;
+    }
+    next();
+  } catch (err) {
+    // Ante un fallo al comprobar el cierre se RECHAZA la escritura: si no se puede
+    // saber si la campaña está cerrada, no se toca su contabilidad.
+    req.log.error({ err, campaignId }, "Failed to check campaign closure state");
+    res.status(503).json({
+      error: "server_error",
+      code: "closure_check_failed",
+      message: "No se pudo comprobar el estado de cierre de la campaña. Inténtalo de nuevo.",
+    });
+  }
+});
 
 // Público: SOLO gastos publicados (is_public=true). El filtro va en SQL para
 // que las filas privadas (responsable, observaciones, comprobantes) NUNCA

@@ -114,6 +114,31 @@ export function parseDashboardFilters(
 }
 
 /**
+ * Semántica de fechas del panel (V14-2.1), expuesta en la respuesta.
+ *
+ * Las cifras de donaciones se filtran por `created_at` (fecha de REGISTRO) y las de
+ * gastos por `date` (fecha de la OPERACIÓN). **No es un descuido**: la tabla
+ * `donations` no guarda una fecha de operación distinta del registro, así que no hay
+ * otro campo que usar. Pero mezclar dos significados sin decirlo produce cifras que
+ * nadie puede conciliar, así que se publica junto a los datos y los informes pueden
+ * declararlo.
+ */
+export interface DateSemantics {
+  donations: string;
+  expenses: string;
+  historical: string;
+  note: string;
+}
+
+export const DASHBOARD_DATE_SEMANTICS: DateSemantics = {
+  donations: "created_at — fecha de REGISTRO de la donación",
+  expenses: "date — fecha de la OPERACIÓN del gasto",
+  historical: "sin fecha — importe histórico registrado a mano",
+  note:
+    "Donaciones y gastos usan campos distintos por diseño (la donación no guarda una fecha de operación aparte). Con un rango de fechas activo, el histórico NO se cuenta porque no es atribuible a un rango, y las donaciones de fondo general (sin campaña) quedan fuera de los filtros de campaña o estado.",
+};
+
+/**
  * Descripción legible de los filtros aplicados, para devolverla con el informe
  * y que un tercero sepa sobre qué se calcularon las cifras.
  */

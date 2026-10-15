@@ -25,6 +25,7 @@ import {
   resolveCorsOrigin,
   validateSecurityConfig,
 } from "./lib/security-config";
+import { createCsrfOriginGuard } from "./lib/csrf-origin";
 
 const app: Express = express();
 
@@ -157,6 +158,16 @@ const sessionSecret =
   (process.env.NODE_ENV === "development"
     ? randomBytes(32).toString("hex")
     : "");
+
+// Defensa CSRF por ORIGEN (V14-1.4): se monta ANTES de la sesión, de los limitadores
+// y de las rutas, para rechazar una escritura cross-site con 403 sin tocar la base ni
+// gastar presupuesto. La cookie ya es sameSite=lax; esto es defensa en profundidad.
+// `resolveCorsOrigin` devuelve `true` en desarrollo (sin lista) → no se restringe.
+const corsOrigin = resolveCorsOrigin(process.env);
+app.use(
+  "/api",
+  createCsrfOriginGuard(corsOrigin === true ? [] : [corsOrigin]),
+);
 
 // Store de sesiones en PostgreSQL: escalable y persistente entre deploys
 // (MemoryStore pierde sesiones en cada reinicio y no escala multi-instancia)

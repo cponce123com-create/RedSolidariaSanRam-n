@@ -856,6 +856,38 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON expense_classifications (expense_id);
     `,
   },
+  {
+    name: "030_campaign_closures.sql",
+    sql: `
+      -- V14-2.3: cierre financiero de campaña.
+      --
+      -- DECISIÓN: el cierre es un ACTO CONTABLE fechado y firmado, no un campo de
+      -- estado. Esta tabla es APPEND-ONLY: cada fila es un evento (closed o
+      -- reopened) con quién, cuándo, por qué y el informe de cifras congelado con
+      -- su SHA-256. El estado actual se deriva del último evento, así que reabrir no
+      -- borra la prueba de que se cerró ni quién lo autorizó.
+      --
+      -- SIN CLAVE FORÁNEA a campaigns A PROPÓSITO: el cierre debe sobrevivir a la
+      -- purga de una campaña DEMO (es la prueba de que existió y cómo se cerró).
+      --
+      -- ADITIVA: una tabla nueva; no toca ninguna otra.
+      CREATE TABLE IF NOT EXISTS campaign_closures (
+        id serial PRIMARY KEY,
+        campaign_id integer NOT NULL,
+        event text NOT NULL,
+        reason text NOT NULL,
+        report jsonb NOT NULL,
+        manifest_hash text NOT NULL,
+        performed_by text,
+        performed_by_id text,
+        created_at timestamp NOT NULL DEFAULT now(),
+        CONSTRAINT campaign_closures_event_check CHECK (event IN ('closed','reopened'))
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_campaign_closures_campaign
+        ON campaign_closures (campaign_id, id);
+    `,
+  },
 ];
 
 /**
