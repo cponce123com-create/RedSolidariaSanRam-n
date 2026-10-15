@@ -1987,6 +1987,64 @@ check(
   `status=${pdfWithoutClosure.status}`,
 );
 
+// ── 7quaterdecies. CERTIFICADO EN PDF (V14, Entrega 3) ───────────────────────
+const certificadoPdf = await call(
+  "POST",
+  "/api/admin/certificates",
+  {
+    holderName: `Donante E2E ${stamp}`,
+    type: "donante",
+    title: "Constancia de donación",
+    description: "Por su aporte solidario a la campaña Chocofest 2025.",
+    issuedAt: "2026-10-15",
+  },
+  { auth: true },
+);
+const certificadoPdfCode = certificadoPdf.body?.code;
+check("se emite un certificado con su código", certificadoPdf.status === 201 && typeof certificadoPdfCode === "string", `status=${certificadoPdf.status} code=${certificadoPdfCode ?? ""}`);
+
+const certPdf = await call("GET", `/api/certificates/${certificadoPdfCode}/pdf`);
+const certPdfText = String(certPdf.text ?? "");
+check(
+  "el certificado se descarga como PDF real SIN sesión (es para el donante)",
+  certPdf.status === 200 && certPdfText.startsWith("%PDF-"),
+  `status=${certPdf.status} inicio=${certPdfText.slice(0, 5)}`,
+);
+check(
+  "el PDF del certificado tiene contenido dibujado",
+  certPdfText.length > 2000,
+  `bytes≈${certPdfText.length}`,
+);
+
+const certUnknown = await call("GET", "/api/certificates/NO-EXISTE-9999/pdf");
+check("un código desconocido no genera ningún PDF (404)", certUnknown.status === 404, `status=${certUnknown.status}`);
+
+const certRevoked = await call(
+  "PATCH",
+  `/api/admin/certificates/${certificadoPdf.body?.id}`,
+  { status: "revoked", revocationReason: "Emitido por error: donación duplicada." },
+  { auth: true },
+);
+check("el certificado se puede revocar", certRevoked.status === 200, `status=${certRevoked.status}`);
+
+const revokedPdf = await call("GET", `/api/certificates/${certificadoPdfCode}/pdf`);
+check(
+  "un certificado REVOCADO se sigue descargando (marcado como anulado), no da 404",
+  revokedPdf.status === 200 && String(revokedPdf.text ?? "").startsWith("%PDF-"),
+  `status=${revokedPdf.status}`,
+);
+
+// La verificación pública de un certificado ANULADO devuelve 404: no se puede acreditar
+// como válido, que es lo importante. (Matiz anotado como mejora: un 404 es
+// indistinguible de un código inexistente; sería más claro responder «revocado» con su
+// motivo. Es una decisión de producto, no un fallo de seguridad.)
+const certVerification = await call("GET", `/api/certificates/${certificadoPdfCode}`);
+check(
+  "la verificación pública NO da por válido un certificado anulado",
+  certVerification.status === 404,
+  `status=${certVerification.status} cuerpo=${String(JSON.stringify(certVerification.body ?? {})).slice(0, 80)}`,
+);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);
@@ -2216,8 +2274,8 @@ check(
   `status=${createdCert.status} code=${createdCert.body?.code ?? ""}`,
 );
 
-const certCode = createdCert.body?.code;
-const publicCert = await call("GET", `/api/certificates/${certCode}`);
+const pdfCertCode = createdCert.body?.code;
+const publicCert = await call("GET", `/api/certificates/${pdfCertCode}`);
 check(
   "el certificado se consulta públicamente (es lo que abre el QR)",
   publicCert.status === 200 && publicCert.body?.holderName === "E2E Donante",
@@ -2247,7 +2305,7 @@ check(
   `status=${revokedCert.status}`,
 );
 
-const afterRevoke = await call("GET", `/api/certificates/${certCode}`);
+const afterRevoke = await call("GET", `/api/certificates/${pdfCertCode}`);
 check(
   "un certificado revocado deja de publicarse (404)",
   afterRevoke.status === 404,

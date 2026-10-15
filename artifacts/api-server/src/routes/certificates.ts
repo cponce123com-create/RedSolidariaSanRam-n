@@ -2,7 +2,8 @@ import { Router, type IRouter } from "express";
 import { db, certificatesTable, campaignsTable, insertCertificateSchema } from "@workspace/db";
 import { desc, eq, and, isNull } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
-import { adminActionLimiter } from "../middleware/rate-limit";
+import { adminActionLimiter, publicApiLimiter } from "../middleware/rate-limit";
+import { renderCertificatePdf } from "../lib/pdf-certificate";
 import {
   canRevoke,
   findDuplicateCertificate,
@@ -258,6 +259,56 @@ router.patch("/admin/certificates/:id", requireAdmin, adminActionLimiter, async 
   } catch (err) {
     req.log.error({ err }, "Failed to update certificate");
     return res.status(500).json({ error: "server_error", message: "No se pudo actualizar el certificado." });
+  }
+});
+
+/**
+ * GET /certificates/:code/pdf — descarga del certificado en PDF.
+ *
+ * PÚBLICA a propósito (igual que la verificación por código): el certificado se entrega
+ * al donante o al voluntario y esa persona debe poder descargarlo. El código es el
+ * secreto; sin él no se llega aquí.
+ *
+ * Un certificado REVOCADO también se descarga, pero sale marcado como ANULADO con su
+ * motivo: si devolviéramos 404 o un PDF limpio, quien tuviera el papel impreso podría
+ * seguir usándolo como si valiera.
+ */
+router.get("/certificates/:code/pdf", publicApiLimiter, async (req, res) => {
+  const code = String(req.params.code ?? "").trim();
+  if (code.length === 0 || code.length > 64) {
+    return res.status(400).json({ error: "validation_error", message: "Código inválido" });
+  }
+  try {
+    const [certificate] = await db
+      .select()
+      .from(certificatesTable)
+      .where(eq(certificatesTable.code, code));
+    if (!certificate) {
+      return res.status(404).json({ error: "not_found", message: "Certificado no encontrado" });
+    }
+
+    const siteUrl = (process.env.SITE_URL ?? "https://redsolidariasanramon.org").replace(/\/+$/, "");
+    const { bytes, filename } = await renderCertificatePdf({
+      code: certificate.code,
+      holderName: certificate.holderName,
+      title: certificate.title,
+      description: certificate.description,
+      type: certificate.type,
+      issuedAt: certificate.issuedAt,
+      status: certificate.status,
+      revokedAt: certificate.revokedAt,
+      revocationReason: certificate.revocationReason,
+      verificationUrl: `${siteUrl}/certificados/${certificate.code}`,
+    });
+
+    res.setHeader("Content-Type", "application/pdf");
+    // No se cachea: si el certificado se revoca, la siguiente descarga debe reflejarlo.
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(Buffer.from(bytes));
+  } catch (err) {
+    req.log.error({ err }, "Failed to render certificate PDF");
+    return res.status(500).json({ error: "server_error", message: "No se pudo generar el certificado" });
   }
 });
 

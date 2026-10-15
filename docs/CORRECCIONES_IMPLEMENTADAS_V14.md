@@ -281,6 +281,38 @@ comprobación debe ir **dentro** de cada manejador, después de validar. Sí est
 probado en las escrituras de **gastos** y en la anulación **individual**, que es por donde
 entra el dinero.
 
+### V14-10 · Certificado en PDF con revocación visible — ALTA
+
+**Archivos:** `lib/pdf-certificate.ts` (nuevo), `routes/certificates.ts`
+
+**Qué faltaba:** los certificados se emitían y se podían revocar, pero no existía ningún
+documento: el donante o el voluntario no tenía nada que enseñar.
+
+**Corrección aplicada:** `GET /certificates/:code/pdf` genera un **PDF A4 horizontal** con
+marco dorado, el nombre del destinatario, el título, la descripción, la fecha, el código,
+el tipo y un **QR a la verificación PÚBLICA** (`GET /certificates/:code`).
+
+**PÚBLICA a propósito:** al revés que el informe de cierre (interno), el certificado está
+hecho para compartirse; el código es el secreto. La descarga **no se cachea**: si el
+certificado se revoca, la siguiente descarga debe reflejarlo.
+
+**REGLA QUE NO SE NEGOCIA:** un certificado **REVOCADO se sigue descargando, marcado como
+ANULADO** con su motivo y con el sello en rojo, y el archivo se llama `…-anulado.pdf`. Si
+devolviéramos 404 o un PDF limpio, quien tuviera el papel impreso podría seguir usándolo.
+La revocación se reconoce por estado **o** por fecha, para que un registro revocado sin el
+estado actualizado siga contando como anulado.
+
+**Prueba:** 6 pruebas (`tests/pdf-certificate.test.mjs`) que abren el PDF con pdf-lib:
+vigente (válido, A4, releíble, **sin** sello de anulado) y revocado (con el rojo de
+anulación en el contenido, nombre `-anulado` y documento igual de válido). E2E
+`7quaterdecies`: emisión, descarga **sin sesión**, 404 con un código desconocido, revocar
+y seguir descargando marcado como anulado.
+
+**MEJORA ANOTADA (decisión de producto, no fallo de seguridad):** la verificación pública
+de un certificado anulado responde **404**, indistinguible de un código inexistente. No se
+puede acreditar como válido (que es lo importante), pero sería más claro responder
+«revocado» con su motivo.
+
 ## Hallazgos detectados y NO corregidos todavía (con motivo)
 
 ### V14-03 · Enumeración de correos en el registro de voluntarios — MEDIA (requiere decisión)

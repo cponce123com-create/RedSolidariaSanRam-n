@@ -91,13 +91,12 @@ test("el informe incluye el motivo, el sello y la URL de verificación", async (
   const content = drawn.join("\n");
   assert.ok(content.length > 500, "debería haber contenido dibujado y descomprimible");
   assert.ok(content.includes("Tj"), "el contenido debe mostrar texto (operador Tj)");
-  // Se comprueba que hay TEXTO DIBUJADO (operadores de texto y de trazado), no la cadena
-  // exacta: pdf-lib codifica el texto según la fuente y extraerlo con fiabilidad
-  // requeriría un paso de extracción de texto que no aporta nada aquí. Lo que sí se
-  // verifica es que los datos del informe llegaron al documento (metadatos + volumen) y
-  // que su estructura interna es válida (pdf-lib lo vuelve a abrir más abajo).
-  assert.ok(content.includes("re"), "debe haber texto trazado en el contenido");
-  assert.ok(/BT|Tf/.test(content), "deben usarse bloques de texto y fuentes");
+  // Se comprueba que hay TEXTO DIBUJADO (bloques de texto, fuentes y operadores Tj), no
+  // la cadena exacta: pdf-lib codifica el texto según la fuente, y extraerlo con
+  // fiabilidad requeriría un paso de extracción de texto que no aporta nada aquí. Lo que
+  // sí se verifica es que los datos del informe llegaron al documento (metadatos) y que
+  // su estructura interna es válida (pdf-lib lo vuelve a abrir más abajo).
+  assert.ok(/BT/.test(content) && /Tf/.test(content), "deben usarse bloques de texto y fuentes");
 
   // Los metadatos del documento identifican el informe: los datos de la campaña llegaron.
   const reloaded = await PDFDocument.load(bytes);
