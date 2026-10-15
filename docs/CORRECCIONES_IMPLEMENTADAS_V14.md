@@ -169,6 +169,38 @@ aceptada, sin `Origin` aceptado, `Origin` mal formado no cuela, y el middleware 
 servidor real (bloquea la escritura cross-site y deja pasar la del panel). El E2E completo
 sigue verde (227 ok), que es la prueba de que **no rompe nada**.
 
+## Entrega 2 · Integridad financiera (en curso)
+
+### V14-07 · Semántica de fechas del panel, sin declarar — MEDIA
+
+**Módulo:** Dashboard · **Archivos:** `routes/dashboard.ts`, `lib/dashboard-filters.ts`
+
+**Auditoría (resultado real, no el esperado):** las tarjetas y la gráfica mensual **ya
+usan el mismo criterio** para cada cifra —donaciones por `d.created_at` en ambas, gastos
+por `e.date` en ambas—, así que **no había divergencia tarjeta/gráfica**. Lo que sí había
+era un problema **semántico**: donaciones y gastos se filtran por campos con significados
+distintos (fecha de **registro** vs fecha de **operación**) y la API no lo decía, así que
+cualquiera que intentara conciliar dos informes con el mismo rango de fechas llegaba a
+conclusiones equivocadas.
+
+No es un descuido del código: la tabla `donations` no guarda una fecha de operación
+aparte del registro. La corrección honesta es **declararlo**.
+
+**Corrección aplicada:** `DASHBOARD_DATE_SEMANTICS` (constante pura) expuesta en
+`filters.dateSemantics` de la respuesta del panel, junto a `filters.description`. El panel
+y los informes pueden ahora declarar sobre qué fechas están calculadas las cifras.
+
+**Prueba:** E2E `7sexies` — la respuesta del panel incluye la semántica con los campos
+`donations`, `expenses`, `historical` y `note`.
+
+### Estado de la Entrega 2
+
+| Punto | Estado |
+| --- | --- |
+| 2.1 Dashboard (tarjetas vs gráficas vs informes) | **Criterios ya coincidentes** (verificado) + semántica de fechas declarada. La igualdad **exacta** entre la conciliación y el panel ya se comprueba en el E2E desde V9.1 (`7sexies`) |
+| 2.2 Libro contable | **Ya completado en V9.1**: estados `empty`/`healthy`/`issues`, asientos de importe cero, asientos huérfanos, cadenas por campaña |
+| 2.3 Cierre financiero de campañas | **Pendiente: módulo nuevo.** Requiere decisiones funcionales (ver informe) |
+
 ## Hallazgos detectados y NO corregidos todavía (con motivo)
 
 ### V14-03 · Enumeración de correos en el registro de voluntarios — MEDIA (requiere decisión)

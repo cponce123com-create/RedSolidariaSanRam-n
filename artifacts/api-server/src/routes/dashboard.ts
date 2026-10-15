@@ -9,6 +9,7 @@ import { eq, gte, sql, desc, count, sum } from "drizzle-orm";
 import { toSafeAmount } from "../lib/amount-format";
 import { campaignFunding, roundMoney } from "../lib/funding";
 import {
+  DASHBOARD_DATE_SEMANTICS,
   describeDashboardFilters,
   parseDashboardFilters,
 } from "../lib/dashboard-filters";
@@ -193,10 +194,12 @@ router.get("/admin/dashboard", async (req, res) => {
   const totalSpent = roundMoney(expenseRow?.total_spent ?? 0);
 
   return res.json({
-    // Trazabilidad: se devuelve QUÉ filtros produjeron estas cifras.
+    // Trazabilidad: se devuelve QUÉ filtros produjeron estas cifras y con qué
+    // semántica de fechas, para que nadie tenga que adivinarla al conciliar.
     filters: {
       ...filters,
       description: describeDashboardFilters(filters),
+      dateSemantics: DASHBOARD_DATE_SEMANTICS,
     },
     summary: {
       totalCampaigns: campaignRow?.total ?? 0,

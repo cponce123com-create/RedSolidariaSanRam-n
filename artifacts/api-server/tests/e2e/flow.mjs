@@ -1575,6 +1575,14 @@ check(
     String(JSON.stringify(orphanAudit.body ?? {})).includes("EXPENSE_DEMO_PURGED"),
 );
 
+check(
+  "el panel declara la SEMÁNTICA de fechas de sus cifras (V14-2.1)",
+  dashboardNow.body?.filters?.dateSemantics?.donations?.includes("created_at") &&
+    dashboardNow.body?.filters?.dateSemantics?.expenses?.includes("date") &&
+    typeof dashboardNow.body?.filters?.dateSemantics?.note === "string",
+  JSON.stringify(dashboardNow.body?.filters?.dateSemantics ?? null),
+);
+
 // ── 7decies. PRIVACIDAD PÚBLICA: mascotas y voluntarios (V14, Entrega 1) ─────
 // Dos fugas reales: la ruta pública de mascotas aceptaba cualquier `?status=` y
 // devolvía la fila entera (con los datos de contacto), y el registro público de
