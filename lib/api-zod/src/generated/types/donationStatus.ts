@@ -14,4 +14,5 @@ export const DonationStatus = {
   approved: "approved",
   reconciled: "reconciled",
   rejected: "rejected",
+  annulled: "annulled",
 } as const;

@@ -3,25 +3,49 @@ import {
   db,
   donationsTable,
   campaignsTable,
+  campaignMovementsTable,
   donationProofsTable,
   donationConsentsTable,
   donorsTable,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
 import {
+  ANNULLED_DONATION_STATUS,
+  annulBlockReason,
+  annulReversalDescription,
+  isAnnulledDonation,
   isDonorType,
   normalizeCollaborationType,
   normalizeEmail,
 } from "../lib/donor-identity";
+import {
+  analyzeAnnulment,
+  planCampaignAnnulment,
+  validateAnnulmentRequest,
+  type AnnulmentDonation,
+} from "../lib/donation-annulment";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
-import { adminActionLimiter, donationLimiter } from "../middleware/rate-limit";
+import {
+  adminActionLimiter,
+  donationLimiter,
+  reauthLimiter,
+} from "../middleware/rate-limit";
 
 // Dinero: solo administrador o superadmin (los moderadores gestionan contenido).
 const adminOnly = [requireAdmin, requireRole(ROLES.ADMIN)];
+
+// ANULACIÓN CONTABLE: irreversible sobre las cifras, así que es exclusiva del
+// superadmin y exige reautenticación (contraseña + 2FA si procede).
+const superadminOnly = [requireAdmin, requireRole(ROLES.SUPERADMIN)];
 import { logAuditAction } from "../middleware/auth-utils";
+import { verifySuperadminReauth } from "../lib/admin-reauth";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
-import { appendMovement } from "../lib/ledger";
+import {
+  DONATION_REVERSAL_SOURCE,
+  appendMovement,
+  verifyLedger,
+} from "../lib/ledger";
 import { toSafeAmount } from "../lib/amount-format";
 import { consentState, validateConsentDecision } from "../lib/donor-consent";
 import {
@@ -276,6 +300,9 @@ router.get("/donations", ...adminOnly, async (req, res) => {
         d.status,
         d.collaboration_type,
         d.admin_note,
+        d.voided_at,
+        d.voided_by,
+        d.void_reason,
         d.created_at,
         c.title AS campaign_title
       FROM donations d
@@ -417,6 +444,449 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
   }
 });
 
+// ─── Anulación contable de donaciones (V7.2.2) ───────────────────────────────
+//
+// Una donación confirmada queda encadenada en el libro y la máquina de estados
+// prohíbe volver atrás (`PUT /donations/:id` solo acepta pending/approved/rejected).
+// Para corregir un dato de prueba o un registro erróneo se ANULA, nunca se borra:
+// borrarla dejaría su asiento huérfano y rompería la cadena. Ver el porqué
+// completo en `lib/donation-annulment.ts`.
+//
+//   · la donación pasa a `status = 'annulled'` → sale de TODAS las cifras;
+//   · se añade un ASIENTO COMPENSATORIO (`gasto`, mismo importe, origen
+//     `donation_reversal`) → el saldo del libro sigue cuadrando;
+//   · el motivo, quién y cuándo quedan en la donación y en la auditoría.
+//
+// Es exclusivo del superadmin y exige reautenticación: cambia cifras publicadas.
+
+type DbExecutor = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function toAnnulmentDonation(row: typeof donationsTable.$inferSelect): AnnulmentDonation {
+  return {
+    id: row.id,
+    campaignId: row.campaignId,
+    firstName: row.firstName,
+    lastName: row.lastName,
+    email: row.email,
+    amount: toSafeAmount(row.amount),
+    status: row.status,
+    reconciledAt: row.reconciledAt ? row.reconciledAt.toISOString() : null,
+  };
+}
+
+/** Asiento de INGRESO original de una donación (si existe). */
+async function findDonationIncome(
+  exec: DbExecutor,
+  donationId: number,
+): Promise<{ id: number; campaignId: number; amount: number | string } | null> {
+  const [movement] = await exec
+    .select({
+      id: campaignMovementsTable.id,
+      campaignId: campaignMovementsTable.campaignId,
+      amount: campaignMovementsTable.amount,
+    })
+    .from(campaignMovementsTable)
+    .where(
+      and(
+        eq(campaignMovementsTable.sourceType, "donation"),
+        eq(campaignMovementsTable.sourceId, donationId),
+      ),
+    )
+    .limit(1);
+  return movement ?? null;
+}
+
+/**
+ * Anula una donación DENTRO de la transacción: añade el asiento compensatorio
+ * (si tenía ingreso encadenado) y la marca como anulada con su traza. Devuelve
+ * la donación actualizada y el asiento compensatorio añadido, si lo hubo.
+ *
+ * El asiento se enlaza a la campaña del ASIENTO original, no a la campaña
+ * actual de la donación: así el reverso cae en la misma cadena que el ingreso y
+ * el saldo cuadra aunque el vínculo se hubiera cambiado después de aprobarla.
+ */
+async function annulWithin(
+  tx: DbExecutor,
+  donation: typeof donationsTable.$inferSelect,
+  income: { id: number; campaignId: number; amount: number | string } | null,
+  reason: string,
+  actor: string | null,
+): Promise<{ donation: typeof donationsTable.$inferSelect; reversalId: number | null }> {
+  let reversalId: number | null = null;
+
+  if (income) {
+    await appendMovement(tx, income.campaignId, {
+      kind: "gasto",
+      amount: toSafeAmount(income.amount),
+      description: annulReversalDescription(donation.id, reason),
+      sourceType: DONATION_REVERSAL_SOURCE,
+      sourceId: donation.id,
+      createdAt: new Date(),
+    });
+    const [inserted] = await tx
+      .select({ id: campaignMovementsTable.id })
+      .from(campaignMovementsTable)
+      .where(
+        and(
+          eq(campaignMovementsTable.sourceType, DONATION_REVERSAL_SOURCE),
+          eq(campaignMovementsTable.sourceId, donation.id),
+        ),
+      )
+      .limit(1);
+    reversalId = inserted?.id ?? null;
+  }
+
+  const [updated] = await tx
+    .update(donationsTable)
+    .set({
+      status: ANNULLED_DONATION_STATUS,
+      voidedAt: new Date(),
+      voidedBy: actor,
+      voidReason: reason,
+    })
+    .where(eq(donationsTable.id, donation.id))
+    .returning();
+
+  return { donation: updated, reversalId };
+}
+
+/**
+ * POST /donations/:id/void — ANULA contablemente una donación confirmada.
+ * Exclusivo del superadmin, con reautenticación y motivo obligatorio.
+ */
+router.post(
+  "/donations/:id/void",
+  ...superadminOnly,
+  reauthLimiter,
+  adminActionLimiter,
+  async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+    }
+    const parsed = validateAnnulmentRequest(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: "validation_error", code: parsed.code, message: parsed.message });
+    }
+
+    const sessionUser = req.session?.adminUser ?? null;
+    const reauth = await verifySuperadminReauth({
+      userId: sessionUser?.id ?? null,
+      username: sessionUser?.username ?? null,
+      password: parsed.value.password,
+      totpCode: parsed.value.totpCode,
+    });
+    if (!reauth.ok) {
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.adminReauthFailed,
+        resource: AUDIT_RESOURCES.donations,
+        resourceId: String(id),
+        details: { operation: "donation_void", code: reauth.code },
+      });
+      return res.status(401).json({ error: "unauthorized", code: reauth.code, message: reauth.message });
+    }
+
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        // Lock de la donación (mismo orden que PUT /donations/:id: donación →
+        // campaña) para que dos anulaciones concurrentes no dupliquen el reverso.
+        const [existing] = await tx
+          .select()
+          .from(donationsTable)
+          .where(eq(donationsTable.id, id))
+          .for("update");
+        if (!existing) return { kind: "not_found" as const };
+        if (isAnnulledDonation(existing.status)) {
+          return { kind: "already" as const, donation: existing };
+        }
+
+        const blocked = annulBlockReason(existing.status);
+        if (blocked) {
+          return { kind: "refused" as const, message: blocked, status: existing.status };
+        }
+
+        const income = await findDonationIncome(tx, id);
+        const verdict = analyzeAnnulment({
+          donation: toAnnulmentDonation(existing),
+          hasMovement: Boolean(income),
+        });
+        const result = await annulWithin(
+          tx,
+          existing,
+          income,
+          parsed.value.reason,
+          sessionUser?.username ?? null,
+        );
+        return { kind: "annulled" as const, ...result, income, verdict };
+      });
+
+      if (outcome.kind === "not_found") {
+        return res.status(404).json({ error: "not_found", message: "Donación no encontrada" });
+      }
+      if (outcome.kind === "already") {
+        return res.status(409).json({
+          error: "conflict",
+          message: "La donación ya está anulada.",
+          donation: await formatDonation(outcome.donation),
+        });
+      }
+      if (outcome.kind === "refused") {
+        return res.status(409).json({
+          error: "conflict",
+          message: outcome.message,
+          status: outcome.status,
+        });
+      }
+
+      // Confirmación contable: la cadena de la campaña afectada debe seguir
+      // verificando después de añadir el asiento compensatorio.
+      const ledger = outcome.income ? await verifyLedger(outcome.income.campaignId) : null;
+
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.donationAnnulled,
+        resource: AUDIT_RESOURCES.donations,
+        resourceId: String(id),
+        details: {
+          amount: toSafeAmount(outcome.donation.amount),
+          campaignId: outcome.donation.campaignId,
+          reason: parsed.value.reason,
+          reversalMovementId: outcome.reversalId,
+          chainVerified: ledger?.verified ?? null,
+        },
+      });
+
+      return res.json({
+        ok: true,
+        donation: await formatDonation(outcome.donation),
+        reversal: { appended: outcome.reversalId !== null, movementId: outcome.reversalId },
+        ledger,
+        warnings: outcome.verdict.warnings,
+      });
+    } catch (err) {
+      req.log.error({ err }, "Failed to annul donation");
+      return res
+        .status(500)
+        .json({ error: "server_error", message: "No se pudo anular la donación." });
+    }
+  },
+);
+
+/**
+ * GET /campaigns/:id/donations/void/preview — qué se anularía de una campaña:
+ * cuántas donaciones, por cuánto, cuántas estaban conciliadas y cuáles no se
+ * pueden tocar. Exclusivo del superadmin. NO modifica nada.
+ */
+router.get(
+  "/campaigns/:id/donations/void/preview",
+  ...superadminOnly,
+  adminActionLimiter,
+  async (req, res) => {
+    const campaignId = Number(req.params.id);
+    if (!Number.isInteger(campaignId) || campaignId <= 0) {
+      return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+    }
+    try {
+      const [campaign] = await db
+        .select({
+          id: campaignsTable.id,
+          title: campaignsTable.title,
+          status: campaignsTable.status,
+        })
+        .from(campaignsTable)
+        .where(eq(campaignsTable.id, campaignId));
+      if (!campaign) {
+        return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+      }
+
+      const rows = await db
+        .select()
+        .from(donationsTable)
+        .where(eq(donationsTable.campaignId, campaignId));
+      const incomeRows = await db
+        .select({ sourceId: campaignMovementsTable.sourceId })
+        .from(campaignMovementsTable)
+        .where(
+          and(
+            eq(campaignMovementsTable.campaignId, campaignId),
+            eq(campaignMovementsTable.sourceType, "donation"),
+          ),
+        );
+
+      const plan = planCampaignAnnulment({
+        campaignId,
+        donations: rows.map(toAnnulmentDonation),
+        movementDonationIds: incomeRows.map((row) => row.sourceId),
+      });
+
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.json({ campaign, plan });
+    } catch (err) {
+      req.log.error({ err }, "Failed to build donation annulment preview");
+      return res
+        .status(500)
+        .json({ error: "server_error", message: "No se pudo analizar la campaña" });
+    }
+  },
+);
+
+/**
+ * POST /campaigns/:id/donations/void — anula EN BLOQUE todas las donaciones
+ * confirmadas de una campaña (un solo motivo, una sola transacción). Es la
+ * operación para limpiar una campaña de prueba o corregida por completo.
+ */
+router.post(
+  "/campaigns/:id/donations/void",
+  ...superadminOnly,
+  reauthLimiter,
+  adminActionLimiter,
+  async (req, res) => {
+    const campaignId = Number(req.params.id);
+    if (!Number.isInteger(campaignId) || campaignId <= 0) {
+      return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+    }
+    const parsed = validateAnnulmentRequest(req.body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: "validation_error", code: parsed.code, message: parsed.message });
+    }
+
+    const sessionUser = req.session?.adminUser ?? null;
+    const reauth = await verifySuperadminReauth({
+      userId: sessionUser?.id ?? null,
+      username: sessionUser?.username ?? null,
+      password: parsed.value.password,
+      totpCode: parsed.value.totpCode,
+    });
+    if (!reauth.ok) {
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.adminReauthFailed,
+        resource: AUDIT_RESOURCES.campaigns,
+        resourceId: String(campaignId),
+        details: { operation: "campaign_donations_void", code: reauth.code },
+      });
+      return res.status(401).json({ error: "unauthorized", code: reauth.code, message: reauth.message });
+    }
+
+    try {
+      const outcome = await db.transaction(async (tx) => {
+        // Lock de la CAMPAÑA primero (mismo orden que la purga DEMO), y después
+        // cada donación: serializa las anulaciones concurrentes de la campaña.
+        const [campaign] = await tx
+          .select()
+          .from(campaignsTable)
+          .where(eq(campaignsTable.id, campaignId))
+          .for("update");
+        if (!campaign) return { kind: "not_found" as const };
+
+        const rows = await tx
+          .select()
+          .from(donationsTable)
+          .where(eq(donationsTable.campaignId, campaignId));
+        const incomeRows = await tx
+          .select({
+            id: campaignMovementsTable.id,
+            sourceId: campaignMovementsTable.sourceId,
+            campaignId: campaignMovementsTable.campaignId,
+            amount: campaignMovementsTable.amount,
+          })
+          .from(campaignMovementsTable)
+          .where(
+            and(
+              eq(campaignMovementsTable.campaignId, campaignId),
+              eq(campaignMovementsTable.sourceType, "donation"),
+            ),
+          );
+        const incomeByDonation = new Map(incomeRows.map((row) => [row.sourceId, row]));
+
+        const plan = planCampaignAnnulment({
+          campaignId,
+          donations: rows.map(toAnnulmentDonation),
+          movementDonationIds: incomeRows.map((row) => row.sourceId),
+        });
+        if (!plan.allowed) return { kind: "nothing" as const, plan };
+
+        const applied: { donationId: number; amount: number; reversalId: number | null }[] = [];
+        for (const item of plan.annullable) {
+          const [row] = await tx
+            .select()
+            .from(donationsTable)
+            .where(eq(donationsTable.id, item.donationId))
+            .for("update");
+          // Carrera: si otra petición ya la anuló (o cambió su estado), se salta.
+          if (!row || isAnnulledDonation(row.status) || annulBlockReason(row.status)) continue;
+
+          const result = await annulWithin(
+            tx,
+            row,
+            incomeByDonation.get(item.donationId) ?? null,
+            parsed.value.reason,
+            sessionUser?.username ?? null,
+          );
+          applied.push({
+            donationId: item.donationId,
+            amount: item.amount,
+            reversalId: result.reversalId,
+          });
+        }
+
+        return { kind: "annulled" as const, campaign, plan, applied };
+      });
+
+      if (outcome.kind === "not_found") {
+        return res.status(404).json({ error: "not_found", message: "Campaña no encontrada" });
+      }
+      if (outcome.kind === "nothing") {
+        return res.status(409).json({
+          error: "conflict",
+          message:
+            outcome.plan.blocked.length > 0
+              ? "No hay donaciones confirmadas que se puedan anular en esta campaña."
+              : "Esta campaña no tiene donaciones confirmadas que anular.",
+          plan: outcome.plan,
+        });
+      }
+
+      const ledger = await verifyLedger(campaignId);
+      const totalAmount =
+        Math.round(outcome.applied.reduce((sum, item) => sum + item.amount, 0) * 100) / 100;
+
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.donationAnnulled,
+        resource: AUDIT_RESOURCES.campaigns,
+        resourceId: String(campaignId),
+        details: {
+          title: outcome.campaign.title,
+          reason: parsed.value.reason,
+          count: outcome.applied.length,
+          totalAmount,
+          donationIds: outcome.applied.map((item) => item.donationId),
+          reversals: outcome.applied.filter((item) => item.reversalId !== null).length,
+          skipped: outcome.plan.blocked,
+          chainVerified: ledger.verified,
+        },
+      });
+
+      return res.json({
+        ok: true,
+        campaign: { id: outcome.campaign.id, title: outcome.campaign.title },
+        annulled: outcome.applied.length,
+        totalAmount,
+        reversals: outcome.applied.filter((item) => item.reversalId !== null).length,
+        blocked: outcome.plan.blocked,
+        ledger,
+      });
+    } catch (err) {
+      req.log.error({ err }, "Failed to annul campaign donations");
+      return res
+        .status(500)
+        .json({ error: "server_error", message: "No se pudieron anular las donaciones." });
+    }
+  },
+);
+
 // GET /campaigns/:id/donations — solo admin (datos personales)
 // Mismo patrón SQL crudo que el listado general (mapeo de drizzle con
 // leftJoin roto en el bundle desplegado).
@@ -441,6 +911,9 @@ router.get("/campaigns/:id/donations", ...adminOnly, async (req, res) => {
         d.status,
         d.collaboration_type,
         d.admin_note,
+        d.voided_at,
+        d.voided_by,
+        d.void_reason,
         d.created_at,
         c.title AS campaign_title
       FROM donations d
@@ -587,6 +1060,10 @@ async function formatDonation(
     receiptNote: d.receiptNote,
     status: d.status,
     adminNote: d.adminNote,
+    // Traza de la anulación contable (migración 027): quién, cuándo y por qué.
+    voidedAt: d.voidedAt instanceof Date && !Number.isNaN(d.voidedAt.getTime()) ? d.voidedAt.toISOString() : null,
+    voidedBy: d.voidedBy,
+    voidReason: d.voidReason,
     createdAt,
   };
 }
@@ -604,6 +1081,13 @@ function formatDonationRow(r: Record<string, unknown>) {
       ? createdAtRaw.toISOString()
       : typeof createdAtRaw === "string" && !Number.isNaN(new Date(createdAtRaw).getTime())
         ? new Date(createdAtRaw).toISOString()
+        : null;
+  const voidedAtRaw = r.voided_at;
+  const voidedAt =
+    voidedAtRaw instanceof Date && !Number.isNaN(voidedAtRaw.getTime())
+      ? voidedAtRaw.toISOString()
+      : typeof voidedAtRaw === "string" && !Number.isNaN(new Date(voidedAtRaw).getTime())
+        ? new Date(voidedAtRaw).toISOString()
         : null;
   return {
     id: r.id,
@@ -623,6 +1107,10 @@ function formatDonationRow(r: Record<string, unknown>) {
     receiptNote: r.receipt_note ?? null,
     status: r.status ?? "pending",
     adminNote: r.admin_note ?? null,
+    // Traza de la anulación contable (migración 027).
+    voidedAt,
+    voidedBy: r.voided_by ?? null,
+    voidReason: r.void_reason ?? null,
     createdAt,
   };
 }

@@ -31,9 +31,26 @@ export const donationsTable = pgTable("donations", {
   // 'reconciled' (texto libre → sin migración de tipos).
   reconciledAt: timestamp("reconciled_at"),
   reconciledBy: text("reconciled_by"),
+  // Migración 027 (aditiva): ANULACIÓN contable. Una donación ya encadenada en
+  // el libro NO se borra ni se edita: pasa a `status = 'annulled'` (con lo que
+  // sale de todas las cifras, que filtran por estados confirmados) y se añade un
+  // ASIENTO COMPENSATORIO al libro append-only. Estas columnas son la traza de
+  // quién, cuándo y por qué, igual que `reconciled_*`.
+  voidedAt: timestamp("voided_at"),
+  voidedBy: text("voided_by"),
+  voidReason: text("void_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertDonationSchema = createInsertSchema(donationsTable).omit({ id: true, createdAt: true });
+// Los campos de anulación contable son de SERVIDOR: nunca se aceptan desde el
+// formulario público (anti mass-assignment), igual que el estado o la
+// conciliación. Solo los escribe `POST /donations/:id/void`.
+export const insertDonationSchema = createInsertSchema(donationsTable).omit({
+  id: true,
+  createdAt: true,
+  voidedAt: true,
+  voidedBy: true,
+  voidReason: true,
+});
 export type InsertDonation = z.infer<typeof insertDonationSchema>;
 export type Donation = typeof donationsTable.$inferSelect;

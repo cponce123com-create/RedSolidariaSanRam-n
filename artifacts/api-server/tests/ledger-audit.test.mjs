@@ -91,7 +91,12 @@ test("asiento con tipo de origen desconocido: se detecta", () => {
   assert.deepEqual(report.movementsWithoutSource, [
     { id: 1, sourceType: "ajuste", sourceId: 7 },
   ]);
-  assert.deepEqual([...KNOWN_SOURCE_TYPES], ["donation", "expense"]);
+  // `donation_reversal` es el asiento compensatorio de una anulación contable
+  // (migración 027): es un origen CONOCIDO, resuelto contra las donaciones.
+  assert.deepEqual(
+    [...KNOWN_SOURCE_TYPES],
+    ["donation", "expense", "donation_reversal"],
+  );
 });
 
 test("importe del asiento distinto al del origen: se detecta", () => {

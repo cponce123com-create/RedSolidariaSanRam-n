@@ -219,9 +219,9 @@ ID real depende del entorno y **no se ha leído ni modificado** el de producció
 
 | Suite | Comando | Resultado |
 | --- | --- | --- |
-| API (unitaria + HTTP) | `pnpm --filter @workspace/api-server test` | **501 / 501 ok** (450 previas + 26 de lógica pura + 24 de autorización + 1 del límite de reautenticación) |
-| Frontend (pura) | `pnpm --filter @workspace/red-solidaria test` | **206 / 206 ok** (188 previas + 18 nuevas) |
-| E2E real (PostgreSQL 17.7) | `bash artifacts/api-server/tests/e2e/run-e2e.sh` | **E2E COMPLETO: OK** — 103 comprobaciones `ok`, 0 fallos |
+| API (unitaria + HTTP) | `pnpm --filter @workspace/api-server test` | **535 / 535 ok** |
+| Frontend (pura) | `pnpm --filter @workspace/red-solidaria test` | **215 / 215 ok** |
+| E2E real (PostgreSQL 17.7) | `bash artifacts/api-server/tests/e2e/run-e2e.sh` | **E2E COMPLETO: OK** — 122 comprobaciones `ok`, 0 fallos |
 | Typecheck | `tsc` en `lib/db`, `api-server`, `red-solidaria`, `scripts` | Sin errores |
 | Build | `build.mjs` (API) y `vite build` (frontend) | Sin errores |
 
@@ -291,7 +291,58 @@ primero):
 
 Pruebas añadidas para fijar las regresiones: `reauthLimiter` (los aciertos y los
 409 no gastan presupuesto; el sexto 401 devuelve 429) y
-`shouldOpenDemoPurgeDialog` (el diálogo no se abre con un menú abierto).
+`shouldOpenAfterMenuClose` (el diálogo no se abre con un menú abierto).
+
+## 11ter. Anulación contable de donaciones (V7.2.2)
+
+**El problema que resuelve.** Una donación confirmada queda encadenada en el libro
+y la máquina de estados prohíbe volver atrás: `PUT /donations/:id` solo acepta
+`pending|approved|rejected` y rechaza cualquier transición desde `approved`. Sin
+una vía de corrección, un dato de prueba —o una donación registrada por error—
+bloqueaba la campaña para siempre: las cifras no se podían limpiar y la purga DEMO
+seguía bloqueada por `reconciled_donations` (que es exactamente lo que ofrecía
+«anulación contable» en §2, ahora implementado).
+
+**Por qué anular y no borrar.** Borrar la donación dejaría su asiento huérfano
+(el informe lo señalaría como `movementsWithoutSource`) y rompería la cadena de
+hashes. La corrección correcta es la que documenta el propio libro: un **asiento
+compensatorio autorizado y trazable**.
+
+| Efecto | Detalle |
+| --- | --- |
+| Estado | `status = 'annulled'` → sale de **todas** las cifras (recaudado, donantes, transparencia, dashboard) sin tocar ninguna consulta: los agregados filtran por `CONFIRMED_DONATION_STATUSES`. |
+| Libro | Se añade un asiento `gasto` por el mismo importe con origen `donation_reversal` (la unicidad por `source_type+source_id` impide reutilizar `donation`). El saldo sigue **cuadrando** y la cadena sigue **verificando**. |
+| Traza | `voided_at`, `voided_by`, `void_reason` en la donación + `DONATION_ANNULLED` en la auditoría (motivo, importe, asiento compensatorio y si la cadena verificó). |
+| Alcance | Solo donaciones **confirmadas** (aprobadas o conciliadas). Una pendiente o rechazada no tiene asiento: se gestiona con el rechazo normal. |
+
+**API** (exclusiva del superadmin, con reautenticación, confirmación explícita y
+motivo obligatorio):
+
+| Método y ruta | Función |
+| --- | --- |
+| `POST /api/donations/:id/void` | Anula una donación confirmada. |
+| `GET /api/campaigns/:id/donations/void/preview` | Qué se anularía: cuántas, por cuánto, cuántas estaban conciliadas y cuáles no se pueden tocar. No modifica nada. |
+| `POST /api/campaigns/:id/donations/void` | Anula **en bloque** todas las confirmadas de una campaña (un motivo, una transacción). |
+
+**Interfaz**: botón **«Anular»** en cada fila de donación confirmada del panel de
+donaciones (solo superadmin) y **Más acciones → Anular donaciones de la campaña**
+en `/admin/campanas` (con el identificador escrito a mano). El diálogo explica
+siempre que **no se borra nada** y avisa cuando la donación está conciliada con el
+banco. Pestaña de filtro **«Anuladas»** para localizarlas.
+
+**Efecto sobre la purga DEMO**: una donación anulada **no** cuenta como dinero real
+(`reconciled_donations` deja de bloquear) y el análisis lo advierte con
+`donations_annulled`. Así el flujo completo queda cerrado: anular lo que estaba
+mal registrado → declarar DEMO → purgar, con el libro cuadrado en todo momento.
+
+**Verificado en el E2E** (campañas desechables 13 y 14 del clúster temporal): una
+donación conciliada bloquea la purga; tras anularla, el libro queda con 60 de
+ingreso y 60 de reverso (`ledgerNet 0`, `sourceNet 0`, `balanced: true`), sin
+asientos huérfanos ni descuadres nuevos, la cadena verifica con 2 asientos, la
+purga deja de estar bloqueada, repetir la anulación da 409 y el lote (2 donaciones,
+75) queda igualmente a cero y cuadrado. Los descuadres `[1,2,3]` que informa el
+libro son el hallazgo **DB-09 preexistente** (donaciones históricas del seed sin
+asiento), no un efecto de la anulación.
 
 ## 12. Archivos
 
@@ -302,24 +353,41 @@ Pruebas añadidas para fijar las regresiones: `reauthLimiter` (los aciertos y lo
 
 **API**
 - `lib/campaign-demo-purge.ts` — análisis, validación, snapshot y sello SHA-256 (puro).
+- `lib/donation-annulment.ts` — anulación contable: veredicto, plan por campaña y validación (puro).
+- `lib/donor-identity.ts` — estado `annulled`, `canAnnull`, `annulBlockReason` y la descripción del asiento compensatorio.
+- `lib/ledger.ts` — origen `donation_reversal` (asiento compensatorio).
+- `lib/ledger-audit.ts` — resuelve el asiento compensatorio contra su donación.
 - `lib/superadmin-credentials.ts` — credenciales del superadmin de entorno (extraídas de `routes/admin.ts`).
 - `lib/admin-reauth.ts` — reautenticación (contraseña + TOTP).
 - `lib/audit.ts` — acciones y etiquetas nuevas.
 - `middleware/rate-limit.ts` — `reauthLimiter`.
-- `routes/campaigns.ts` — endpoints y transacción de purga.
+- `routes/campaigns.ts` — purga DEMO y análisis.
+- `routes/donations.ts` — anulación individual, vista previa y en bloque.
+- `routes/ledger-audit.ts` — informe con todas las donaciones (para resolver el reverso).
 - `routes/admin.ts` — usa el módulo compartido de credenciales.
 - `build-tests.mjs` — nuevos puntos de entrada.
 
 **Frontend**
-- `src/lib/campaign-demo-purge.ts` — presentación pura (nuevo).
-- `src/lib/campaign-admin.ts` — cliente HTTP + re-exports.
-- `src/hooks/use-campaign-lifecycle.ts` — `useDemoPurgePreview` y `useDemoPurge`.
-- `src/components/admin/CampaignDemoPurgeDialog.tsx` — diálogo de tres pasos (nuevo).
+- `src/lib/campaign-demo-purge.ts` — presentación pura de la purga (nuevo).
+- `src/lib/donation-annulment.ts` — presentación pura de la anulación (nuevo).
+- `src/lib/campaign-admin.ts`, `src/lib/donors-admin.ts` — clientes HTTP + re-exports.
+- `src/hooks/use-campaign-lifecycle.ts`, `src/hooks/use-donors-admin.ts` — mutaciones y consultas.
+- `src/components/admin/CampaignDemoPurgeDialog.tsx` — diálogo de purga (nuevo).
+- `src/components/admin/DonationVoidDialog.tsx` — diálogo de anulación (nuevo).
+- `src/components/admin/DonationVoidAction.tsx` — acción «Anular» por fila (nuevo).
 - `src/components/ui/dropdown-menu.tsx` — menú «Más acciones» (nuevo).
-- `src/pages/admin/campaigns.tsx` — «Más acciones → Eliminar campaña DEMO».
+- `src/pages/admin/campaigns.tsx`, `src/pages/admin/donations.tsx`.
+
+**Contrato**
+- `lib/api-spec/openapi.yaml` — `annulled` en los enums de estado de donación.
+- `lib/api-client-react`, `lib/api-zod` — enums generados sincronizados a mano (orval exige Node 22 y aquí no puede regenerarse con seguridad; la próxima regeneración en CI no debe producir diferencias).
 
 **Pruebas**
 - `artifacts/api-server/tests/campaign-demo-purge.test.mjs`
 - `artifacts/api-server/tests/campaign-demo-purge-auth.test.mjs`
-- `artifacts/api-server/tests/e2e/flow.mjs` — sección `7ter`
+- `artifacts/api-server/tests/donation-annulment.test.mjs`
+- `artifacts/api-server/tests/donation-void-auth.test.mjs`
+- `artifacts/api-server/tests/rate-limit.test.mjs` (límite de reautenticación)
+- `artifacts/api-server/tests/e2e/flow.mjs` — secciones `7ter` y `7quater`
 - `artifacts/red-solidaria/tests/campaign-demo-purge.test.mjs`
+- `artifacts/red-solidaria/tests/donation-annulment.test.mjs`

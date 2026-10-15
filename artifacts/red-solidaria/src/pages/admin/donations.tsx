@@ -20,8 +20,15 @@ import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/
 import { useReconcileDonation } from "@/hooks/use-donors-admin";
 import { invalidateDonationQueries } from "@/lib/query-invalidation";
 import { collaborationTypeLabel, isMoneyCollaboration } from "@/lib/donors-admin";
+import { DonationVoidAction } from "@/components/admin/DonationVoidAction";
 
-type FilterStatus = "all" | "pending" | "approved" | "rejected" | "reconciled";
+type FilterStatus =
+  | "all"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "reconciled"
+  | "annulled";
 
 export default function AdminDonations() {
   const [filter, setFilter] = useState<FilterStatus>("all");
@@ -180,14 +187,17 @@ export default function AdminDonations() {
     pending: "bg-yellow-500 hover:bg-yellow-600 text-white",
     approved: "bg-accent hover:bg-accent text-white",
     rejected: "bg-destructive hover:bg-destructive text-white",
-    reconciled: "bg-emerald-600 hover:bg-emerald-700 text-white"
+    reconciled: "bg-emerald-600 hover:bg-emerald-700 text-white",
+    // Anulada contablemente (V7.2.2): distinta de un rechazo administrativo.
+    annulled: "bg-slate-600 hover:bg-slate-700 text-white"
   };
 
   const statusLabels: Record<string, string> = {
     pending: "Pendiente",
     approved: "Aprobada",
     rejected: "Rechazada",
-    reconciled: "Conciliada"
+    reconciled: "Conciliada",
+    annulled: "Anulada"
   };
 
   // Formato defensivo: un createdAt corrupto/nulo no debe tumbar la página
@@ -229,7 +239,7 @@ export default function AdminDonations() {
       {/* Filters + Search */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
         <div className="flex gap-2 bg-secondary/50 p-1.5 rounded-xl inline-flex">
-          {(["all", "pending", "approved", "rejected", "reconciled"] as const).map(tab => (
+          {(["all", "pending", "approved", "rejected", "reconciled", "annulled"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setFilter(tab)}
@@ -470,6 +480,17 @@ export default function AdminDonations() {
                           Conciliar
                         </Button>
                       )}
+                      {/* Anular contablemente (solo superadmin y solo si está
+                          confirmada): no borra, compensa en el libro. */}
+                      <DonationVoidAction
+                        donation={{
+                          id: d.id,
+                          title: `${d.firstName} ${d.lastName}`.trim() || "Donación",
+                          amount: Number(d.amount) || 0,
+                          status: d.status,
+                          campaignId: d.campaignId ?? null,
+                        }}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

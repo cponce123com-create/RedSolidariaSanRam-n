@@ -330,7 +330,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, approved, reconciled, rejected]
+            enum: [pending, approved, reconciled, rejected, annulled]
       responses:
         "200":
           description: List of donations
@@ -993,7 +993,7 @@ components:
           nullable: true
         status:
           type: string
-          enum: [pending, approved, reconciled, rejected]
+          enum: [pending, approved, reconciled, rejected, annulled]
         collaborationType:
           type: string
           enum: [dinero, productos, servicios, logistica]

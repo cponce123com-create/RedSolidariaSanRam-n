@@ -136,6 +136,13 @@ export interface DemoPurgeRealSignals {
   evidenceLinkedToLeftovers: number;
   /** Certificados vigentes que reconocen a personas (se conservan). */
   issuedCertificates: number;
+  /**
+   * Donaciones ANULADAS contablemente (V7.2.2). NO son una señal de datos
+   * reales: están compensadas con un asiento de reverso y su superadmin las
+   * anuló de forma expresa y auditada, así que no bloquean la purga. Se informan
+   * para explicar por qué las cifras de la campaña bajaron antes de purgarla.
+   */
+  annulledDonations: number;
 }
 
 export interface DemoPurgeLedgerState {
@@ -281,6 +288,12 @@ export function analyzeDemoPurge(input: DemoPurgeAnalysisInput): DemoPurgeVerdic
     warnings.push({
       code: "donors_preserved",
       message: `Los perfiles de donante (y el voluntariado) NO se borran: solo desaparecen las donaciones ficticias.`,
+    });
+  }
+  if (real.annulledDonations > 0) {
+    warnings.push({
+      code: "donations_annulled",
+      message: `${real.annulledDonations} donación(es) anulada(s) contablemente no cuentan como dinero real y no bloquean la purga: su asiento compensatorio se elimina junto con la campaña.`,
     });
   }
 

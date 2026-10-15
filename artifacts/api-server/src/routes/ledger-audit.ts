@@ -13,6 +13,7 @@ import { logAuditAction } from "../middleware/auth-utils";
 import { AUDIT_ACTIONS, AUDIT_RESOURCES, auditContext } from "../lib/audit";
 import { appendMovement, verifyCampaignChains } from "../lib/ledger";
 import { auditLedger, type LedgerAuditReport } from "../lib/ledger-audit";
+import { isConfirmedDonationStatus } from "../lib/donor-identity";
 import {
   planRegularization,
   validateRegularizationRequest,
@@ -37,7 +38,7 @@ async function buildAuditReport(): Promise<{
   confirmedDonations: { id: number; campaignId: number | null; amount: number }[];
   expenseCount: number;
 }> {
-  const [movements, confirmedDonations, expenses] = await Promise.all([
+  const [movements, allDonations, expenses] = await Promise.all([
     db
       .select()
       .from(campaignMovementsTable)
@@ -47,9 +48,9 @@ async function buildAuditReport(): Promise<{
         id: donationsTable.id,
         campaignId: donationsTable.campaignId,
         amount: donationsTable.amount,
+        status: donationsTable.status,
       })
-      .from(donationsTable)
-      .where(inArray(donationsTable.status, [...CONFIRMED_STATUSES])),
+      .from(donationsTable),
     db
       .select({
         id: campaignExpensesTable.id,
@@ -59,9 +60,26 @@ async function buildAuditReport(): Promise<{
       .from(campaignExpensesTable),
   ]);
 
+  // Solo las confirmadas deben tener asiento: es la lista que usa la
+  // regularización (DB-09) y NO debe incluir una donación anulada, o la
+  // regularización le crearía un ingreso que ya se compensó.
+  const confirmedDonations = allDonations
+    .filter((d) => isConfirmedDonationStatus(d.status))
+    .map((d) => ({ id: d.id, campaignId: d.campaignId, amount: d.amount }));
+
   const report = auditLedger({
     movements,
-    donations: confirmedDonations.map((d) => ({ ...d, confirmed: true })),
+    // Se pasan TODAS las donaciones con su bandera `confirmed`, no solo las
+    // confirmadas: el ASIENTO COMPENSATORIO de una anulación contable
+    // (`sourceType = 'donation_reversal'`) tiene como origen una donación que ya
+    // no está confirmada pero que SIGUE EXISTIENDO. Sin ella, el informe lo
+    // señalaría como asiento huérfano y el libro parecería descuadrado.
+    donations: allDonations.map((d) => ({
+      id: d.id,
+      campaignId: d.campaignId,
+      amount: d.amount,
+      confirmed: isConfirmedDonationStatus(d.status),
+    })),
     expenses,
     // La cadena es independiente por campaña: se agrupa antes de verificar.
     chain: verifyCampaignChains(movements),

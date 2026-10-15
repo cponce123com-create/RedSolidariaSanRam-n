@@ -764,6 +764,33 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON campaign_purge_backups (created_at DESC);
     `,
   },
+  {
+    name: "027_donation_annulment.sql",
+    sql: `
+      -- V7.2.2: ANULACIÓN CONTABLE de una donación ya confirmada.
+      -- ADITIVA: añade columnas y AMPLÍA el CHECK de estados; no borra ni
+      -- reinterpreta ningún dato existente.
+      --
+      -- Por qué no se borra: una donación confirmada ya tiene un asiento en el
+      -- libro append-only y encadenado por hashes. Borrarla dejaría un asiento
+      -- huérfano (el informe de integridad lo señalaría como 'movementsWithoutSource')
+      -- y rompería la cadena. La corrección correcta —y la que documenta el
+      -- propio informe— es un ASIENTO COMPENSATORIO autorizado y trazable.
+      --
+      -- 'annulled' sale de TODAS las cifras sin tocar ninguna consulta: los
+      -- agregados (recaudado, donantes, transparencia, dashboard) filtran por
+      -- CONFIRMED_DONATION_STATUSES = ('approved','reconciled').
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS voided_at timestamp;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS voided_by text;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS void_reason text;
+
+      -- NOT VALID: las filas históricas no se revisan (una migración no puede
+      -- fallar por datos viejos), pero las escrituras NUEVAS sí se comprueban.
+      ALTER TABLE donations DROP CONSTRAINT IF EXISTS donations_status_check;
+      ALTER TABLE donations ADD CONSTRAINT donations_status_check
+        CHECK (status IN ('pending','approved','rejected','reconciled','annulled')) NOT VALID;
+    `,
+  },
 ];
 
 /**

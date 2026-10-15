@@ -97,6 +97,7 @@ export const DonationStatus = {
   approved: "approved",
   reconciled: "reconciled",
   rejected: "rejected",
+  annulled: "annulled",
 } as const;
 
 export type DonationCollaborationType =
@@ -380,6 +381,7 @@ export const GetDonationsStatus = {
   approved: "approved",
   reconciled: "reconciled",
   rejected: "rejected",
+  annulled: "annulled",
 } as const;
 
 export type AddDonationProofBody = {
