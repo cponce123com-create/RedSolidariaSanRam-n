@@ -30,6 +30,11 @@ export E2E_ADMIN_PASSWORD="E2e-Passw0rd!2026"
 export NODE_ENV=development
 export ADMIN_USERNAME="$E2E_ADMIN_USERNAME"
 export ADMIN_PASSWORD="$E2E_ADMIN_PASSWORD"
+# Un recorrido completo de la plataforma hace muchas más de 100 acciones
+# administrativas legítimas, así que el ensayo amplía ese presupuesto de forma
+# EXPLÍCITA. No afecta a producción (allí la variable no se define) y NO toca el
+# límite de reautenticación, que el ensayo sigue verificando.
+export ADMIN_ACTION_LIMIT_OVERRIDE=5000
 export SESSION_SECRET="e2e-secret-no-usar-en-produccion"
 export PORT="$APIPORT"
 

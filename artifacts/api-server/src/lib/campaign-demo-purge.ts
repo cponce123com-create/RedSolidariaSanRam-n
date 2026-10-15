@@ -128,8 +128,20 @@ export interface DemoPurgeCampaign {
 export interface DemoPurgeRealSignals {
   /** Donaciones con conciliación bancaria (`status = 'reconciled'` o fecha). */
   reconciledDonations: number;
-  /** Gastos con documento de respaldo (`receipt_url` no vacío). */
+  /**
+   * Gastos con documento PROPIO de respaldo (subido al almacenamiento de la
+   * organización). Es el único caso que implica obligación de conservación.
+   *
+   * CORRECCIÓN V9.1: antes bastaba con que `receipt_url` no estuviera vacío, y eso
+   * era incorrecto: el seed usa la MISMA foto de relleno
+   * (`images.unsplash.com/...`) como comprobante de los gastos DEMO **y** de los de
+   * Chocofest 2025 (la campaña real que hay que conservar). Un comprobante alojado
+   * en un servicio de imágenes de ejemplo no prueba nada y no puede bloquear la
+   * limpieza de datos ficticios.
+   */
   expensesWithReceipt: number;
+  /** Gastos cuyo comprobante es un medio de RELLENO: aviso, no bloqueo. */
+  placeholderReceipts: number;
   /** Bienes con flujo registrado o ligados a un donante/evidencia. */
   leftoversWithFlow: number;
   /** Evidencias que prueban documentalmente un bien registrado. */
@@ -224,7 +236,16 @@ export function analyzeDemoPurge(input: DemoPurgeAnalysisInput): DemoPurgeVerdic
   if (real.expensesWithReceipt > 0) {
     blockers.push({
       code: "expenses_with_receipt",
-      message: `Hay ${real.expensesWithReceipt} gasto(s) con documento de respaldo (boleta o factura): existe obligación de conservación. Archiva la campaña o anula contablemente.`,
+      message: `Hay ${real.expensesWithReceipt} gasto(s) con documento PROPIO de respaldo (subido al almacenamiento de la organización): existe obligación de conservación. Archiva la campaña o anula contablemente.`,
+    });
+  }
+  // Aviso, NO bloqueo: un comprobante alojado en un servicio de imágenes de
+  // ejemplo no es un documento. Se avisa porque se destruirá junto con la campaña
+  // y queda en el respaldo.
+  if (real.placeholderReceipts > 0) {
+    warnings.push({
+      code: "placeholder_receipts",
+      message: `Se destruirán ${real.placeholderReceipts} comprobante(s) que son imágenes de RELLENO (no documentos reales). Quedan copiados en el respaldo.`,
     });
   }
   if (real.leftoversWithFlow > 0) {

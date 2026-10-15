@@ -7,7 +7,7 @@ import {
 } from "@workspace/db";
 import { eq, gte, sql, desc, count, sum } from "drizzle-orm";
 import { toSafeAmount } from "../lib/amount-format";
-import { campaignFunding } from "../lib/funding";
+import { campaignFunding, roundMoney } from "../lib/funding";
 import {
   describeDashboardFilters,
   parseDashboardFilters,
@@ -128,6 +128,7 @@ router.get("/admin/dashboard", async (req, res) => {
       FROM donations d
       ${donationJoin}
       WHERE d.created_at >= ${sixMonthsAgo.toISOString()}
+        AND d.status IN ('approved','reconciled')
         ${donationCampaignWhere}
         ${donationDateWhere}
       GROUP BY TO_CHAR(d.created_at, 'YYYY-MM')
@@ -186,7 +187,10 @@ router.get("/admin/dashboard", async (req, res) => {
     filters.hasDateRange ? 0 : donationRow?.historical,
     donationRow?.verified,
   );
-  const totalSpent = Number(expenseRow?.total_spent ?? 0);
+  // Redondeo a céntimos: los importes son `numeric(12,2)` y sumarlos en coma
+  // flotante deriva (p. ej. −1714.3000000000002). El panel debe publicar la misma
+  // cifra que la conciliación, con dos decimales.
+  const totalSpent = roundMoney(expenseRow?.total_spent ?? 0);
 
   return res.json({
     // Trazabilidad: se devuelve QUÉ filtros produjeron estas cifras.
@@ -204,7 +208,7 @@ router.get("/admin/dashboard", async (req, res) => {
       historicalRaised: funding.historicalRaised,
       historicalCounted: funding.historicalCounted,
       totalSpent,
-      balance: funding.reconciledRaised - totalSpent,
+      balance: roundMoney(funding.reconciledRaised - totalSpent),
       pendingReports: pendingReports[0]?.count ?? 0,
       pendingAdoptions: pendingAdoptions[0]?.count ?? 0,
       pendingVolunteers: pendingVolunteers[0]?.count ?? 0,
