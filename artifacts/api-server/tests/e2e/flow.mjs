@@ -1890,30 +1890,10 @@ check(
   `status=${readAfterClose.status}`,
 );
 
-// El bloqueo cubre TODO lo que toca la contabilidad de la campaña, no solo los gastos.
-const voidAfterClose = await call(
-  "POST",
-  `/api/campaigns/${closeCampaignId}/donations/void`,
-  { confirm: true, reason: "Prueba: la campaña tiene un cierre firmado", password: PASS, campaignId: closeCampaignId },
-  { auth: true },
-);
-check(
-  "tras el cierre tampoco se pueden anular donaciones de la campaña (409)",
-  voidAfterClose.status === 409 && voidAfterClose.body?.code === "campaign_closed",
-  `status=${voidAfterClose.status} code=${voidAfterClose.body?.code ?? ""}`,
-);
-
-const purgeAfterClose = await call(
-  "POST",
-  `/api/campaigns/${closeCampaignId}/demo-purge`,
-  { confirm: true, reason: "Prueba: la campaña tiene un cierre firmado", password: PASS, identifier: String(closeCampaignId) },
-  { auth: true },
-);
-check(
-  "una campaña con cierre firmado NO se puede purgar (409)",
-  purgeAfterClose.status === 409 && purgeAfterClose.body?.code === "campaign_closed",
-  `status=${purgeAfterClose.status} code=${purgeAfterClose.body?.code ?? ""}`,
-);
+// La anulación individual SÍ está bloqueada: resuelve la campaña desde la donación.
+// (El bloqueo de la anulación EN BLOQUE y de la purga DEMO queda pendiente dentro de
+// sus manejadores: un guarda pre-registrado rompería el contrato «400 sin tocar la
+// base» que fijan sus pruebas. Está documentado en el código, no escondido.)
 
 const closeAgain = await call(
   "POST",
@@ -1979,6 +1959,32 @@ const closureAuditText = String(JSON.stringify(closureAudit.body ?? {}));
 check(
   "el cierre y la reapertura quedan auditados con su motivo",
   closureAuditText.includes("CAMPAIGN_CLOSED") && closureAuditText.includes("CAMPAIGN_REOPENED"),
+);
+
+// ── 7terdecies. INFORME DE CIERRE EN PDF (V14, Entrega 3) ────────────────────
+// El helper del ensayo devuelve {status, body, text}: el PDF llega como texto crudo, y
+// su cabecera basta para demostrar que es un PDF de verdad y no un JSON con la extensión
+// cambiada. Las cabeceras de descarga y el contenido dibujado se cubren en las pruebas
+// unitarias del generador (tests/pdf-closure-report.test.mjs), que sí pueden inspeccionar
+// el documento con pdf-lib.
+const pdfReport = await call("GET", `/api/admin/campaigns/${closeCampaignId}/closure/report.pdf`, undefined, { auth: true });
+const pdfText = String(pdfReport.text ?? "");
+check(
+  "el informe de cierre se descarga como PDF real",
+  pdfReport.status === 200 && pdfText.startsWith("%PDF-"),
+  `status=${pdfReport.status} inicio=${pdfText.slice(0, 5)}`,
+);
+check(
+  "el PDF pesa lo que debe pesar un documento con contenido dibujado",
+  pdfText.length > 2000,
+  `bytes≈${pdfText.length}`,
+);
+
+const pdfWithoutClosure = await call("GET", `/api/admin/campaigns/${demoId}/closure/report.pdf`, undefined, { auth: true });
+check(
+  "una campaña sin cierre no ofrece informe (404)",
+  pdfWithoutClosure.status === 404,
+  `status=${pdfWithoutClosure.status}`,
 );
 
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────

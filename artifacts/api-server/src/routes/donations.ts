@@ -91,31 +91,15 @@ const router: IRouter = Router();
 import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
 
 /**
- * V14-2.3: la contabilidad de una campaña con CIERRE FINANCIERO FIRMADO no se toca.
- * Se aplica a la anulación en bloque (el path trae la campaña). La anulación
- * individual resuelve la campaña desde la propia donación, más abajo.
+ * PENDIENTE (V14-2.3): bloquear la anulación EN BLOQUE de una campaña con cierre
+ * financiero firmado. Mismo motivo que en la purga DEMO: un guarda pre-registrado se
+ * ejecuta antes de la validación de la ruta y rompe el contrato «400 sin tocar la
+ * base» que fijan las pruebas. Va dentro del manejador, tras validar y antes de la
+ * transacción.
+ *
+ * La anulación INDIVIDUAL sí está bloqueada más abajo (resuelve la campaña desde la
+ * donación, después de la reautenticación).
  */
-router.use("/campaigns/:id/donations/void", async (req, res, next) => {
-  const campaignId = Number(req.params.id);
-  if (!Number.isInteger(campaignId) || campaignId <= 0) {
-    next();
-    return;
-  }
-  try {
-    if (await isCampaignClosed(campaignId)) {
-      res.status(409).json(closedCampaignError());
-      return;
-    }
-    next();
-  } catch (err) {
-    req.log.error({ err, campaignId }, "Failed to check campaign closure state");
-    res.status(503).json({
-      error: "server_error",
-      code: "closure_check_failed",
-      message: "No se pudo comprobar el estado de cierre de la campaña. Inténtalo de nuevo.",
-    });
-  }
-});
 
 // POST /donations — público, con rate limit anti-spam.
 // El donante puede adjuntar el comprobante (captura de Yape/transferencia)

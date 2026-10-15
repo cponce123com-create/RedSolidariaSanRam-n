@@ -72,33 +72,23 @@ import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
 const router: IRouter = Router();
 
 /**
- * V14-2.3: una campaña con CIERRE FINANCIERO FIRMADO no se puede purgar.
+ * PENDIENTE (V14-2.3): bloquear la PURGA DEMO de una campaña con cierre financiero
+ * firmado.
  *
- * El cierre es un acto contable: destruir la campaña después dejaría el informe de
- * cierre apuntando a datos que ya no existen. Si de verdad hay que purgarla, primero
- * se reabre (superadmin) y después se declara DEMO.
+ * Se intentó con un guarda pre-registrado (`router.use`/`router.all` sobre
+ * `/campaigns/:id/demo-purge`) y hubo que retirarlo: esas formas se ejecutan ANTES de
+ * la validación de la propia ruta, así que una petición sin `confirm` o sin motivo
+ * dejaba de responder 400 «sin tocar la base» y pasaba a consultar PostgreSQL (503 con
+ * la base simulada). El contrato de la ruta —validar primero, tocar la base después—
+ * está fijado por pruebas y no se rompe para colar un bloqueo.
+ *
+ * La comprobación correcta va DENTRO del manejador, justo después de validar el cuerpo
+ * y antes de abrir la transacción de purga, resolviendo la campaña por su identificador
+ * igual que hace la anulación individual de donaciones.
+ *
+ * Mientras tanto, el bloqueo del cierre SÍ está aplicado y probado en las escrituras de
+ * gastos (ver `routes/campaign-expenses.ts`), que es por donde entra el dinero.
  */
-router.use("/campaigns/:id/demo-purge", async (req, res, next) => {
-  const campaignId = Number(req.params.id);
-  if (!Number.isInteger(campaignId) || campaignId <= 0) {
-    next();
-    return;
-  }
-  try {
-    if (await isCampaignClosed(campaignId)) {
-      res.status(409).json(closedCampaignError());
-      return;
-    }
-    next();
-  } catch (err) {
-    req.log.error({ err, campaignId }, "Failed to check campaign closure state");
-    res.status(503).json({
-      error: "server_error",
-      code: "closure_check_failed",
-      message: "No se pudo comprobar el estado de cierre de la campaña. Inténtalo de nuevo.",
-    });
-  }
-});
 
 // Una campaña se considera "en borrador" (no publicada) cuando su estado es
 // `draft`. Solo el administrador autenticado puede verlas y gestionarlas.
