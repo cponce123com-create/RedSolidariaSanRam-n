@@ -42,6 +42,7 @@ await build({
     "./src/lib/campaign-demo-purge.ts",
     "./src/lib/demo-classification.ts",
     "./src/lib/demo-inventory.ts",
+    "./src/lib/expense-cleanup.ts",
     "./src/lib/admin-reauth.ts",
     "./src/lib/two-factor-account.ts",
     "./src/lib/asset-cleanup.ts",

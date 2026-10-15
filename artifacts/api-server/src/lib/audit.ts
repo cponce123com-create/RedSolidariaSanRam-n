@@ -25,6 +25,7 @@ export const AUDIT_ACTIONS = {
   campaignDemoPurged: "CAMPAIGN_DEMO_PURGED",
   campaignsProtected: "CAMPAIGNS_PROTECTED",
   campaignsDemoDeclaredBulk: "CAMPAIGNS_DEMO_DECLARED_BULK",
+  expenseDemoPurged: "EXPENSE_DEMO_PURGED",
   adminReauthFailed: "ADMIN_REAUTH_FAILED",
   ledgerRegularized: "LEDGER_REGULARIZED",
   donorCreated: "DONOR_CREATED",

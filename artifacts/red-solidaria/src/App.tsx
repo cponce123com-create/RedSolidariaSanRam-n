@@ -65,6 +65,7 @@ const AdminTestimonials = lazy(() => import("./pages/admin/testimonials"));
 const AdminFaq = lazy(() => import("./pages/admin/faq"));
 const AdminUsers = lazy(() => import("./pages/admin/users"));
 const AdminSettings = lazy(() => import("./pages/admin/settings"));
+const AdminMaintenanceExpenses = lazy(() => import("./pages/admin/maintenance-expenses"));
 
 // Caché de 60s y refresco al volver a la pestaña: los datos ya cacheados se
 // muestran al instante y, si tienen más de 60s, se revalidan al enfocar la
@@ -242,6 +243,11 @@ function App() {
                 <Route path="/admin/usuarios">
                   <AdminLayout>
                     <AdminUsers />
+                  </AdminLayout>
+                </Route>
+                <Route path="/admin/mantenimiento/gastos">
+                  <AdminLayout>
+                    <AdminMaintenanceExpenses />
                   </AdminLayout>
                 </Route>
                 <Route path="/admin/configuracion">
