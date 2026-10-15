@@ -38,6 +38,13 @@ export const loginLimiter = rateLimit({
 // presupuesto medio. Sin sesión: mínimo (protege el gate /admin de fuerza
 // bruta, p.ej. al enumerar endpoints sin credenciales).
 export function adminActionLimitForRole(role?: string): number {
+  // Ampliación EXPLÍCITA por variable de entorno, pensada para los ensayos de
+  // extremo a extremo (un recorrido completo de la plataforma supera con holgura
+  // las 100 acciones legítimas de un superadmin) y para limpiezas masivas
+  // scriptadas. En producción NO se define, así que el límite real no cambia.
+  const override = Number(process.env.ADMIN_ACTION_LIMIT_OVERRIDE ?? "");
+  if (Number.isInteger(override) && override > 0) return override;
+
   if (role === "superadmin") return 100;
   if (role) return 30; // administrador / moderador
   return 20; // sin sesión

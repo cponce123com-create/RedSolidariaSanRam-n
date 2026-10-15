@@ -31,6 +31,11 @@ import { isForeignKeyViolation } from "../lib/pg-errors";
 import { cleanupCloudinaryAssets } from "../lib/asset-cleanup";
 import { DONATION_REVERSAL_SOURCE, verifyChain } from "../lib/ledger";
 import { verifySuperadminReauth } from "../lib/admin-reauth";
+import { isPlaceholderMedia, isOwnDocument } from "../lib/demo-classification";
+import {
+  isCampaignProtected,
+  readProtectedCampaignIds,
+} from "../lib/protected-campaigns";
 import {
   EMPTY_DEMO_PURGE_COUNTS,
   analyzeDemoPurge,
@@ -1059,9 +1064,12 @@ async function loadDemoPurgeFacts(
         (row.status === "reconciled" || row.reconciledAt !== null),
     ).length,
     annulledDonations: donationRows.filter((row) => row.status === "annulled").length,
-    expensesWithReceipt: expenseRows.filter(
-      (row) => typeof row.receiptUrl === "string" && row.receiptUrl.trim().length > 0,
-    ).length,
+    // Solo los documentos PROPIOS bloquean. Los comprobantes de RELLENO del seed
+    // solo avisan (ver DemoPurgeRealSignals): el seed usa la misma foto de ejemplo
+    // en los gastos DEMO y en los de Chocofest 2025, así que un comprobante no
+    // puede ser prueba de nada por sí solo.
+    expensesWithReceipt: expenseRows.filter((row) => isOwnDocument(row.receiptUrl)).length,
+    placeholderReceipts: expenseRows.filter((row) => isPlaceholderMedia(row.receiptUrl)).length,
     leftoversWithFlow: leftoverRows.filter(
       (row) =>
         Number(row.receivedQty ?? 0) !== 0 ||
@@ -1249,6 +1257,18 @@ router.post(
       return res.status(400).json({ error: "validation_error", code: parsed.code, message: parsed.message });
     }
 
+    // Una campaña PROTEGIDA (ChocoFest) no se declara DEMO: la declaración es el
+    // paso previo a la purga y no tiene sentido sobre datos que hay que conservar.
+    // Se comprueba tras validar y antes de la reautenticación (sin gastar intentos).
+    if (await isCampaignProtected(id)) {
+      return res.status(409).json({
+        error: "conflict",
+        code: "protected_campaign",
+        message:
+          "Esta campaña está PROTEGIDA (ChocoFest) y no se puede declarar DEMO. Retira la protección de forma explícita si de verdad procede.",
+      });
+    }
+
     const sessionUser = req.session?.adminUser ?? null;
     const reauth = await verifySuperadminReauth({
       userId: sessionUser?.id ?? null,
@@ -1359,6 +1379,21 @@ router.post(
     const parsed = validateDemoPurgeRequest(req.body, { id });
     if (!parsed.ok) {
       return res.status(400).json({ error: "validation_error", code: parsed.code, message: parsed.message });
+    }
+
+    // Protección de ChocoFest (V9.1): se comprueba tras validar la petición y
+    // ANTES de la reautenticación, para no gastar intentos de reauth y para que el
+    // motivo sea inequívoco. La protección es por ID (resuelto desde la base), no
+    // por nombre: renombrar la campaña no la desprotege.
+    const protectedIds = await readProtectedCampaignIds();
+    if (protectedIds.includes(id)) {
+      return res.status(409).json({
+        error: "conflict",
+        code: "protected_campaign",
+        message:
+          "Esta campaña está PROTEGIDA frente a purgas (ChocoFest). Retira la protección de forma explícita si de verdad procede.",
+        protectedCampaignIds: protectedIds,
+      });
     }
 
     const sessionUser = req.session?.adminUser ?? null;

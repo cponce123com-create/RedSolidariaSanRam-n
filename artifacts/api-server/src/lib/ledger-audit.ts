@@ -70,6 +70,15 @@ export interface CampaignTotals {
 export interface LedgerAuditReport {
   chain: ChainResult;
   movementCount: number;
+  /**
+   * Estado para la interfaz: «empty» (sin movimientos), «healthy» o «issues».
+   * Con la cadena vacía NO se dice «verificada»: no hay nada que verificar.
+   */
+  status: "empty" | "healthy" | "issues";
+  /** Atajo: la cadena está vacía. */
+  empty: boolean;
+  /** Asientos de importe cero: no justifican nada y no deberían existir. */
+  zeroAmountMovements: { id: number; campaignId: number; kind: string }[];
   /** Donaciones confirmadas SIN asiento en el libro (ingresos no auditables). */
   donationsWithoutMovement: { id: number; campaignId: number | null; amount: number }[];
   /** Asientos cuyo origen no existe o es de un tipo desconocido. */
@@ -263,6 +272,17 @@ export function auditLedger(input: {
   });
   const unbalancedCampaigns = totals.filter((t) => !t.balanced).map((t) => t.campaignId);
 
+  // Asientos de importe cero: no justifican nada y no deberían existir. Se
+  // informan porque una regularización que crea un asiento de 0 solo ensucia el
+  // libro (no corrige ningún descuadre).
+  const zeroAmountMovements = movements
+    .filter((movement) => roundMoney(movement.amount) === 0)
+    .map((movement) => ({
+      id: movement.id,
+      campaignId: movement.campaignId,
+      kind: movement.kind,
+    }));
+
   const healthy =
     chain.verified &&
     donationsWithoutMovement.length === 0 &&
@@ -270,16 +290,24 @@ export function auditLedger(input: {
     amountMismatches.length === 0 &&
     campaignMismatches.length === 0 &&
     duplicateMovements.length === 0 &&
+    zeroAmountMovements.length === 0 &&
     unbalancedCampaigns.length === 0;
 
   return {
     chain,
     movementCount: movements.length,
+    /**
+     * Estado para la interfaz. Con la cadena VACÍA no se puede decir «verificada»:
+     * no hay nada que verificar, así que se informa «Libro sin movimientos».
+     */
+    status: movements.length === 0 ? "empty" : healthy ? "healthy" : "issues",
+    empty: movements.length === 0,
     donationsWithoutMovement,
     movementsWithoutSource,
     amountMismatches,
     campaignMismatches,
     duplicateMovements,
+    zeroAmountMovements,
     totals,
     unbalancedCampaigns,
     healthy,

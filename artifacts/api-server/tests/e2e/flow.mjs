@@ -445,7 +445,9 @@ await call(
     description: "Gasto con boleta (documento real)",
     amount: 90,
     date: "2026-03-04",
-    receiptUrl: "https://res.cloudinary.com/demo/image/upload/v1/boleta-real.jpg",
+    // Documento PROPIO (no la nube DEMO de Cloudinary): es lo único que implica
+    // obligación de conservación desde la corrección V9.1.
+    receiptUrl: "https://res.cloudinary.com/redsolidaria/image/upload/v1/boleta-real.jpg",
     receiptType: "boleta",
   },
   { auth: true },
@@ -995,6 +997,131 @@ check(
   "la sesión del ensayo sigue válida tras todo el ciclo de 2FA",
   sessionStillValid.status === 200,
   `status=${sessionStillValid.status}`,
+);
+
+// ── 7sexies. Mantenimiento: inventario, protección de ChocoFest y conciliación ─
+// Fase 1-3 del V9.1: la herramienta debe decir qué es DEMO (con evidencia),
+// proteger ChocoFest por ID REAL y explicar cada cifra del panel sin ocultarla.
+// Se apoya en la campaña Chocofest 2025 del seed (la real): protegerla y comprobar
+// que queda fuera del alcance de cualquier purga.
+const MAINT_REASON = "Limpieza integral de datos de prueba de la plataforma";
+
+const inventory = await call("GET", "/api/admin/maintenance/inventory", undefined, { auth: true });
+check(
+  "el inventario integral responde 200 con recuentos por tabla",
+  inventory.status === 200 && Array.isArray(inventory.body?.inventory?.byTable) && inventory.body.inventory.byTable.length > 0,
+  `status=${inventory.status}`,
+);
+check(
+  "el inventario clasifica cada registro en las cuatro categorías",
+  inventory.body?.inventory?.totals !== undefined &&
+    ["real", "demo", "pending", "protected"].every((key) => typeof inventory.body.inventory.totals[key] === "number"),
+  JSON.stringify(inventory.body?.inventory?.totals ?? null),
+);
+check(
+  "la campaña DEMO ya purgada no aparece en el inventario",
+  !(inventory.body?.inventory?.records ?? []).some((r) => r.table === "campaigns" && r.id === demoId),
+);
+
+const candidates = inventory.body?.protection?.candidates ?? [];
+check(
+  "se detectan las candidatas a proteger resolviendo IDs reales de la base",
+  candidates.length > 0 && candidates.every((c) => /choco\s*fest|chocolatada/i.test(c.title) && [2025, 2026].includes(c.year)),
+  `candidatas=${JSON.stringify(candidates.map((c) => ({ id: c.id, year: c.year })))}`,
+);
+const seededChocofest = candidates.find((c) => /chocofest 2025/i.test(c.title));
+check("la Chocofest 2025 del seed es candidata", seededChocofest !== undefined, `ids=${JSON.stringify(candidates.map((c) => c.id))}`);
+check(
+  "sin proteger todavía, el inventario no da ninguna campaña por protegida",
+  (inventory.body?.protection?.protectedCampaignIds ?? []).length === 0,
+  JSON.stringify(inventory.body?.protection?.protectedCampaignIds ?? null),
+);
+
+// Protección: se guarda por ID y bloquea cualquier purga o declaración DEMO.
+const protect = await call(
+  "POST",
+  "/api/admin/maintenance/protect-campaigns",
+  { confirm: true, reason: MAINT_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "la protección de ChocoFest se resuelve y se guarda por ID",
+  protect.status === 200 && (protect.body?.protectedCampaignIds ?? []).includes(seededChocofest?.id),
+  `status=${protect.status} ids=${JSON.stringify(protect.body?.protectedCampaignIds ?? null)}`,
+);
+
+const markProtected = await call(
+  "POST",
+  `/api/campaigns/${seededChocofest?.id}/demo-mark`,
+  { confirm: true, reason: MAINT_REASON, password: PASS },
+  { auth: true },
+);
+check(
+  "una campaña PROTEGIDA no se puede declarar DEMO (409)",
+  markProtected.status === 409 && markProtected.body?.code === "protected_campaign",
+  `status=${markProtected.status} code=${markProtected.body?.code ?? ""}`,
+);
+
+const purgeProtected = await call(
+  "POST",
+  `/api/campaigns/${seededChocofest?.id}/demo-purge`,
+  {
+    confirm: true,
+    reason: MAINT_REASON,
+    password: PASS,
+    identifier: String(seededChocofest?.id),
+  },
+  { auth: true },
+);
+check(
+  "una campaña PROTEGIDA no se puede purgar (409)",
+  purgeProtected.status === 409 && purgeProtected.body?.code === "protected_campaign",
+  `status=${purgeProtected.status} code=${purgeProtected.body?.code ?? ""}`,
+);
+
+// La conciliación debe explicar EXACTAMENTE las cifras del panel.
+const reconciliation = await call("GET", "/api/admin/maintenance/reconciliation", undefined, { auth: true });
+const dashboardNow = await call("GET", "/api/admin/dashboard", undefined, { auth: true });
+check(
+  "la conciliación reproduce la recaudación del dashboard",
+  reconciliation.status === 200 && reconciliation.body?.summary?.totalRaised === dashboardNow.body?.summary?.totalRaised,
+  `conciliación=${reconciliation.body?.summary?.totalRaised} panel=${dashboardNow.body?.summary?.totalRaised}`,
+);
+check(
+  "la conciliación reproduce los gastos y el saldo del dashboard",
+  reconciliation.body?.summary?.totalSpent === dashboardNow.body?.summary?.totalSpent &&
+    reconciliation.body?.summary?.balance === dashboardNow.body?.summary?.balance,
+  `gastos ${reconciliation.body?.summary?.totalSpent}/${dashboardNow.body?.summary?.totalSpent} · saldo ${reconciliation.body?.summary?.balance}/${dashboardNow.body?.summary?.balance}`,
+);
+check(
+  "cada línea conciliada lleva campaña, importe, clasificación y evidencia",
+  (reconciliation.body?.figures?.spent?.lines ?? []).length > 0 &&
+    (reconciliation.body.figures.spent.lines ?? []).every(
+      (line) => typeof line.id === "number" && typeof line.amount === "number" && typeof line.classification === "string" && line.reason.length > 0,
+    ),
+);
+check(
+  "el informe separa la parte DEMO y la pendiente de cada cifra",
+  typeof reconciliation.body?.summary?.demoSpent === "number" && typeof reconciliation.body?.summary?.pendingSpent === "number",
+  JSON.stringify(reconciliation.body?.summary ?? null),
+);
+
+// El informe del libro distingue «sin movimientos» de «verificado».
+const ledgerReport = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
+check(
+  "el informe del libro declara su estado (empty/healthy/issues)",
+  ledgerReport.status === 200 && ["empty", "healthy", "issues"].includes(ledgerReport.body?.status),
+  `status=${ledgerReport.status} estado=${ledgerReport.body?.status ?? ""}`,
+);
+check(
+  "con la cadena vacía NO se declara verificada",
+  ledgerReport.body?.empty === true ? ledgerReport.body?.status === "empty" : true,
+  `empty=${ledgerReport.body?.empty} status=${ledgerReport.body?.status}`,
+);
+check(
+  "el informe del libro informa de los asientos de importe cero",
+  Array.isArray(ledgerReport.body?.zeroAmountMovements),
+  `zero=${JSON.stringify(ledgerReport.body?.zeroAmountMovements ?? null)}`,
 );
 
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
