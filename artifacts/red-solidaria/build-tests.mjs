@@ -12,6 +12,7 @@ await build({
     "./src/lib/campaign-deletion.ts",
     "./src/lib/campaign-demo-purge.ts",
     "./src/lib/donation-annulment.ts",
+    "./src/lib/expense-selection.ts",
     "./src/lib/chocofest.ts",
     "./src/lib/inventory.ts",
     "./src/lib/results.ts",

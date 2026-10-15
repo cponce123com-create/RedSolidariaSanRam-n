@@ -4,6 +4,11 @@ import { AlertTriangle, CheckCircle2, Eraser, RefreshCw, ShieldAlert } from "luc
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  selectVisible,
+  selectionState,
+  summarizeSelection,
+} from "@/lib/expense-selection";
 
 /**
  * Mantenimiento → Gastos DEMO (V10.1).
@@ -152,7 +157,21 @@ export default function AdminMaintenanceExpenses() {
     [rows, selected],
   );
   const selectedAmount = selectedRows.reduce((sum, row) => sum + row.amount, 0);
-  const selectedBlocked = selectedRows.filter((row) => !row.deletable);
+  // La lógica de selección vive en un módulo puro y probado (`expense-selection`):
+  // seleccionar no autoriza nada; eliminar exige que TODOS sean eliminables.
+  const selection = useMemo(
+    () =>
+      summarizeSelection(
+        selectedRows.map((row) => ({
+          id: row.id,
+          deletable: row.deletable,
+          actionLabel: row.actionLabel,
+        })),
+        selectedRows.map((row) => row.id),
+      ),
+    [selectedRows],
+  );
+  const selectedBlocked = selection.blocked;
 
   const previewMutation = useMutation({
     mutationFn: async (ids: number[]) => {
@@ -197,7 +216,9 @@ export default function AdminMaintenanceExpenses() {
       setClassifyReason("");
       setClassifyEvidence("");
       setNotice(`${data.classified} gasto(s) clasificado(s) como «${data.classificationLabel}».`);
-      setSelected([]);
+      // NO se limpia la selección: el flujo natural es clasificar y, acto seguido,
+      // eliminar lo que ya es eliminable. Al refrescar la consulta, esos mismos ids
+      // pasan a tener «Eliminación definitiva» y el botón se habilita solo.
       await queryClient.invalidateQueries();
     },
   });
@@ -325,11 +346,28 @@ export default function AdminMaintenanceExpenses() {
               <th className="p-3">
                 <input
                   type="checkbox"
-                  aria-label="Seleccionar todos los eliminables"
-                  checked={filtered.length > 0 && filtered.filter((r) => r.deletable).every((r) => selected.includes(r.id))}
+                  aria-label="Seleccionar todos los gastos visibles"
+                  // Estado indeterminado cuando hay una selección parcial de los
+                  // visibles: el atributo no existe en HTML, se fija en el nodo.
+                  ref={(el) => {
+                    if (!el) return;
+                    el.indeterminate =
+                      selectionState(selected, filtered.map((row) => row.id)) === "some";
+                  }}
+                  checked={selectionState(selected, filtered.map((row) => row.id)) === "all"}
                   onChange={(event) => {
-                    const deletable = filtered.filter((row) => row.deletable).map((row) => row.id);
-                    setSelected(event.target.checked ? [...new Set([...selected, ...deletable])] : []);
+                    // Selecciona TODOS los visibles (los filtros activos se respetan).
+                    // La selección es para REVISAR y CLASIFICAR: no autoriza por sí
+                    // misma ninguna eliminación, así que no se limita a los que ya son
+                    // eliminables — si no, los huérfanos sin clasificar quedarían
+                    // atrapados sin poder seleccionarse.
+                    setSelected((current) =>
+                      selectVisible(
+                        current,
+                        filtered.map((row) => row.id),
+                        event.target.checked,
+                      ),
+                    );
                   }}
                 />
               </th>
@@ -352,8 +390,11 @@ export default function AdminMaintenanceExpenses() {
                   <input
                     type="checkbox"
                     aria-label={`Seleccionar gasto ${row.id}`}
+                    // NUNCA deshabilitado: seleccionar solo marca para revisar o
+                    // clasificar. Antes se deshabilitaba con `!row.deletable` y los
+                    // gastos pendientes de clasificación (los huérfanos, justo los que
+                    // hay que clasificar) no se podían ni seleccionar.
                     checked={selected.includes(row.id)}
-                    disabled={!row.deletable}
                     onChange={() => toggle(row.id)}
                   />
                 </td>
@@ -416,10 +457,14 @@ export default function AdminMaintenanceExpenses() {
       {selected.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4">
           <p className="text-sm">
-            <strong>{selected.length}</strong> gasto(s) seleccionado(s) · <strong>{money(selectedAmount)}</strong>
+            <strong>{selected.length}</strong> gasto(s) seleccionado(s) ·{" "}
+            <strong>{money(selectedAmount)}</strong>
             {selectedBlocked.length > 0 && (
               <span className="ml-2 text-red-700">
-                {selectedBlocked.length} no se puede(n) eliminar: quítalos de la selección.
+                No se puede(n) eliminar {selectedBlocked.length}:{" "}
+                {selectedBlocked
+                  .map((row) => `#${row.id} (${row.actionLabel})`)
+                  .join(" · ")}
               </span>
             )}
           </p>
@@ -427,6 +472,8 @@ export default function AdminMaintenanceExpenses() {
             <Button variant="outline" onClick={() => setSelected([])}>
               Limpiar
             </Button>
+            {/* Clasificar: disponible con CUALQUIER selección, también la de gastos
+                que hoy no son eliminables — es justo el paso que los desbloquea. */}
             <Button
               variant="outline"
               onClick={() => {
@@ -436,6 +483,8 @@ export default function AdminMaintenanceExpenses() {
             >
               Clasificar seleccionados…
             </Button>
+            {/* Eliminar: solo si TODOS los seleccionados son eliminables según el
+                diagnóstico vigente del servidor. */}
             <Button
               onClick={() => {
                 setError(null);
