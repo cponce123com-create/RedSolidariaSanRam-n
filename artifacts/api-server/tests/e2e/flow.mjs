@@ -1890,6 +1890,31 @@ check(
   `status=${readAfterClose.status}`,
 );
 
+// El bloqueo cubre TODO lo que toca la contabilidad de la campaña, no solo los gastos.
+const voidAfterClose = await call(
+  "POST",
+  `/api/campaigns/${closeCampaignId}/donations/void`,
+  { confirm: true, reason: "Prueba: la campaña tiene un cierre firmado", password: PASS, campaignId: closeCampaignId },
+  { auth: true },
+);
+check(
+  "tras el cierre tampoco se pueden anular donaciones de la campaña (409)",
+  voidAfterClose.status === 409 && voidAfterClose.body?.code === "campaign_closed",
+  `status=${voidAfterClose.status} code=${voidAfterClose.body?.code ?? ""}`,
+);
+
+const purgeAfterClose = await call(
+  "POST",
+  `/api/campaigns/${closeCampaignId}/demo-purge`,
+  { confirm: true, reason: "Prueba: la campaña tiene un cierre firmado", password: PASS, identifier: String(closeCampaignId) },
+  { auth: true },
+);
+check(
+  "una campaña con cierre firmado NO se puede purgar (409)",
+  purgeAfterClose.status === 409 && purgeAfterClose.body?.code === "campaign_closed",
+  `status=${purgeAfterClose.status} code=${purgeAfterClose.body?.code ?? ""}`,
+);
+
 const closeAgain = await call(
   "POST",
   `/api/admin/campaigns/${closeCampaignId}/closure`,

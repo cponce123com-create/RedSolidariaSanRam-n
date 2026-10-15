@@ -67,8 +67,38 @@ import {
 import { CONFIRMED_DONATION_STATUSES } from "../lib/donor-identity";
 import { latestConsentMap, type ConsentDecision } from "../lib/donor-consent";
 import { formatPublicDonor } from "../lib/donor-format";
+import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
 
 const router: IRouter = Router();
+
+/**
+ * V14-2.3: una campaña con CIERRE FINANCIERO FIRMADO no se puede purgar.
+ *
+ * El cierre es un acto contable: destruir la campaña después dejaría el informe de
+ * cierre apuntando a datos que ya no existen. Si de verdad hay que purgarla, primero
+ * se reabre (superadmin) y después se declara DEMO.
+ */
+router.use("/campaigns/:id/demo-purge", async (req, res, next) => {
+  const campaignId = Number(req.params.id);
+  if (!Number.isInteger(campaignId) || campaignId <= 0) {
+    next();
+    return;
+  }
+  try {
+    if (await isCampaignClosed(campaignId)) {
+      res.status(409).json(closedCampaignError());
+      return;
+    }
+    next();
+  } catch (err) {
+    req.log.error({ err, campaignId }, "Failed to check campaign closure state");
+    res.status(503).json({
+      error: "server_error",
+      code: "closure_check_failed",
+      message: "No se pudo comprobar el estado de cierre de la campaña. Inténtalo de nuevo.",
+    });
+  }
+});
 
 // Una campaña se considera "en borrador" (no publicada) cuando su estado es
 // `draft`. Solo el administrador autenticado puede verlas y gestionarlas.

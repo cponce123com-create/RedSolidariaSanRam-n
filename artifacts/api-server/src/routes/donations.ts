@@ -88,6 +88,35 @@ class DonationProofRequiredError extends DonationBusinessError {
 
 const router: IRouter = Router();
 
+import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
+
+/**
+ * V14-2.3: la contabilidad de una campaña con CIERRE FINANCIERO FIRMADO no se toca.
+ * Se aplica a la anulación en bloque (el path trae la campaña). La anulación
+ * individual resuelve la campaña desde la propia donación, más abajo.
+ */
+router.use("/campaigns/:id/donations/void", async (req, res, next) => {
+  const campaignId = Number(req.params.id);
+  if (!Number.isInteger(campaignId) || campaignId <= 0) {
+    next();
+    return;
+  }
+  try {
+    if (await isCampaignClosed(campaignId)) {
+      res.status(409).json(closedCampaignError());
+      return;
+    }
+    next();
+  } catch (err) {
+    req.log.error({ err, campaignId }, "Failed to check campaign closure state");
+    res.status(503).json({
+      error: "server_error",
+      code: "closure_check_failed",
+      message: "No se pudo comprobar el estado de cierre de la campaña. Inténtalo de nuevo.",
+    });
+  }
+});
+
 // POST /donations — público, con rate limit anti-spam.
 // El donante puede adjuntar el comprobante (captura de Yape/transferencia)
 // subido previamente a Cloudinary.
@@ -585,6 +614,16 @@ router.post(
         details: { operation: "donation_void", code: reauth.code },
       });
       return res.status(401).json({ error: "unauthorized", code: reauth.code, message: reauth.message });
+    }
+
+    // V14-2.3: la contabilidad de una campaña con CIERRE FINANCIERO FIRMADO no se
+    // toca. Este path no trae la campaña, así que se resuelve desde la donación.
+    const [target] = await db
+      .select({ campaignId: donationsTable.campaignId })
+      .from(donationsTable)
+      .where(eq(donationsTable.id, id));
+    if (target?.campaignId && (await isCampaignClosed(target.campaignId))) {
+      return res.status(409).json(closedCampaignError());
     }
 
     try {
