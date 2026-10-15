@@ -62,6 +62,27 @@ export const adminActionLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
+// Reautenticación de operaciones IRREVERSIBLES (purga de campañas DEMO).
+// Presupuesto muy estrecho por usuario admin: una sesión robada no puede usar el
+// endpoint como oráculo para adivinar la contraseña del superadmin. Es
+// independiente del presupuesto general de acciones administrativas.
+export const reauthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  keyGenerator: (req) => {
+    const admin = (req as any).session?.adminUser;
+    const ip = ipKeyGenerator(req.ip ?? "unknown");
+    return admin ? `reauth:${admin.id}` : `reauth-ip:${ip}`;
+  },
+  message: {
+    error: "too_many_attempts",
+    message: "Demasiados intentos de reautenticación. Espera 15 minutos e inténtalo de nuevo.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+});
+
 export const contactLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,

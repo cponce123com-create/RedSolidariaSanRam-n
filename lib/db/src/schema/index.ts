@@ -26,3 +26,4 @@ export * from "./audit-logs";
 export * from "./supervisor-observations";
 export * from "./volunteer-teams";
 export * from "./certificates";
+export * from "./campaign-purge-backups";

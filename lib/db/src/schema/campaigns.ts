@@ -18,8 +18,25 @@ export const campaignsTable = pgTable("campaigns", {
   latitude: real("latitude"),
   longitude: real("longitude"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  // Migración 026 (aditiva): DECLARACIÓN explícita de que la campaña contiene
+  // datos de prueba. Es condición NECESARIA pero NO SUFICIENTE para la purga
+  // DEMO: el análisis de seguridad del servidor sigue bloqueando la operación si
+  // detecta dinero conciliado, documentos de gasto, bienes con flujo real o
+  // asientos ajenos a la campaña.
+  isDemo: boolean("is_demo").notNull().default(false),
+  demoMarkedAt: timestamp("demo_marked_at"),
+  demoMarkedBy: text("demo_marked_by"),
 });
 
-export const insertCampaignSchema = createInsertSchema(campaignsTable).omit({ id: true, createdAt: true });
+// Las columnas de la migración 026 se OMITEN del schema de inserción: se
+// gestionan solo por los endpoints /campaigns/:id/demo-mark (anti
+// mass-assignment, igual que el 2FA de los usuarios admin).
+export const insertCampaignSchema = createInsertSchema(campaignsTable).omit({
+  id: true,
+  createdAt: true,
+  isDemo: true,
+  demoMarkedAt: true,
+  demoMarkedBy: true,
+});
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type Campaign = typeof campaignsTable.$inferSelect;

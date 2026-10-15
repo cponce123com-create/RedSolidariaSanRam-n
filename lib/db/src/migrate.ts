@@ -721,6 +721,49 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         CHECK (scope IN ('public_name','public_proof','public_photo')) NOT VALID;
     `,
   },
+  {
+    name: "026_campaign_demo_purge.sql",
+    sql: `
+      -- V7.2: designación y PURGA DEFINITIVA de campañas DEMO.
+      -- ADITIVA: añade columnas con valor por defecto y una tabla nueva; no
+      -- reinterpreta ni borra ningún dato existente.
+      --
+      -- campaigns.is_demo es la DECLARACIÓN explícita y auditada de que una
+      -- campaña contiene datos de prueba. Es condición NECESARIA pero NO
+      -- SUFICIENTE para la purga: el análisis de seguridad del servidor sigue
+      -- bloqueando la operación si detecta dinero conciliado, documentos de
+      -- gasto, bienes con flujo real, evidencias documentales o asientos cuyo
+      -- origen no pertenezca a la campaña. Nunca se asume que un dato es
+      -- ficticio por su nombre ni por la indicación del administrador.
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS demo_marked_at timestamp;
+      ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS demo_marked_by text;
+
+      -- Respaldo verificable de cada purga DEMO. SIN clave foránea a campaigns
+      -- a propósito: el respaldo debe SOBREVIVIR al borrado de la campaña (es la
+      -- copia de seguridad y el manifiesto de la operación). manifest_hash es
+      -- el SHA-256 del snapshot normalizado: cualquiera puede recomputarlo y
+      -- comprobar que el respaldo no se alteró después.
+      CREATE TABLE IF NOT EXISTS campaign_purge_backups (
+        id serial PRIMARY KEY,
+        campaign_id integer NOT NULL,
+        campaign_title text NOT NULL,
+        campaign_status text NOT NULL,
+        manifest_hash text NOT NULL,
+        algorithm text NOT NULL DEFAULT 'sha256',
+        snapshot jsonb NOT NULL,
+        reason text NOT NULL,
+        performed_by text,
+        performed_by_id text,
+        created_at timestamp NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_campaign_purge_backups_campaign
+        ON campaign_purge_backups (campaign_id);
+      CREATE INDEX IF NOT EXISTS idx_campaign_purge_backups_created
+        ON campaign_purge_backups (created_at DESC);
+    `,
+  },
 ];
 
 /**

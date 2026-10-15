@@ -39,6 +39,8 @@ await build({
     "./src/lib/donation-reconcile.ts",
     "./src/lib/pg-errors.ts",
     "./src/lib/campaign-lifecycle.ts",
+    "./src/lib/campaign-demo-purge.ts",
+    "./src/lib/admin-reauth.ts",
     "./src/lib/asset-cleanup.ts",
     "./src/lib/donor-consent.ts",
     "./src/lib/donor-identity.ts",

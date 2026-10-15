@@ -2,6 +2,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { ApiError, errorMessage, readErrorMessage } from "@/lib/api-error";
 import { invalidateEntities } from "@/lib/query-invalidation";
 import type { CampaignDeletionDiagnostic } from "./campaign-deletion";
+import type { DemoPurgeAnalysis, DemoPurgeResult } from "./campaign-demo-purge";
 
 /**
  * Cliente del ciclo de vida de campañas (Fase 1 del Prompt Maestro).
@@ -272,3 +273,121 @@ export type {
   DeletionOperation,
   GroupedDependencies,
 } from "./campaign-deletion";
+
+// ─── Purga definitiva de campañas DEMO (V7.2) ────────────────────────────────
+
+/**
+ * Análisis de seguridad de la purga DEMO (exclusivo del superadmin). Devuelve el
+ * nombre, el identificador, el estado, el recuento y los tipos de registros
+ * relacionados, el estado del libro contable y el veredicto. NO borra nada.
+ */
+export async function fetchDemoPurgePreview(id: number): Promise<DemoPurgeAnalysis> {
+  const res = await fetch(`/api/campaigns/${id}/demo-purge/preview`, {
+    credentials: "include",
+  });
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
+  return (await res.json()) as DemoPurgeAnalysis;
+}
+
+export interface DemoPurgeCredentials {
+  /** Contraseña actual del superadmin (reautenticación). */
+  password: string;
+  /** Código TOTP, solo si la cuenta tiene 2FA activo. */
+  totpCode?: string;
+}
+
+/**
+ * Declara una campaña como DEMO. Exige reautenticación en el servidor: es una
+ * afirmación explícita del administrador, no una inferencia del sistema.
+ */
+export async function markCampaignDemo(
+  id: number,
+  payload: DemoPurgeCredentials & { reason: string },
+): Promise<void> {
+  const res = await fetch(`/api/campaigns/${id}/demo-mark`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      confirm: true,
+      reason: payload.reason,
+      password: payload.password,
+      ...(payload.totpCode ? { totpCode: payload.totpCode } : {}),
+    }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
+}
+
+/** Retira la declaración DEMO (si se marcó por error). */
+export async function unmarkCampaignDemo(id: number, reason?: string): Promise<void> {
+  const res = await fetch(`/api/campaigns/${id}/demo-mark`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(reason ? { reason } : {}),
+  });
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
+}
+
+/**
+ * ELIMINA DEFINITIVAMENTE una campaña DEMO y sus datos de prueba.
+ *
+ * Irreversible. El servidor exige superadmin, reautenticación, motivo, el
+ * identificador escrito a mano y confirmación explícita; si el análisis detecta
+ * datos reales responde 409 con el motivo exacto y no modifica nada.
+ */
+export async function purgeDemoCampaign(
+  id: number,
+  payload: DemoPurgeCredentials & { identifier: string; reason: string },
+): Promise<DemoPurgeResult> {
+  const res = await fetch(`/api/campaigns/${id}/demo-purge`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      confirm: true,
+      identifier: payload.identifier,
+      reason: payload.reason,
+      password: payload.password,
+      ...(payload.totpCode ? { totpCode: payload.totpCode } : {}),
+    }),
+  });
+  if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
+  return (await res.json()) as DemoPurgeResult;
+}
+
+/**
+ * Helpers de presentación de la purga DEMO (puros y testeables), re-exportados
+ * para que el panel los consuma desde el mismo punto de entrada del dominio.
+ */
+export {
+  MIN_DEMO_REASON,
+  affectedTables,
+  blockerSummary,
+  canPurgeDemoCampaign,
+  demoPurgeHeadline,
+  demoPurgeSteps,
+  demoPurgeSummary,
+  describeLedger,
+  describePlan,
+  identifierMatches,
+  needsDemoMarking,
+  shortHash,
+  totalOfPlan,
+} from "./campaign-demo-purge";
+export type {
+  DemoPurgeAnalysis,
+  DemoPurgeCampaign,
+  DemoPurgeChainSummary,
+  DemoPurgeCounts,
+  DemoPurgeIssue,
+  DemoPurgeLedgerState,
+  DemoPurgeManifest,
+  DemoPurgePlanEntry,
+  DemoPurgeRealSignals,
+  DemoPurgeResult,
+  DemoPurgeStep,
+  DemoPurgeSummary,
+  DemoPurgeTableKey,
+  DemoPurgeVerdict,
+} from "./campaign-demo-purge";
