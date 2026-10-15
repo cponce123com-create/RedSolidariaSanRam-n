@@ -28,3 +28,4 @@ export * from "./volunteer-teams";
 export * from "./certificates";
 export * from "./campaign-purge-backups";
 export * from "./env-superadmin-2fa";
+export * from "./expense-classifications";

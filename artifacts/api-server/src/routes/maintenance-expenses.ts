@@ -16,6 +16,12 @@ import { verifyChain, type LedgerRow } from "../lib/ledger";
 import { readProtectedCampaignIds } from "../lib/protected-campaigns";
 import { toSafeAmount } from "../lib/amount-format";
 import {
+  MANUAL_CLASSIFICATION_LABEL,
+  readAllManualClassifications,
+  upsertManualClassification,
+  validateClassificationRequest,
+} from "../lib/expense-manual-classification";
+import {
   compareFinancialSnapshots,
   diagnoseExpense,
   planExpensePurge,
@@ -49,7 +55,7 @@ async function loadExpenseDiagnoses(): Promise<{
 }> {
   const protectedCampaignIds = await readProtectedCampaignIds();
 
-  const [campaignRows, expenseRows, movementRows] = await Promise.all([
+  const [campaignRows, expenseRows, movementRows, manualClassifications] = await Promise.all([
     db
       .select({
         id: campaignsTable.id,
@@ -60,6 +66,8 @@ async function loadExpenseDiagnoses(): Promise<{
       .from(campaignsTable),
     db.select().from(campaignExpensesTable).orderBy(asc(campaignExpensesTable.id)),
     db.select().from(campaignMovementsTable).orderBy(asc(campaignMovementsTable.id)),
+    // La declaración manual manda sobre la deducción automática (migración 029).
+    readAllManualClassifications(),
   ]);
 
   const campaignById = new Map(
@@ -147,6 +155,7 @@ async function loadExpenseDiagnoses(): Promise<{
       classification: classificationByExpense.get(row.id) ?? "pending",
       protectedCampaignIds,
       campaignMovements: movementsByCampaign.get(row.campaignId) ?? [],
+      manualClassification: manualClassifications.get(row.id) ?? null,
     }),
   );
 
@@ -287,6 +296,113 @@ router.get("/admin/maintenance/financial-check", ...superadminOnly, adminActionL
 });
 
 /**
+ * POST /admin/maintenance/expenses/classify — declaración manual (Fase 1).
+ *
+ * El superadmin declara qué es cada gasto. Es lo que desbloquea los HUÉRFANOS: sin
+ * campaña no hay declaración DEMO posible, así que hasta ahora quedaban en «revisión
+ * manual» para siempre. La declaración se guarda en PostgreSQL (sobrevive a
+ * reinicios y al borrado del gasto) con motivo, evidencia, responsable y fecha, y
+ * queda auditada.
+ *
+ * NO habilita nada por sí sola: `diagnoseExpense` vuelve a decidir después, y las
+ * protecciones objetivas (campaña protegida, documento propio, cadena del libro)
+ * siguen mandando.
+ */
+router.post(
+  "/admin/maintenance/expenses/classify",
+  ...superadminOnly,
+  reauthLimiter,
+  adminActionLimiter,
+  async (req, res) => {
+    const body = (req.body ?? {}) as {
+      ids?: unknown;
+      password?: unknown;
+      totpCode?: unknown;
+    };
+    const ids = Array.isArray(body.ids)
+      ? [...new Set(body.ids.map((value) => Number(value)).filter((id) => Number.isInteger(id) && id > 0))]
+      : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: "validation_error", message: "Selecciona al menos un gasto." });
+    }
+    const parsed = validateClassificationRequest(body);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: "validation_error", code: parsed.code, message: parsed.message });
+    }
+
+    try {
+      const before = await loadExpenseDiagnoses();
+      const missing = ids.filter((id) => !before.diagnoses.some((diagnosis) => diagnosis.id === id));
+      if (missing.length > 0) {
+        return res.status(404).json({
+          error: "not_found",
+          message: `Gastos inexistentes: ${missing.join(", ")}.`,
+        });
+      }
+
+      const sessionUser = req.session?.adminUser ?? null;
+      const reauth = await verifySuperadminReauth({
+        userId: sessionUser?.id ?? null,
+        username: sessionUser?.username ?? null,
+        password: typeof body.password === "string" ? body.password : "",
+        totpCode: typeof body.totpCode === "string" ? body.totpCode : null,
+      });
+      if (!reauth.ok) {
+        await logAuditAction({
+          ...auditContext(req),
+          action: AUDIT_ACTIONS.adminReauthFailed,
+          resource: AUDIT_RESOURCES.campaigns,
+          details: { operation: "expense_classify", code: reauth.code, expenseIds: ids },
+        });
+        return res.status(401).json({ error: "unauthorized", code: reauth.code, message: reauth.message });
+      }
+
+      for (const id of ids) {
+        await upsertManualClassification({
+          expenseId: id,
+          classification: parsed.value.classification,
+          reason: parsed.value.reason,
+          evidence: parsed.value.evidence,
+          classifiedBy: sessionUser?.username ?? null,
+          classifiedById: sessionUser ? String(sessionUser.id) : null,
+        });
+      }
+
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.expenseClassified,
+        resource: AUDIT_RESOURCES.campaigns,
+        details: {
+          classification: parsed.value.classification,
+          classificationLabel: MANUAL_CLASSIFICATION_LABEL[parsed.value.classification],
+          reason: parsed.value.reason,
+          evidence: parsed.value.evidence,
+          expenseIds: ids,
+        },
+      });
+
+      // Se devuelve el diagnóstico ACTUALIZADO para que la interfaz refresque las
+      // acciones disponibles sin adivinar.
+      const after = await loadExpenseDiagnoses();
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.json({
+        ok: true,
+        classified: ids.length,
+        classification: parsed.value.classification,
+        classificationLabel: MANUAL_CLASSIFICATION_LABEL[parsed.value.classification],
+        expenses: after.diagnoses.filter((diagnosis) => ids.includes(diagnosis.id)),
+        summary: summarizeExpenses(after.diagnoses),
+      });
+    } catch (err) {
+      req.log.error({ err }, "Failed to classify expenses");
+      return res
+        .status(500)
+        .json({ error: "server_error", message: "No se pudieron clasificar los gastos" });
+    }
+  },
+);
+
+/**
  * POST /admin/maintenance/expenses/purge — vista previa y eliminación real.
  *
  * Con `preview: true` devuelve exactamente qué se borraría (y qué no, con su
@@ -399,6 +515,47 @@ router.post(
         const movementIds = plan.movementIdsToDelete;
         const backupIds: number[] = [];
 
+        // 0. REVALIDACIÓN DENTRO DE LA TRANSACCIÓN. Entre la vista previa y este
+        //    momento pudo cambiar algo (un asiento nuevo, una protección, un
+        //    borrado ajeno): si es así no se escribe NADA y se avisa. Se lee con
+        //    `tx`, así que la comprobación y el borrado son la misma foto.
+        const currentExpenses = await tx
+          .select({ id: campaignExpensesTable.id })
+          .from(campaignExpensesTable)
+          .where(inArray(campaignExpensesTable.id, expenseIds));
+        if (currentExpenses.length !== expenseIds.length) {
+          return { stale: "Alguno de los gastos seleccionados ya no existe. Recarga la tabla." };
+        }
+
+        const currentMovements = await tx
+          .select({
+            id: campaignMovementsTable.id,
+            sourceType: campaignMovementsTable.sourceType,
+          })
+          .from(campaignMovementsTable)
+          .where(inArray(campaignMovementsTable.sourceId, expenseIds));
+        const currentMovementIds = currentMovements
+          .filter((row) => row.sourceType === "expense")
+          .map((row) => row.id)
+          .sort((a, b) => a - b);
+        const plannedMovementIds = [...movementIds].sort((a, b) => a - b);
+        if (currentMovementIds.join(",") !== plannedMovementIds.join(",")) {
+          return {
+            stale:
+              "Los asientos del libro cambiaron desde la vista previa. Recarga la tabla y vuelve a intentarlo.",
+          };
+        }
+
+        const protectedNow = await readProtectedCampaignIds();
+        const stillProtected = plan.totals.byCampaign
+          .map((group) => group.campaignId)
+          .filter((campaignId) => protectedNow.includes(campaignId));
+        if (stillProtected.length > 0) {
+          return {
+            stale: `Hay campañas PROTEGIDAS en la selección (${stillProtected.join(", ")}): no se toca nada.`,
+          };
+        }
+
         // 1. Respaldo verificable POR CAMPAÑA, antes de borrar nada.
         for (const group of plan.totals.byCampaign) {
           const groupDiagnoses = plan.deletable.filter(
@@ -465,6 +622,15 @@ router.post(
       });
 
       const after = await financialSnapshot();
+
+      if ("stale" in result) {
+        return res.status(409).json({
+          error: "conflict",
+          code: "purge_stale",
+          message: result.stale,
+        });
+      }
+
       const comparison = compareFinancialSnapshots(before, after, {
         expensesCount: result.deletedExpenses,
         expensesTotal: plan.totals.amount,

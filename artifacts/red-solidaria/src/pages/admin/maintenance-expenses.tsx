@@ -107,6 +107,12 @@ export default function AdminMaintenanceExpenses() {
   const [totpCode, setTotpCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PurgeResponse | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [classifyOpen, setClassifyOpen] = useState(false);
+  const [classifyReason, setClassifyReason] = useState("");
+  const [classifyEvidence, setClassifyEvidence] = useState("");
+  const [classifyPassword, setClassifyPassword] = useState("");
+  const [classifyTotp, setClassifyTotp] = useState("");
 
   const expensesQuery = useQuery({
     queryKey: ["maintenance-expenses"],
@@ -159,6 +165,40 @@ export default function AdminMaintenanceExpenses() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message ?? "No se pudo preparar la vista previa");
       return data;
+    },
+  });
+
+  // Clasificación MANUAL: es lo que desbloquea los gastos huérfanos (sin campaña no
+  // hay declaración DEMO posible). Al terminar se refresca el diagnóstico, así que
+  // la acción disponible cambia de «Revisión manual» a «Eliminación definitiva».
+  const classifyMutation = useMutation({
+    mutationFn: async (payload: { classification: "demo" | "real" | "pending" }) => {
+      const res = await fetch("/api/admin/maintenance/expenses/classify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          ids: selected,
+          classification: payload.classification,
+          reason: classifyReason,
+          evidence: classifyEvidence || undefined,
+          password: classifyPassword,
+          totpCode: classifyTotp || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message ?? "No se pudieron clasificar los gastos");
+      return data as { classified: number; classificationLabel: string };
+    },
+    onSuccess: async (data) => {
+      setClassifyOpen(false);
+      setClassifyPassword("");
+      setClassifyTotp("");
+      setClassifyReason("");
+      setClassifyEvidence("");
+      setNotice(`${data.classified} gasto(s) clasificado(s) como «${data.classificationLabel}».`);
+      setSelected([]);
+      await queryClient.invalidateQueries();
     },
   });
 
@@ -383,9 +423,18 @@ export default function AdminMaintenanceExpenses() {
               </span>
             )}
           </p>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setSelected([])}>
               Limpiar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError(null);
+                setClassifyOpen(true);
+              }}
+            >
+              Clasificar seleccionados…
             </Button>
             <Button
               onClick={() => {
@@ -563,6 +612,86 @@ export default function AdminMaintenanceExpenses() {
             </div>
           </div>
         </div>
+      )}
+
+      {classifyOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-lg space-y-4 rounded-2xl bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-semibold">Clasificar {selected.length} gasto(s)</h2>
+            <p className="text-sm text-muted-foreground">
+              Declara qué es cada gasto. Es lo que desbloquea los <strong>huérfanos</strong>: sin
+              campaña no hay declaración DEMO posible. Queda registrado quién lo dijo, cuándo y por
+              qué, y el sistema vuelve a decidir la acción permitida.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="classify-reason">Motivo (obligatorio)</Label>
+                <Input
+                  id="classify-reason"
+                  value={classifyReason}
+                  onChange={(event) => setClassifyReason(event.target.value)}
+                  placeholder="Ej.: gasto de prueba de la campaña de adopciones eliminada"
+                />
+              </div>
+              <div>
+                <Label htmlFor="classify-evidence">Evidencia o referencia (opcional)</Label>
+                <Input
+                  id="classify-evidence"
+                  value={classifyEvidence}
+                  onChange={(event) => setClassifyEvidence(event.target.value)}
+                  placeholder="Nº de boleta, enlace al respaldo, nota…"
+                />
+              </div>
+              <div>
+                <Label htmlFor="classify-password">Tu contraseña (reautenticación)</Label>
+                <Input
+                  id="classify-password"
+                  type="password"
+                  value={classifyPassword}
+                  onChange={(event) => setClassifyPassword(event.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="classify-totp">Código 2FA (si lo tienes activo)</Label>
+                <Input
+                  id="classify-totp"
+                  value={classifyTotp}
+                  onChange={(event) => setClassifyTotp(event.target.value)}
+                  inputMode="numeric"
+                  placeholder="123456"
+                />
+              </div>
+            </div>
+
+            {classifyMutation.isError && (
+              <p className="text-sm text-red-700">{(classifyMutation.error as Error).message}</p>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => setClassifyOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => classifyMutation.mutate({ classification: "real" })}
+                disabled={classifyReason.trim().length < 10 || classifyPassword.length === 0 || classifyMutation.isPending}
+              >
+                Clasificar como REAL
+              </Button>
+              <Button
+                onClick={() => classifyMutation.mutate({ classification: "demo" })}
+                disabled={classifyReason.trim().length < 10 || classifyPassword.length === 0 || classifyMutation.isPending}
+              >
+                {classifyMutation.isPending ? "Guardando…" : "Clasificar como DEMO"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {notice && (
+        <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{notice}</p>
       )}
     </div>
   );

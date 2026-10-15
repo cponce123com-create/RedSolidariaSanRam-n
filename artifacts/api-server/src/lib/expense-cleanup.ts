@@ -104,6 +104,10 @@ export interface ExpenseDiagnosis {
   hasPlaceholderReceipt: boolean;
   classification: DemoClassification;
   classificationLabel: string;
+  /** Clasificación DEDUCIDA automáticamente (sin contar la declaración manual). */
+  computedClassification: DemoClassification;
+  /** Declaración manual registrada, si la hay. */
+  manualClassification: ManualClassificationInput | null;
   isDemoCampaign: boolean;
   protectedCampaign: boolean;
   ledgerMovements: ExpenseLedgerRef[];
@@ -119,6 +123,15 @@ export interface ExpenseDiagnosis {
   reasons: string[];
 }
 
+/** Declaración manual del superadmin sobre un gasto (migración 029). */
+export interface ManualClassificationInput {
+  classification: "demo" | "real" | "pending";
+  reason: string;
+  evidence?: string | null;
+  classifiedBy?: string | null;
+  classifiedAt?: Date | string | null;
+}
+
 export interface ExpenseDiagnosisInput {
   expense: ExpenseRow;
   /** `null` si su campaña ya no existe. */
@@ -127,6 +140,13 @@ export interface ExpenseDiagnosisInput {
   protectedCampaignIds: readonly number[];
   /** TODOS los asientos de la campaña del gasto, ordenados por id. */
   campaignMovements: readonly ExpenseMovementRow[];
+  /**
+   * Clasificación MANUAL persistente, si el superadmin ya se pronunció. Manda sobre
+   * la deducida, pero NO sobre las protecciones objetivas (campaña protegida y
+   * documento propio): una declaración no puede habilitar lo que la evidencia
+   * prohíbe.
+   */
+  manualClassification?: ManualClassificationInput | null;
 }
 
 /** Asientos cuyo origen es este gasto. */
@@ -172,20 +192,41 @@ export function diagnoseExpense(input: ExpenseDiagnosisInput): ExpenseDiagnosis 
 
   const blockers: string[] = [];
   const reasons: string[] = [];
+  const manual = input.manualClassification ?? null;
 
-  if (isOrphan) {
-    reasons.push("Su campaña ya no existe: no hay declaración DEMO que lo respalde.");
+  // La declaración manual MANDA sobre la clasificación deducida, pero no sobre las
+  // protecciones objetivas de abajo.
+  const effectiveClassification: DemoClassification = manual
+    ? manual.classification
+    : classification;
+  if (manual) {
+    reasons.push(
+      `Clasificación MANUAL «${CLASSIFICATION_LABEL[manual.classification]}» por ${
+        manual.classifiedBy ?? "el superadmin"
+      }: ${manual.reason}${manual.evidence ? ` (evidencia: ${manual.evidence})` : ""}.`,
+    );
+  }
+
+  if (isOrphan && !manual) {
+    reasons.push(
+      "Su campaña ya no existe y nadie lo ha clasificado todavía: no hay declaración que lo respalde.",
+    );
     return finish("review", false, ["orphan_expense"], reasons);
   }
+
+  // Protección de ChocoFest: una declaración manual NO la levanta.
   if (protectedCampaign) {
     reasons.push("Pertenece a una campaña PROTEGIDA (ChocoFest): se conserva.");
     return finish("review", false, ["protected_campaign"], reasons);
   }
 
+  if (isOrphan && manual) {
+    reasons.push("Gasto huérfano (su campaña ya no existe) con clasificación manual registrada.");
+  }
   if (isDemoCampaign) {
     reasons.push("Pertenece a una campaña DECLARADA DEMO por el superadmin.");
   }
-  if (classification === "demo") {
+  if (classification === "demo" && !isOrphan) {
     reasons.push("Clasificado DEMO confirmado en el inventario.");
   }
   if (hasPlaceholderReceipt) {
@@ -193,9 +234,11 @@ export function diagnoseExpense(input: ExpenseDiagnosisInput): ExpenseDiagnosis 
   }
 
   // ─── Real: no se destruye, se corrige o se anula ───────────────────────────
-  if (classification === "real" || conservationObligation) {
+  if (effectiveClassification === "real" || conservationObligation) {
     if (hasOwnDocument) {
-      reasons.push("Tiene un documento propio: posible obligación de conservación.");
+      reasons.push(
+        "Tiene un documento propio: existe obligación de conservación y no se destruye aunque se declare DEMO.",
+      );
     }
     if (hasLedgerEntry) {
       reasons.push("Está contabilizado: se anula con un asiento compensatorio, sin borrar el histórico.");
@@ -206,11 +249,13 @@ export function diagnoseExpense(input: ExpenseDiagnosisInput): ExpenseDiagnosis 
   }
 
   // ─── Ficticio ──────────────────────────────────────────────────────────────
-  if (!isDemoCampaign && classification !== "demo") {
+  if (effectiveClassification !== "demo") {
     reasons.push(
-      "Ni es de una campaña declarada DEMO ni lleva firma de relleno: hace falta una decisión humana.",
+      isOrphan
+        ? "Huérfano sin clasificar como DEMO: hace falta la declaración manual del superadmin."
+        : "Ni es de una campaña declarada DEMO ni lleva firma de relleno: hace falta una decisión humana.",
     );
-    return finish("review", false, ["not_confirmed_demo"], reasons);
+    return finish("review", false, [isOrphan ? "orphan_unclassified" : "not_confirmed_demo"], reasons);
   }
 
   if (!hasLedgerEntry) {
@@ -250,8 +295,10 @@ export function diagnoseExpense(input: ExpenseDiagnosisInput): ExpenseDiagnosis 
       receiptUrl: expense.receiptUrl,
       hasOwnDocument,
       hasPlaceholderReceipt,
-      classification,
-      classificationLabel: CLASSIFICATION_LABEL[classification],
+      classification: effectiveClassification,
+      classificationLabel: CLASSIFICATION_LABEL[effectiveClassification],
+      computedClassification: classification,
+      manualClassification: manual,
       isDemoCampaign,
       protectedCampaign,
       ledgerMovements: ledgerMovements.map((movement) => ({

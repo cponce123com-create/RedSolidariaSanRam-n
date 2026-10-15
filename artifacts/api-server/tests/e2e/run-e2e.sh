@@ -95,6 +95,16 @@ if [ "$USE_CASE_INDEXES" -lt 6 ]; then
   exit 1
 fi
 
+# Condición REAL de producción (V11): la FK de campaign_expenses.campaign_id se
+# añadió con NOT VALID (migración 025), así que PostgreSQL no revisó las filas que ya
+# existían y hay gastos que apuntan a campañas desaparecidas. Se reproduce aquí para
+# poder probar la clasificación manual de huérfanos. Se deja la FK igual que en
+# producción.
+psql_c "ALTER TABLE campaign_expenses DROP CONSTRAINT IF EXISTS campaign_expenses_campaign_id_fkey" >/dev/null
+psql_c "INSERT INTO campaign_expenses (campaign_id, description, amount, date, category, is_public) VALUES (999001, 'Gasto huérfano DEMO (E2E)', 1200, '2026-01-15', 'general', false), (999002, 'Gasto huérfano real (E2E)', 300, '2026-01-16', 'general', false)" >/dev/null
+psql_c "ALTER TABLE campaign_expenses ADD CONSTRAINT campaign_expenses_campaign_id_fkey FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE RESTRICT NOT VALID" >/dev/null
+echo "   gastos huérfanos de prueba: $(psql_c "SELECT count(*) FROM campaign_expenses e LEFT JOIN campaigns c ON c.id = e.campaign_id WHERE c.id IS NULL")"
+
 echo "== 4b. Restricciones de estado (DB-08) y updated_at automático (DB-10) =="
 STATUS_CHECKS="$(psql_c "SELECT count(*) FROM pg_constraint WHERE contype='c' AND conname IN ('donations_status_check','campaigns_status_check','pets_status_check','volunteers_status_check','adoption_requests_status_check','community_reports_status_check','campaign_movements_kind_check')")"
 echo "   restricciones de estado (DB-08): $STATUS_CHECKS/7"
