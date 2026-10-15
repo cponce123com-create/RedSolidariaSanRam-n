@@ -2,6 +2,13 @@ import { Router } from "express";
 import { db, adminUsersTable, insertAdminUserSchema } from "@workspace/db";
 import { eq, ne } from "drizzle-orm";
 import { hashPassword, logAuditAction } from "../middleware/auth-utils";
+import {
+  SUPERADMIN_ROLE,
+  guardDeleteAdminUser,
+  guardUpdateAdminUser,
+  revokeAdminSessions,
+  shouldRevokeSessions,
+} from "../lib/admin-user-guards";
 
 const router = Router();
 
@@ -105,22 +112,70 @@ router.patch("/admin/users/:id", async (req, res) => {
   }
   
   const userId = Number(req.params.id);
-  
-  // Obtener usuario antes de actualizar para audit log
-  const existingUsers = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, userId));
-  const existingUser = existingUsers[0];
-  
-  const [updated] = await db.update(adminUsersTable)
-    .set(updateData)
-    .where(eq(adminUsersTable.id, userId))
-    .returning({
-      id: adminUsersTable.id, username: adminUsersTable.username,
-      role: adminUsersTable.role, name: adminUsersTable.name,
-      email: adminUsersTable.email, active: adminUsersTable.active,
+  const actor = req.session?.adminUser ?? null;
+  const changes = { role: parsed.data.role, active: parsed.data.active };
+
+  // V14-1.3: mismas guardas que en el borrado — no se puede degradar ni desactivar al
+  // ÚLTIMO superadmin activo, ni desactivarse a uno mismo — y todo dentro de una
+  // transacción con bloqueo para que no haya carrera entre dos peticiones.
+  const outcome = await db.transaction(async (tx) => {
+    const admins = await tx
+      .select({
+        id: adminUsersTable.id,
+        username: adminUsersTable.username,
+        role: adminUsersTable.role,
+        active: adminUsersTable.active,
+      })
+      .from(adminUsersTable)
+      .for("update");
+
+    const target = admins.find((row) => row.id === userId) ?? null;
+    const activeSuperadmins = admins.filter(
+      (row) => row.role === SUPERADMIN_ROLE && row.active === true,
+    ).length;
+
+    const guard = guardUpdateAdminUser({
+      actor: actor ? { id: actor.id, username: actor.username } : null,
+      target,
+      activeSuperadmins,
+      changes,
     });
-    
-  if (!updated) return res.status(404).json({ error: "Usuario no encontrado" });
-  
+    if (!guard.ok) return { ok: false as const, guard };
+
+    const [updatedRow] = await tx
+      .update(adminUsersTable)
+      .set(updateData)
+      .where(eq(adminUsersTable.id, userId))
+      .returning({
+        id: adminUsersTable.id,
+        username: adminUsersTable.username,
+        role: adminUsersTable.role,
+        name: adminUsersTable.name,
+        email: adminUsersTable.email,
+        active: adminUsersTable.active,
+      });
+
+    if (!updatedRow) {
+      return {
+        ok: false as const,
+        guard: { ok: false as const, code: "not_found", message: "Usuario no encontrado.", status: 404 },
+      };
+    }
+    return { ok: true as const, updated: updatedRow, target: target as NonNullable<typeof target> };
+  });
+
+  if (!outcome.ok) {
+    return res
+      .status(outcome.guard.status)
+      .json({ error: outcome.guard.code, code: outcome.guard.code, message: outcome.guard.message });
+  }
+  const updated = outcome.updated;
+
+  // Desactivar a alguien o cambiarle el rol debe surtir efecto YA: si no, su sesión
+  // seguiría viva con los permisos antiguos hasta que caducara la cookie.
+  const revocation = shouldRevokeSessions(outcome.target, changes);
+  const revokedSessions = revocation.revoke ? await revokeAdminSessions(userId) : 0;
+
   // Audit log
   const adminUser = req.session?.adminUser;
   await logAuditAction({
@@ -131,33 +186,69 @@ router.patch("/admin/users/:id", async (req, res) => {
     resourceId: userId.toString(),
     ipAddress: req.ip || req.connection?.remoteAddress || null,
     userAgent: req.get("user-agent") || null,
-    details: { 
+    details: {
       updatedUserId: userId,
       updatedUsername: updated.username,
       changedFields: Object.keys(parsed.data),
       passwordChanged: !!password,
+      previousRole: outcome.target.role,
+      revokedSessions,
+      revokeReason: revocation.reason,
     },
   });
-  
+
   return res.json(updated);
 });
 
 // ─── Delete admin user ───────────────────────────────────────────────────────
 router.delete("/admin/users/:id", async (req, res) => {
   if (!isSuperAdmin(req)) return res.status(403).json({ error: "Solo superadmin" });
-  
+
   const userId = Number(req.params.id);
-  
-  // Obtener usuario antes de eliminar para audit log
-  const existingUsers = await db.select().from(adminUsersTable).where(eq(adminUsersTable.id, userId));
-  const existingUser = existingUsers[0];
-  
-  if (!existingUser) {
-    return res.status(404).json({ error: "Usuario no encontrado" });
+  const actor = req.session?.adminUser ?? null;
+
+  // V14-1.3: las guardas van en el SERVIDOR (no en botones deshabilitados) y dentro
+  // de una TRANSACCIÓN con bloqueo de filas, para que dos peticiones simultáneas no
+  // puedan dejar el panel sin ningún superadministrador (condición de carrera).
+  const outcome = await db.transaction(async (tx) => {
+    // Se bloquean TODAS las filas de administradores (la tabla es minúscula) para
+    // que el recuento y el borrado sean la misma foto.
+    const admins = await tx
+      .select({
+        id: adminUsersTable.id,
+        username: adminUsersTable.username,
+        role: adminUsersTable.role,
+        active: adminUsersTable.active,
+      })
+      .from(adminUsersTable)
+      .for("update");
+
+    const target = admins.find((row) => row.id === userId) ?? null;
+    const activeSuperadmins = admins.filter(
+      (row) => row.role === SUPERADMIN_ROLE && row.active === true,
+    ).length;
+
+    const guard = guardDeleteAdminUser({
+      actor: actor ? { id: actor.id, username: actor.username } : null,
+      target,
+      activeSuperadmins,
+    });
+    if (!guard.ok) return { ok: false as const, guard };
+
+    await tx.delete(adminUsersTable).where(eq(adminUsersTable.id, userId));
+    return { ok: true as const, target: target as NonNullable<typeof target> };
+  });
+
+  if (!outcome.ok) {
+    return res
+      .status(outcome.guard.status)
+      .json({ error: outcome.guard.code, code: outcome.guard.code, message: outcome.guard.message });
   }
-  
-  await db.delete(adminUsersTable).where(eq(adminUsersTable.id, userId));
-  
+
+  // Una cuenta eliminada no debe seguir navegando con su cookie: se revocan sus
+  // sesiones abiertas.
+  const revokedSessions = await revokeAdminSessions(userId);
+
   // Audit log
   const adminUser = req.session?.adminUser;
   await logAuditAction({
@@ -168,9 +259,13 @@ router.delete("/admin/users/:id", async (req, res) => {
     resourceId: userId.toString(),
     ipAddress: req.ip || req.connection?.remoteAddress || null,
     userAgent: req.get("user-agent") || null,
-    details: { deletedUserId: userId, deletedUsername: existingUser.username },
+    details: {
+      deletedUserId: userId,
+      deletedUsername: outcome.target.username,
+      revokedSessions,
+    },
   });
-  
+
   return res.status(204).send();
 });
 

@@ -7,12 +7,69 @@ import { adoptionLimiter } from "../middleware/rate-limit";
 
 const router = Router();
 
+/**
+ * Estados que el PÚBLICO puede ver (V14-01, seguridad).
+ *
+ * Es una ALLOWLIST, no un valor por defecto: antes la ruta pública hacía
+ * `eq(status, (status as string) || "available")`, así que cualquiera podía pedir
+ * `?status=reviewing` (o el que fuera) y listar fichas sin aprobar. Ahora el estado
+ * del cliente se valida contra esta lista y, si no pertenece, se rechaza.
+ */
+const PUBLIC_PET_STATUSES = ["available"] as const;
+
+/**
+ * DTO PÚBLICO de una mascota.
+ *
+ * Se construye por INCLUSIÓN (nunca `select()` de la fila entera): la respuesta
+ * pública no debe llevar datos de contacto de quien la publicó
+ * (`contactName`, `contactPhone`, `contactEmail`) ni marcas internas de flujo
+ * (`submittedByPublic`). El DTO administrativo sigue siendo la fila completa.
+ */
+function formatPublicPet(pet: typeof petsTable.$inferSelect) {
+  return {
+    id: pet.id,
+    name: pet.name,
+    species: pet.species,
+    breed: pet.breed,
+    sex: pet.sex,
+    ageCategory: pet.ageCategory,
+    ageApprox: pet.ageApprox,
+    size: pet.size,
+    photos: pet.photos,
+    description: pet.description,
+    history: pet.history,
+    healthStatus: pet.healthStatus,
+    vaccinated: pet.vaccinated,
+    sterilized: pet.sterilized,
+    dewormed: pet.dewormed,
+    adoptionRequirements: pet.adoptionRequirements,
+    location: pet.location,
+    urgent: pet.urgent,
+    status: pet.status,
+    featuredOnHome: pet.featuredOnHome,
+    createdAt: pet.createdAt,
+    updatedAt: pet.updatedAt,
+  };
+}
+
 // ─── PUBLIC: List available pets ─────────────────────────────────────────────
 router.get("/pets", async (req, res) => {
   const { species, sex, ageCategory, size, vaccinated, sterilized, urgent, status } = req.query;
+
+  // El estado pedido por el cliente solo puede ser uno de los públicos.
+  if (status !== undefined && !(PUBLIC_PET_STATUSES as readonly string[]).includes(String(status))) {
+    res.status(400).json({
+      error: "validation_error",
+      message: `Estado no disponible públicamente. Valores permitidos: ${PUBLIC_PET_STATUSES.join(", ")}.`,
+    });
+    return;
+  }
+
   let query = db.select().from(petsTable).$dynamic();
 
-  const filters: any[] = [eq(petsTable.status, (status as string) || "available")];
+  // La vista pública SOLO publica fichas aprobadas y publicables: el filtro no
+  // depende de lo que pida el cliente.
+  const filters: any[] = [eq(petsTable.status, PUBLIC_PET_STATUSES[0])];
 
   if (species) filters.push(eq(petsTable.species, species as string));
   if (sex) filters.push(eq(petsTable.sex, sex as string));
@@ -23,15 +80,23 @@ router.get("/pets", async (req, res) => {
   if (urgent === "true") filters.push(eq(petsTable.urgent, true));
 
   const pets = await query.where(and(...filters)).orderBy(desc(petsTable.urgent), desc(petsTable.createdAt));
-  res.json(pets);
+  res.json(pets.map(formatPublicPet));
 });
 
 // ─── PUBLIC: Get single pet ──────────────────────────────────────────────────
 router.get("/pets/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const [pet] = await db.select().from(petsTable).where(eq(petsTable.id, id));
+  if (!Number.isInteger(id) || id <= 0) {
+    return res.status(404).json({ error: "Mascota no encontrada" });
+  }
+  // V14-01: la consulta por ID también filtra por estado público. Antes devolvía
+  // CUALQUIER ficha (en revisión, rechazada o inactiva) con sus datos de contacto.
+  const [pet] = await db
+    .select()
+    .from(petsTable)
+    .where(and(eq(petsTable.id, id), eq(petsTable.status, PUBLIC_PET_STATUSES[0])));
   if (!pet) return res.status(404).json({ error: "Mascota no encontrada" });
-  return res.json(pet);
+  return res.json(formatPublicPet(pet));
 });
 
 // ─── PUBLIC: Submit pet for adoption (requires review) ───────────────────────
@@ -41,7 +106,9 @@ router.post("/pets/submit", adoptionLimiter, async (req, res) => {
     return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   }
   const [pet] = await db.insert(petsTable).values({ ...parsed.data, status: "reviewing", submittedByPublic: true }).returning();
-  return res.status(201).json(pet);
+  // DTO público también aquí: la respuesta no repite los datos de contacto que se
+  // acaban de enviar ni las marcas internas del flujo de revisión.
+  return res.status(201).json(formatPublicPet(pet));
 });
 
 // ─── PUBLIC: Submit adoption request ─────────────────────────────────────────

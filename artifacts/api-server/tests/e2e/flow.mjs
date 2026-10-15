@@ -1575,6 +1575,235 @@ check(
     String(JSON.stringify(orphanAudit.body ?? {})).includes("EXPENSE_DEMO_PURGED"),
 );
 
+// ── 7decies. PRIVACIDAD PÚBLICA: mascotas y voluntarios (V14, Entrega 1) ─────
+// Dos fugas reales: la ruta pública de mascotas aceptaba cualquier `?status=` y
+// devolvía la fila entera (con los datos de contacto), y el registro público de
+// voluntarios devolvía la ficha administrativa (con `adminNotes` y `approvedBy`).
+const PRIVATE_CONTACT = {
+  contactName: "Contacto Privado E2E",
+  contactPhone: "+51 999 888 777",
+  contactEmail: "contacto-privado-e2e@example.com",
+};
+
+const submittedPet = await call("POST", "/api/pets/submit", {
+  name: `Mascota E2E ${stamp}`,
+  species: "perro",
+  sex: "macho",
+  ageCategory: "adulto",
+  size: "mediano",
+  description: "Ficha enviada por una persona de la comunidad para su revisión.",
+  location: "San Ramón",
+  ...PRIVATE_CONTACT,
+});
+const submittedPetId = submittedPet.body?.id;
+check("la ficha enviada por el público se registra en revisión", submittedPet.status === 201, `status=${submittedPet.status}`);
+check(
+  "la respuesta del envío NO repite los datos de contacto ni marcas internas",
+  submittedPet.body !== undefined &&
+    !("contactName" in submittedPet.body) &&
+    !("contactPhone" in submittedPet.body) &&
+    !("contactEmail" in submittedPet.body) &&
+    !("submittedByPublic" in submittedPet.body),
+  `claves=${JSON.stringify(Object.keys(submittedPet.body ?? {}))}`,
+);
+
+const petNotPublic = await call("GET", `/api/pets/${submittedPetId}`);
+check("una ficha EN REVISIÓN no es consultable públicamente (404)", petNotPublic.status === 404, `status=${petNotPublic.status}`);
+
+const publicListBefore = await call("GET", "/api/pets");
+check(
+  "la ficha en revisión no aparece en el listado público",
+  publicListBefore.status === 200 && !(publicListBefore.body ?? []).some((row) => row.id === submittedPetId),
+);
+
+const manipulatedStatus = await call("GET", "/api/pets?status=reviewing");
+check(
+  "un estado no público se RECHAZA (400): no se puede manipular el filtro",
+  manipulatedStatus.status === 400,
+  `status=${manipulatedStatus.status}`,
+);
+const manipulatedStatus2 = await call("GET", "/api/pets?status=inactive");
+check("tampoco cuela un estado inventado", manipulatedStatus2.status === 400, `status=${manipulatedStatus2.status}`);
+
+// Se publica desde la administración y entonces sí es visible… sin datos privados.
+const publishedPet = await call("PATCH", `/api/admin/pets/${submittedPetId}`, { status: "available" }, { auth: true });
+check("la administración publica la ficha", publishedPet.status === 200, `status=${publishedPet.status}`);
+
+const publicDetail = await call("GET", `/api/pets/${submittedPetId}`);
+check("ya publicada, la ficha se consulta públicamente", publicDetail.status === 200, `status=${publicDetail.status}`);
+check(
+  "el DTO público NO expone contacto ni marcas internas",
+  publicDetail.body !== undefined &&
+    !("contactName" in publicDetail.body) &&
+    !("contactPhone" in publicDetail.body) &&
+    !("contactEmail" in publicDetail.body) &&
+    !("submittedByPublic" in publicDetail.body),
+  `claves=${JSON.stringify(Object.keys(publicDetail.body ?? {}))}`,
+);
+check(
+  "el DTO público SÍ lleva lo que la web necesita",
+  publicDetail.body?.name !== undefined && publicDetail.body?.species !== undefined && publicDetail.body?.status === "available",
+);
+check(
+  "el DTO ADMINISTRATIVO conserva los datos de contacto (para gestionar la adopción)",
+  (await call("GET", `/api/admin/pets/${submittedPetId}`, undefined, { auth: true })).body?.contactPhone ===
+    PRIVATE_CONTACT.contactPhone,
+);
+
+// Voluntarios: el registro público no devuelve campos administrativos.
+const volunteerSignup = await call("POST", "/api/volunteers", {
+  name: `Voluntario E2E ${stamp}`,
+  email: `voluntario-e2e-${stamp}@example.com`,
+  phone: "+51 900 000 000",
+  age: "30",
+  district: "San Ramón",
+  availability: "fines de semana",
+  skills: "logística",
+  interests: "niñez",
+  motivation: "Quiero ayudar en las campañas de la comunidad.",
+});
+check("el registro de voluntario responde 201", volunteerSignup.status === 201, `status=${volunteerSignup.status}`);
+check(
+  "el registro público NO devuelve notas internas ni quién aprobó",
+  volunteerSignup.status === 201 &&
+    volunteerSignup.body !== undefined &&
+    !("adminNotes" in volunteerSignup.body) &&
+    !("approvedBy" in volunteerSignup.body),
+  `status=${volunteerSignup.status} claves=${JSON.stringify(Object.keys(volunteerSignup.body ?? {}))}`,
+);
+check(
+  "el registro público devuelve lo mínimo (estado y enlace de seguimiento)",
+  volunteerSignup.body?.status === "pending" &&
+    typeof volunteerSignup.body?.statusLabel === "string" &&
+    typeof volunteerSignup.body?.publicToken === "string",
+  JSON.stringify({ status: volunteerSignup.body?.status, tieneToken: typeof volunteerSignup.body?.publicToken }),
+);
+
+// ── 7undecies. GUARDAS DEL SUPERADMIN (V14, Entrega 1.3) ─────────────────────
+// El panel no puede quedarse sin ningún superadministrador activo, y nadie puede
+// eliminarse a sí mismo. Las reglas están en el SERVIDOR, no en botones.
+const SUPER_GUARD_REASON = "Prueba de las guardas de administración (E2E)";
+
+const createdSuper = await call(
+  "POST",
+  "/api/admin/users",
+  {
+    username: `e2e-super-${stamp}`,
+    password: "E2e-Passw0rd!2026",
+    name: "Superadmin de prueba E2E",
+    role: "superadmin",
+  },
+  { auth: true },
+);
+const createdSuperId = createdSuper.body?.id;
+check("se crea un superadmin de prueba", createdSuper.status === 201 && Number.isInteger(createdSuperId), `status=${createdSuper.status}`);
+
+// Con UN solo superadmin activo en la tabla, las tres operaciones críticas se bloquean.
+const deleteLast = await call("DELETE", `/api/admin/users/${createdSuperId}`, undefined, { auth: true });
+check(
+  "no se puede ELIMINAR al último superadmin activo (409)",
+  deleteLast.status === 409 && deleteLast.body?.code === "last_superadmin",
+  `status=${deleteLast.status} code=${deleteLast.body?.code ?? ""}`,
+);
+
+const deactivateLast = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { active: false },
+  { auth: true },
+);
+check(
+  "no se puede DESACTIVAR al último superadmin activo (409)",
+  deactivateLast.status === 409 && deactivateLast.body?.code === "last_superadmin",
+  `status=${deactivateLast.status} code=${deactivateLast.body?.code ?? ""}`,
+);
+
+const demoteLast = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { role: "administrador" },
+  { auth: true },
+);
+check(
+  "no se puede DEGRADAR al último superadmin activo (409)",
+  demoteLast.status === 409 && demoteLast.body?.code === "last_superadmin",
+  `status=${demoteLast.status} code=${demoteLast.body?.code ?? ""}`,
+);
+
+const invalidRole = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { role: "root" },
+  { auth: true },
+);
+check(
+  "un rol inventado se rechaza (400): no hay escalada a roles inexistentes",
+  invalidRole.status === 400 && invalidRole.body?.code === "invalid_role",
+  `status=${invalidRole.status} code=${invalidRole.body?.code ?? ""}`,
+);
+
+check(
+  "el superadmin protegido sigue existiendo y activo",
+  (await call("GET", "/api/admin/users", undefined, { auth: true })).body?.some?.(
+    (row) => row.id === createdSuperId && row.active === true,
+  ) === true,
+);
+
+// Con DOS superadmins activos, las operaciones vuelven a permitirse: la guarda no es
+// un bloqueo ciego, solo impide quedarse sin ninguno.
+const secondSuper = await call(
+  "POST",
+  "/api/admin/users",
+  {
+    username: `e2e-super2-${stamp}`,
+    password: "E2e-Passw0rd!2026",
+    name: "Segundo superadmin de prueba E2E",
+    role: "superadmin",
+  },
+  { auth: true },
+);
+const secondSuperId = secondSuper.body?.id;
+check("se crea un segundo superadmin", secondSuper.status === 201, `status=${secondSuper.status}`);
+
+const demoteWithBackup = await call(
+  "PATCH",
+  `/api/admin/users/${createdSuperId}`,
+  { role: "administrador" },
+  { auth: true },
+);
+check(
+  "con otro superadmin activo, degradar SÍ se permite",
+  demoteWithBackup.status === 200 && demoteWithBackup.body?.role === "administrador",
+  `status=${demoteWithBackup.status} role=${demoteWithBackup.body?.role ?? ""}`,
+);
+
+const deleteNow = await call("DELETE", `/api/admin/users/${createdSuperId}`, undefined, { auth: true });
+check("y eliminar también se permite", deleteNow.status === 204, `status=${deleteNow.status}`);
+
+const goneAfterDelete = await call("GET", `/api/admin/users`, undefined, { auth: true });
+check(
+  "el usuario eliminado ya no aparece en el listado",
+  !(goneAfterDelete.body ?? []).some((row) => row.id === createdSuperId),
+);
+
+// Limpieza: el que queda es el ÚNICO superadmin activo de la tabla, así que la guarda
+// lo protege hasta el final. Es la mejor prueba de que la regla no tiene rendijas.
+const cleanupSuper = await call("DELETE", `/api/admin/users/${secondSuperId}`, undefined, { auth: true });
+check(
+  "el último superadmin de la tabla sigue protegido hasta el final (409)",
+  cleanupSuper.status === 409 && cleanupSuper.body?.code === "last_superadmin",
+  `status=${cleanupSuper.status} code=${cleanupSuper.body?.code ?? ""}`,
+);
+
+// La revocación de sesiones se registra en la auditoría (prueba de que el camino se
+// ejecuta; la decisión está cubierta por las pruebas puras de las guardas).
+const guardAudit = await call("GET", "/api/admin/audit-logs?limit=100", undefined, { auth: true });
+const guardAuditText = String(JSON.stringify(guardAudit.body ?? {}));
+check(
+  "los cambios administrativos quedan auditados con el rol anterior y las sesiones revocadas",
+  guardAuditText.includes("previousRole") && guardAuditText.includes("revokedSessions"),
+);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);
