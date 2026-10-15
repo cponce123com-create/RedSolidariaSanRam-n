@@ -134,6 +134,41 @@ trabajando con los permisos antiguos hasta que caducara la cookie.
 (10 comprobaciones, PostgreSQL real). La guarda saltó incluso contra mi propia prueba de
 limpieza: al quedar un solo superadmin, su borrado devolvió 409.
 
+### V14-06 · Defensa CSRF por origen (defensa en profundidad) — MEDIA
+
+**Módulo:** Sesiones/autenticación · **Archivos:** `app.ts`, `lib/csrf-origin.ts` (nuevo)
+
+**Auditoría previa (lo que YA estaba bien, con evidencia):**
+
+| Punto | Estado | Evidencia |
+| --- | --- | --- |
+| Cookie de sesión | ✅ | `httpOnly: true`, `secure` resuelto por entorno, `maxAge` 24 h, `rolling: true` |
+| CSRF (base) | ✅ | `sameSite: "lax"`: un formulario cross-site **no** envía la cookie en un POST |
+| Store de sesiones | ✅ | PostgreSQL (`connect-pg-simple`), no `MemoryStore`: sobrevive a reinicios y escala |
+| Fijación de sesión | ✅ | `establishAdminSession` usa `req.session.regenerate()` al iniciar sesión |
+| CORS | ✅ | `resolveCorsOrigin`: origen explícito o el dominio del sitio; `true` **solo** en desarrollo. Sin comodín con credenciales |
+| `SESSION_SECRET` | ✅ | Obligatorio en producción (si falta, el arranque falla) |
+| Cabeceras | ✅ | `helmet`, `trust proxy` para la IP real, `x-powered-by` fuera |
+| Secretos en logs | ✅ | Ningún `req.log` registra `password`, `token`, `secret` ni el cuerpo completo |
+| Fuerza bruta en login | ✅ | `loginLimiter` + bloqueo de 2FA (5 intentos por origen y cuenta) |
+
+**Lo que faltaba (y se ha añadido):** ninguna capa comprobaba el **origen** de una
+petición de escritura. Si algún día se relajara `sameSite`, o llegara una petición desde
+un navegador antiguo, no había red de seguridad.
+
+**Corrección aplicada:** `createCsrfOriginGuard` montado en `/api` **antes** de la sesión,
+los limitadores y las rutas. Para POST/PUT/PATCH/DELETE:
+`Sec-Fetch-Site: cross-site` → 403; `Origin` ausente → se acepta (no es un navegador);
+`Origin` con el **mismo host** que la petición → se acepta (el panel consigo mismo, así no
+se rompen los despliegues que entran por la URL de Render); `Origin` en la lista de CORS →
+se acepta; cualquier otro → **403**.
+
+**Prueba:** 12 pruebas (`tests/csrf-origin.test.mjs`): lecturas nunca restringidas, origen
+ajeno rechazado, `Sec-Fetch-Site: cross-site` rechazado, mismo host aceptado, lista de CORS
+aceptada, sin `Origin` aceptado, `Origin` mal formado no cuela, y el middleware sobre un
+servidor real (bloquea la escritura cross-site y deja pasar la del panel). El E2E completo
+sigue verde (227 ok), que es la prueba de que **no rompe nada**.
+
 ## Hallazgos detectados y NO corregidos todavía (con motivo)
 
 ### V14-03 · Enumeración de correos en el registro de voluntarios — MEDIA (requiere decisión)
@@ -160,12 +195,16 @@ se puede endurecer con un límite específico por token/IP en una entrega poster
 
 | Entrega | Estado |
 | --- | --- |
-| **1 · Seguridad crítica** | **1.1 ✅ 1.2 ✅ 1.3 ✅** · pendiente 1.4 (auditoría de sesiones, CSRF/CORS, IDOR, fuerza bruta sobre login) |
+| **1 · Seguridad crítica** | **✅ 1.1, 1.2, 1.3 y 1.4 completadas y probadas** |
 | 2 · Dashboard, conciliación e integridad financiera | Pendiente |
 | 3 · Certificados PDF y cierre de campañas | Pendiente |
 | 4 · Revisión de los 23 módulos | Pendiente |
 | 5 · UX/UI, centro de control y herramientas | Pendiente |
 | 6 · Optimización, pruebas integrales y producción | Pendiente |
+
+Queda **una decisión funcional tuya** (V14-03) antes de dar la Entrega 1 por cerrada al
+100 %: si el registro de voluntarios debe seguir avisando cuando el correo ya existe
+(útil, pero enumerable) o dejar de hacerlo.
 
 **No he escrito los seis documentos de la Fase 11** porque solo tengo material real de
 la Entrega 1: rellenar `AUDITORIA_INTEGRAL_V14.md` o calificar los 23 módulos ahora
