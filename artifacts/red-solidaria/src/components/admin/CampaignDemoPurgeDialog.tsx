@@ -72,7 +72,7 @@ export function CampaignDemoPurgeDialog({
   const { data: analysis, isLoading, isError, error } = useDemoPurgePreview(
     open ? campaignId : null,
   );
-  const { mark, purge } = useDemoPurge();
+  const { mark, unmark, purge } = useDemoPurge();
   const { setStatus } = useCampaignLifecycle();
 
   const [reason, setReason] = useState("");
@@ -80,6 +80,10 @@ export function CampaignDemoPurgeDialog({
   const [totpCode, setTotpCode] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
+  // Motivo REAL del rechazo del servidor (401 de reautenticación, 409 de bloqueo,
+  // 429 de límite…). Se muestra EN LÍNEA, dentro del diálogo: si solo apareciera
+  // como toast, un fallo dejaría la sensación de que el botón «no hace nada».
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -88,10 +92,11 @@ export function CampaignDemoPurgeDialog({
       setTotpCode("");
       setIdentifier("");
       setAcknowledged(false);
+      setFormError(null);
     }
   }, [open]);
 
-  const busy = mark.isPending || purge.isPending || setStatus.isPending;
+  const busy = mark.isPending || purge.isPending || setStatus.isPending || unmark.isPending;
   const verdict = analysis?.verdict;
   const summary = demoPurgeSummary(verdict);
   const blocker = blockerSummary(verdict?.blockers);
@@ -104,14 +109,23 @@ export function CampaignDemoPurgeDialog({
 
   const handleMark = () => {
     if (!campaignId) return;
+    setFormError(null);
     mark.mutate(
       { id: campaignId, reason: reason.trim(), password, totpCode: totpCode || undefined },
-      { onSuccess: () => setReason("") },
+      {
+        onSuccess: () => {
+          setReason("");
+          setPassword("");
+          setTotpCode("");
+        },
+        onError: (err) => setFormError(errorMessage(err)),
+      },
     );
   };
 
   const handlePurge = () => {
     if (!campaignId) return;
+    setFormError(null);
     purge.mutate(
       {
         id: campaignId,
@@ -120,13 +134,35 @@ export function CampaignDemoPurgeDialog({
         password,
         totpCode: totpCode || undefined,
       },
-      { onSuccess: close },
+      {
+        onSuccess: close,
+        onError: (err) => setFormError(errorMessage(err)),
+      },
     );
   };
 
   const handleArchive = () => {
     if (!campaignId) return;
-    setStatus.mutate({ id: campaignId, status: "archived" }, { onSuccess: close });
+    setFormError(null);
+    setStatus.mutate(
+      { id: campaignId, status: "archived" },
+      {
+        onSuccess: close,
+        onError: (err) => setFormError(errorMessage(err)),
+      },
+    );
+  };
+
+  // Retirar la declaración DEMO: es la marcha atrás si la campaña se marcó por
+  // error. No es destructivo (sin la marca la purga queda bloqueada) y el
+  // servidor lo deja auditado con el motivo.
+  const handleUnmark = () => {
+    if (!campaignId) return;
+    setFormError(null);
+    unmark.mutate(
+      { id: campaignId, reason: reason.trim() || undefined },
+      { onError: (err) => setFormError(errorMessage(err)) },
+    );
   };
 
   return (
@@ -356,10 +392,32 @@ export function CampaignDemoPurgeDialog({
           </div>
         )}
 
+        {formError && (
+          <div
+            role="alert"
+            className="flex gap-2 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+          >
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{formError}</span>
+          </div>
+        )}
+
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" className="rounded-xl" onClick={close} disabled={busy}>
             Cancelar
           </Button>
+
+          {analysis?.campaign.isDemo && (
+            <Button
+              variant="outline"
+              className="rounded-xl gap-2"
+              onClick={handleUnmark}
+              disabled={busy}
+            >
+              {unmark.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Retirar declaración DEMO
+            </Button>
+          )}
 
           {analysis && !canPurge && !mustMark && (
             <>
