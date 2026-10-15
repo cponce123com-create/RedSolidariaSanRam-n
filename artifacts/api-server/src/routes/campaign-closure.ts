@@ -27,6 +27,7 @@ import {
   validateClosureRequest,
   type ClosureReport,
 } from "../lib/campaign-closure";
+import { renderClosureReportPdf } from "../lib/pdf-closure-report";
 
 /**
  * CIERRE FINANCIERO DE CAMPAÑA (V14-2.3).
@@ -426,6 +427,59 @@ router.get(
     } catch (err) {
       req.log.error({ err }, "Failed to read closure report");
       return res.status(500).json({ error: "server_error", message: "No se pudo leer el informe" });
+    }
+  },
+);
+
+/**
+ * GET /admin/campaigns/:id/closure/report.pdf — informe de cierre en PDF real.
+ *
+ * A4 horizontal, con las cifras congeladas, las diez revisiones, el motivo, quién lo
+ * firmó, el sello SHA-256 y un QR.
+ *
+ * DECISIÓN: el QR apunta a la página del cierre EN EL PANEL (autenticada), no a una URL
+ * pública. El informe de cierre es información financiera interna: publicarla abierta
+ * expondría ingresos, gastos y saldos a cualquiera que diera con el enlace. La
+ * verificación pública de autenticidad es cosa de los CERTIFICADOS (Entrega 3), que sí
+ * están pensados para compartirse.
+ */
+router.get(
+  "/admin/campaigns/:id/closure/report.pdf",
+  ...adminRoles,
+  adminActionLimiter,
+  async (req, res) => {
+    const campaignId = parseId(req.params.id);
+    if (campaignId === null) {
+      return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
+    }
+    try {
+      const events = await loadClosureEvents(campaignId);
+      const lastClosure = [...events].reverse().find((row) => row.event === "closed");
+      if (!lastClosure) {
+        return res.status(404).json({
+          error: "not_found",
+          message: "La campaña no tiene ningún cierre registrado: no hay informe que descargar.",
+        });
+      }
+
+      const siteUrl = (process.env.SITE_URL ?? "https://redsolidariasanramon.org").replace(/\/+$/, "");
+      const { bytes, filename } = await renderClosureReportPdf({
+        report: lastClosure.report as ClosureReport,
+        closureId: lastClosure.id,
+        closedAt: lastClosure.createdAt,
+        closedBy: lastClosure.performedBy,
+        reason: lastClosure.reason,
+        manifestHash: lastClosure.manifestHash,
+        verificationUrl: `${siteUrl}/admin/campanas/${campaignId}/cierre`,
+      });
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.send(Buffer.from(bytes));
+    } catch (err) {
+      req.log.error({ err }, "Failed to render closure report PDF");
+      return res.status(500).json({ error: "server_error", message: "No se pudo generar el informe" });
     }
   },
 );

@@ -67,8 +67,28 @@ import {
 import { CONFIRMED_DONATION_STATUSES } from "../lib/donor-identity";
 import { latestConsentMap, type ConsentDecision } from "../lib/donor-consent";
 import { formatPublicDonor } from "../lib/donor-format";
+import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
 
 const router: IRouter = Router();
+
+/**
+ * PENDIENTE (V14-2.3): bloquear la PURGA DEMO de una campaña con cierre financiero
+ * firmado.
+ *
+ * Se intentó con un guarda pre-registrado (`router.use`/`router.all` sobre
+ * `/campaigns/:id/demo-purge`) y hubo que retirarlo: esas formas se ejecutan ANTES de
+ * la validación de la propia ruta, así que una petición sin `confirm` o sin motivo
+ * dejaba de responder 400 «sin tocar la base» y pasaba a consultar PostgreSQL (503 con
+ * la base simulada). El contrato de la ruta —validar primero, tocar la base después—
+ * está fijado por pruebas y no se rompe para colar un bloqueo.
+ *
+ * La comprobación correcta va DENTRO del manejador, justo después de validar el cuerpo
+ * y antes de abrir la transacción de purga, resolviendo la campaña por su identificador
+ * igual que hace la anulación individual de donaciones.
+ *
+ * Mientras tanto, el bloqueo del cierre SÍ está aplicado y probado en las escrituras de
+ * gastos (ver `routes/campaign-expenses.ts`), que es por donde entra el dinero.
+ */
 
 // Una campaña se considera "en borrador" (no publicada) cuando su estado es
 // `draft`. Solo el administrador autenticado puede verlas y gestionarlas.

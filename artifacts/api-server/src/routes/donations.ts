@@ -88,6 +88,19 @@ class DonationProofRequiredError extends DonationBusinessError {
 
 const router: IRouter = Router();
 
+import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
+
+/**
+ * PENDIENTE (V14-2.3): bloquear la anulación EN BLOQUE de una campaña con cierre
+ * financiero firmado. Mismo motivo que en la purga DEMO: un guarda pre-registrado se
+ * ejecuta antes de la validación de la ruta y rompe el contrato «400 sin tocar la
+ * base» que fijan las pruebas. Va dentro del manejador, tras validar y antes de la
+ * transacción.
+ *
+ * La anulación INDIVIDUAL sí está bloqueada más abajo (resuelve la campaña desde la
+ * donación, después de la reautenticación).
+ */
+
 // POST /donations — público, con rate limit anti-spam.
 // El donante puede adjuntar el comprobante (captura de Yape/transferencia)
 // subido previamente a Cloudinary.
@@ -585,6 +598,16 @@ router.post(
         details: { operation: "donation_void", code: reauth.code },
       });
       return res.status(401).json({ error: "unauthorized", code: reauth.code, message: reauth.message });
+    }
+
+    // V14-2.3: la contabilidad de una campaña con CIERRE FINANCIERO FIRMADO no se
+    // toca. Este path no trae la campaña, así que se resuelve desde la donación.
+    const [target] = await db
+      .select({ campaignId: donationsTable.campaignId })
+      .from(donationsTable)
+      .where(eq(donationsTable.id, id));
+    if (target?.campaignId && (await isCampaignClosed(target.campaignId))) {
+      return res.status(409).json(closedCampaignError());
     }
 
     try {

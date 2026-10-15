@@ -235,6 +235,52 @@ ciegas.
 funcionando, no se puede cerrar dos veces, el informe verifica su sello, la reapertura
 devuelve la escritura y el historial conserva el cierre anterior.
 
+## Entrega 3 · Documentos PDF (en curso)
+
+### V14-09 · Informe de cierre financiero en PDF real — ALTA
+
+**Archivos:** `lib/pdf-closure-report.ts` (nuevo), `routes/campaign-closure.ts`
+
+**Qué faltaba:** el cierre se firmaba y se guardaba, pero no producía ningún documento.
+Un cierre sin papel firmado es una fila en una tabla.
+
+**Corrección aplicada:** `GET /admin/campaigns/:id/closure/report.pdf` genera un **PDF A4
+horizontal** con:
+- las cifras congeladas del cierre;
+- las diez revisiones del procedimiento, con `[OK]` / `[AVISO]` / `[BLOQUEANTE]`;
+- las salvedades registradas;
+- el **motivo**, quién lo firmó y la fecha;
+- el **sello SHA-256** y un **QR**.
+
+**Dependencias añadidas:** `pdf-lib` y `qrcode` (ambas **MIT**, JS puro, sin binarios
+nativos → compatibles con Render Free), más `@types/qrcode` como dependencia de
+desarrollo. Sin ellas no hay PDF real: solo un `print()` del navegador.
+
+**DECISIÓN (documentada en el código):** el QR apunta a la página del cierre **en el
+panel autenticado**, no a una URL pública. El informe de cierre es información financiera
+interna: publicarla abierta expondría ingresos, gastos y saldos a quien diera con el
+enlace. La verificación pública de autenticidad es cosa de los **certificados**.
+
+**Robustez:** `toWinAnsi` sanea el texto antes de dibujarlo. `pdf-lib` **lanza una
+excepción** con cualquier carácter fuera de WinAnsi (comillas angulares, viñetas, tics),
+así que sin ese saneado un informe con «comillas» o un ✓ sería un 500 en producción. Los
+acentos y la ñ sí se conservan (Latin-1 está en WinAnsi).
+
+**Prueba:** 5 pruebas (`tests/pdf-closure-report.test.mjs`) que **abren el PDF generado
+con pdf-lib**: cabecera `%PDF-`, cierre `%%EOF`, tamaño, A4 horizontal verificado por
+geometría, **relectura del documento** (la prueba de fuego de que la estructura es
+válida), metadatos con la campaña, saneado de caracteres tipográficos y que un título con
+«comillas», emoji y tics no tumba la generación. E2E `7terdecies`: descarga real por HTTP
+con cabecera `%PDF-` y 404 en una campaña sin cierre.
+
+**PENDIENTE (documentado en el código, no escondido):** el bloqueo del cierre en la
+**purga DEMO** y en la **anulación en bloque** se retiró tras comprobar que un guarda
+pre-registrado (`router.use`/`router.all`) se ejecuta **antes** de la validación de la
+ruta y rompe el contrato «400 sin tocar la base» que fijan 19 pruebas existentes. La
+comprobación debe ir **dentro** de cada manejador, después de validar. Sí está aplicado y
+probado en las escrituras de **gastos** y en la anulación **individual**, que es por donde
+entra el dinero.
+
 ## Hallazgos detectados y NO corregidos todavía (con motivo)
 
 ### V14-03 · Enumeración de correos en el registro de voluntarios — MEDIA (requiere decisión)
