@@ -306,6 +306,388 @@ check("diagnóstico: ofrece archivar como alternativa segura", protectedDiag.bod
 const protectedDelete = await call("DELETE", `/api/campaigns/${protectedId}`, undefined, { auth: true });
 check("borrar el borrador con donación confirmada se bloquea (409)", protectedDelete.status === 409, `status=${protectedDelete.status} ${protectedDelete.body?.message ?? ""}`);
 
+// ── 7ter. Purga DEFINITIVA de una campaña DEMO (V7.2) ────────────────────────
+// Reproduce el caso real: una campaña de demostración («Adopciones» / «Rescate
+// Animal San Ramón») con donaciones, gastos y asientos de PRUEBA que el borrado
+// seguro y la purga de borradores rechazan. El superadmin la declara DEMO y la
+// elimina con TODOS sus datos ficticios, sin tocar ninguna campaña real.
+//
+// Presupuesto de reautenticación: `reauthLimiter` permite 5 intentos por
+// superadmin cada 15 minutos, así que esta sección hace EXACTAMENTE 5 peticiones
+// con reautenticación y comprueba en la SEXTA que el límite anti fuerza bruta
+// entra en acción.
+const demoReason = "Campaña de demostración con datos ficticios cargados por error";
+
+const demo = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `E2E DEMO ${stamp}`,
+    description: "Campaña de demostración: sus donaciones y gastos son ficticios.",
+    goal: 800,
+    category: "general",
+    startDate: "2026-03-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const demoId = demo.body?.id;
+await call("PATCH", `/api/campaigns/${demoId}/status`, { status: "active" }, { auth: true });
+
+// Donación con comprobante → aprobada: genera UN asiento encadenado de prueba.
+const demoDonation = await call("POST", "/api/donations", {
+  campaignId: demoId,
+  firstName: "Demo",
+  lastName: "Ficticia",
+  email: `demo-${donorEmail}`,
+  amount: 60,
+  paymentMethod: "transfer",
+  collaborationType: "dinero",
+  proofImageUrl: "https://res.cloudinary.com/demo/image/upload/v1/demo.jpg",
+  proofPublicId: "e2e/demo",
+});
+await call("PUT", `/api/donations/${demoDonation.body?.id}`, { status: "approved" }, { auth: true });
+
+// Datos auxiliares de prueba: galería, novedades, presupuesto, gasto, evidencia
+// y un bien sin flujo registrado (todo ficticio, sin obligación de conservación).
+await call("POST", `/api/campaigns/${demoId}/images`, { imageUrl: "https://res.cloudinary.com/demo/image/upload/v1/demo-galeria.jpg", caption: "Imagen de demostración" }, { auth: true });
+await call("POST", `/api/campaigns/${demoId}/updates`, { title: "Novedad de demostración", content: "Contenido ficticio de la campaña DEMO." }, { auth: true });
+await call("POST", `/api/campaigns/${demoId}/budgets`, { category: "Difusión", plannedAmount: 120 }, { auth: true });
+await call("POST", `/api/campaigns/${demoId}/expenses`, { description: "Gasto ficticio sin comprobante", amount: 40, date: "2026-03-02" }, { auth: true });
+await call("POST", `/api/campaigns/${demoId}/evidence`, { title: "Evidencia de demostración", mediaUrl: "https://res.cloudinary.com/demo/image/upload/v1/demo-evidencia.jpg", date: "2026-03-03" }, { auth: true });
+await call("POST", `/api/campaigns/${demoId}/leftovers`, { item: "Raciones de prueba", quantity: 10 }, { auth: true });
+
+// El problema original: el borrado seguro la rechaza aunque sea de prueba.
+const demoSafeDelete = await call("DELETE", `/api/campaigns/${demoId}`, undefined, { auth: true });
+check(
+  "una campaña DEMO con historial NO se elimina por la vía normal (409)",
+  demoSafeDelete.status === 409,
+  `status=${demoSafeDelete.status}`,
+);
+
+// ── Análisis de seguridad previo (no modifica nada) ──────────────────────────
+const demoPreview = await call("GET", `/api/campaigns/${demoId}/demo-purge/preview`, undefined, { auth: true });
+check("el análisis de purga DEMO responde 200", demoPreview.status === 200, `status=${demoPreview.status}`);
+check(
+  "el análisis identifica la campaña por su IDENTIFICADOR real (no por el nombre)",
+  demoPreview.body?.campaign?.id === demoId && typeof demoPreview.body?.campaign?.title === "string",
+  `id=${demoPreview.body?.campaign?.id}`,
+);
+check(
+  "el análisis informa del estado y de la falta de declaración DEMO",
+  demoPreview.body?.campaign?.status === "active" &&
+    demoPreview.body?.campaign?.isDemo === false &&
+    demoPreview.body?.verdict?.requiresDemoMarking === true &&
+    demoPreview.body?.verdict?.allowed === false,
+  JSON.stringify({ status: demoPreview.body?.campaign?.status, isDemo: demoPreview.body?.campaign?.isDemo }),
+);
+const demoCounts = demoPreview.body?.counts ?? {};
+check(
+  "el análisis cuenta y TIPEA los registros relacionados por tabla",
+  demoCounts.campaigns === 1 &&
+    // Dos asientos: el ingreso de la donación aprobada + el gasto registrado.
+    demoCounts.campaign_movements === 2 &&
+    demoCounts.donations === 1 &&
+    demoCounts.campaign_expenses === 1 &&
+    demoCounts.campaign_images === 1 &&
+    demoCounts.campaign_updates === 1 &&
+    demoCounts.campaign_budgets === 1 &&
+    demoCounts.campaign_evidence === 1 &&
+    demoCounts.campaign_leftovers === 1,
+  JSON.stringify(demoCounts),
+);
+check(
+  "el análisis tipa el plan (etiqueta legible por tipo de registro)",
+  (demoPreview.body?.verdict?.deletionPlan ?? []).length > 0 &&
+    (demoPreview.body.verdict.deletionPlan ?? []).every((entry) => typeof entry.label === "string" && entry.label.length > 0),
+);
+check(
+  "el análisis confirma que NO hay dinero real (donación sin conciliar) ni documentos de gasto",
+  demoPreview.body?.real?.reconciledDonations === 0 && demoPreview.body?.real?.expensesWithReceipt === 0,
+  JSON.stringify(demoPreview.body?.real ?? null),
+);
+check(
+  "el análisis identifica la cadena de hashes afectada y la verifica",
+  demoPreview.body?.ledger?.movementCount === 2 &&
+    demoPreview.body?.ledger?.chainVerified === true &&
+    typeof demoPreview.body?.ledger?.rootHash === "string",
+  JSON.stringify(demoPreview.body?.ledger ?? null),
+);
+check(
+  "el análisis advierte de que se eliminará la cadena de prueba con copia previa",
+  (demoPreview.body?.verdict?.warnings ?? []).some((w) => w.code === "ledger_chain_removed"),
+);
+check(
+  "la vista previa NO elimina nada (la campaña sigue existiendo)",
+  (await call("GET", `/api/campaigns/${demoId}`, undefined, { auth: true })).status === 200,
+);
+
+// ── Segunda campaña DEMO con un GASTO CON COMPROBANTE (dato a conservar) ─────
+const receiptCampaign = await call(
+  "POST",
+  "/api/campaigns",
+  {
+    title: `E2E DEMO con boleta ${stamp}`,
+    description: "Campaña DEMO con un gasto documentado: la purga debe bloquearse.",
+    goal: 300,
+    category: "general",
+    startDate: "2026-03-01",
+    status: "draft",
+  },
+  { auth: true },
+);
+const receiptId = receiptCampaign.body?.id;
+await call("PATCH", `/api/campaigns/${receiptId}/status`, { status: "active" }, { auth: true });
+await call(
+  "POST",
+  `/api/campaigns/${receiptId}/expenses`,
+  {
+    description: "Gasto con boleta (documento real)",
+    amount: 90,
+    date: "2026-03-04",
+    receiptUrl: "https://res.cloudinary.com/demo/image/upload/v1/boleta-real.jpg",
+    receiptType: "boleta",
+  },
+  { auth: true },
+);
+
+// ── Intentos de purga: reautenticación, validación y límite anti fuerza bruta ─
+const purgeWrongPassword = await call(
+  "POST",
+  `/api/campaigns/${demoId}/demo-purge`,
+  { confirm: true, identifier: String(demoId), reason: demoReason, password: "contrasena-incorrecta" },
+  { auth: true },
+);
+check(
+  "la purga exige REAUTENTICARSE: contraseña incorrecta → 401",
+  purgeWrongPassword.status === 401,
+  `status=${purgeWrongPassword.status} code=${purgeWrongPassword.body?.code ?? ""}`,
+);
+
+const purgeNotMarked = await call(
+  "POST",
+  `/api/campaigns/${demoId}/demo-purge`,
+  { confirm: true, identifier: String(demoId), reason: demoReason, password: PASS },
+  { auth: true },
+);
+check(
+  "sin declaración DEMO la purga se BLOQUEA (409) y explica el paso que falta",
+  purgeNotMarked.status === 409 &&
+    (purgeNotMarked.body?.blockers ?? []).some((b) => b.code === "demo_not_marked"),
+  `status=${purgeNotMarked.status}`,
+);
+check(
+  "el bloqueo NO ha modificado nada (la campaña y su donación siguen ahí)",
+  (await call("GET", `/api/campaigns/${demoId}`, undefined, { auth: true })).status === 200,
+);
+
+const markDemo = await call(
+  "POST",
+  `/api/campaigns/${demoId}/demo-mark`,
+  { confirm: true, reason: demoReason, password: PASS },
+  { auth: true },
+);
+check(
+  "declarar la campaña como DEMO (con reautenticación) responde 200 y queda firmada",
+  markDemo.status === 200 && markDemo.body?.campaign?.isDemo === true && Boolean(markDemo.body?.campaign?.demoMarkedBy),
+  `status=${markDemo.status}`,
+);
+
+const markReceipt = await call(
+  "POST",
+  `/api/campaigns/${receiptId}/demo-mark`,
+  { confirm: true, reason: "Campaña de demostración con un gasto documentado", password: PASS },
+  { auth: true },
+);
+check("se declara DEMO la segunda campaña de prueba", markReceipt.status === 200, `status=${markReceipt.status}`);
+
+const purged = await call(
+  "POST",
+  `/api/campaigns/${demoId}/demo-purge`,
+  { confirm: true, identifier: String(demoId), reason: demoReason, password: PASS },
+  { auth: true },
+);
+check(
+  "la purga definitiva de la campaña DEMO responde 200",
+  purged.status === 200,
+  `status=${purged.status} ${purged.body?.message ?? ""}`,
+);
+const backupId = purged.body?.backupId;
+check("la purga devuelve el identificador del respaldo", Number.isInteger(backupId), `backupId=${backupId}`);
+check(
+  "la purga devuelve el manifiesto con el sello SHA-256 del respaldo",
+  /^[0-9a-f]{64}$/.test(purged.body?.manifest?.hash ?? "") && purged.body?.manifest?.ledger?.verified === true,
+  `hash=${(purged.body?.manifest?.hash ?? "").slice(0, 12)}`,
+);
+
+// La SEXTA petición con reautenticación ya no pasa: el límite protege el endpoint.
+const purgeAfterLimit = await call(
+  "POST",
+  `/api/campaigns/${demoId}/demo-purge`,
+  { confirm: true, identifier: String(demoId), reason: demoReason, password: PASS },
+  { auth: true },
+);
+check(
+  "el límite anti fuerza bruta corta la reautenticación tras 5 intentos (429)",
+  purgeAfterLimit.status === 429,
+  `status=${purgeAfterLimit.status}`,
+);
+
+// ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
+const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
+check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);
+
+const demoTransparencyAfter = await call("GET", `/api/campaigns/${demoId}/transparency`);
+check("su panel de transparencia desaparece (404)", demoTransparencyAfter.status === 404, `status=${demoTransparencyAfter.status}`);
+
+const publicListAfter = await call("GET", "/api/campaigns");
+const publicIdsAfter = (Array.isArray(publicListAfter.body) ? publicListAfter.body : []).map((c) => c.id);
+check("la campaña eliminada NO aparece en el listado público", !publicIdsAfter.includes(demoId));
+
+const adminListAfter = await call("GET", "/api/campaigns?status=active", undefined, { auth: true });
+const adminIdsAfter = (Array.isArray(adminListAfter.body) ? adminListAfter.body : []).map((c) => c.id);
+check("la campaña eliminada NO aparece en la administración", !adminIdsAfter.includes(demoId));
+
+const donationsAfter = await call("GET", "/api/donations", undefined, { auth: true });
+const donationsAfterRows = Array.isArray(donationsAfter.body) ? donationsAfter.body : (donationsAfter.body?.donations ?? []);
+check(
+  "la donación DEMO desaparece de las estadísticas del panel",
+  !donationsAfterRows.some((d) => d.campaignId === demoId),
+  `donaciones_restantes_de_la_campaña=${donationsAfterRows.filter((d) => d.campaignId === demoId).length}`,
+);
+
+// Sin registros huérfanos: ningún subrecurso sobrevive apuntando a la campaña.
+const orphans = await Promise.all([
+  call("GET", `/api/campaigns/${demoId}/movements`),
+  call("GET", `/api/campaigns/${demoId}/expenses`),
+  call("GET", `/api/campaigns/${demoId}/budgets`),
+  call("GET", `/api/campaigns/${demoId}/evidence`),
+  call("GET", `/api/campaigns/${demoId}/leftovers`),
+  call("GET", `/api/campaigns/${demoId}/updates`),
+  call("GET", `/api/campaigns/${demoId}/images`),
+]);
+check(
+  "no quedan registros huérfanos (asientos, gastos, presupuesto, evidencia, bienes, novedades, galería)",
+  orphans.every((res) => Array.isArray(res.body) && res.body.length === 0),
+  orphans.map((res) => `${res.status}:${Array.isArray(res.body) ? res.body.length : "?"}`).join(" "),
+);
+
+const demoChainAfter = await call("GET", `/api/campaigns/${demoId}/movements/verify`);
+check(
+  "la cadena contable de la campaña eliminada ya no tiene asientos y verifica vacía",
+  demoChainAfter.status === 200 && demoChainAfter.body?.verified === true && demoChainAfter.body?.count === 0,
+  JSON.stringify(demoChainAfter.body ?? null),
+);
+
+// ── Las campañas REALES conservan sus datos y sus cadenas ────────────────────
+const otherChain = await call("GET", `/api/campaigns/${campaignId}/movements/verify`);
+check(
+  "la OTRA campaña conserva su asiento y su cadena sigue verificando",
+  otherChain.status === 200 && otherChain.body?.verified === true && otherChain.body?.count === 1,
+  JSON.stringify(otherChain.body ?? null),
+);
+const otherStillPublic = await call("GET", `/api/campaigns/${campaignId}`);
+check("la OTRA campaña sigue publicada con su recaudación intacta", otherStillPublic.status === 200 && Number(otherStillPublic.body?.raised) === 80, `status=${otherStillPublic.status} raised=${otherStillPublic.body?.raised}`);
+
+const auditAfter = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
+check(
+  "el libro contable global sigue íntegro tras la purga",
+  auditAfter.status === 200 && auditAfter.body?.chain?.verified === true,
+  JSON.stringify(auditAfter.body?.chain ?? null),
+);
+
+// ── La SEGUNDA campaña DEMO queda bloqueada por un documento real ────────────
+const receiptPreview = await call("GET", `/api/campaigns/${receiptId}/demo-purge/preview`, undefined, { auth: true });
+check(
+  "una campaña DECLARADA DEMO se sigue bloqueando si tiene un gasto con comprobante",
+  receiptPreview.body?.campaign?.isDemo === true &&
+    receiptPreview.body?.verdict?.allowed === false &&
+    (receiptPreview.body?.verdict?.blockers ?? []).some((b) => b.code === "expenses_with_receipt"),
+  JSON.stringify((receiptPreview.body?.verdict?.blockers ?? []).map((b) => b.code)),
+);
+check(
+  "el bloqueo ofrece la alternativa segura (archivar / anular contablemente)",
+  receiptPreview.body?.verdict?.requiresDemoMarking === false &&
+    (receiptPreview.body?.verdict?.warnings ?? []).length >= 0,
+);
+
+// La declaración DEMO se puede RETIRAR (marcada por error): deja de habilitar nada.
+const unmarkReceipt = await call("DELETE", `/api/campaigns/${receiptId}/demo-mark`, { reason: "Se marcó por error en la prueba E2E" }, { auth: true });
+check("retirar la declaración DEMO responde 200", unmarkReceipt.status === 200, `status=${unmarkReceipt.status}`);
+check("la campaña deja de estar declarada DEMO", unmarkReceipt.body?.campaign?.isDemo === false && unmarkReceipt.body?.campaign?.demoMarkedAt === null);
+const receiptPreviewAfterUnmark = await call("GET", `/api/campaigns/${receiptId}/demo-purge/preview`, undefined, { auth: true });
+check(
+  "tras retirar la marca, el análisis vuelve a exigir la declaración DEMO",
+  receiptPreviewAfterUnmark.body?.campaign?.isDemo === false &&
+    receiptPreviewAfterUnmark.body?.verdict?.requiresDemoMarking === true &&
+    receiptPreviewAfterUnmark.body?.verdict?.allowed === false,
+  JSON.stringify((receiptPreviewAfterUnmark.body?.verdict?.blockers ?? []).map((b) => b.code)),
+);
+
+const receiptDelete = await call("DELETE", `/api/campaigns/${receiptId}`, undefined, { auth: true });
+check("la campaña con gasto documentado se archiva en vez de destruirse (409 en el borrado)", receiptDelete.status === 409, `status=${receiptDelete.status}`);
+
+// ── Respaldo verificable de la purga ─────────────────────────────────────────
+const backup = await call("GET", `/api/admin/campaign-demo-purge/backups/${backupId}`, undefined, { auth: true });
+check("el respaldo de la purga se conserva y responde 200", backup.status === 200, `status=${backup.status}`);
+check(
+  "el sello SHA-256 del respaldo VERIFICA (la copia no se alteró)",
+  backup.body?.verified === true && backup.body?.manifestHash === purged.body?.manifest?.hash,
+  `verified=${backup.body?.verified}`,
+);
+check(
+  "el respaldo conserva la copia íntegra de lo eliminado (donaciones, gastos, asientos)",
+  (backup.body?.snapshot?.tables?.donations ?? []).length === 1 &&
+    (backup.body?.snapshot?.tables?.campaign_expenses ?? []).length === 1 &&
+    (backup.body?.snapshot?.tables?.campaign_movements ?? []).length === 2,
+  JSON.stringify({
+    donations: (backup.body?.snapshot?.tables?.donations ?? []).length,
+    expenses: (backup.body?.snapshot?.tables?.campaign_expenses ?? []).length,
+    movements: (backup.body?.snapshot?.tables?.campaign_movements ?? []).length,
+  }),
+);
+check(
+  "el respaldo registra el motivo y quién autorizó la operación",
+  backup.body?.reason === demoReason && typeof backup.body?.performedBy === "string" && backup.body.performedBy.length > 0,
+  `por=${backup.body?.performedBy}`,
+);
+check(
+  "la cadena contable eliminada se puede reconstruir desde el respaldo",
+  backup.body?.ledger?.movements === 2 &&
+    (backup.body?.snapshot?.tables?.campaign_movements ?? []).every((row) => typeof row.hash === "string" && row.hash.length === 64),
+);
+
+// ── Auditoría externa a los datos purgados ──────────────────────────────────
+const purgeAudit = await call("GET", "/api/admin/audit-logs?action=CAMPAIGN_DEMO_PURGED&resource=campaigns", undefined, { auth: true });
+const purgeLog = (Array.isArray(purgeAudit.body) ? purgeAudit.body : []).find((row) => row.resourceId === String(demoId));
+check("la purga queda en el registro de auditoría (externo a lo purgado)", Boolean(purgeLog), `registros=${Array.isArray(purgeAudit.body) ? purgeAudit.body.length : "?"}`);
+check(
+  "el registro de auditoría guarda el motivo, el sello y el desglose por tabla",
+  purgeLog?.details?.reason === demoReason &&
+    purgeLog?.details?.manifestHash === purged.body?.manifest?.hash &&
+    Array.isArray(purgeLog?.details?.removed),
+);
+const reauthAudit = await call("GET", "/api/admin/audit-logs?action=ADMIN_REAUTH_FAILED", undefined, { auth: true });
+check(
+  "los intentos de reautenticación fallidos también quedan auditados",
+  Array.isArray(reauthAudit.body) && reauthAudit.body.some((row) => row.resourceId === String(demoId)),
+  `registros=${Array.isArray(reauthAudit.body) ? reauthAudit.body.length : "?"}`,
+);
+
+const markAudit = await call("GET", "/api/admin/audit-logs?action=CAMPAIGN_DEMO_MARKED&resource=campaigns", undefined, { auth: true });
+check(
+  "la declaración DEMO queda auditada (quién y por qué)",
+  Array.isArray(markAudit.body) &&
+    markAudit.body.some((row) => row.resourceId === String(demoId) && typeof row.details?.reason === "string"),
+  `registros=${Array.isArray(markAudit.body) ? markAudit.body.length : "?"}`,
+);
+const unmarkAudit = await call("GET", "/api/admin/audit-logs?action=CAMPAIGN_DEMO_UNMARKED&resource=campaigns", undefined, { auth: true });
+check(
+  "la retirada de la declaración DEMO también queda auditada",
+  Array.isArray(unmarkAudit.body) && unmarkAudit.body.some((row) => row.resourceId === String(receiptId)),
+  `registros=${Array.isArray(unmarkAudit.body) ? unmarkAudit.body.length : "?"}`,
+);
+
 // ── 8. Informe de integridad del libro ───────────────────────────────────────
 const audit = await call("GET", "/api/admin/ledger/audit", undefined, { auth: true });
 check("el informe de integridad responde 200", audit.status === 200, `status=${audit.status}`);

@@ -1,12 +1,24 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useGetCampaigns, useCreateCampaign } from "@workspace/api-client-react";
+import {
+  useGetAdminMe,
+  useGetCampaigns,
+  useCreateCampaign,
+} from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
@@ -14,10 +26,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { formatSafeDate } from "@/lib/i18n/date";
-import { Plus, Trash2, Edit, Star, Search, Loader2 } from "lucide-react";
+import { Plus, Trash2, Edit, Star, Search, Loader2, MoreVertical, ShieldAlert } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ProtagonistToggle } from "@/components/admin/ProtagonistToggle";
 import { CampaignDeletionDialog } from "@/components/admin/CampaignDeletionDialog";
+import { CampaignDemoPurgeDialog } from "@/components/admin/CampaignDemoPurgeDialog";
 import { useCampaignLifecycle } from "@/hooks/use-campaign-lifecycle";
 import {
   campaignStatusBadge,
@@ -75,6 +88,14 @@ export default function AdminCampaigns() {
   // antes de mostrar ninguna acción. `manageId === null` = cerrado.
   const [manageId, setManageId] = useState<number | null>(null);
   const [manageTitle, setManageTitle] = useState("");
+  // Purga definitiva de campañas DEMO (V7.2): exclusiva del superadmin. El
+  // análisis y la confirmación viven en `CampaignDemoPurgeDialog`.
+  const [demoId, setDemoId] = useState<number | null>(null);
+  const [demoTitle, setDemoTitle] = useState("");
+  const { data: adminUser } = useGetAdminMe({
+    query: { queryKey: ["/api/admin/me"], retry: false },
+  });
+  const isSuperadmin = adminUser?.role === "superadmin";
 
   // Búsqueda local por título o categoría + ordenación de lo visible. El
   // servidor ya devuelve la lista filtrada por estado; aquí solo se reordena.
@@ -140,6 +161,14 @@ export default function AdminCampaigns() {
   const openManage = (id: number, title: string) => {
     setManageId(id);
     setManageTitle(title);
+  };
+
+  // Purga definitiva de campañas DEMO: solo desde «Más acciones» y solo para el
+  // superadmin. El diálogo muestra el análisis de seguridad antes de permitir
+  // cualquier confirmación.
+  const openDemoPurge = (id: number, title: string) => {
+    setDemoId(id);
+    setDemoTitle(title);
   };
 
   return (
@@ -303,6 +332,32 @@ export default function AdminCampaigns() {
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Gestionar
                       </Button>
+                      {isSuperadmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Más acciones para la campaña ${c.title}`}
+                              className="h-8 rounded-lg text-xs font-medium gap-1.5"
+                              disabled={busy}
+                            >
+                              <MoreVertical className="w-3.5 h-3.5" /> Más acciones
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-72">
+                            <DropdownMenuLabel>Operaciones de superadmin</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="gap-2 text-destructive focus:text-destructive"
+                              onSelect={() => openDemoPurge(c.id, c.title)}
+                            >
+                              <ShieldAlert className="w-4 h-4" />
+                              Eliminar campaña DEMO
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -319,6 +374,14 @@ export default function AdminCampaigns() {
         Una campaña con historial financiero no se elimina: se <strong>archiva</strong> para conservar
         sus registros. Pulsa <strong>Gestionar</strong> en cualquier campaña para ver sus dependencias
         concretas y las operaciones permitidas.
+        {isSuperadmin && (
+          <>
+            {" "}
+            Las campañas de <strong>demostración</strong> se eliminan definitivamente desde{" "}
+            <strong>Más acciones → Eliminar campaña DEMO</strong>; el servidor vuelve a analizar los
+            datos antes de borrar y guarda un respaldo verificable.
+          </>
+        )}
       </p>
 
       <CampaignDeletionDialog
@@ -327,6 +390,15 @@ export default function AdminCampaigns() {
         open={manageId !== null}
         onOpenChange={(next) => {
           if (!next) setManageId(null);
+        }}
+      />
+
+      <CampaignDemoPurgeDialog
+        campaignId={demoId}
+        title={demoTitle}
+        open={demoId !== null}
+        onOpenChange={(next) => {
+          if (!next) setDemoId(null);
         }}
       />
     </div>
