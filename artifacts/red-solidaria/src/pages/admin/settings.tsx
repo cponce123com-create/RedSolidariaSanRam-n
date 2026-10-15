@@ -41,7 +41,13 @@ function TwoFactorCard() {
     queryFn: async () => {
       const res = await fetch("/api/admin/2fa/status", { credentials: "include" });
       if (!res.ok) throw new Error("Error al consultar 2FA");
-      return res.json() as Promise<{ enabled: boolean }>;
+      return res.json() as Promise<{
+        enabled: boolean;
+        /** Es la cuenta de respaldo por variables de entorno (ADMIN_USERNAME). */
+        envAccount?: boolean;
+        /** El operador la ha desactivado con ENV_SUPERADMIN_2FA_DISABLED=1. */
+        disabledByEnv?: boolean;
+      }>;
     },
   });
 
@@ -92,6 +98,8 @@ function TwoFactorCard() {
   });
 
   const enabled = status.data?.enabled ?? false;
+  const envAccount = status.data?.envAccount ?? false;
+  const disabledByEnv = status.data?.disabledByEnv ?? false;
 
   return (
     <div className="bg-card rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -100,6 +108,22 @@ function TwoFactorCard() {
         <h2 className="font-semibold text-gray-800">Seguridad de mi cuenta (2FA)</h2>
       </div>
       <div className="p-6 space-y-4">
+        {envAccount && (
+          <p className="text-xs text-muted-foreground rounded-xl bg-secondary/40 p-3">
+            Estás en la <strong>cuenta de respaldo por variables de entorno</strong> (
+            <code>ADMIN_USERNAME</code>). Su segundo factor se guarda aparte del resto de usuarios. Si
+            pierdes el autenticador, la recuperación es del operador: definir{" "}
+            <code>ENV_SUPERADMIN_2FA_DISABLED=1</code> y reiniciar el servicio.
+          </p>
+        )}
+
+        {disabledByEnv && (
+          <p className="text-xs text-amber-900 rounded-xl bg-amber-50 border border-amber-200 p-3">
+            El 2FA de esta cuenta está <strong>ignorado por configuración</strong> (
+            <code>ENV_SUPERADMIN_2FA_DISABLED=1</code>): no se exige en el login ni en las
+            operaciones irreversibles. Quita esa variable para volver a exigirlo.
+          </p>
+        )}
         {enabled ? (
           <>
             <div className="flex items-center gap-2 text-sm">

@@ -791,6 +791,37 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         CHECK (status IN ('pending','approved','rejected','reconciled','annulled')) NOT VALID;
     `,
   },
+  {
+    name: "028_env_superadmin_2fa.sql",
+    sql: `
+      -- V7.2.3: 2FA (TOTP) del superadministrador de respaldo por variables de
+      -- entorno. ADITIVA: una tabla nueva de UNA sola fila; no toca nada más.
+      --
+      -- El superadmin de entorno (ADMIN_USERNAME/ADMIN_PASSWORD) no tiene fila en
+      -- admin_users, así que no tenía dónde guardar su secreto TOTP: /admin/2fa/*
+      -- le respondía 404 y quedaba SIEMPRE protegido solo por contraseña. Como
+      -- app.ts exige esas variables en producción, el panel tenía una entrada sin
+      -- segundo factor y activar 2FA en un usuario de tabla no protegía del todo.
+      --
+      -- Por qué NO se guarda en la tabla settings: GET /admin/settings devuelve
+      -- TODAS las claves (y el panel las pinta), y PUT /admin/settings/:key
+      -- sobrescribe cualquiera. Con tabla propia el secreto es inalcanzable desde
+      -- los endpoints genéricos de configuración.
+      --
+      -- El CHECK garantiza que solo exista la fila 1: un único secreto.
+      CREATE TABLE IF NOT EXISTS env_superadmin_2fa (
+        id integer PRIMARY KEY DEFAULT 1,
+        secret text,
+        enabled boolean NOT NULL DEFAULT false,
+        updated_at timestamp NOT NULL DEFAULT now(),
+        CONSTRAINT env_superadmin_2fa_singleton CHECK (id = 1)
+      );
+
+      -- Fila única lista para usar: el resto del código puede leerla sin
+      -- preocuparse por su ausencia.
+      INSERT INTO env_superadmin_2fa (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+    `,
+  },
 ];
 
 /**
