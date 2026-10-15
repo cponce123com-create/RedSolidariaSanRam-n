@@ -1,3 +1,4 @@
+import { NEWS_KEY } from "../../lib/query-keys";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -94,8 +95,31 @@ export default function AdminNews() {
   });
 
   const deleteNews = useMutation({
-    mutationFn: async (id: number) => { await fetch(`/api/news/${id}`, { method: "DELETE" }); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/news"] }); toast({ title: "Noticia eliminada" }); },
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/news/${id}`, { method: "DELETE" });
+      // V14-3.1: ANTES no se comprobaba `res.ok`, así que `fetch` resolvía incluso con
+      // 404 o 500 y el `onSuccess` mostraba «Noticia eliminada» sin haber borrado nada.
+      // El servidor ya devuelve 404 cuando no borra ninguna fila: aquí se propaga.
+      if (!res.ok) {
+        let message = "No se pudo eliminar la noticia";
+        try {
+          const body = await res.json();
+          if (typeof body?.message === "string" && body.message.length > 0) message = body.message;
+        } catch {
+          // Respuesta sin cuerpo JSON: se usa el mensaje genérico.
+        }
+        throw new Error(message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [NEWS_KEY] });
+      toast({ title: "Noticia eliminada" });
+    },
+    // Antes no había onError: un fallo no decía nada y la noticia seguía en la lista.
+    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: [NEWS_KEY] });
+      toast({ title: "No se pudo eliminar", description: error.message, variant: "destructive" });
+    },
   });
 
   const handleSave = () => { queryClient.invalidateQueries({ queryKey: ["/api/news"] }); setShowForm(false); setEditing(null); };

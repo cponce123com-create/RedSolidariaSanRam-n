@@ -313,6 +313,54 @@ de un certificado anulado responde **404**, indistinguible de un código inexist
 puede acreditar como válido (que es lo importante), pero sería más claro responder
 «revocado» con su motivo.
 
+## Fase 3 · Sincronización admin ↔ público (reporte del superadministrador)
+
+### V14-11 · Se eliminaba en el panel y seguía publicado — CRÍTICA
+
+**Síntoma reportado:** «mascotas, reportes, noticias que elimino en el admin siguen
+activas en el frontend».
+
+**Diagnóstico (código real, no hipótesis).** Se encontraron **tres fallos
+independientes**, y el más grave no era la caché:
+
+**1 · Falso éxito en el borrado (backend).** `DELETE /news/:id` y
+`DELETE /admin/pets/:id` hacían:
+
+```ts
+await db.delete(newsTable).where(eq(newsTable.id, id));
+return res.status(204).send();   // 204 SIEMPRE
+```
+
+Drizzle devuelve 0 filas afectadas si el id no existe, pero el 204 se enviaba igual: el
+panel mostraba «eliminado» sin haber borrado nada. Corregido con `.returning()` y **404**
+cuando no se borra ninguna fila.
+
+**2 · El cliente no comprobaba `res.ok` (frontend).** En `pages/admin/news.tsx`:
+
+```ts
+mutationFn: async (id) => { await fetch(`/api/news/${id}`, { method: "DELETE" }); },
+onSuccess: () => { ...; toast({ title: "Noticia eliminada" }); }
+```
+
+`fetch` **resuelve aunque el servidor devuelva 404 o 500**, así que `onSuccess` mostraba
+el éxito siempre. Y **no había `onError`**: un fallo real era silencioso y la noticia
+seguía en la lista. Corregido: se comprueba `res.ok`, se propaga el mensaje del servidor y
+se añade `onError` con aviso visible.
+
+**3 · Asimetría de claves de caché (frontend).** En `pet-form.tsx` el panel invalidaba
+**solo** `["/api/admin/pets"]`, nunca `["/api/pets"]`. Son dos entradas distintas: la web
+pública seguía mostrando la mascota borrada hasta que el visitante recargaba a mano.
+Corregido invalidando **ambas**.
+
+**Hallazgo de diseño:** la tabla `news` **no tiene campo de visibilidad**. «Ocultar» una
+noticia es imposible: solo se puede borrar. Se documenta como decisión pendiente (añadir
+`active`/`published` sería una migración aditiva, no destructiva).
+
+**Prueba:** E2E `7quindecies` (15 comprobaciones, PostgreSQL real) con el ciclo completo
+—Casos A, B y E del encargo—: crear en el panel → ver en la web pública → eliminar →
+**comprobar que ya no aparece** → volver a borrar y exigir **404 en vez de 204**; ídem para
+mascotas, incluida su ficha pública (404); y sin sesión, 401.
+
 ## Hallazgos detectados y NO corregidos todavía (con motivo)
 
 ### V14-03 · Enumeración de correos en el registro de voluntarios — MEDIA (requiere decisión)

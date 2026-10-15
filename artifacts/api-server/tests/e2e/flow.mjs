@@ -2045,6 +2045,108 @@ check(
   `status=${certVerification.status} cuerpo=${String(JSON.stringify(certVerification.body ?? {})).slice(0, 80)}`,
 );
 
+// ── 7quindecies. SINCRONIZACIÓN ADMIN ↔ PÚBLICO (V14, Fase 3) ────────────────
+// El síntoma real que se corrige: se elimina algo en el panel y la web pública sigue
+// mostrándolo. Aquí se recorre el ciclo completo contra PostgreSQL real, incluido el
+// caso de fallo: borrar algo que ya no existe NO puede fingir éxito.
+
+// --- Caso A/B: NOTICIAS -----------------------------------------------------
+const newsPost = await call(
+  "POST",
+  "/api/news",
+  {
+    title: `Noticia de sincronización ${stamp}`,
+    summary: "Resumen de prueba del ciclo completo admin → público.",
+    content: "Contenido de prueba.",
+    publishedAt: "2026-10-15",
+  },
+  { auth: true },
+);
+const newsId = newsPost.body?.id;
+check("A1 · se crea la noticia desde el panel", newsPost.status === 201 && Number.isInteger(newsId), `status=${newsPost.status}`);
+
+const newsPublic = await call("GET", "/api/news");
+check(
+  "A2 · la noticia nueva YA se ve en la web pública",
+  Array.isArray(newsPublic.body) && newsPublic.body.some((post) => post.id === newsId),
+  `¿aparece? ${Array.isArray(newsPublic.body) && newsPublic.body.some((post) => post.id === newsId)}`,
+);
+
+const newsDeleted = await call("DELETE", `/api/news/${newsId}`, undefined, { auth: true });
+check("A3 · el panel la elimina (204)", newsDeleted.status === 204, `status=${newsDeleted.status}`);
+
+const newsPublicAfter = await call("GET", "/api/news");
+check(
+  "A4 · YA NO aparece en la web pública (el caso que se reportó)",
+  Array.isArray(newsPublicAfter.body) && !newsPublicAfter.body.some((post) => post.id === newsId),
+  `¿sigue apareciendo? ${Array.isArray(newsPublicAfter.body) && newsPublicAfter.body.some((post) => post.id === newsId)}`,
+);
+
+const newsDeletedAgain = await call("DELETE", `/api/news/${newsId}`, undefined, { auth: true });
+check(
+  "B · borrar algo inexistente NO finge éxito: 404 en vez de 204",
+  newsDeletedAgain.status === 404,
+  `status=${newsDeletedAgain.status}`,
+);
+
+// --- Caso A/B: MASCOTAS -----------------------------------------------------
+const newPet = await call(
+  "POST",
+  "/api/admin/pets",
+  {
+    name: `Mascota E2E ${stamp}`,
+    species: "perro",
+    breed: "Mestizo",
+    sex: "hembra",
+    ageCategory: "adulto",
+    size: "mediano",
+    description: "Mascota de prueba del ciclo completo admin → público.",
+    location: "San Ramón",
+    contactName: "Equipo E2E",
+    status: "available",
+  },
+  { auth: true },
+);
+const petId = newPet.body?.id;
+check("A1 · se crea la mascota desde el panel", newPet.status === 201 && Number.isInteger(petId), `status=${newPet.status}`);
+
+const petsPublic = await call("GET", "/api/pets");
+check(
+  "A2 · la mascota nueva YA se ve en la web pública (estado disponible)",
+  Array.isArray(petsPublic.body) && petsPublic.body.some((pet) => pet.id === petId),
+  `¿aparece? ${Array.isArray(petsPublic.body) && petsPublic.body.some((pet) => pet.id === petId)}`,
+);
+
+const petDetail = await call("GET", `/api/pets/${petId}`);
+check("A2b · su ficha pública responde", petDetail.status === 200, `status=${petDetail.status}`);
+
+const petDeleted = await call("DELETE", `/api/admin/pets/${petId}`, undefined, { auth: true });
+check("A3 · el panel la elimina (204)", petDeleted.status === 204, `status=${petDeleted.status}`);
+
+const petsPublicAfter = await call("GET", "/api/pets");
+check(
+  "A4 · YA NO aparece en la web pública",
+  Array.isArray(petsPublicAfter.body) && !petsPublicAfter.body.some((pet) => pet.id === petId),
+  `¿sigue apareciendo? ${Array.isArray(petsPublicAfter.body) && petsPublicAfter.body.some((pet) => pet.id === petId)}`,
+);
+
+const petDetailAfter = await call("GET", `/api/pets/${petId}`);
+check("A5 · su ficha pública devuelve 404", petDetailAfter.status === 404, `status=${petDetailAfter.status}`);
+
+const petDeletedAgain = await call("DELETE", `/api/admin/pets/${petId}`, undefined, { auth: true });
+check(
+  "B · borrar una mascota inexistente NO finge éxito: 404 en vez de 204",
+  petDeletedAgain.status === 404,
+  `status=${petDeletedAgain.status}`,
+);
+
+// --- Caso E: permisos --------------------------------------------------------
+const newsDeleteAnonymous = await call("DELETE", "/api/news/1");
+check("E · sin sesión no se puede borrar una noticia (401)", newsDeleteAnonymous.status === 401, `status=${newsDeleteAnonymous.status}`);
+
+const petDeleteAnonymous = await call("DELETE", "/api/admin/pets/1");
+check("E · sin sesión no se puede borrar una mascota (401)", petDeleteAnonymous.status === 401, `status=${petDeleteAnonymous.status}`);
+
 // ── La campaña DEMO ya no existe y sus datos ficticios desaparecieron ────────
 const demoPublicAfter = await call("GET", `/api/campaigns/${demoId}`);
 check("la campaña eliminada NO existe en el frontend (404)", demoPublicAfter.status === 404, `status=${demoPublicAfter.status}`);

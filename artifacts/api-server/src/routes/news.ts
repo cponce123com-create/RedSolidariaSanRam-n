@@ -77,7 +77,16 @@ router.put("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
 router.delete("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await db.delete(newsTable).where(eq(newsTable.id, id));
+    // V14-3.1: se COMPRUEBA que el borrado afectó a una fila. Antes se devolvía 204
+    // siempre, así que borrar un id inexistente (o ya borrado) mostraba «eliminado» en
+    // el panel sin haber borrado nada: un falso éxito que dejaba la noticia publicada.
+    const deleted = await db
+      .delete(newsTable)
+      .where(eq(newsTable.id, id))
+      .returning({ id: newsTable.id });
+    if (deleted.length === 0) {
+      return res.status(404).json({ error: "not_found", message: "News post not found" });
+    }
     return res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete news post");

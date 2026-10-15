@@ -28,6 +28,17 @@ export const ALLIES_KEY = "/api/allies";
 export const ADMIN_ALLIES_KEY = "/api/admin/allies";
 export const SETTINGS_KEY = "settings";
 export const ADMIN_SETTINGS_KEY = "admin-settings";
+// V14-3.1: pares admin/público que faltaban. Sin ellos, el panel invalidaba una entrada
+// de caché y la web pública leía otra distinta: el cambio no se reflejaba.
+export const PETS_KEY = "/api/pets";
+export const ADMIN_PETS_KEY = "/api/admin/pets";
+export const NEWS_KEY = "/api/news";
+export const ADMIN_REPORTS_KEY = "/api/admin/reports";
+export const REPORTS_KEY = "/api/reports";
+export const FAQ_KEY = "/api/faq";
+export const ADMIN_FAQ_KEY = "/api/admin/faq";
+export const TESTIMONIALS_KEY = "/api/testimonials";
+export const ADMIN_TESTIMONIALS_KEY = "/api/admin/testimonials";
 
 /**
  * `true` si la primera parte de la clave es `prefix` o un recurso colgante de
