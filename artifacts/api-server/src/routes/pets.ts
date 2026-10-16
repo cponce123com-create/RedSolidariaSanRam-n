@@ -180,7 +180,16 @@ router.delete("/admin/pets/:id", async (req, res) => {
         message: `Esta mascota tiene ${requests.length} solicitud(es) de adopción. Resuélvelas antes de eliminarla.`,
       });
     }
-    await db.delete(petsTable).where(eq(petsTable.id, id));
+    // V14-3.1: se COMPRUEBA que el borrado afectó a una fila. Antes se devolvía 204
+    // siempre, así que el panel mostraba «eliminada» aunque el id no existiera y la
+    // mascota siguiera publicada.
+    const deleted = await db
+      .delete(petsTable)
+      .where(eq(petsTable.id, id))
+      .returning({ id: petsTable.id });
+    if (deleted.length === 0) {
+      return res.status(404).json({ error: "not_found", message: "Mascota no encontrada" });
+    }
     return res.status(204).send();
   } catch (err) {
     req.log.error({ err }, "Failed to delete pet");

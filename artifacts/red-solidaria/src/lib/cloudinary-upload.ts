@@ -45,7 +45,10 @@ export class UploadError extends Error {
  */
 export async function uploadImageToCloudinary(
   file: File,
-  endpoint: "/api/uploads/signature" | "/api/uploads/admin-signature",
+  endpoint:
+    | "/api/uploads/signature"
+    | "/api/uploads/admin-signature"
+    | "/api/uploads/institutional-signature",
 ): Promise<UploadedImage> {
   const res = await fetch(endpoint, { method: "POST" });
   if (!res.ok) {

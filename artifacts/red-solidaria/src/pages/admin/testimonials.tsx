@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { errorMessage } from "@/lib/api-error";
+import { adminRequestNoContent } from "@/lib/admin-request";
+import { invalidateTestimonialQueries } from "@/lib/query-invalidation";
 import { Plus, Edit2, Trash2, Check, Quote, User } from "lucide-react";
 
 interface Testimonial {
@@ -79,12 +82,23 @@ export default function AdminTestimonials() {
 
   const { data: testimonials = [], isLoading } = useQuery<Testimonial[]>({
     queryKey: ["/api/testimonials"],
-    queryFn: async () => { const r = await fetch("/api/testimonials"); return r.json(); },
+    queryFn: async () => {
+      const r = await fetch("/api/testimonials");
+      if (!r.ok) throw new Error("No se pudieron cargar los testimonios");
+      return r.json();
+    },
   });
 
   const deleteItem = useMutation({
-    mutationFn: async (id: number) => { await fetch(`/api/testimonials/${id}`, { method: "DELETE" }); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/testimonials"] }); toast({ title: "Testimonio eliminado" }); },
+    mutationFn: (id: number) => adminRequestNoContent(`/api/testimonials/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      // Testimonios es UNA entidad: se refrescan panel y página pública.
+      invalidateTestimonialQueries(queryClient);
+      toast({ title: "Testimonio eliminado" });
+    },
+    // Antes no había onError: un 404/500 dejaba el testimonio publicado sin avisar.
+    onError: (error: unknown) =>
+      toast({ title: "No se pudo eliminar el testimonio", description: errorMessage(error), variant: "destructive" }),
   });
 
   const handleSave = () => { queryClient.invalidateQueries({ queryKey: ["/api/testimonials"] }); setShowForm(false); setEditing(null); };

@@ -28,6 +28,25 @@ export const ALLIES_KEY = "/api/allies";
 export const ADMIN_ALLIES_KEY = "/api/admin/allies";
 export const SETTINGS_KEY = "settings";
 export const ADMIN_SETTINGS_KEY = "admin-settings";
+// V14-3.1: pares admin/público que faltaban. Sin ellos, el panel invalidaba una entrada
+// de caché y la web pública leía otra distinta: el cambio no se reflejaba.
+export const PETS_KEY = "/api/pets";
+export const ADMIN_PETS_KEY = "/api/admin/pets";
+export const NEWS_KEY = "/api/news";
+export const ADMIN_REPORTS_KEY = "/api/admin/reports";
+export const REPORTS_KEY = "/api/reports";
+export const FAQ_KEY = "/api/faq";
+export const ADMIN_FAQ_KEY = "/api/admin/faq";
+export const TESTIMONIALS_KEY = "/api/testimonials";
+export const ADMIN_TESTIMONIALS_KEY = "/api/admin/testimonials";
+// V15: entidades que aún no tenían predicado propio y que el panel invalida.
+// `adoption-requests` cuelga de la entidad mascotas: aprobar una solicitud cambia
+// el estado de la mascota y su ficha pública.
+export const ADOPTION_REQUESTS_KEY = "/api/admin/adoption-requests";
+// Identidad institucional (Fase 3): la vista pública y la administrativa son la
+// misma entidad con dos claves; ambas se invalidan juntas.
+export const IDENTITY_KEY = "institutional-identity";
+export const ADMIN_IDENTITY_KEY = "admin-institutional-identity";
 
 /**
  * `true` si la primera parte de la clave es `prefix` o un recurso colgante de
@@ -65,6 +84,42 @@ export function isSettingsQueryKey(key: readonly unknown[]): boolean {
   return key[0] === SETTINGS_KEY || key[0] === ADMIN_SETTINGS_KEY;
 }
 
+// ─── V15: predicados de las entidades restantes ──────────────────────────────
+
+/** Mascotas (pública + panel) y solicitudes de adopción. */
+export function isPetQueryKey(key: readonly unknown[]): boolean {
+  return (
+    headIs(key, PETS_KEY) ||
+    headIs(key, ADMIN_PETS_KEY) ||
+    headIs(key, ADOPTION_REQUESTS_KEY)
+  );
+}
+
+/** Noticias: listado público y panel (comparten `/api/news`). */
+export function isNewsQueryKey(key: readonly unknown[]): boolean {
+  return headIs(key, NEWS_KEY);
+}
+
+/** Testimonios: página pública y panel administrativo. */
+export function isTestimonialQueryKey(key: readonly unknown[]): boolean {
+  return headIs(key, TESTIMONIALS_KEY) || headIs(key, ADMIN_TESTIMONIALS_KEY);
+}
+
+/** Preguntas frecuentes: página pública y panel administrativo. */
+export function isFaqQueryKey(key: readonly unknown[]): boolean {
+  return headIs(key, FAQ_KEY) || headIs(key, ADMIN_FAQ_KEY);
+}
+
+/** Reportes ciudadanos: listado público y panel. */
+export function isReportQueryKey(key: readonly unknown[]): boolean {
+  return headIs(key, REPORTS_KEY) || headIs(key, ADMIN_REPORTS_KEY);
+}
+
+/** Identidad institucional: vista pública y borrador administrativo. */
+export function isIdentityQueryKey(key: readonly unknown[]): boolean {
+  return key[0] === IDENTITY_KEY || key[0] === ADMIN_IDENTITY_KEY;
+}
+
 /**
  * `true` si la clave pertenece a alguna de las entidades indicadas. Se usa para
  * invalidar «todo lo que depende de X» sin repetir predicados por el código.
@@ -73,7 +128,13 @@ export type QueryEntity =
   | "campaigns"
   | "donations"
   | "allies"
-  | "settings";
+  | "settings"
+  | "pets"
+  | "news"
+  | "testimonials"
+  | "faq"
+  | "reports"
+  | "identity";
 
 const ENTITY_PREDICATES: Record<
   QueryEntity,
@@ -83,6 +144,12 @@ const ENTITY_PREDICATES: Record<
   donations: isDonationQueryKey,
   allies: isAllyQueryKey,
   settings: isSettingsQueryKey,
+  pets: isPetQueryKey,
+  news: isNewsQueryKey,
+  testimonials: isTestimonialQueryKey,
+  faq: isFaqQueryKey,
+  reports: isReportQueryKey,
+  identity: isIdentityQueryKey,
 };
 
 export function isEntityQueryKey(

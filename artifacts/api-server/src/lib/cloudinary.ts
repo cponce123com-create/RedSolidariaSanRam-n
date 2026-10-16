@@ -43,6 +43,14 @@ export interface UploadSignature {
 const ALLOWED_UPLOAD_FORMATS = "jpg,png,webp";
 const MAX_UPLOAD_BYTES = String(8 * 1024 * 1024);
 
+/**
+ * Carpeta de Cloudinary para la identidad institucional (Fase 3). Se fija en el
+ * servidor: la firma solo se emite para esta carpeta, así el cliente no puede
+ * subir a carpetas arbitrarias. El borrado de assets solo actúa sobre publicIds
+ * con este prefijo (nunca archivos compartidos).
+ */
+export const INSTITUTIONAL_IDENTITY_FOLDER = "institutional-identity";
+
 export function getUploadSignature(
   folder: string,
 ): UploadSignature | null {

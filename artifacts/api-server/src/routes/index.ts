@@ -26,6 +26,7 @@ import faqRouter from "./faq";
 import adminUsersRouter from "./admin-users";
 import adminTwoFactorRouter from "./admin-2fa";
 import settingsRouter from "./settings";
+import institutionalIdentityRouter from "./institutional-identity";
 import auditLogsRouter from "./audit-logs";
 import reportsRouter from "./reports";
 import supervisorRouter from "./supervisor";
@@ -81,6 +82,9 @@ router.use(dashboardRouter);
 router.use(faqRouter);
 router.use(adminUsersRouter);
 router.use(settingsRouter);
+// Identidad institucional (Fase 3): la vista pública vive fuera de /admin y la
+// administrativa queda tras el gate global + requireRole(SUPERADMIN).
+router.use(institutionalIdentityRouter);
 router.use(maintenanceRouter);
 router.use(maintenanceExpensesRouter);
 router.use(campaignClosureRouter);

@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import SEO from "@/components/shared/SEO";
 import { buildSiteJsonLd } from "@/lib/structured-data";
+import { InstitutionalCover } from "@/components/home/InstitutionalCover";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HowToHelpSection } from "@/components/home/HowToHelpSection";
 import { ActiveCampaignsSection } from "@/components/home/ActiveCampaignsSection";
@@ -27,6 +28,7 @@ const AdoptionsSection = lazy(() =>
  * Página de inicio — centro de acción de la red.
  *
  * Jerarquía (respuesta en <5s):
+ *  0. Portada institucional (solo si está configurada y publicada)
  *  1. Qué es → Hero
  *  2. Cómo puedo ayudar → HowToHelpSection
  *  3. Personas que necesitan → ActiveCampaignsSection (+ casos urgentes)
@@ -53,6 +55,9 @@ export default function Home() {
         })}
       />
 
+      {/* Portada institucional administrable: no renderiza nada si no hay
+          contenido publicado, así el home nunca se rompe por falta de identidad. */}
+      <InstitutionalCover />
       <HomeHero />
       {/* Campaña protagonista (ChocoFest 2026): solo si está configurada,
           publicada y activa. Si no, no renderiza nada y la portada general

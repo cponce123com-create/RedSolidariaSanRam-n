@@ -888,6 +888,31 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON campaign_closures (campaign_id, id);
     `,
   },
+  {
+    name: "031_institutional_identity.sql",
+    sql: `
+      -- V15 (Fase 3): identidad institucional administrable por el superadmin.
+      --
+      -- FILA ÚNICA (id = 1) con la restricción CHECK que lo garantiza. Dos
+      -- columnas JSONB separan el BORRADOR (lo que se edita) del PUBLICADO (lo
+      -- que consume la web pública); published IS NULL significa «sin publicar».
+      -- Publicar copia draft→published y sella la fecha.
+      --
+      -- ADITIVA: una tabla nueva; no toca ninguna otra. Rollback: DROP TABLE.
+      CREATE TABLE IF NOT EXISTS institutional_identity (
+        id integer PRIMARY KEY DEFAULT 1,
+        draft jsonb NOT NULL DEFAULT '{}'::jsonb,
+        published jsonb,
+        published_at timestamp,
+        updated_at timestamp NOT NULL DEFAULT now(),
+        updated_by text,
+        CONSTRAINT institutional_identity_single_row CHECK (id = 1)
+      );
+
+      INSERT INTO institutional_identity (id) VALUES (1)
+        ON CONFLICT (id) DO NOTHING;
+    `,
+  },
 ];
 
 /**

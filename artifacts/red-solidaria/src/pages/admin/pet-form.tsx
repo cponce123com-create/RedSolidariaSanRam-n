@@ -1,3 +1,4 @@
+import { PETS_KEY, ADMIN_PETS_KEY } from "../../lib/query-keys";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -57,6 +58,7 @@ export default function AdminPetForm() {
     queryKey: ["/api/admin/pets", id],
     queryFn: async () => {
       const res = await fetch(`/api/admin/pets/${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("No se pudo cargar la mascota");
       return res.json();
     },
     enabled: isEdit,
@@ -91,7 +93,12 @@ export default function AdminPetForm() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pets"] });
+      // V14-3.1: se invalida TAMBIÉN la clave PÚBLICA. Antes solo se invalidaba
+      // `/api/admin/pets`, así que la web pública seguía mostrando la mascota eliminada
+      // (o los datos viejos) hasta que el visitante recargaba a mano: dos entradas de
+      // caché distintas para el mismo dato.
+      queryClient.invalidateQueries({ queryKey: [ADMIN_PETS_KEY] });
+      queryClient.invalidateQueries({ queryKey: [PETS_KEY] });
       toast({ title: isEdit ? "Mascota actualizada" : "Mascota creada" });
       setLocation("/admin/adopciones");
     },
