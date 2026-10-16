@@ -108,10 +108,11 @@ export async function uploadImageToCloudinary(
   form.append("timestamp", sig.timestamp);
   form.append("api_key", sig.apiKey);
   form.append("signature", sig.signature);
-  // Parámetros firmados por el servidor: si el cliente no los envía tal cual,
-  // Cloudinary invalida la subida (formato y tamaño máximos).
+  // Parámetro firmado por el servidor: si el cliente no lo envía tal cual, Cloudinary
+  // invalida la subida. SOLO se envían parámetros que Cloudinary reconoce: firmar o
+  // enviar un parámetro desconocido (como el antiguo `max_bytes`) provoca un 401
+  // «Invalid Signature». El límite de tamaño se valida antes de subir.
   form.append("allowed_formats", sig.allowedFormats);
-  form.append("max_bytes", sig.maxBytes);
 
   let upload: Response;
   try {

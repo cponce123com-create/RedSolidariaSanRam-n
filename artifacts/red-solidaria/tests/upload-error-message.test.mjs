@@ -52,3 +52,27 @@ test("sin datos → mensaje genérico reintentable", () => {
   assert.equal(f.kind, "unknown");
   assert.match(f.message, /Inténtalo de nuevo/);
 });
+
+// ─── V18.1: el 401 de Cloudinary debe mostrar SU mensaje, no hablar de la sesión ──
+
+test("V18.1: un 401 de Cloudinary muestra su mensaje literal", () => {
+  const f = describeUploadFailure({
+    status: 401,
+    cloudinaryMessage: "Invalid Signature abcd1234. String to sign - 'folder=...'",
+  });
+  assert.equal(f.kind, "signature");
+  assert.match(f.message, /Invalid Signature/);
+  // Antes se mostraba «vuelve a iniciar sesión», que despistaba por completo.
+  assert.doesNotMatch(f.message, /iniciar sesión/i);
+});
+
+test("V18.1: un 401 sin mensaje de Cloudinary (sesión propia) conserva el aviso de sesión", () => {
+  const f = describeUploadFailure({ status: 401 });
+  assert.equal(f.kind, "signature");
+  assert.match(f.message, /iniciar sesión/i);
+});
+
+test("V18.1: 'Invalid credentials' también se propaga", () => {
+  const f = describeUploadFailure({ status: 401, cloudinaryMessage: "Invalid credentials" });
+  assert.match(f.message, /Invalid credentials/);
+});
