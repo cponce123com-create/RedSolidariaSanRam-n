@@ -967,6 +967,57 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON cms_page_versions (slug, version);
     `,
   },
+  {
+    name: "034_donation_items_fulfillment.sql",
+    sql: `
+      -- V20 (Fases 6 y 9): cumplimiento del aporte, código de seguimiento,
+      -- idempotencia del formulario público e ÍTEMS de donación en especie.
+      --
+      -- IMPORTANTE: el estado CONTABLE de una donación sigue siendo
+      -- \`donations.status\` (pending|approved|rejected|reconciled|annulled) y es la
+      -- ÚNICA fuente de las cifras y del libro: una promesa nunca cuenta como
+      -- ingreso. \`fulfillment_status\` es un ciclo de vida PARALELO que no altera
+      -- ninguna cifra.
+      --
+      -- ADITIVA e IDEMPOTENTE: no modifica ni borra ninguna donación histórica.
+      -- Rollback: DROP TABLE donation_items; y DROP COLUMN de las columnas nuevas.
+      ALTER TABLE donations
+        ADD COLUMN IF NOT EXISTS fulfillment_status text NOT NULL DEFAULT 'pendiente_coordinacion';
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS tracking_code text;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS dedupe_token text;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS received_at timestamp;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS fulfillment_updated_at timestamp;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS fulfillment_updated_by text;
+      -- Consentimiento de CONTACTO (separado del de publicación) y organización.
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS contact_consent boolean NOT NULL DEFAULT false;
+      ALTER TABLE donations ADD COLUMN IF NOT EXISTS org_name text;
+
+      -- Índices únicos PARCIALES: solo aplican cuando el valor existe, así las
+      -- donaciones históricas (todas con NULL) no chocan entre sí.
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_donations_tracking_code
+        ON donations (tracking_code) WHERE tracking_code IS NOT NULL;
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_donations_dedupe_token
+        ON donations (dedupe_token) WHERE dedupe_token IS NOT NULL;
+
+      -- Ítems de una donación en especie (varios productos por donación).
+      CREATE TABLE IF NOT EXISTS donation_items (
+        id serial PRIMARY KEY,
+        donation_id integer NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
+        product text NOT NULL,
+        quantity numeric(12, 3) NOT NULL DEFAULT 0,
+        unit text NOT NULL,
+        description text,
+        estimated_value numeric(12, 2) NOT NULL DEFAULT 0,
+        photo_url text,
+        photo_public_id text,
+        received_quantity numeric(12, 3) NOT NULL DEFAULT 0,
+        created_at timestamp NOT NULL DEFAULT now()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_donation_items_donation
+        ON donation_items (donation_id);
+    `,
+  },
 ];
 
 /**

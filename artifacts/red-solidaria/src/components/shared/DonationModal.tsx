@@ -1,654 +1,888 @@
-import { useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useEffect, useRef, useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useCreateDonation } from "@workspace/api-client-react";
-import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { CreditCard, Landmark, Phone, Heart, CheckCircle2, ChevronRight, ChevronLeft, UploadCloud, Trash2, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Gift,
+  HandHeart,
+  Heart,
+  Loader2,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import confetti from "canvas-confetti";
-import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/cloudinary-upload";
+import {
+  DONATION_UNITS,
+  MAX_ITEMS,
+  MAX_ITEM_DESCRIPTION,
+  MAX_OTHER_PRODUCT,
+  OTHER_PRODUCT,
+  PRODUCT_CATALOG,
+  emptyDonationItem,
+  itemSummary,
+  toDonationItemsPayload,
+  type DonationItemDraft,
+} from "@/lib/donation-products";
+import { isValidPePhone, normalizePePhone } from "@/lib/phone";
+import {
+  DonationSubmitError,
+  newDedupeToken,
+  submitDonation,
+} from "@/lib/donation-submit";
 
-type PaymentMethod = "yape" | "plin" | "transfer" | "card" | "cash" | "other";
-type DonorType = "individual" | "familia" | "empresa" | "organizacion" | "anonimo";
-type CollaborationType = "dinero" | "productos" | "servicios" | "logistica";
-
-/** Clave i18n de cada tipo de colaboración (para etiquetas en el selector/resumen). */
-const COLLABORATION_LABEL_KEY: Record<CollaborationType, string> = {
-  dinero: "donation.collaborationDinero",
-  productos: "donation.collaborationProductos",
-  servicios: "donation.collaborationServicios",
-  logistica: "donation.collaborationLogistica",
-};
-
-type DonationFormValues = {
-  collaborationType: CollaborationType;
-  amount: number;
-  paymentMethod?: PaymentMethod;
-  message?: string;
-  anonymous: boolean;
-  publicProof: boolean;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  donorType: DonorType;
-  receiptNote?: string;
-};
+/**
+ * Formulario público de donación (V20).
+ *
+ * ── FASE 1: LA CAUSA RAÍZ DEL MODAL QUE NO CERRABA ──────────────────────────
+ * Antes se montaba `onOpenChange={open ? undefined : resetAndClose}`: con el
+ * diálogo ABIERTO el manejador quedaba en `undefined`, así que Radix no tenía a
+ * quién pedir el cierre y la X, la tecla Escape y el clic fuera NO hacían nada.
+ *
+ * Ahora hay SIEMPRE un manejador (`handleOpenChange`) que pasa por `requestClose`:
+ *   · sin datos introducidos → cierra directamente;
+ *   · con datos → pide confirmación antes de descartarlos;
+ *   · tras enviar → cierra sin preguntar (el aporte ya está guardado);
+ *   · mientras se envía → no cierra (evita perder el envío a medias).
+ * Así el modal no puede quedar bloqueado: cualquier gesto de cierre tiene salida.
+ *
+ * ── FASE 2: DOS PASOS ───────────────────────────────────────────────────────
+ * Paso 1: qué donas (dinero / productos / servicios). Paso 2: tus datos.
+ * Se bloquea ÚNICAMENTE el botón de envío mientras se procesa; el resto sigue
+ * accesible. En móvil ocupa toda la pantalla y solo el cuerpo hace scroll, con
+ * cabecera y pie siempre visibles.
+ */
+type CollaborationChoice = "dinero" | "productos" | "servicios";
+type ServiceKind = "servicios" | "logistica";
+type PaymentMethod = "yape" | "plin" | "transfer" | "other";
 
 interface DonationModalProps {
   open: boolean;
   onClose: () => void;
   campaignId?: number;
   campaignTitle?: string;
+  /** Producto preseleccionado (botón «Quiero donar esto» de Necesidades). */
+  preselectProduct?: string;
 }
 
-export function DonationModal({ open, onClose, campaignId, campaignTitle }: DonationModalProps) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [donationId, setDonationId] = useState<number | null>(null);
-  const [proofUrl, setProofUrl] = useState<string | null>(null);
-  const [proofPublicId, setProofPublicId] = useState<string | null>(null);
-  const [proofMimeType, setProofMimeType] = useState<string | null>(null);
-  const [proofFileName, setProofFileName] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const QUICK_AMOUNTS = [10, 20, 50, 100];
+const MIN_AMOUNT = 5;
 
-  const { toast } = useToast();
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const createDonation = useCreateDonation();
+const PAYMENT_METHODS: { value: PaymentMethod; label: string; hint: string }[] = [
+  { value: "yape", label: "Yape", hint: "Al 921 615 737" },
+  { value: "plin", label: "Plin", hint: "Al 921 615 737" },
+  { value: "transfer", label: "Transferencia", hint: "BCP 193-12345678-0-55" },
+  { value: "other", label: "Otro medio", hint: "Coordinamos contigo" },
+];
 
-  // Schema de validación con mensajes traducidos (se reconstruye por render:
-  // es barato y mantiene los mensajes sincronizados con el idioma activo).
-  const donationSchema = z
-    .object({
-      collaborationType: z
-        .enum(["dinero", "productos", "servicios", "logistica"])
-        .default("dinero"),
-      // Monto (dinero) o valor estimado (especie). En especie puede quedar
-      // vacío: z.coerce.number() convierte "" en 0 y el mínimo es 0.
-      amount: z
-        .coerce
-        .number()
-        .min(0, t("donation.minAmount"))
-        // Épsilon: 5.01*100 = 500.99999999999994 en float64; comparación exacta
-        // rechazaría montos legítimos con centavos (50.01, 10.10, ...).
-        .refine((v) => Math.abs(v * 100 - Math.round(v * 100)) < 1e-8, t("donation.twoDecimals")),
-      // Solo las donaciones de dinero exigen método de pago (ver superRefine).
-      paymentMethod: z
-        .enum(["yape", "plin", "transfer", "card", "cash", "other"])
-        .optional(),
-      message: z.string().optional(),
-      anonymous: z.boolean().default(false),
-      publicProof: z.boolean().default(false),
-      firstName: z.string().min(2, t("donation.requiredName")),
-      lastName: z.string().min(2, t("donation.requiredLastName")),
-      email: z.string().email(t("donation.invalidEmail")),
-      phone: z.string().optional(),
-      donorType: z
-        .enum(["individual", "familia", "empresa", "organizacion", "anonimo"])
-        .default("individual"),
-      receiptNote: z.string().optional(),
-    })
-    // Monto mínimo (S/ 5) y método de pago SOLO para colaboraciones de dinero:
-    // una donación en especie es válida con valor estimado 0 y sin método.
-    .superRefine((data, ctx) => {
-      if (data.collaborationType !== "dinero") return;
-      if (!(data.amount >= 5)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["amount"],
-          message: t("donation.minAmount"),
-        });
-      }
-      if (!data.paymentMethod) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["paymentMethod"],
-          message: t("donation.selectMethod"),
-        });
-      }
-    });
-
-  const form = useForm<DonationFormValues>({
-    resolver: zodResolver(donationSchema),
-    defaultValues: {
-      collaborationType: "dinero",
-      amount: 50,
-      paymentMethod: "yape",
-      message: "",
-      anonymous: false,
-      publicProof: false,
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      donorType: "individual",
-      receiptNote: "",
-    },
-  });
-
-  const collaborationType = form.watch("collaborationType");
-  const isMoney = collaborationType === "dinero";
-  const paymentMethod = form.watch("paymentMethod");
-  const amount = form.watch("amount");
-  const estimatedValue = Number(amount) || 0;
-  const donorTypeValue = form.watch("donorType");
-  const requiresReceipt =
-    isMoney && paymentMethod != null && ["yape", "plin", "transfer"].includes(paymentMethod);
-
-  // Cambiar el tipo de colaboración reajusta la UI: en especie el valor es un
-  // estimado opcional (0 por defecto) y no se piden monto ni método de pago.
-  const handleCollaborationChange = (value: CollaborationType) => {
-    form.setValue("collaborationType", value);
-    if (value !== "dinero") form.setValue("amount", 0);
-    if (value === "dinero" && !(Number(form.getValues("amount")) >= 5)) {
-      form.setValue("amount", 50);
-    }
-    form.clearErrors(["amount", "paymentMethod"]);
-  };
-
-  const triggerConfetti = () => {
-    const duration = 3 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 10000 };
-
-    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-    const interval: any = setInterval(function() {
-      const timeLeft = animationEnd - Date.now();
-
-      if (timeLeft <= 0) {
-        return clearInterval(interval);
-      }
-
-      const particleCount = 50 * (timeLeft / duration);
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-    }, 250);
-  };
-
-  const handleProofFile = async (file: File) => {
-    const error = validateProofImage(file);
-    if (error) {
-      toast({
-        title: t("donation.invalidFile"),
-        description: error === "size" ? t("donation.proofSizeError") : t("donation.proofTypeError"),
-        variant: "destructive",
-      });
+function triggerConfetti() {
+  const duration = 2500;
+  const end = Date.now() + duration;
+  const interval = window.setInterval(() => {
+    if (Date.now() > end) {
+      window.clearInterval(interval);
       return;
     }
-    setUploading(true);
-    try {
-      const result = await uploadImageToCloudinary(file, "/api/uploads/signature");
-      setProofUrl(result.imageUrl);
-      setProofPublicId(result.publicId);
-      setProofMimeType(file.type);
-      setProofFileName(file.name);
-      toast({ title: t("donation.proofUploadedToast"), description: t("donation.proofUploadedToastDesc") });
-    } catch (err) {
-      toast({
-        title: t("donation.uploadError"),
-        description:
-          err instanceof UploadError
-            ? t(err.code === "init" ? "donation.uploadInitError" : "donation.uploadFailedError")
-            : err instanceof Error
-              ? err.message
-              : t("donation.uploadErrorRetry"),
-        variant: "destructive",
+    confetti({ particleCount: 40, spread: 360, startVelocity: 30, zIndex: 10000 });
+  }, 250);
+}
+
+export function DonationModal({
+  open,
+  onClose,
+  campaignId,
+  campaignTitle,
+  preselectProduct,
+}: DonationModalProps) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+
+  const [step, setStep] = useState<1 | 2>(1);
+  const [choice, setChoice] = useState<CollaborationChoice>("dinero");
+  const [serviceKind, setServiceKind] = useState<ServiceKind>("servicios");
+  const [amount, setAmount] = useState("50");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("yape");
+  const [items, setItems] = useState<DonationItemDraft[]>([emptyDonationItem()]);
+  const [message, setMessage] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [orgName, setOrgName] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
+  const [contactConsent, setContactConsent] = useState(true);
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ id: number; trackingCode: string | null } | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  const dedupeTokenRef = useRef<string>(newDedupeToken());
+
+  // Al abrir: clave de idempotencia nueva y formulario limpio (restauración
+  // correcta tras cerrar o finalizar).
+  useEffect(() => {
+    if (!open) return;
+    dedupeTokenRef.current = newDedupeToken();
+    setStep(1);
+    setChoice("dinero");
+    setServiceKind("servicios");
+    setAmount("50");
+    setPaymentMethod("yape");
+    setItems([{ ...emptyDonationItem(), product: preselectProduct || "panetones" }]);
+    setMessage("");
+    setFullName("");
+    setPhone("");
+    setEmail("");
+    setOrgName("");
+    setAnonymous(false);
+    setContactConsent(true);
+    setErrors({});
+    setSubmitError(null);
+    setResult(null);
+    setConfirmDiscard(false);
+  }, [open, preselectProduct]);
+
+  // ¿Hay datos que se perderían al cerrar?
+  const hasEnteredData =
+    step === 2 ||
+    choice !== "dinero" ||
+    amount !== "50" ||
+    message.trim() !== "" ||
+    fullName.trim() !== "" ||
+    phone.trim() !== "" ||
+    email.trim() !== "" ||
+    orgName.trim() !== "" ||
+    anonymous ||
+    !contactConsent ||
+    items.length > 1 ||
+    items.some(
+      (item) =>
+        item.product !== (preselectProduct || "panetones") ||
+        item.productOther !== "" ||
+        item.quantity !== "1" ||
+        item.description !== "" ||
+        item.estimatedValue !== "",
+    );
+
+  /** Cierre real: restaura el formulario y avisa al padre. */
+  const hardClose = () => {
+    setConfirmDiscard(false);
+    setStep(1);
+    setResult(null);
+    setSubmitting(false);
+    onClose();
+  };
+
+  /**
+   * Única puerta de cierre (X, Escape, clic fuera, «Cancelar»). Nunca se deja el
+   * diálogo sin manejador, así que nunca queda bloqueado.
+   */
+  const requestClose = () => {
+    if (submitting) return; // no se pierde un envío a medias
+    if (result) {
+      hardClose(); // ya está guardado: cerrar sin preguntar
+      return;
+    }
+    if (hasEnteredData) {
+      setConfirmDiscard(true);
+      return;
+    }
+    hardClose();
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) return; // solo gestionamos el cierre
+    requestClose();
+  };
+
+  const updateItem = (index: number, patch: Partial<DonationItemDraft>) => {
+    setItems((current) => current.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  };
+
+  const validateStep1 = (): boolean => {
+    const next: Record<string, string> = {};
+    if (choice === "dinero") {
+      const value = Number(amount);
+      if (!Number.isFinite(value) || value < MIN_AMOUNT) {
+        next.amount = `El monto mínimo es S/ ${MIN_AMOUNT}.`;
+      } else if (Math.abs(value * 100 - Math.round(value * 100)) >= 1e-8) {
+        // Sin redondeo silencioso: 50.123 no es 50.12. Misma regla que el servidor.
+        next.amount = "El monto admite máximo 2 decimales.";
+      }
+    }
+    if (choice === "productos") {
+      if (items.length === 0) next.items = "Añade al menos un producto.";
+      items.forEach((item, index) => {
+        const quantity = Number(item.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          next[`item-${index}-quantity`] = "La cantidad debe ser mayor que cero.";
+        }
+        if (item.product === OTHER_PRODUCT && item.productOther.trim().length < 2) {
+          next[`item-${index}-product`] = "Escribe qué producto donas.";
+        }
       });
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+    if (choice === "servicios" && message.trim().length < 10) {
+      next.message = "Describe brevemente tu colaboración (al menos 10 caracteres).";
+    }
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const validateStep2 = (): boolean => {
+    const next: Record<string, string> = {};
+    if (fullName.trim().length < 4) next.fullName = "Escribe tu nombre y apellido.";
+    if (!isValidPePhone(phone)) next.phone = "Escribe un WhatsApp peruano válido (9 dígitos).";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      next.email = "Escribe un correo válido para enviarte tu constancia.";
+    }
+    if (!contactConsent) next.contactConsent = "Necesitamos tu autorización para coordinar el aporte.";
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const handleNext = () => {
+    if (validateStep1()) {
+      setErrors({});
+      setStep(2);
     }
   };
 
-  const removeProof = () => {
-    setProofUrl(null);
-    setProofPublicId(null);
-    setProofMimeType(null);
-    setProofFileName(null);
-  };
+  const handleSubmit = async () => {
+    if (submitting) return;
+    if (!validateStep2()) return;
 
-  const onSubmit = (data: DonationFormValues) => {
-    const money = data.collaborationType === "dinero";
-    createDonation.mutate(
-      {
-        data: {
-          ...data,
-          // En especie no hay método de pago real: la API exige "other".
-          paymentMethod: money ? data.paymentMethod ?? "other" : "other",
-          campaignId: campaignId || null,
-          proofImageUrl: proofUrl,
-          proofPublicId,
-          proofMimeType,
-        }
-      },
-      {
-        onSuccess: (res) => {
-          setDonationId(res.id);
-          setIsSuccess(true);
-          triggerConfetti();
-          queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
-          if (campaignId) {
-            queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/donations`] });
-            queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/donors`] });
-          }
-        },
-        onError: () => {
-          toast({ title: t("donation.error"), description: t("donation.processError"), variant: "destructive" });
-        }
+    const [firstName, ...rest] = fullName.trim().split(/\s+/);
+    const lastName = rest.join(" ") || firstName;
+    const collaborationType =
+      choice === "servicios" ? serviceKind : choice === "productos" ? "productos" : "dinero";
+
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await submitDonation({
+        campaignId: campaignId ?? null,
+        firstName,
+        lastName,
+        email: email.trim(),
+        phone: normalizePePhone(phone),
+        orgName: orgName.trim() || undefined,
+        collaborationType,
+        amount: choice === "dinero" ? Number(amount) : 0,
+        paymentMethod: choice === "dinero" ? paymentMethod : undefined,
+        message: message.trim() || undefined,
+        anonymous,
+        contactConsent,
+        items: choice === "productos" ? toDonationItemsPayload(items) : undefined,
+        dedupeToken: dedupeTokenRef.current,
+      });
+
+      setResult({ id: created.id, trackingCode: created.trackingCode ?? null });
+      triggerConfetti();
+      // Sincronización (Fase 10): el aporte nuevo aparece en el panel y en las
+      // vistas de campaña sin recargar.
+      queryClient.invalidateQueries({ queryKey: ["donations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations/stats"] });
+      if (campaignId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/donations`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/campaigns/${campaignId}/donors`] });
       }
-    );
+    } catch (err) {
+      setSubmitError(
+        err instanceof DonationSubmitError
+          ? err.message
+          : "No pudimos registrar tu donación. Inténtalo de nuevo.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleNextStep = async () => {
-    const isValid = await form.trigger(["amount", "paymentMethod"]);
-    if (isValid) setStep(2);
-  };
-
-  const resetAndClose = () => {
-    onClose();
-    setTimeout(() => {
-      setStep(1);
-      setIsSuccess(false);
-      setDonationId(null);
-      removeProof();
-      form.reset();
-    }, 300);
-  };
-
-  if (isSuccess) {
-    return (
-      <Dialog open={open} onOpenChange={resetAndClose}>
-        <DialogContent className="sm:max-w-[500px] text-center p-8 rounded-3xl" data-testid="donation-success-modal">
-          <div className="mx-auto w-20 h-20 bg-accent/20 text-accent rounded-full flex items-center justify-center mb-6">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
-          <DialogTitle className="text-3xl font-display font-bold mb-2">{t("donation.successTitle")}</DialogTitle>
-          <DialogDescription className="text-lg text-muted-foreground mb-8">
-            {t("donation.successDescription")}
-            <br/><br/>
-            <span className="font-semibold text-foreground">{t("donation.donationId", { id: donationId })}</span>
-          </DialogDescription>
-          <Button onClick={resetAndClose} className="w-full h-12 text-lg rounded-xl shadow-md hover-elevate">
-            {t("donation.backButton")}
-          </Button>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+  const busy = submitting;
 
   return (
-    <Dialog open={open} onOpenChange={open ? undefined : resetAndClose}>
-      <DialogContent className="sm:max-w-[600px] rounded-3xl p-0 overflow-hidden" data-testid="donation-modal">
-        <div className="bg-primary/5 p-6 border-b border-border/50">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-display font-bold">
-              {campaignTitle ? t("donation.title", { campaign: campaignTitle }) : t("donation.generalTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {step === 1 ? t("donation.step1") : t("donation.step2")}
-            </DialogDescription>
-          </DialogHeader>
-        </div>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent
+        data-testid="donation-modal"
+        // Altura y scroll (Fase 1.7): en móvil ocupa la pantalla completa y en
+        // escritorio queda acotada; SOLO el cuerpo hace scroll, así el título y
+        // los botones siempre se ven.
+        className="flex h-[100dvh] w-full max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-auto sm:max-h-[85vh] sm:max-w-[620px] sm:rounded-3xl"
+      >
+        {result ? (
+          // ── Éxito ───────────────────────────────────────────────────────────
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <CheckCircle2 className="h-10 w-10" />
+            </div>
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="font-display text-2xl font-bold">
+                ¡Gracias por sumarte{campaignTitle ? ` a ${campaignTitle}` : ""}!
+              </DialogTitle>
+              <DialogDescription className="text-base text-muted-foreground">
+                Hemos recibido tu solicitud. Nos comunicaremos contigo para coordinar tu aporte.
+              </DialogDescription>
+            </DialogHeader>
+            {result.trackingCode && (
+              <div className="w-full rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Código de seguimiento
+                </p>
+                <p
+                  className="mt-1 font-display text-2xl font-bold tracking-widest text-primary"
+                  data-testid="donation-tracking-code"
+                >
+                  {result.trackingCode}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Guárdalo: con él podemos ubicar tu aporte.
+                </p>
+              </div>
+            )}
+            {choice === "dinero" && (
+              <p className="rounded-xl bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                Tu aporte queda <strong>registrado como solicitud pendiente</strong>. Se sumará al
+                total cuando verifiquemos la recepción del pago.
+              </p>
+            )}
+            <Button
+              onClick={hardClose}
+              className="h-12 w-full rounded-xl text-base font-semibold"
+              data-testid="btn-donation-close-success"
+            >
+              {t("donation.backButton")}
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* ── Cabecera (fija) ──────────────────────────────────────────── */}
+            <header className="shrink-0 border-b border-border/50 bg-primary/5 px-5 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <DialogHeader className="space-y-1 text-left">
+                  <DialogTitle className="font-display text-xl font-bold sm:text-2xl">
+                    {campaignTitle ? t("donation.title", { campaign: campaignTitle }) : t("donation.generalTitle")}
+                  </DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Paso {step} de 2 ·{" "}
+                    {step === 1 ? "¿Qué deseas donar?" : "Tus datos para coordinar"}
+                  </DialogDescription>
+                </DialogHeader>
+                <button
+                  type="button"
+                  onClick={requestClose}
+                  aria-label="Cerrar"
+                  data-testid="btn-donation-close"
+                  className="-mr-1 -mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-300"
+                  style={{ width: step === 1 ? "50%" : "100%" }}
+                />
+              </div>
+            </header>
 
-        <div className="p-6 max-h-[75vh] overflow-y-auto">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              
-              {/* STEP 1 */}
-              <div className={step === 1 ? "block" : "hidden"}>
-                {/* Tipo de colaboración: dinero o especie (productos, servicios,
-                    apoyo logístico). Define si se piden monto y método de pago. */}
-                <div className="mb-8">
-                  <p className="text-base font-semibold block mb-3">{t("donation.collaborationLabel")}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {([
-                      { value: "dinero" as const, label: t("donation.collaborationDinero") },
-                      { value: "productos" as const, label: t("donation.collaborationProductos") },
-                      { value: "servicios" as const, label: t("donation.collaborationServicios") },
-                      { value: "logistica" as const, label: t("donation.collaborationLogistica") },
-                    ]).map((opt) => (
+            {/* ── Cuerpo (scroll) ──────────────────────────────────────────── */}
+            <div className="flex-1 overflow-y-auto px-5 py-5">
+              {confirmDiscard ? (
+                <div className="flex flex-col items-center gap-4 py-8 text-center" data-testid="donation-discard-confirm">
+                  <AlertTriangle className="h-10 w-10 text-amber-500" />
+                  <p className="font-semibold">¿Descartar tu donación?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Si cierras ahora, perderás los datos que ya escribiste.
+                  </p>
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                    <Button
+                      variant="outline"
+                      className="h-12 rounded-xl"
+                      onClick={() => setConfirmDiscard(false)}
+                      data-testid="btn-donation-keep-editing"
+                    >
+                      Seguir editando
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      className="h-12 rounded-xl"
+                      onClick={hardClose}
+                      data-testid="btn-donation-discard"
+                    >
+                      Descartar
+                    </Button>
+                  </div>
+                </div>
+              ) : step === 1 ? (
+                <div className="space-y-6">
+                  {/* 1 · ¿Qué deseas donar? */}
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {(
+                      [
+                        { value: "dinero", label: "Donar dinero", icon: Heart },
+                        { value: "productos", label: "Donar productos", icon: Gift },
+                        { value: "servicios", label: "Ofrecer servicios", icon: HandHeart },
+                      ] as const
+                    ).map((option) => (
                       <button
-                        key={opt.value}
+                        key={option.value}
                         type="button"
-                        onClick={() => handleCollaborationChange(opt.value)}
-                        aria-pressed={collaborationType === opt.value}
-                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${collaborationType === opt.value ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-card text-muted-foreground hover:border-primary/40"}`}
+                        onClick={() => setChoice(option.value)}
+                        aria-pressed={choice === option.value}
+                        data-testid={`choice-${option.value}`}
+                        className={`flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl border-2 px-3 py-3 text-sm font-semibold transition-all ${
+                          choice === option.value
+                            ? "border-primary bg-primary/5 text-primary shadow-sm"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                        }`}
                       >
-                        {opt.label}
+                        <option.icon className="h-5 w-5" />
+                        {option.label}
                       </button>
                     ))}
                   </div>
-                </div>
 
-                <FormField
-                  control={form.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-base font-semibold">
-                        {isMoney ? t("donation.amountLabel") : t("donation.estimatedValueLabel")}
-                      </FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          className="h-14 text-2xl font-bold text-center rounded-xl" 
+                  {/* 1a · Dinero */}
+                  {choice === "dinero" && (
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="donation-amount" className="mb-2 block text-sm font-semibold">
+                          Monto en soles
+                        </label>
+                        <Input
+                          id="donation-amount"
+                          type="number"
+                          inputMode="decimal"
+                          min={MIN_AMOUNT}
+                          value={amount}
+                          onChange={(event) => setAmount(event.target.value)}
+                          aria-invalid={Boolean(errors.amount)}
+                          className="h-14 rounded-xl text-center text-2xl font-bold"
                           data-testid="donation-amount"
-                          {...field} 
                         />
-                      </FormControl>
-                      {isMoney && (
-                        <div className="flex flex-wrap gap-2 mt-3 justify-center">
-                          {[20, 50, 100, 200, 500].map(val => (
+                        <div className="mt-3 grid grid-cols-4 gap-2">
+                          {QUICK_AMOUNTS.map((value) => (
                             <Button
-                              key={val}
+                              key={value}
                               type="button"
-                              variant={amount === val ? "default" : "outline"}
-                              className={`rounded-xl ${amount === val ? 'shadow-md' : ''}`}
-                              onClick={() => form.setValue("amount", val)}
+                              variant={Number(amount) === value ? "default" : "outline"}
+                              className="h-11 rounded-xl"
+                              onClick={() => setAmount(String(value))}
+                              data-testid={`quick-amount-${value}`}
                             >
-                              S/ {val}
+                              S/ {value}
                             </Button>
                           ))}
                         </div>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {!isMoney && (
-                  <div className="mt-6 p-5 border border-primary/20 bg-primary/5 rounded-2xl">
-                    <div className="flex items-center gap-2 text-primary font-medium">
-                      <Heart className="w-5 h-5" /> {t("donation.inKindTitle")}
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">{t("donation.inKindHint")}</p>
-                  </div>
-                )}
-
-                {isMoney && (
-                <div className="mt-8">
-                  <p className="text-base font-semibold block mb-4">{t("donation.paymentMethod")}</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    
-                    <div 
-                      className={`relative border rounded-2xl p-4 cursor-pointer transition-all hover-elevate ${paymentMethod === 'yape' ? 'border-primary bg-primary/5 shadow-sm' : 'border-border bg-card'}`}
-                      onClick={() => form.setValue("paymentMethod", "yape")}
-                      data-testid="btn-payment-yape"
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-[#8A3781]/10 text-[#8A3781] flex items-center justify-center">
-                          <Phone className="w-5 h-5" />
-                        </div>
-                        <span className="font-bold text-foreground">Yape</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{t("donation.yapeSendTo")}</p>
-                    </div>
-
-                    <div 
-                      className={`relative border rounded-2xl p-4 cursor-pointer transition-all hover-elevate ${paymentMethod === 'plin' ? 'border-primary bg-primary/5 shadow-sm' : 'border-border bg-card'}`}
-                      onClick={() => form.setValue("paymentMethod", "plin")}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-[#00D09E]/10 text-[#00D09E] flex items-center justify-center">
-                          <Phone className="w-5 h-5" />
-                        </div>
-                        <span className="font-bold text-foreground">Plin</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{t("donation.plinSendTo")}</p>
-                    </div>
-
-                    <div 
-                      className={`relative border rounded-2xl p-4 cursor-pointer transition-all hover-elevate ${paymentMethod === 'transfer' ? 'border-primary bg-primary/5 shadow-sm' : 'border-border bg-card'}`}
-                      onClick={() => form.setValue("paymentMethod", "transfer")}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center">
-                          <Landmark className="w-5 h-5" />
-                        </div>
-                        <span className="font-bold text-foreground">{t("donation.transfer")}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{t("donation.transferAccount")}</p>
-                    </div>
-
-                    <div className="relative border rounded-2xl p-4 opacity-50 cursor-not-allowed bg-card">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-full bg-slate-500/10 text-slate-600 flex items-center justify-center">
-                          <CreditCard className="w-5 h-5" />
-                        </div>
-                        <span className="font-bold text-foreground">{t("donation.card")}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{t("donation.cardSoon")}</p>
-                    </div>
-
-                  </div>
-                </div>
-                )}
-
-                <div className="mt-8 space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="message"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Textarea 
-                            placeholder={t("donation.messagePlaceholder")} 
-                            className="resize-none rounded-xl bg-secondary/30" 
-                            {...field} 
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="anonymous"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border p-4 bg-card">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            className="mt-1"
-                          />
-                        </FormControl>
-                        <div className="space-y-1 leading-none">
-                          <FormLabel className="cursor-pointer">{t("donation.anonymous")}</FormLabel>
-                          <p className="text-sm text-muted-foreground">{t("donation.anonymousHint")}</p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="mt-8">
-                  <Button type="button" onClick={handleNextStep} className="w-full h-14 text-lg rounded-xl shadow-md hover-elevate">
-                    {t("donation.continue")} <ChevronRight className="w-5 h-5 ml-2" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* STEP 2 */}
-              <div className={step === 2 ? "block" : "hidden"}>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={form.control} name="firstName" render={({ field }) => (
-                    <FormItem><FormLabel>{t("donation.firstName")}</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" data-testid="input-first-name" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="lastName" render={({ field }) => (
-                    <FormItem><FormLabel>{t("donation.lastName")}</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <FormField control={form.control} name="email" render={({ field }) => (
-                    <FormItem><FormLabel>{t("donation.email")}</FormLabel><FormControl><Input type="email" className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name="phone" render={({ field }) => (
-                    <FormItem><FormLabel>{t("donation.phoneOptional")}</FormLabel><FormControl><Input type="tel" className="rounded-xl bg-secondary/30" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                </div>
-
-                {/* Tipo de donante: identifica el perfil (privado) para el
-                    historial del panel. No cambia el monto ni el comprobante. */}
-                <div className="mt-6">
-                  <p className="text-base font-semibold block mb-3">{t("donation.donorTypeLabel")}</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {([
-                      { value: "individual" as const, label: t("donation.donorTypeIndividual") },
-                      { value: "familia" as const, label: t("donation.donorTypeFamilia") },
-                      { value: "empresa" as const, label: t("donation.donorTypeEmpresa") },
-                      { value: "organizacion" as const, label: t("donation.donorTypeOrganizacion") },
-                    ]).map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => form.setValue("donorType", opt.value)}
-                        aria-pressed={donorTypeValue === opt.value}
-                        className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all ${donorTypeValue === opt.value ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-card text-muted-foreground hover:border-primary/40"}`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {requiresReceipt && (
-                  <div className="mt-6 p-5 border border-primary/20 bg-primary/5 rounded-2xl space-y-4">
-                    <div className="flex items-center gap-2 text-primary font-medium">
-                      <Landmark className="w-5 h-5" /> {t("donation.proofTitle")}
-                    </div>
-                    <p className="text-sm text-muted-foreground -mt-2">
-                      {t("donation.proofHint", { method: paymentMethod === "transfer" ? t("donation.transfer") : (paymentMethod ?? "").toUpperCase() })}
-                    </p>
-
-                    <FormField control={form.control} name="receiptNote" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t("donation.operationNumber")}</FormLabel>
-                        <FormControl><Input placeholder={t("donation.operationPlaceholder")} className="bg-background rounded-xl" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-
-                    {/* Uploader */}
-                    {proofUrl ? (
-                      <div className="rounded-2xl border border-green-200 bg-green-50 p-4">
-                        <div className="flex items-start gap-4">
-                          <img src={proofUrl} alt={t("donation.proofAlt")} className="w-24 h-24 object-cover rounded-xl border border-green-200 bg-card" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-green-800 truncate">{proofFileName || t("donation.proofUploaded")}</p>
-                            <p className="text-xs text-green-700 mt-0.5">{t("donation.readyValidation")}</p>
-                            <Button type="button" variant="ghost" size="sm" className="mt-2 text-red-600 hover:text-red-700 hover:bg-red-50 px-2 h-8" onClick={removeProof}>
-                              <Trash2 className="w-4 h-4 mr-1" /> {t("donation.remove")}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        className="border-2 border-dashed border-primary/30 rounded-2xl p-6 text-center cursor-pointer hover:border-primary/60 hover:bg-primary/5 transition-colors"
-                        onClick={() => fileInputRef.current?.click()}
-                        data-testid="proof-uploader"
-                      >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleProofFile(file);
-                          }}
-                        />
-                        {uploading ? (
-                          <div className="flex flex-col items-center gap-2 py-2">
-                            <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                            <span className="text-sm font-medium text-muted-foreground">{t("donation.uploading")}</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center gap-2 py-2">
-                            <UploadCloud className="w-8 h-8 text-primary" />
-                            <span className="text-sm font-semibold">{t("donation.uploadScreenshot")}</span>
-                            <span className="text-xs text-muted-foreground">{t("donation.uploadFormats")}</span>
-                          </div>
+                        {errors.amount && (
+                          <p role="alert" className="mt-2 text-sm text-destructive">
+                            {errors.amount}
+                          </p>
                         )}
                       </div>
-                    )}
 
-                    {proofUrl && (
-                      <FormField
-                        control={form.control}
-                        name="publicProof"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-xl border border-border p-4 bg-background">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                className="mt-1"
+                      <div>
+                        <p className="mb-2 text-sm font-semibold">¿Cómo quieres aportar?</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {PAYMENT_METHODS.map((method) => (
+                            <button
+                              key={method.value}
+                              type="button"
+                              onClick={() => setPaymentMethod(method.value)}
+                              aria-pressed={paymentMethod === method.value}
+                              className={`rounded-2xl border-2 p-3 text-left transition-all ${
+                                paymentMethod === method.value
+                                  ? "border-primary bg-primary/5"
+                                  : "border-border bg-card hover:border-primary/40"
+                              }`}
+                            >
+                              <span className="block text-sm font-bold">{method.label}</span>
+                              <span className="block text-xs text-muted-foreground">{method.hint}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="rounded-xl bg-secondary px-4 py-3 text-sm text-muted-foreground">
+                        Tu aporte queda <strong>pendiente</strong> hasta que verifiquemos la
+                        recepción del pago: así no contamos una intención como dinero recaudado.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 1b · Productos */}
+                  {choice === "productos" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">¿Qué productos donas?</p>
+                        <span className="text-xs text-muted-foreground">
+                          {items.length}/{MAX_ITEMS}
+                        </span>
+                      </div>
+
+                      {items.map((item, index) => (
+                        <div key={index} className="space-y-3 rounded-2xl border border-border p-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              Producto {index + 1}
+                            </span>
+                            {items.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Quitar producto ${index + 1}`}
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+
+                          <select
+                            value={item.product}
+                            aria-label={`Producto ${index + 1}`}
+                            onChange={(event) => updateItem(index, { product: event.target.value })}
+                            className="h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                          >
+                            {PRODUCT_CATALOG.map((product) => (
+                              <option key={product.value} value={product.value}>
+                                {product.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {item.product === OTHER_PRODUCT && (
+                            <Input
+                              value={item.productOther}
+                              maxLength={MAX_OTHER_PRODUCT}
+                              placeholder="¿Qué producto es?"
+                              onChange={(event) => updateItem(index, { productOther: event.target.value })}
+                              className="h-12 rounded-xl"
+                            />
+                          )}
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="text-xs text-muted-foreground">
+                              Cantidad
+                              <Input
+                                type="number"
+                                inputMode="decimal"
+                                min="0.001"
+                                step="any"
+                                value={item.quantity}
+                                onChange={(event) => updateItem(index, { quantity: event.target.value })}
+                                className="mt-1 h-12 rounded-xl"
                               />
-                            </FormControl>
-                            <div className="space-y-1 leading-none">
-                              <FormLabel className="cursor-pointer">{t("donation.showReceiptPublic")}</FormLabel>
-                              <p className="text-sm text-muted-foreground">
-                                {t("donation.showReceiptPublicHint")}
-                              </p>
-                            </div>
-                          </FormItem>
-                        )}
+                            </label>
+                            <label className="text-xs text-muted-foreground">
+                              Unidad
+                              <select
+                                value={item.unit}
+                                onChange={(event) =>
+                                  updateItem(index, { unit: event.target.value as DonationItemDraft["unit"] })
+                                }
+                                className="mt-1 h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                              >
+                                {DONATION_UNITS.map((unit) => (
+                                  <option key={unit.value} value={unit.value}>
+                                    {unit.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+
+                          <Input
+                            value={item.description}
+                            maxLength={MAX_ITEM_DESCRIPTION}
+                            placeholder="Descripción (opcional): caja de 6 panetones"
+                            onChange={(event) => updateItem(index, { description: event.target.value })}
+                            className="h-12 rounded-xl"
+                          />
+
+                          <label className="block text-xs text-muted-foreground">
+                            Valor estimado en soles (opcional)
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              value={item.estimatedValue}
+                              placeholder="No suma al dinero recaudado"
+                              onChange={(event) => updateItem(index, { estimatedValue: event.target.value })}
+                              className="mt-1 h-12 rounded-xl"
+                            />
+                          </label>
+
+                          {(errors[`item-${index}-quantity`] || errors[`item-${index}-product`]) && (
+                            <p role="alert" className="text-sm text-destructive">
+                              {errors[`item-${index}-quantity`] || errors[`item-${index}-product`]}
+                            </p>
+                          )}
+
+                          <p className="text-xs text-muted-foreground">Resumen: {itemSummary(item)}</p>
+                        </div>
+                      ))}
+
+                      {items.length < MAX_ITEMS && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-12 w-full rounded-xl"
+                          onClick={() => setItems((current) => [...current, emptyDonationItem()])}
+                          data-testid="btn-add-item"
+                        >
+                          <Plus className="mr-1 h-4 w-4" /> Añadir otro producto
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 1c · Servicios */}
+                  {choice === "servicios" && (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        {(
+                          [
+                            { value: "servicios", label: "Ofrezco un servicio" },
+                            { value: "logistica", label: "Apoyo logístico" },
+                          ] as const
+                        ).map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setServiceKind(option.value)}
+                            aria-pressed={serviceKind === option.value}
+                            className={`min-h-[52px] rounded-2xl border-2 px-3 text-sm font-semibold transition-all ${
+                              serviceKind === option.value
+                                ? "border-primary bg-primary/5 text-primary"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <label htmlFor="donation-service" className="block text-sm font-semibold">
+                        ¿En qué consiste tu colaboración?
+                      </label>
+                      <Textarea
+                        id="donation-service"
+                        value={message}
+                        maxLength={1000}
+                        rows={4}
+                        placeholder="Ej.: transporte de juguetes, préstamo de vehículo, preparación de la chocolatada, apoyo en la distribución, fotografía, animación infantil…"
+                        onChange={(event) => setMessage(event.target.value)}
+                        aria-invalid={Boolean(errors.message)}
+                        className="rounded-xl"
+                        data-testid="donation-service-description"
                       />
+                      {errors.message && (
+                        <p role="alert" className="text-sm text-destructive">
+                          {errors.message}
+                        </p>
+                      )}
+                      <label className="block text-sm text-muted-foreground">
+                        Disponibilidad y observaciones (opcional)
+                        <Input
+                          value={orgName}
+                          onChange={(event) => setOrgName(event.target.value)}
+                          placeholder="Ej.: sábados por la tarde"
+                          className="mt-1 h-12 rounded-xl"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* ── Paso 2: datos del donante ─────────────────────────────── */
+                <div className="space-y-4">
+                  <label htmlFor="donor-name" className="block text-sm font-semibold">
+                    Nombre y apellido *
+                  </label>
+                  <Input
+                    id="donor-name"
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                    aria-invalid={Boolean(errors.fullName)}
+                    autoComplete="name"
+                    className="h-12 rounded-xl"
+                    data-testid="input-donor-name"
+                  />
+                  {errors.fullName && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {errors.fullName}
+                    </p>
+                  )}
+
+                  <label htmlFor="donor-phone" className="block text-sm font-semibold">
+                    WhatsApp *
+                  </label>
+                  <Input
+                    id="donor-phone"
+                    type="tel"
+                    inputMode="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    placeholder="921 615 737"
+                    aria-invalid={Boolean(errors.phone)}
+                    autoComplete="tel"
+                    className="h-12 rounded-xl"
+                    data-testid="input-donor-phone"
+                  />
+                  {errors.phone && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {errors.phone}
+                    </p>
+                  )}
+
+                  <label htmlFor="donor-email" className="block text-sm font-semibold">
+                    Correo electrónico *
+                  </label>
+                  <Input
+                    id="donor-email"
+                    type="email"
+                    inputMode="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    aria-invalid={Boolean(errors.email)}
+                    autoComplete="email"
+                    className="h-12 rounded-xl"
+                    data-testid="input-donor-email"
+                  />
+                  {errors.email && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {errors.email}
+                    </p>
+                  )}
+
+                  <label htmlFor="donor-org" className="block text-sm font-semibold">
+                    Empresa u organización (opcional)
+                  </label>
+                  <Input
+                    id="donor-org"
+                    value={orgName}
+                    onChange={(event) => setOrgName(event.target.value)}
+                    className="h-12 rounded-xl"
+                  />
+
+                  <div className="space-y-3 pt-1">
+                    <label className="flex items-start gap-3 rounded-xl border border-border p-3">
+                      <Checkbox
+                        checked={contactConsent}
+                        onCheckedChange={(value) => setContactConsent(value === true)}
+                        className="mt-0.5"
+                        data-testid="check-contact-consent"
+                      />
+                      <span className="text-sm">
+                        Autorizo que me contacten para coordinar mi aporte. *
+                      </span>
+                    </label>
+                    {errors.contactConsent && (
+                      <p role="alert" className="text-sm text-destructive">
+                        {errors.contactConsent}
+                      </p>
                     )}
+
+                    <label className="flex items-start gap-3 rounded-xl border border-border p-3">
+                      <Checkbox
+                        checked={anonymous}
+                        onCheckedChange={(value) => setAnonymous(value === true)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm">
+                        Prefiero que mi nombre no se publique (donación anónima).
+                      </span>
+                    </label>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Pie (fijo) ───────────────────────────────────────────────── */}
+            {!confirmDiscard && (
+              <footer className="shrink-0 border-t border-border/60 bg-background px-5 py-4">
+                {submitError && (
+                  <p
+                    role="alert"
+                    className="mb-3 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                    data-testid="donation-error"
+                  >
+                    {submitError}
+                  </p>
                 )}
-
-                <div className="mt-8 bg-secondary rounded-2xl p-5 border border-border">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2"><Heart className="w-4 h-4 text-primary"/> {t("donation.summary")}</h4>
-                  <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">{t("donation.collaborationLabelShort")}</span>
-                    <span className="font-medium">{t(COLLABORATION_LABEL_KEY[collaborationType])}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm mb-2">
-                    <span className="text-muted-foreground">{isMoney ? t("donation.amount") : t("donation.estimatedValueLabel")}</span>
-                    <span className="font-bold text-lg">{isMoney ? `S/ ${amount}` : estimatedValue > 0 ? `S/ ${estimatedValue}` : t("donation.noEstimatedValue")}</span>
-                  </div>
-                  {isMoney && paymentMethod && (
-                    <div className="flex justify-between items-center text-sm mb-2">
-                      <span className="text-muted-foreground">{t("donation.method")}</span>
-                      <span className="capitalize font-medium">{paymentMethod}</span>
-                    </div>
-                  )}
-                  {campaignTitle && (
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">{t("donation.campaign")}</span>
-                      <span className="font-medium text-right max-w-[200px] truncate">{campaignTitle}</span>
-                    </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={requestClose}
+                    className="h-12 flex-1 rounded-xl sm:flex-none sm:px-6"
+                    data-testid="btn-donation-cancel"
+                  >
+                    Cancelar
+                  </Button>
+                  {step === 1 ? (
+                    <Button
+                      type="button"
+                      onClick={handleNext}
+                      className="h-12 flex-1 rounded-xl text-base font-semibold"
+                      data-testid="btn-donation-next"
+                    >
+                      Continuar <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setStep(1)}
+                        disabled={busy}
+                        className="h-12 rounded-xl px-3"
+                        data-testid="btn-donation-back"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="sr-only">Volver al paso 1</span>
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={busy}
+                        className="h-12 flex-1 rounded-xl text-base font-semibold"
+                        data-testid="btn-submit-donation"
+                      >
+                        {busy ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando…
+                          </>
+                        ) : (
+                          "Confirmar donación"
+                        )}
+                      </Button>
+                    </>
                   )}
                 </div>
-
-                <div className="mt-8 flex gap-3">
-                  <Button type="button" variant="outline" onClick={() => setStep(1)} className="h-14 px-6 rounded-xl">
-                    <ChevronLeft className="w-5 h-5 mr-1" /> {t("donation.back")}
-                  </Button>
-                  <Button type="submit" className="flex-1 h-14 text-lg rounded-xl shadow-md hover-elevate" disabled={createDonation.isPending || uploading} data-testid="btn-submit-donation">
-                    {createDonation.isPending ? t("donation.processing") : t("donation.confirm")}
-                  </Button>
-                </div>
-              </div>
-
-            </form>
-          </Form>
-        </div>
+              </footer>
+            )}
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
