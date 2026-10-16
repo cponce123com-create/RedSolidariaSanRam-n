@@ -91,3 +91,54 @@ test("helmet sirve la cabecera CSP con sha256 y sin unsafe-inline en script-src"
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+// ─── V17: connect-src debe permitir la subida directa a Cloudinary ────────────
+// El navegador sube el archivo a https://api.cloudinary.com (signed upload). Sin
+// este origen en connect-src, la CSP bloquea el POST y el upload falla.
+
+test("connect-src permite api.cloudinary.com y CONSERVA los orígenes existentes", () => {
+  const d = buildCspDirectives({ isDev: false });
+  assert.ok(d.connectSrc.includes("'self'"), "falta 'self' en connect-src");
+  assert.ok(
+    d.connectSrc.includes("https://api.cloudinary.com"),
+    "falta https://api.cloudinary.com en connect-src",
+  );
+  assert.ok(
+    d.connectSrc.some((s) => s.includes("api.redsolidaria.com")),
+    "se perdió el API propio en connect-src",
+  );
+  // Sin comodines ni `https:` abierto: el CSP no se relaja más de lo necesario.
+  assert.ok(!d.connectSrc.includes("*"), "connect-src no debe llevar comodín");
+  assert.ok(!d.connectSrc.includes("https:"), "connect-src no debe abrir https: entero");
+});
+
+test("la cabecera CSP incluye api.cloudinary.com y NO duplica directivas", async () => {
+  const app = express();
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: buildCspDirectives({ isDev: false, indexHtmlPath: INDEX_HTML }),
+      },
+    }),
+  );
+  app.get("/", (_req, res) => res.send("ok"));
+
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once("listening", resolve));
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/`);
+    const csp = res.headers.get("content-security-policy") ?? "";
+    const connect = csp.match(/connect-src ([^;]+)/)?.[1] ?? "";
+    assert.ok(connect.includes("https://api.cloudinary.com"), `connect-src sin Cloudinary: ${connect}`);
+    assert.ok(connect.includes("'self'"), `connect-src sin 'self': ${connect}`);
+
+    // Varias políticas CSP se aplican CONJUNTAMENTE (intersección): una directiva
+    // duplicada o contradictoria rompería la subida aunque esta sea correcta.
+    assert.equal((csp.match(/connect-src/g) ?? []).length, 1, "connect-src duplicada");
+    assert.equal((csp.match(/default-src/g) ?? []).length, 1, "default-src duplicada");
+    assert.equal((csp.match(/img-src/g) ?? []).length, 1, "img-src duplicada");
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

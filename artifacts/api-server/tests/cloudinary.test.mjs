@@ -57,3 +57,19 @@ test("cloudinary: la firma incluye restricciones firmadas de formato y tamaño",
   assert.notEqual(withoutRestrictions, sig.signature);
   assert.notEqual(tampered, sig.signature);
 });
+
+test("cloudinary: la respuesta de firma NO expone el api_secret", async () => {
+  process.env.CLOUDINARY_CLOUD_NAME = "test-cloud";
+  process.env.CLOUDINARY_API_KEY = "key123";
+  process.env.CLOUDINARY_API_SECRET = "secret123";
+  const mod = await import("./dist/lib/cloudinary.mjs?nosecret=" + Date.now());
+  const sig = mod.getUploadSignature("institutional-identity");
+  assert.ok(sig, "debe devolver una firma");
+  // El secreto solo se usa para FIRMAR en el servidor: nunca viaja al navegador.
+  assert.ok(!("apiSecret" in sig), "la respuesta no debe incluir apiSecret");
+  assert.ok(!JSON.stringify(sig).includes("secret123"), "el api_secret no debe aparecer en la respuesta");
+  // El cloud name y el api_key sí se devuelven (Cloudinary los exige en el formulario).
+  assert.equal(sig.cloudName, "test-cloud");
+  assert.equal(sig.apiKey, "key123");
+  assert.equal(sig.folder, "institutional-identity");
+});
