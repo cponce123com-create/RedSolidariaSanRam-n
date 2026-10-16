@@ -86,3 +86,90 @@ test("isSafeImageUrl / isSafeLinkUrl", () => {
   assert.equal(isSafeLinkUrl("javascript:alert(1)"), false);
   assert.equal(isSafeLinkUrl(""), true);
 });
+
+// ─── V18: favicon y gestión de activos (reemplazo sin huérfanos) ─────────────
+
+test("V18: normalizeContent conserva el favicon y su publicId", () => {
+  const c = normalizeContent({
+    favicon: {
+      url: "https://res.cloudinary.com/c/image/upload/v1/institutional-identity/favicon/x.png",
+      publicId: "institutional-identity/favicon/x",
+    },
+  });
+  assert.equal(
+    c.favicon.url,
+    "https://res.cloudinary.com/c/image/upload/v1/institutional-identity/favicon/x.png",
+  );
+  assert.equal(c.favicon.publicId, "institutional-identity/favicon/x");
+});
+
+test("V18: publicIdentityDto incluye el favicon y NO expone publicId", () => {
+  const dto = publicIdentityDto(
+    {
+      favicon: {
+        url: "https://res.cloudinary.com/c/image/upload/v1/institutional-identity/favicon/f.png",
+        publicId: "institutional-identity/favicon/f",
+      },
+    },
+    new Date("2026-02-01T00:00:00Z"),
+  );
+  assert.ok(dto);
+  assert.equal(dto.favicon.publicId, null);
+  assert.match(dto.favicon.url, /favicon\/f\.png$/);
+});
+
+test("V18: collectAssetPublicIds reúne logo, portada y favicon (y fotos con extractor)", async () => {
+  const { collectAssetPublicIds } = await import("./dist/lib/institutional-identity.mjs");
+  const content = normalizeContent({
+    logo: { url: "https://x/y.png", publicId: "institutional-identity/logo/a" },
+    cover: { desktopUrl: "https://x/z.png", publicId: "institutional-identity/cover/b" },
+    favicon: { url: "https://x/f.png", publicId: "institutional-identity/favicon/c" },
+    story: {
+      photos: ["https://res.cloudinary.com/c/image/upload/v1/institutional-identity/story/p.jpg"],
+    },
+  });
+
+  assert.deepEqual(collectAssetPublicIds(content).sort(), [
+    "institutional-identity/cover/b",
+    "institutional-identity/favicon/c",
+    "institutional-identity/logo/a",
+  ]);
+
+  const withPhotos = collectAssetPublicIds(content, (url) =>
+    url.includes("story/p") ? "institutional-identity/story/p" : null,
+  );
+  assert.equal(withPhotos.includes("institutional-identity/story/p"), true);
+});
+
+test("V18: diffRemovedAssets borra el reemplazado pero NUNCA lo que sigue en uso", async () => {
+  const { diffRemovedAssets } = await import("./dist/lib/institutional-identity.mjs");
+  const before = normalizeContent({
+    logo: { url: "https://x/old.png", publicId: "institutional-identity/logo/old" },
+    cover: { desktopUrl: "https://x/c.png", publicId: "institutional-identity/cover/keep" },
+  });
+  const after = normalizeContent({
+    logo: { url: "https://x/new.png", publicId: "institutional-identity/logo/new" },
+    cover: { desktopUrl: "https://x/c.png", publicId: "institutional-identity/cover/keep" },
+  });
+
+  // El logo viejo se reemplazó y ya no se usa → se puede borrar.
+  assert.deepEqual(diffRemovedAssets(before, after, null), ["institutional-identity/logo/old"]);
+  // Si el contenido publicado TODAVÍA lo referencia, NO se borra.
+  assert.deepEqual(diffRemovedAssets(before, after, before), []);
+});
+
+test("V18: hasPendingChanges compara borrador y publicado", async () => {
+  const { hasPendingChanges } = await import("./dist/lib/institutional-identity.mjs");
+  const a = normalizeContent({ mission: "Misión" });
+  assert.equal(hasPendingChanges(a, null), true);
+  assert.equal(hasPendingChanges(a, a), false);
+  assert.equal(hasPendingChanges(normalizeContent({ mission: "Otra" }), a), true);
+});
+
+test("V18: isOwnedPublicId solo acepta nuestras carpetas (favicon incluido)", async () => {
+  const { isOwnedPublicId } = await import("./dist/lib/institutional-identity.mjs");
+  assert.equal(isOwnedPublicId("institutional-identity/favicon/x"), true);
+  assert.equal(isOwnedPublicId("institutional-identity/logo/x"), true);
+  assert.equal(isOwnedPublicId("campaign-evidence/x"), false);
+  assert.equal(isOwnedPublicId(null), false);
+});

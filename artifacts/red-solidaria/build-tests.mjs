@@ -26,6 +26,7 @@ await build({
     "./src/lib/query-invalidation.ts",
     "./src/lib/delete-outcome.ts",
     "./src/lib/upload-error-message.ts",
+    "./src/lib/image-validation.ts",
     "./src/lib/budget.ts",
     "./src/lib/baskets.ts",
     "./src/lib/admin-access.ts",

@@ -20,6 +20,12 @@ export const institutionalIdentityTable = pgTable("institutional_identity", {
   publishedAt: timestamp("published_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   updatedBy: text("updated_by"),
+  /**
+   * Control de concurrencia OPTIMISTA (V18): se incrementa en cada guardado y en
+   * cada publicación. El cliente envía la versión que leyó; si no coincide, la API
+   * responde 409 y NO escribe nada (dos pestañas no se pisan el borrador).
+   */
+  version: integer("version").notNull().default(1),
 });
 
 export type InstitutionalIdentityRow =

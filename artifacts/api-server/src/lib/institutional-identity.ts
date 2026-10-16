@@ -1,12 +1,17 @@
 import { sanitizeRichText } from "./rich-text";
 
 /**
- * Lógica pura de la identidad institucional (Fase 3 del Prompt Maestro).
+ * Lógica pura de la identidad institucional (Fase 3 · V18).
  *
  * Normaliza el contenido que llega del panel, valida reglas de negocio y
  * construye el DTO PÚBLICO con una ALLOWLIST EXPLÍCITA de campos: nada que no
  * esté en `publicIdentityDto` se expone, aunque exista en la fila. El
  * identificador interno de Cloudinary (`publicId`) NUNCA se publica.
+ *
+ * V18 añade el FAVICON y las utilidades de assets: qué `public_id` referencia el
+ * contenido (`collectAssetPublicIds`) y cuáles hay que borrar al reemplazar
+ * (`diffRemovedAssets`). Gracias a eso el borrado del archivo anterior se puede
+ * DIFERIR hasta confirmar que el reemplazo se guardó y publicó.
  *
  * Módulo PURO y SIN DEPENDENCIAS de red/DB (se compila para `node:test`).
  */
@@ -27,8 +32,14 @@ export interface InstitutionalValue {
   description: string;
 }
 
+/** Activo de imagen: URL pública + identificador interno (para poder borrarlo). */
+export interface InstitutionalAsset {
+  url: string;
+  publicId: string | null;
+}
+
 export interface InstitutionalIdentityContent {
-  logo: { url: string; publicId: string | null };
+  logo: InstitutionalAsset;
   cover: {
     desktopUrl: string;
     mobileUrl: string;
@@ -36,6 +47,8 @@ export interface InstitutionalIdentityContent {
     /** Encuadre de la portada, p. ej. "50% 30%" (object-position). */
     focus: string;
   };
+  /** Favicon administrable (cuadrado, PNG/WebP). Vacío = favicon estático. */
+  favicon: InstitutionalAsset;
   hero: { title: string; subtitle: string; ctaLabel: string; ctaHref: string };
   story: { title: string; subtitle: string; html: string; photos: string[] };
   mission: string;
@@ -51,6 +64,7 @@ export function emptyContent(): InstitutionalIdentityContent {
   return {
     logo: { url: "", publicId: null },
     cover: { desktopUrl: "", mobileUrl: "", publicId: null, focus: "50% 50%" },
+    favicon: { url: "", publicId: null },
     hero: { title: "", subtitle: "", ctaLabel: "", ctaHref: "" },
     story: { title: "", subtitle: "", html: "", photos: [] },
     mission: "",
@@ -114,6 +128,15 @@ function asValues(value: unknown): InstitutionalValue[] {
   return out;
 }
 
+/** Normaliza un activo (logo/favicon): URL https + publicId opcional. */
+function asAsset(value: unknown): InstitutionalAsset {
+  const r = rec(value);
+  return {
+    url: asImageUrl(r.url),
+    publicId: asOptionalString(r.publicId, IDENTITY_LIMITS.url),
+  };
+}
+
 /**
  * Normaliza (y sanea) el contenido recibido. NUNCA lanza: descarta lo inválido y
  * devuelve una estructura completa y tipada. La historia pasa por el sanitizador
@@ -121,7 +144,6 @@ function asValues(value: unknown): InstitutionalValue[] {
  */
 export function normalizeContent(input: unknown): InstitutionalIdentityContent {
   const root = rec(input);
-  const logo = rec(root.logo);
   const cover = rec(root.cover);
   const hero = rec(root.hero);
   const story = rec(root.story);
@@ -129,16 +151,14 @@ export function normalizeContent(input: unknown): InstitutionalIdentityContent {
   const ctaHref = asString(hero.ctaHref, IDENTITY_LIMITS.url);
 
   return {
-    logo: {
-      url: asImageUrl(logo.url),
-      publicId: asOptionalString(logo.publicId, IDENTITY_LIMITS.url),
-    },
+    logo: asAsset(root.logo),
     cover: {
       desktopUrl: asImageUrl(cover.desktopUrl),
       mobileUrl: asImageUrl(cover.mobileUrl),
       publicId: asOptionalString(cover.publicId, IDENTITY_LIMITS.url),
       focus: asString(cover.focus, 40) || "50% 50%",
     },
+    favicon: asAsset(root.favicon),
     hero: {
       title: asString(hero.title, IDENTITY_LIMITS.title),
       subtitle: asString(hero.subtitle, IDENTITY_LIMITS.subtitle),
@@ -174,6 +194,7 @@ export function isContentEmpty(content: InstitutionalIdentityContent): boolean {
   return (
     !content.logo.url &&
     !content.cover.desktopUrl &&
+    !content.favicon.url &&
     !content.hero.title &&
     !content.hero.subtitle &&
     !content.story.title &&
@@ -183,6 +204,22 @@ export function isContentEmpty(content: InstitutionalIdentityContent): boolean {
     content.values.length === 0 &&
     content.story.photos.length === 0
   );
+}
+
+/**
+ * Huella estable del contenido normalizado. Sirve para saber si el borrador tiene
+ * CAMBIOS PENDIENTES respecto a lo publicado (comparación exacta, no heurística).
+ */
+export function contentFingerprint(content: InstitutionalIdentityContent): string {
+  return JSON.stringify(content);
+}
+
+export function hasPendingChanges(
+  draft: InstitutionalIdentityContent,
+  published: InstitutionalIdentityContent | null,
+): boolean {
+  if (!published) return !isContentEmpty(draft);
+  return contentFingerprint(draft) !== contentFingerprint(published);
 }
 
 /**
@@ -213,6 +250,7 @@ export function publicIdentityDto(
       publicId: null,
       focus: content.cover.focus,
     },
+    favicon: { url: content.favicon.url, publicId: null },
     hero: content.hero,
     story: content.story,
     mission: content.mission,
@@ -223,11 +261,57 @@ export function publicIdentityDto(
 }
 
 /**
- * `true` si el `publicId` pertenece a NUESTRA carpeta de identidad institucional.
+ * `true` si el `publicId` pertenece a NUESTRAS carpetas de identidad institucional.
  * Guarda contra el borrado accidental de archivos compartidos en Cloudinary.
  */
 export function isOwnedPublicId(publicId: string | null | undefined): boolean {
   return (
     typeof publicId === "string" && publicId.startsWith("institutional-identity/")
   );
+}
+
+/**
+ * TODOS los `public_id` referenciados por el contenido (logo, portada, favicon y,
+ * si se pasa un extractor, las fotos de la historia, que solo guardan la URL).
+ */
+export function collectAssetPublicIds(
+  content: InstitutionalIdentityContent,
+  extractFromUrl?: (url: string) => string | null,
+): string[] {
+  const ids: string[] = [];
+  const fromUrl = (url: string) => {
+    if (!extractFromUrl || !url) return;
+    const id = extractFromUrl(url);
+    if (id) ids.push(id);
+  };
+  // Preferimos el publicId guardado; si falta (p. ej. la portada móvil, que solo
+  // guarda URL), lo deducimos de la URL para no dejar el archivo sin limpiar.
+  const push = (publicId: string | null, url: string) => {
+    if (publicId) ids.push(publicId);
+    else fromUrl(url);
+  };
+  push(content.logo.publicId, content.logo.url);
+  push(content.cover.publicId, content.cover.desktopUrl);
+  fromUrl(content.cover.mobileUrl);
+  push(content.favicon.publicId, content.favicon.url);
+  for (const url of content.story.photos) fromUrl(url);
+  return [...new Set(ids)];
+}
+
+/**
+ * `public_id` que hay que BORRAR al confirmar un reemplazo: estaban referenciados
+ * por `previous` y ya NO lo están ni en `next` ni en el contenido que sigue vivo
+ * (`stillReferenced`, p. ej. lo publicado). Nunca borra algo que aún se usa.
+ */
+export function diffRemovedAssets(
+  previous: InstitutionalIdentityContent,
+  next: InstitutionalIdentityContent,
+  stillReferenced: InstitutionalIdentityContent | null,
+  extractFromUrl?: (url: string) => string | null,
+): string[] {
+  const keep = new Set([
+    ...collectAssetPublicIds(next, extractFromUrl),
+    ...(stillReferenced ? collectAssetPublicIds(stillReferenced, extractFromUrl) : []),
+  ]);
+  return collectAssetPublicIds(previous, extractFromUrl).filter((id) => !keep.has(id));
 }

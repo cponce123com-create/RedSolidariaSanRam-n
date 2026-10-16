@@ -2,7 +2,8 @@ import { Router, type IRouter } from "express";
 import {
   getUploadSignature,
   isCloudinaryConfigured,
-  INSTITUTIONAL_IDENTITY_FOLDER,
+  INSTITUTIONAL_ASSET_KINDS,
+  isInstitutionalAssetKind,
 } from "../lib/cloudinary";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
@@ -40,22 +41,37 @@ router.post(
   },
 );
 
-// Firma para la IDENTIDAD INSTITUCIONAL (Fase 3): logotipo, portada y fotos de
-// «Nuestra historia». Solo superadmin. La carpeta la fija el SERVIDOR (el cliente
-// no puede pedir una carpeta arbitraria), así que el borrado de assets solo actúa
-// sobre nuestra carpeta y nunca sobre archivos compartidos.
+/**
+ * Firma para la IDENTIDAD INSTITUCIONAL (Fase 3 · V18): logotipo, portada, favicon y
+ * fotos de «Nuestra historia». Solo superadmin.
+ *
+ * El cliente indica el TIPO de activo (`kind`), pero la CARPETA y los FORMATOS
+ * permitidos los fija el SERVIDOR (`INSTITUTIONAL_ASSET_KINDS`): el cliente no puede
+ * pedir una carpeta arbitraria ni ampliar los formatos (el favicon es solo PNG/WebP).
+ * El borrado de assets solo actúa sobre publicIds de nuestras carpetas.
+ */
 router.post(
   "/uploads/institutional-signature",
   requireRole(ROLES.SUPERADMIN),
   adminActionLimiter,
-  (_req, res) => {
+  (req, res) => {
     if (!isCloudinaryConfigured()) {
       return res.status(503).json({
         error: "upload_unavailable",
         message: "Cloudinary no está configurado.",
       });
     }
-    return res.json(getUploadSignature(INSTITUTIONAL_IDENTITY_FOLDER));
+    const requested = (req.body ?? {}) as { kind?: unknown };
+    const kind = isInstitutionalAssetKind(requested.kind) ? requested.kind : "logo";
+    const { folder, allowedFormats } = INSTITUTIONAL_ASSET_KINDS[kind];
+    const signature = getUploadSignature(folder, { allowedFormats });
+    if (!signature) {
+      return res.status(503).json({
+        error: "upload_unavailable",
+        message: "Cloudinary no está configurado.",
+      });
+    }
+    return res.json({ ...signature, kind });
   },
 );
 

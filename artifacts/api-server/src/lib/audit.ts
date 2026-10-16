@@ -48,6 +48,8 @@ export const AUDIT_ACTIONS = {
   identityUpdated: "IDENTITY_UPDATED",
   identityPublished: "IDENTITY_PUBLISHED",
   identityUnpublished: "IDENTITY_UNPUBLISHED",
+  // V18: se descartaron activos (imágenes) que se reemplazaron antes de guardar.
+  identityAssetsDiscarded: "IDENTITY_ASSETS_DISCARDED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -90,6 +92,7 @@ const ACTION_LABEL: Record<string, string> = {
   [AUDIT_ACTIONS.identityUpdated]: "Identidad institucional actualizada (borrador)",
   [AUDIT_ACTIONS.identityPublished]: "Identidad institucional publicada",
   [AUDIT_ACTIONS.identityUnpublished]: "Identidad institucional despublicada",
+  [AUDIT_ACTIONS.identityAssetsDiscarded]: "Activos de identidad descartados (reemplazados sin guardar)",
 };
 
 export function auditActionLabel(action: string): string {

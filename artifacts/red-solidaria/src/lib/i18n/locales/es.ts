@@ -248,6 +248,11 @@ export const es = {
     upload: "Subir imagen",
     formats: "JPG/PNG/WebP · máx 8MB",
     placeholder: "https://...",
+    // V18: botón permanente de subida/reemplazo y estados.
+    replace: "Subir / Reemplazar",
+    current: "Imagen actual",
+    useUrl: "Usar URL",
+    checking: "Comprobando la imagen...",
   },
   home: {
     heroTitleWord1: "Red",
