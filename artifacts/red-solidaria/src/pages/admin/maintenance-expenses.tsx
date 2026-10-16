@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, Eraser, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eraser, RefreshCw, ShieldAlert, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,12 +11,18 @@ import {
 } from "@/lib/expense-selection";
 
 /**
- * Mantenimiento → Gastos DEMO (V10.1).
+ * Mantenimiento → Gastos DEMO (V10.1) + REGULARIZAR gastos reales (V16).
  *
  * La herramienta que faltaba: VER los gastos que siguen en la base, consultar sus
  * dependencias, SELECCIONAR los ficticios y ELIMINARLOS de verdad (con respaldo,
  * auditoría y comprobación de cifras antes/después). No oculta nada: si un gasto no
  * se puede borrar, dice por qué y qué hacer.
+ *
+ * V16 SEPARA lo que antes venía mezclado: por defecto solo se ven los gastos DEMO y
+ * los pendientes de clasificar. Los gastos REALES tienen su propio segmento, y los
+ * reales a los que les FALTA el asiento se resuelven con «Regularizar gastos
+ * reales…»: una operación que APILA el asiento que falta (el libro es append-only),
+ * sin eliminar ni duplicar nada.
  */
 
 interface LedgerRef {
@@ -24,6 +30,13 @@ interface LedgerRef {
   kind: string;
   amount: number;
   isTail: boolean;
+}
+
+interface LedgerRelation {
+  status: string;
+  label: string;
+  message: string;
+  movementIds: number[];
 }
 
 interface ExpenseDiagnosis {
@@ -49,6 +62,10 @@ interface ExpenseDiagnosis {
   deletable: boolean;
   blockers: string[];
   reasons: string[];
+  // V16
+  relation: LedgerRelation;
+  segment: string;
+  needsRegularization: boolean;
 }
 
 interface ExpensesResponse {
@@ -62,7 +79,10 @@ interface ExpensesResponse {
     withLedger: number;
     byAction: Record<string, { count: number; amount: number }>;
     byClassification: Record<string, { count: number; amount: number }>;
+    regularizableCount: number;
+    regularizableAmount: number;
   };
+  relations: Record<string, number>;
 }
 
 interface FinancialSnapshot {
@@ -88,6 +108,27 @@ interface PurgeResponse {
   };
 }
 
+interface RegularizationPlan {
+  entries: { expenseId: number; campaignId: number; amount: number; description: string }[];
+  skipped: { id: number; amount: number; reason: string }[];
+  total: number;
+  amount: number;
+}
+
+interface RegularizeResponse {
+  ok: boolean;
+  applied: { expenseId: number; campaignId: number; amount: number }[];
+  total: number;
+  amount: number;
+  comparison: {
+    before: FinancialSnapshot;
+    after: FinancialSnapshot;
+    delta: { expensesCount: number; expensesTotal: number; donationsTotal: number; balance: number; movementsCount: number };
+    consistent: boolean;
+    problems: string[];
+  };
+}
+
 const money = (value: number): string =>
   new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(value);
 
@@ -99,9 +140,28 @@ const ACTION_TONE: Record<string, string> = {
   review: "bg-gray-100 text-gray-800 border-gray-200",
 };
 
+/** Relación gasto↔libro: distingue «falta el asiento» de «el asiento está mal». */
+const RELATION_TONE: Record<string, string> = {
+  missing: "bg-indigo-50 text-indigo-900 border-indigo-200",
+  ok: "bg-green-50 text-green-800 border-green-200",
+  wrong_campaign: "bg-red-50 text-red-800 border-red-200",
+  amount_mismatch: "bg-red-50 text-red-800 border-red-200",
+  duplicate: "bg-red-50 text-red-800 border-red-200",
+  wrong_kind: "bg-amber-50 text-amber-900 border-amber-200",
+};
+
+/** Segmentos del listado: separa DEMO de REAL y de lo pendiente de regularizar. */
+const SEGMENTS = [
+  { value: "non_real", label: "DEMO y pendientes" },
+  { value: "real", label: "Reales" },
+  { value: "regularize", label: "Pendientes de regularización" },
+  { value: "all", label: "Todo" },
+] as const;
+
 export default function AdminMaintenanceExpenses() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [segmentFilter, setSegmentFilter] = useState<string>("non_real");
   const [actionFilter, setActionFilter] = useState<string>("");
   const [campaignFilter, setCampaignFilter] = useState<string>("");
   const [selected, setSelected] = useState<number[]>([]);
@@ -118,6 +178,14 @@ export default function AdminMaintenanceExpenses() {
   const [classifyEvidence, setClassifyEvidence] = useState("");
   const [classifyPassword, setClassifyPassword] = useState("");
   const [classifyTotp, setClassifyTotp] = useState("");
+  // V16 — Regularización de gastos reales.
+  const [regularizeOpen, setRegularizeOpen] = useState(false);
+  const [regReason, setRegReason] = useState("");
+  const [regEvidence, setRegEvidence] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regTotp, setRegTotp] = useState("");
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regResult, setRegResult] = useState<RegularizeResponse | null>(null);
 
   const expensesQuery = useQuery({
     queryKey: ["maintenance-expenses"],
@@ -130,6 +198,7 @@ export default function AdminMaintenanceExpenses() {
 
   const rows = expensesQuery.data?.expenses ?? [];
   const summary = expensesQuery.data?.summary;
+  const relations = expensesQuery.data?.relations;
 
   const campaigns = useMemo(() => {
     const map = new Map<number, string>();
@@ -140,6 +209,10 @@ export default function AdminMaintenanceExpenses() {
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return rows.filter((row) => {
+      // Segmento: por defecto se ocultan los REALES (van en su propio segmento).
+      if (segmentFilter === "non_real" && row.segment === "real") return false;
+      if (segmentFilter === "real" && row.segment !== "real") return false;
+      if (segmentFilter === "regularize" && !row.needsRegularization) return false;
       if (actionFilter && row.action !== actionFilter) return false;
       if (campaignFilter && String(row.campaignId) !== campaignFilter) return false;
       if (!needle) return true;
@@ -150,7 +223,7 @@ export default function AdminMaintenanceExpenses() {
         row.category.toLowerCase().includes(needle)
       );
     });
-  }, [rows, search, actionFilter, campaignFilter]);
+  }, [rows, search, segmentFilter, actionFilter, campaignFilter]);
 
   const selectedRows = useMemo(
     () => rows.filter((row) => selected.includes(row.id)),
@@ -172,6 +245,12 @@ export default function AdminMaintenanceExpenses() {
     [selectedRows],
   );
   const selectedBlocked = selection.blocked;
+  // Regularizar exige que TODOS los seleccionados sean reales con asiento faltante.
+  const selectedRegularizable =
+    selectedRows.length > 0 && selectedRows.every((row) => row.needsRegularization);
+  const selectedRegularizableAmount = selectedRows
+    .filter((row) => row.needsRegularization)
+    .reduce((sum, row) => sum + row.amount, 0);
 
   const previewMutation = useMutation({
     mutationFn: async (ids: number[]) => {
@@ -184,6 +263,18 @@ export default function AdminMaintenanceExpenses() {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message ?? "No se pudo preparar la vista previa");
       return data;
+    },
+  });
+
+  // V16: vista previa de la regularización (solo lectura) — qué asientos faltan.
+  const regularizePreview = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/maintenance/expenses/regularize/preview", {
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message ?? "No se pudo preparar la regularización");
+      return data as { plan: RegularizationPlan; relations: Record<string, number>; before: FinancialSnapshot };
     },
   });
 
@@ -219,6 +310,47 @@ export default function AdminMaintenanceExpenses() {
       // NO se limpia la selección: el flujo natural es clasificar y, acto seguido,
       // eliminar lo que ya es eliminable. Al refrescar la consulta, esos mismos ids
       // pasan a tener «Eliminación definitiva» y el botón se habilita solo.
+      await queryClient.invalidateQueries();
+    },
+  });
+
+  // V16: regularización — apila el asiento que falta a cada gasto REAL seleccionado.
+  const regularizeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/admin/maintenance/expenses/regularize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          expenseIds: selected,
+          confirm: true,
+          reason: regReason,
+          evidenceRef: regEvidence,
+          password: regPassword,
+          totpCode: regTotp || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(
+          Array.isArray(data?.skipped) && data.skipped.length > 0
+            ? `${data.message} ${data.skipped
+                .map((s: { id: number; reason: string }) => `#${s.id}: ${s.reason}`)
+                .join(" · ")}`
+            : (data?.message ?? "No se pudieron regularizar los gastos"),
+        );
+      }
+      return data as RegularizeResponse;
+    },
+    onSuccess: async (data) => {
+      setRegResult(data);
+      setSelected([]);
+      setRegPassword("");
+      setRegTotp("");
+      setRegReason("");
+      setRegEvidence("");
+      setRegularizeOpen(false);
+      // Fase 6: los gastos regularizados deben salir del segmento pendiente ya.
       await queryClient.invalidateQueries();
     },
   });
@@ -274,12 +406,14 @@ export default function AdminMaintenanceExpenses() {
         </h1>
         <p className="text-sm text-muted-foreground">
           Gastos que siguen en la base de datos. Selecciona los ficticios y elimínalos de verdad:
-          la operación queda respaldada, auditada y con las cifras comprobadas antes y después.
+          la operación queda respaldada, auditada y con las cifras comprobadas antes y después. Los
+          gastos <strong>reales</strong> a los que les falta el asiento se corrigen con
+          «Regularizar gastos reales».
         </p>
       </header>
 
       {summary && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <SummaryCard label="Gastos en la base" value={String(summary.total)} hint={money(summary.totalAmount)} />
           <SummaryCard
             label="Eliminables ahora"
@@ -287,9 +421,23 @@ export default function AdminMaintenanceExpenses() {
             hint={money(summary.deletableAmount)}
             tone="text-red-700"
           />
+          <SummaryCard
+            label="Reales sin asiento"
+            value={String(summary.regularizableCount)}
+            hint={money(summary.regularizableAmount)}
+            tone={summary.regularizableCount > 0 ? "text-indigo-700" : "text-gray-900"}
+          />
           <SummaryCard label="Con asiento en el libro" value={String(summary.withLedger)} hint="requieren purga controlada" />
           <SummaryCard label="Huérfanos" value={String(summary.orphans)} hint="campaña inexistente" />
         </div>
+      )}
+
+      {relations && (
+        <p className="text-xs text-muted-foreground">
+          Relación gasto↔libro: {relations.missing ?? 0} sin asiento · {relations.ok ?? 0} correctos ·{" "}
+          {relations.wrong_campaign ?? 0} en otra campaña · {relations.amount_mismatch ?? 0} con importe distinto ·{" "}
+          {relations.duplicate ?? 0} duplicados · {relations.wrong_kind ?? 0} con tipo incorrecto.
+        </p>
       )}
 
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-gray-100 bg-card p-4">
@@ -301,6 +449,21 @@ export default function AdminMaintenanceExpenses() {
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Descripción, id, campaña o categoría"
           />
+        </div>
+        <div>
+          <Label htmlFor="expense-segment">Grupo</Label>
+          <select
+            id="expense-segment"
+            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            value={segmentFilter}
+            onChange={(event) => setSegmentFilter(event.target.value)}
+          >
+            {SEGMENTS.map((segment) => (
+              <option key={segment.value} value={segment.value}>
+                {segment.label}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <Label htmlFor="expense-action">Acción permitida</Label>
@@ -376,9 +539,8 @@ export default function AdminMaintenanceExpenses() {
               <th className="p-3">Descripción</th>
               <th className="p-3 text-right">Importe</th>
               <th className="p-3">Fecha</th>
-              <th className="p-3">Categoría</th>
               <th className="p-3">Clasificación</th>
-              <th className="p-3">Asiento</th>
+              <th className="p-3">Relación con el libro</th>
               <th className="p-3">Evidencia</th>
               <th className="p-3">Acción permitida</th>
             </tr>
@@ -407,21 +569,23 @@ export default function AdminMaintenanceExpenses() {
                     {row.isOrphan && " · huérfano"}
                   </span>
                 </td>
-                <td className="p-3 max-w-[260px]">{row.description}</td>
+                <td className="p-3 max-w-[240px]">{row.description}</td>
                 <td className="p-3 text-right font-mono">{money(row.amount)}</td>
                 <td className="p-3">{row.date}</td>
-                <td className="p-3">{row.category}</td>
                 <td className="p-3">
                   <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs">
                     {row.classificationLabel}
                   </span>
                 </td>
                 <td className="p-3">
-                  {row.hasLedgerEntry ? (
-                    <span className="text-amber-800">#{row.ledgerMovements.map((m) => m.id).join(", ")}</span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs font-medium ${
+                      RELATION_TONE[row.relation.status] ?? "bg-gray-50 text-gray-800 border-gray-200"
+                    }`}
+                    title={row.relation.message}
+                  >
+                    {row.relation.label}
+                  </span>
                 </td>
                 <td className="p-3">
                   {row.receiptUrl ? (
@@ -445,7 +609,7 @@ export default function AdminMaintenanceExpenses() {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={11} className="p-6 text-center text-muted-foreground">
+                <td colSpan={10} className="p-6 text-center text-muted-foreground">
                   No hay gastos que coincidan con el filtro.
                 </td>
               </tr>
@@ -483,6 +647,26 @@ export default function AdminMaintenanceExpenses() {
             >
               Clasificar seleccionados…
             </Button>
+            {/* V16: Regularizar — solo si TODOS los seleccionados son gastos REALES
+                a los que les falta el asiento. No convierte DEMO en real. */}
+            <Button
+              variant="outline"
+              className="border-indigo-300 text-indigo-800 hover:bg-indigo-50"
+              onClick={() => {
+                setRegError(null);
+                setRegResult(null);
+                setRegularizeOpen(true);
+                regularizePreview.mutate();
+              }}
+              disabled={!selectedRegularizable || regularizeMutation.isPending}
+              title={
+                selectedRegularizable
+                  ? "Apila el asiento que falta (no borra ni duplica)"
+                  : "Solo se pueden regularizar gastos REALES a los que les falta el asiento"
+              }
+            >
+              <Wand2 className="w-4 h-4 mr-1" /> Regularizar gastos reales…
+            </Button>
             {/* Eliminar: solo si TODOS los seleccionados son eliminables según el
                 diagnóstico vigente del servidor. */}
             <Button
@@ -497,6 +681,42 @@ export default function AdminMaintenanceExpenses() {
               Eliminar seleccionados…
             </Button>
           </div>
+        </div>
+      )}
+
+      {regResult && (
+        <div className="space-y-2 rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm">
+          <p className="flex items-center gap-2 font-semibold text-indigo-900">
+            <CheckCircle2 className="w-4 h-4" />
+            Se apilaron {regResult.total} asiento(s) por {money(regResult.amount)}. No se eliminó ni
+            duplicó ningún gasto.
+          </p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-indigo-900/70">
+                <th className="py-1">Cifra</th>
+                <th className="py-1 text-right">Antes</th>
+                <th className="py-1 text-right">Después</th>
+                <th className="py-1 text-right">Diferencia</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono">
+              <ComparisonRow label="Gastos" before={regResult.comparison.before.expensesTotal} after={regResult.comparison.after.expensesTotal} />
+              <ComparisonRow label="Donaciones" before={regResult.comparison.before.donationsTotal} after={regResult.comparison.after.donationsTotal} />
+              <ComparisonRow label="Saldo" before={regResult.comparison.before.balance} after={regResult.comparison.after.balance} />
+              <tr>
+                <td className="py-1">Asientos</td>
+                <td className="py-1 text-right">{regResult.comparison.before.movementsCount}</td>
+                <td className="py-1 text-right">{regResult.comparison.after.movementsCount}</td>
+                <td className="py-1 text-right">{regResult.comparison.delta.movementsCount}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className={regResult.comparison.consistent ? "text-indigo-900" : "font-semibold text-red-800"}>
+            {regResult.comparison.consistent
+              ? "Los totales no cambiaron: solo se añadieron asientos. Ya aparecen en los reportes contables."
+              : `AVISO: ${regResult.comparison.problems.join(" ")}`}
+          </p>
         </div>
       )}
 
@@ -530,8 +750,7 @@ export default function AdminMaintenanceExpenses() {
           <p className={result.comparison.matchesPurged ? "text-green-900" : "font-semibold text-red-800"}>
             {result.comparison.matchesPurged
               ? "La diferencia coincide exactamente con lo eliminado."
-              : "AVISO: la diferencia NO coincide con lo eliminado. Revísalo antes de seguir."}
-            {" "}
+              : "AVISO: la diferencia NO coincide con lo eliminado. Revísalo antes de seguir."}{" "}
             Cadenas verificadas: {result.comparison.after.chainsVerified ? "sí" : `no (${result.comparison.after.brokenChains.join(", ")})`}.
           </p>
         </div>
@@ -553,6 +772,7 @@ export default function AdminMaintenanceExpenses() {
               <Detail label="¿Campaña DEMO?" value={detail.isDemoCampaign ? "Sí" : "No"} />
               <Detail label="¿Protegida (ChocoFest)?" value={detail.protectedCampaign ? "Sí" : "No"} />
               <Detail label="¿Documento propio?" value={detail.conservationObligation ? "Sí (se conserva)" : "No"} />
+              <Detail label="Relación con el libro" value={detail.relation.label} />
               <Detail
                 label="Asientos del libro"
                 value={detail.hasLedgerEntry ? detail.ledgerMovements.map((m) => `#${m.id} (${m.kind})`).join(", ") : "ninguno"}
@@ -560,6 +780,7 @@ export default function AdminMaintenanceExpenses() {
               <Detail label="Acción permitida" value={detail.actionLabel} />
             </dl>
             <div className="mt-4 space-y-1 text-sm">
+              <p className="text-muted-foreground">· {detail.relation.message}</p>
               {detail.reasons.map((reason) => (
                 <p key={reason} className="text-muted-foreground">
                   · {reason}
@@ -569,6 +790,109 @@ export default function AdminMaintenanceExpenses() {
             <div className="mt-4 flex justify-end">
               <Button variant="outline" onClick={() => setDetail(null)}>
                 Cerrar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {regularizeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto space-y-4 rounded-2xl bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Wand2 className="w-5 h-5 text-indigo-700" /> Regularizar {selected.length} gasto(s) reales
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Se <strong>apila</strong> el asiento que falta en el libro contable. No se elimina ni se
+              modifica ningún gasto, y el índice único impide duplicar el asiento. Queda auditado.
+            </p>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 text-sm">
+              <p>
+                Asientos a crear: <strong>{selectedRows.filter((r) => r.needsRegularization).length}</strong> ·
+                importe: <strong>{money(selectedRegularizableAmount)}</strong>
+              </p>
+              <ul className="mt-1 max-h-32 space-y-0.5 overflow-y-auto text-xs text-muted-foreground">
+                {selectedRows.map((row) => (
+                  <li key={row.id}>
+                    #{row.id} {row.description} · {money(row.amount)} · {row.relation.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {regularizePreview.data?.before && (
+              <p className="text-xs text-muted-foreground">
+                Cifra actual: {regularizePreview.data.before.expensesCount} gasto(s) por{" "}
+                {money(regularizePreview.data.before.expensesTotal)} · {regularizePreview.data.before.movementsCount} asiento(s).
+              </p>
+            )}
+            {regularizePreview.isError && (
+              <p className="text-sm text-red-700">{(regularizePreview.error as Error).message}</p>
+            )}
+            {regError && <p className="text-sm text-red-700">{regError}</p>}
+
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="reg-reason">Motivo (obligatorio, queda auditado)</Label>
+                <Input
+                  id="reg-reason"
+                  value={regReason}
+                  onChange={(event) => setRegReason(event.target.value)}
+                  placeholder="Ej.: gastos de Chocofest 2025 sin asiento tras la carga inicial"
+                />
+              </div>
+              <div>
+                <Label htmlFor="reg-evidence">Evidencia (obligatoria: nº de boleta, voucher o informe)</Label>
+                <Input
+                  id="reg-evidence"
+                  value={regEvidence}
+                  onChange={(event) => setRegEvidence(event.target.value)}
+                  placeholder="Ej.: informe de rendición Chocofest 2025 (S/ 2,912.80)"
+                />
+              </div>
+              <div>
+                <Label htmlFor="reg-password">Tu contraseña (reautenticación)</Label>
+                <Input
+                  id="reg-password"
+                  type="password"
+                  value={regPassword}
+                  onChange={(event) => setRegPassword(event.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="reg-totp">Código 2FA (si lo tienes activo)</Label>
+                <Input
+                  id="reg-totp"
+                  value={regTotp}
+                  onChange={(event) => setRegTotp(event.target.value)}
+                  inputMode="numeric"
+                  placeholder="123456"
+                />
+              </div>
+            </div>
+
+            {regularizeMutation.isError && (
+              <p className="flex items-start gap-2 text-sm text-red-700">
+                <AlertTriangle className="w-4 h-4 mt-0.5" />
+                {(regularizeMutation.error as Error).message}
+              </p>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setRegularizeOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => regularizeMutation.mutate()}
+                disabled={
+                  regReason.trim().length < 10 ||
+                  regEvidence.trim().length === 0 ||
+                  regPassword.length === 0 ||
+                  regularizeMutation.isPending
+                }
+              >
+                {regularizeMutation.isPending ? "Regularizando…" : "Regularizar (apilar asientos)"}
               </Button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createHash } from "node:crypto";
 import { db, campaignsTable, campaignExpensesTable, campaignMovementsTable, campaignPurgeBackupsTable } from "@workspace/db";
-import { asc, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
 import { adminActionLimiter, reauthLimiter } from "../middleware/rate-limit";
@@ -12,7 +12,7 @@ import { canonicalJson, normalizeForHash } from "../lib/campaign-demo-purge";
 import { classifyDemoData, type DemoClassification, type DemoWorld } from "../lib/demo-classification";
 import { CONFIRMED_DONATION_STATUSES } from "../lib/donor-identity";
 import { roundMoney } from "../lib/funding";
-import { verifyChain, type LedgerRow } from "../lib/ledger";
+import { appendMovement, verifyChain, type LedgerRow } from "../lib/ledger";
 import { readProtectedCampaignIds } from "../lib/protected-campaigns";
 import { toSafeAmount } from "../lib/amount-format";
 import {
@@ -30,29 +30,51 @@ import {
   type ExpenseMovementRow,
   type FinancialSnapshot,
 } from "../lib/expense-cleanup";
+import {
+  classifyExpenseLedgerRelation,
+  planExpenseRegularization,
+  validateExpenseRegularizationRequest,
+  verifyRegularizationTotals,
+  type ExpenseLedgerRelation,
+  type ExpenseMovementLike,
+  type RegularizationCandidate,
+} from "../lib/expense-regularization";
 
 /**
- * Mantenimiento → GASTOS DEMO (V10.1).
+ * Mantenimiento → GASTOS DEMO (V10.1) + REGULARIZACIÓN de gastos reales (V16).
  *
  * Es la herramienta que faltaba: ver los gastos que siguen en la base, consultar
  * las dependencias de cada uno, seleccionar los ficticios y ELIMINARLOS de verdad
  * (transacción + respaldo + auditoría), comprobando antes y después las cifras.
  *
- * Solo el superadmin. Nada se elimina sin `confirm`, `reason` (10+ caracteres) y
- * reautenticación. La clasificación y el veredicto los produce
- * `lib/expense-cleanup.ts` (puro): aquí solo se leen filas y se ejecuta.
+ * V16 añade la acción que antes NO existía: REGULARIZAR un gasto REAL confirmado
+ * al que le falta el asiento contable. El libro es append-only, así que la
+ * regularización APILA el asiento que falta; nunca edita ni borra historial, y el
+ * índice único `(source_type, source_id)` impide duplicarlo. Un gasto DEMO o
+ * pendiente NO se regulariza: no se convierten ficticios en reales.
+ *
+ * Solo el superadmin. Nada se ejecuta sin `confirm`, `reason` (10+ caracteres) y
+ * reautenticación. La clasificación y el veredicto los producen módulos PUROS
+ * (`lib/expense-cleanup.ts` y `lib/expense-regularization.ts`): aquí solo se leen
+ * filas y se ejecuta.
  */
 const router: IRouter = Router();
 
 const superadminOnly = [requireAdmin, requireRole(ROLES.SUPERADMIN)];
 const MIN_REASON = 10;
 
-/** Instantánea de los gastos con su campaña, sus asientos y su clasificación. */
-async function loadExpenseDiagnoses(): Promise<{
+interface ExpenseDiagnosesBundle {
   diagnoses: ExpenseDiagnosis[];
   movementsByCampaign: Map<number, ExpenseMovementRow[]>;
   campaignById: Map<number, { id: number; title: string; status: string; isDemo: boolean }>;
-}> {
+  /** TODOS los asientos de origen `expense`, para juzgar la relación con cada gasto. */
+  expenseMovements: ExpenseMovementLike[];
+  /** Fecha original de creación de cada gasto (para conservar la cronología). */
+  expenseCreatedAtById: Map<number, Date | string | null>;
+}
+
+/** Instantánea de los gastos con su campaña, sus asientos y su clasificación. */
+async function loadExpenseDiagnoses(): Promise<ExpenseDiagnosesBundle> {
   const protectedCampaignIds = await readProtectedCampaignIds();
 
   const [campaignRows, expenseRows, movementRows, manualClassifications] = await Promise.all([
@@ -117,6 +139,7 @@ async function loadExpenseDiagnoses(): Promise<{
   );
 
   const movementsByCampaign = new Map<number, ExpenseMovementRow[]>();
+  const expenseMovements: ExpenseMovementLike[] = [];
   for (const row of movementRows) {
     const movement: ExpenseMovementRow = {
       id: row.id,
@@ -133,7 +156,24 @@ async function loadExpenseDiagnoses(): Promise<{
     const list = movementsByCampaign.get(row.campaignId) ?? [];
     list.push(movement);
     movementsByCampaign.set(row.campaignId, list);
+
+    // Índice GLOBAL por origen `expense`: imprescindible para detectar un asiento
+    // que exista pero esté en OTRA campaña (no aparecería en el mapa por campaña).
+    if (row.sourceType === "expense") {
+      expenseMovements.push({
+        id: row.id,
+        campaignId: row.campaignId,
+        kind: row.kind,
+        amount: toSafeAmount(row.amount),
+        sourceType: row.sourceType,
+        sourceId: row.sourceId,
+      });
+    }
   }
+
+  const expenseCreatedAtById = new Map<number, Date | string | null>(
+    expenseRows.map((row) => [row.id, row.createdAt]),
+  );
 
   const diagnoses = expenseRows.map((row) =>
     diagnoseExpense({
@@ -159,7 +199,52 @@ async function loadExpenseDiagnoses(): Promise<{
     }),
   );
 
-  return { diagnoses, movementsByCampaign, campaignById };
+  return {
+    diagnoses,
+    movementsByCampaign,
+    campaignById,
+    expenseMovements,
+    expenseCreatedAtById,
+  };
+}
+
+/** Candidatos a regularización a partir del diagnóstico (solo lo que el plan necesita). */
+function toRegularizationCandidates(
+  diagnoses: readonly ExpenseDiagnosis[],
+  expenseCreatedAtById: Map<number, Date | string | null>,
+): RegularizationCandidate[] {
+  return diagnoses.map((diagnosis) => ({
+    id: diagnosis.id,
+    campaignId: diagnosis.campaignId,
+    campaignExists: diagnosis.campaignExists,
+    amount: diagnosis.amount,
+    description: diagnosis.description,
+    classification: diagnosis.classification,
+    createdAt: expenseCreatedAtById.get(diagnosis.id) ?? null,
+  }));
+}
+
+/** Recuento de relaciones gasto↔libro (responde a «¿falta o está mal el asiento?»). */
+function summarizeRelations(
+  diagnoses: readonly ExpenseDiagnosis[],
+  expenseMovements: readonly ExpenseMovementLike[],
+): Record<ExpenseLedgerRelation, number> {
+  const counts: Record<ExpenseLedgerRelation, number> = {
+    missing: 0,
+    ok: 0,
+    wrong_campaign: 0,
+    amount_mismatch: 0,
+    duplicate: 0,
+    wrong_kind: 0,
+  };
+  for (const diagnosis of diagnoses) {
+    const relation = classifyExpenseLedgerRelation(
+      { id: diagnosis.id, campaignId: diagnosis.campaignId, amount: diagnosis.amount },
+      expenseMovements,
+    );
+    counts[relation.status] += 1;
+  }
+  return counts;
 }
 
 /** Comprobación financiera completa (Fase 7): cifras, asientos y cadenas. */
@@ -241,7 +326,7 @@ async function financialSnapshot(): Promise<FinancialSnapshot> {
 /** GET /admin/maintenance/expenses — la tabla completa con su veredicto. */
 router.get("/admin/maintenance/expenses", ...superadminOnly, adminActionLimiter, async (req, res) => {
   try {
-    const { diagnoses } = await loadExpenseDiagnoses();
+    const { diagnoses, expenseMovements, expenseCreatedAtById } = await loadExpenseDiagnoses();
     const campaignFilter = Number(req.query.campaignId);
     const onlyDeletable = req.query.onlyDeletable === "true";
     const filtered = diagnoses.filter((diagnosis) => {
@@ -251,11 +336,39 @@ router.get("/admin/maintenance/expenses", ...superadminOnly, adminActionLimiter,
       if (onlyDeletable && !diagnosis.deletable) return false;
       return true;
     });
+
+    // Relación REAL con el libro por cada gasto (¿falta, está bien o está mal?) y
+    // el SEGMENTO (demo/real/pending/protected) para poder separar en el panel.
+    const withRelation = filtered.map((diagnosis) => {
+      const relation = classifyExpenseLedgerRelation(
+        { id: diagnosis.id, campaignId: diagnosis.campaignId, amount: diagnosis.amount },
+        expenseMovements,
+      );
+      return {
+        ...diagnosis,
+        relation,
+        segment: diagnosis.classification,
+        needsRegularization: diagnosis.classification === "real" && relation.status === "missing",
+      };
+    });
+
+    const plan = planExpenseRegularization(
+      toRegularizationCandidates(diagnoses, expenseCreatedAtById),
+      expenseMovements,
+    );
+
     res.setHeader("Cache-Control", "private, no-store");
     return res.json({
       generatedAt: new Date().toISOString(),
-      expenses: filtered,
-      summary: summarizeExpenses(diagnoses),
+      expenses: withRelation,
+      summary: {
+        ...summarizeExpenses(diagnoses),
+        // Gastos REALES a los que les falta el asiento: lo que la herramienta
+        // «Regularizar gastos reales» puede resolver.
+        regularizableCount: plan.total,
+        regularizableAmount: plan.amount,
+      },
+      relations: summarizeRelations(diagnoses, expenseMovements),
       filters: { campaignId: Number.isInteger(campaignFilter) ? campaignFilter : null, onlyDeletable },
     });
   } catch (err) {
@@ -264,6 +377,216 @@ router.get("/admin/maintenance/expenses", ...superadminOnly, adminActionLimiter,
   }
 });
 
+/**
+ * GET /admin/maintenance/expenses/regularize/preview — plan de regularización.
+ *
+ * Describe, SIN escribir nada, qué asientos se apilarían para cerrar los gastos
+ * reales sin asiento, y qué gastos quedan fuera con su motivo. Se registra ANTES
+ * de la ruta `/:id` para que no la capture el parámetro.
+ */
+router.get(
+  "/admin/maintenance/expenses/regularize/preview",
+  ...superadminOnly,
+  adminActionLimiter,
+  async (req, res) => {
+    try {
+      const { diagnoses, expenseMovements, expenseCreatedAtById } = await loadExpenseDiagnoses();
+      const plan = planExpenseRegularization(
+        toRegularizationCandidates(diagnoses, expenseCreatedAtById),
+        expenseMovements,
+      );
+      res.setHeader("Cache-Control", "private, no-store");
+      return res.json({
+        preview: true,
+        plan,
+        relations: summarizeRelations(diagnoses, expenseMovements),
+        before: await financialSnapshot(),
+      });
+    } catch (err) {
+      req.log.error({ err }, "Failed to build expense regularization plan");
+      return res
+        .status(500)
+        .json({ error: "server_error", message: "No se pudo preparar la regularización" });
+    }
+  },
+);
+
+/**
+ * POST /admin/maintenance/expenses/regularize — regularización autorizada (V16).
+ *
+ * APILA el asiento que falta a cada gasto REAL confirmado seleccionado. No edita
+ * ni borra historial. Exige superadmin, confirmación explícita, motivo, evidencia y
+ * reautenticación. Dentro de la transacción se vuelve a comprobar que cada gasto
+ * sigue existiendo y SIN asiento: si algo cambió, no se escribe NADA.
+ */
+router.post(
+  "/admin/maintenance/expenses/regularize",
+  ...superadminOnly,
+  reauthLimiter,
+  adminActionLimiter,
+  async (req, res) => {
+    const validation = validateExpenseRegularizationRequest(req.body);
+    if (!validation.ok) {
+      return res.status(400).json({ error: "validation_error", message: validation.message });
+    }
+    const { expenseIds, reason, evidenceRef } = validation.value;
+    const body = (req.body ?? {}) as { password?: unknown; totpCode?: unknown };
+
+    try {
+      // ─── Vista previa (misma foto que la escritura) ─────────────────────────
+      const before = await loadExpenseDiagnoses();
+      const missing = expenseIds.filter(
+        (id) => !before.diagnoses.some((diagnosis) => diagnosis.id === id),
+      );
+      if (missing.length > 0) {
+        return res.status(404).json({
+          error: "not_found",
+          message: `Gastos inexistentes: ${missing.join(", ")}.`,
+        });
+      }
+
+      const selected = before.diagnoses.filter((diagnosis) => expenseIds.includes(diagnosis.id));
+      const plan = planExpenseRegularization(
+        toRegularizationCandidates(selected, before.expenseCreatedAtById),
+        before.expenseMovements,
+      );
+
+      if (plan.total === 0) {
+        return res.status(409).json({
+          error: "conflict",
+          code: "nothing_to_regularize",
+          message:
+            "Ninguno de los gastos seleccionados es un gasto REAL sin asiento. No hay nada que regularizar.",
+          skipped: plan.skipped,
+        });
+      }
+      if (plan.skipped.length > 0) {
+        return res.status(409).json({
+          error: "conflict",
+          code: "expenses_not_regularizable",
+          message: `Hay ${plan.skipped.length} gasto(s) que NO se pueden regularizar. Quítalos de la selección o resuélvelos antes.`,
+          skipped: plan.skipped,
+        });
+      }
+
+      // ─── Reautenticación reforzada ─────────────────────────────────────────
+      const sessionUser = req.session?.adminUser ?? null;
+      const reauth = await verifySuperadminReauth({
+        userId: sessionUser?.id ?? null,
+        username: sessionUser?.username ?? null,
+        password: typeof body.password === "string" ? body.password : "",
+        totpCode: typeof body.totpCode === "string" ? body.totpCode : null,
+      });
+      if (!reauth.ok) {
+        await logAuditAction({
+          ...auditContext(req),
+          action: AUDIT_ACTIONS.adminReauthFailed,
+          resource: AUDIT_RESOURCES.campaigns,
+          details: { operation: "expense_regularize", code: reauth.code, expenseIds },
+        });
+        return res.status(401).json({ error: "unauthorized", code: reauth.code, message: reauth.message });
+      }
+
+      const snapshotBefore = await financialSnapshot();
+      const now = new Date();
+
+      // ─── Transacción: solo se APILAN asientos ──────────────────────────────
+      const result = await db.transaction(async (tx) => {
+        const targetIds = plan.entries.map((entry) => entry.expenseId);
+
+        // REVALIDACIÓN dentro de la transacción: la comprobación y la escritura
+        // son la misma foto.
+        const current = await tx
+          .select({ id: campaignExpensesTable.id })
+          .from(campaignExpensesTable)
+          .where(inArray(campaignExpensesTable.id, targetIds));
+        if (current.length !== targetIds.length) {
+          return { stale: "Alguno de los gastos seleccionados ya no existe. Recarga la tabla." };
+        }
+
+        // Si alguno YA tiene asiento, no se escribe nada: el índice único lo
+        // impediría, pero se comprueba antes para dar un mensaje claro.
+        const existing = await tx
+          .select({ sourceId: campaignMovementsTable.sourceId })
+          .from(campaignMovementsTable)
+          .where(
+            and(
+              eq(campaignMovementsTable.sourceType, "expense"),
+              inArray(campaignMovementsTable.sourceId, targetIds),
+            ),
+          );
+        if (existing.length > 0) {
+          return {
+            stale: `Alguno de los gastos ya tiene asiento (#${existing
+              .map((row) => row.sourceId)
+              .join(", #")}): no se regulariza nada para no duplicar.`,
+          };
+        }
+
+        const applied: { expenseId: number; campaignId: number; amount: number }[] = [];
+        for (const entry of plan.entries) {
+          await appendMovement(tx, entry.campaignId, {
+            kind: "gasto",
+            amount: entry.amount,
+            description: `${entry.description} · ${evidenceRef}`,
+            sourceType: "expense",
+            sourceId: entry.expenseId,
+            // Conserva la FECHA original del gasto (punto 4 del encargo).
+            createdAt: entry.createdAt ? new Date(entry.createdAt) : now,
+          });
+          applied.push({
+            expenseId: entry.expenseId,
+            campaignId: entry.campaignId,
+            amount: entry.amount,
+          });
+        }
+        return { applied };
+      });
+
+      if ("stale" in result) {
+        return res.status(409).json({
+          error: "conflict",
+          code: "regularize_stale",
+          message: result.stale,
+        });
+      }
+
+      const after = await financialSnapshot();
+      // Comprobación de cifras: regularizar NO altera gastos, donaciones ni saldo;
+      // solo sube el número de asientos.
+      const totals = verifyRegularizationTotals(snapshotBefore, after, result.applied.length);
+
+      await logAuditAction({
+        ...auditContext(req),
+        action: AUDIT_ACTIONS.expenseRegularized,
+        resource: AUDIT_RESOURCES.campaigns,
+        details: {
+          reason,
+          evidenceRef,
+          expenseIds: result.applied.map((item) => item.expenseId),
+          movementCount: result.applied.length,
+          amount: plan.amount,
+          comparison: { delta: totals.delta, consistent: totals.ok },
+        },
+      });
+
+      return res.json({
+        ok: true,
+        applied: result.applied,
+        total: result.applied.length,
+        amount: plan.amount,
+        comparison: { before: snapshotBefore, after, delta: totals.delta, consistent: totals.ok, problems: totals.problems },
+        after,
+      });
+    } catch (err) {
+      req.log.error({ err }, "Failed to regularize expenses");
+      return res
+        .status(500)
+        .json({ error: "server_error", message: "No se pudieron regularizar los gastos" });
+    }
+  },
+);
+
 /** GET /admin/maintenance/expenses/:id — diagnóstico individual (Fase 2). */
 router.get("/admin/maintenance/expenses/:id", ...superadminOnly, adminActionLimiter, async (req, res) => {
   const id = Number(req.params.id);
@@ -271,13 +594,19 @@ router.get("/admin/maintenance/expenses/:id", ...superadminOnly, adminActionLimi
     return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
   }
   try {
-    const { diagnoses } = await loadExpenseDiagnoses();
+    const { diagnoses, expenseMovements } = await loadExpenseDiagnoses();
     const diagnosis = diagnoses.find((item) => item.id === id);
     if (!diagnosis) {
       return res.status(404).json({ error: "not_found", message: "El gasto no existe" });
     }
     res.setHeader("Cache-Control", "private, no-store");
-    return res.json(diagnosis);
+    return res.json({
+      ...diagnosis,
+      relation: classifyExpenseLedgerRelation(
+        { id: diagnosis.id, campaignId: diagnosis.campaignId, amount: diagnosis.amount },
+        expenseMovements,
+      ),
+    });
   } catch (err) {
     req.log.error({ err }, "Failed to load expense diagnosis");
     return res.status(500).json({ error: "server_error", message: "No se pudo diagnosticar el gasto" });
