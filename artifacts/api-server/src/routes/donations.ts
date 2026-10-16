@@ -6,6 +6,7 @@ import {
   campaignMovementsTable,
   donationProofsTable,
   donationConsentsTable,
+  donationItemsTable,
   donorsTable,
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -54,6 +55,17 @@ import {
   isAllowedTransition,
   isValidProofUrl,
 } from "../lib/donation-validation";
+import {
+  fulfillmentBlockReason,
+  fulfillmentLabel,
+  normalizeFulfillmentStatus,
+} from "../lib/donation-fulfillment";
+import { normalizeDonationItems } from "../lib/donation-items";
+import {
+  generateTrackingCode,
+  normalizeDedupeToken,
+  normalizePePhone,
+} from "../lib/donation-tracking";
 
 // NOTA sobre la proyección de los listados admin:
 // Se usa proyección por tabla (`donation: donationsTable`) + leftJoin, NO
@@ -151,6 +163,56 @@ router.post("/donations", donationLimiter, async (req, res) => {
       });
     }
 
+    // ── Ítems de la donación en especie (V20 · Fase 2) ───────────────────────
+    const collaborationType = normalizeCollaborationType(data.collaborationType);
+    let items: {
+      product: string;
+      quantity: number;
+      unit: string;
+      description: string | null;
+      estimatedValue: number;
+    }[] = [];
+    if (collaborationType === "productos") {
+      const normalized = normalizeDonationItems(data.items);
+      if (!normalized.ok) {
+        return res.status(400).json({ error: "validation_error", message: normalized.message });
+      }
+      items = normalized.items;
+    } else if (collaborationType === "servicios" || collaborationType === "logistica") {
+      // Un servicio o apoyo logístico se DESCRIBE: sin descripción no hay nada
+      // que coordinar con el donante.
+      if (!data.message || data.message.trim().length < 10) {
+        return res.status(400).json({
+          error: "validation_error",
+          message: "Describe brevemente tu colaboración (al menos 10 caracteres).",
+        });
+      }
+    }
+
+    // El DINERO es lo único que lleva importe. Un aporte en especie guarda su
+    // valor —si lo declara— en cada ítem; si aquí se colara un `amount` en una
+    // donación de productos, al aprobarla inflaría el total recaudado.
+    const moneyAmount = collaborationType === "dinero" ? data.amount : 0;
+
+    // ── Idempotencia (V20 · Fase 3) ──────────────────────────────────────────
+    // Si el navegador reintenta el mismo envío (doble clic, red que se corta), se
+    // devuelve la donación YA creada en lugar de registrar una segunda.
+    const dedupeToken = normalizeDedupeToken(data.dedupeToken);
+    if (dedupeToken) {
+      const [existing] = await db
+        .select()
+        .from(donationsTable)
+        .where(eq(donationsTable.dedupeToken, dedupeToken));
+      if (existing) {
+        return res.status(200).json(await formatDonation(existing));
+      }
+    }
+
+    // WhatsApp normalizado a +51XXXXXXXXX (zod ya garantizó el formato).
+    const phone = data.phone && data.phone.trim() ? normalizePePhone(data.phone) : null;
+    // Código único de seguimiento que verá el donante.
+    const trackingCode = generateTrackingCode();
+
     // Transaccional (hallazgo API-02): la donación, su comprobante y el campo
     // legacy receiptUrl se escriben juntos o no se escriben.
     // Valores explícitos: `status` lo fija el servidor (el cliente no puede
@@ -242,7 +304,9 @@ router.post("/donations", donationLimiter, async (req, res) => {
       return row;
     });
 
-    return res.status(201).json(await formatDonation(donation));
+    // Se devuelve la donación con sus ítems y el CÓDIGO DE SEGUIMIENTO que verá
+    // el donante en la pantalla de agradecimiento.
+    return res.status(201).json(await formatDonation(donation, null, items));
   } catch (err) {
     // API-06: un fallo inesperado (base de datos caída, error de programación)
     // NO es un error de validación del cliente. Devolver 400 aquí hacía que la
@@ -263,7 +327,10 @@ router.get("/donations/stats", async (req, res) => {
     const [stats] = await db
       .select({
         totalDonations: sql<number>`count(*)::int`,
-        totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled')), 0)::float8`,
+        // El total es DINERO: se exige además `collaboration_type = 'dinero'`.
+        // Así un importe colado en una donación en especie (histórica o futura)
+        // jamás puede inflar el recaudado: bienes y dinero no se mezclan.
+        totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled') and ${donationsTable.collaborationType} = 'dinero'), 0)::float8`,
         pendingCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int`,
         approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
         totalDonors: sql<number>`count(distinct ${donationsTable.email})::int`,
@@ -1044,9 +1111,133 @@ router.delete(
   },
 );
 
+// PUT /donations/:id/fulfillment — solo admin.
+//
+// Cambia el estado de CUMPLIMIENTO del aporte (pendiente de coordinación →
+// comprometida → recibida → verificada, o rechazada/cancelada) SIN tocar el estado
+// CONTABLE: el dinero sigue sumando solo cuando su `status` es approved/reconciled.
+// Así una promesa nunca se convierte en ingreso por cambiar de estado aquí.
+//
+// Para las donaciones de productos permite registrar la CANTIDAD REALMENTE
+// RECIBIDA de cada ítem (lo prometido y lo recibido pueden no coincidir).
+router.put(
+  "/donations/:id/fulfillment",
+  ...adminOnly,
+  adminActionLimiter,
+  async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "validation_error", message: "ID inválido" });
+    }
+
+    const body = (req.body ?? {}) as {
+      fulfillmentStatus?: unknown;
+      receivedQuantities?: unknown;
+    };
+    // Validación ESTRICTA: si el valor no es un estado conocido, `normalize...`
+    // devuelve el inicial y la comparación falla → 400 (nunca se acepta basura).
+    const next = normalizeFulfillmentStatus(body.fulfillmentStatus);
+    if (typeof body.fulfillmentStatus !== "string" || body.fulfillmentStatus !== next) {
+      return res.status(400).json({
+        error: "validation_error",
+        message: "Estado de cumplimiento inválido.",
+      });
+    }
+
+    try {
+      const [donation] = await db.select().from(donationsTable).where(eq(donationsTable.id, id));
+      if (!donation) {
+        return res.status(404).json({ error: "not_found", message: "Donation not found" });
+      }
+
+      const current = normalizeFulfillmentStatus(donation.fulfillmentStatus);
+      const blocked = fulfillmentBlockReason(current, next);
+      if (blocked) {
+        return res.status(400).json({ error: "validation_error", message: blocked });
+      }
+
+      // Cantidades realmente recibidas (opcional, solo para productos).
+      const received = Array.isArray(body.receivedQuantities)
+        ? (body.receivedQuantities as { id?: unknown; quantity?: unknown }[])
+        : [];
+      const receivedUpdates: { itemId: number; quantity: number }[] = [];
+      for (const entry of received) {
+        const itemId = Number(entry?.id);
+        const quantity = Number(entry?.quantity);
+        if (!Number.isInteger(itemId) || itemId <= 0) continue;
+        if (!Number.isFinite(quantity) || quantity < 0) {
+          return res.status(400).json({
+            error: "validation_error",
+            message: "La cantidad recibida no puede ser negativa.",
+          });
+        }
+        receivedUpdates.push({ itemId, quantity });
+      }
+
+      const now = new Date();
+      const actor = auditContext(req);
+      await db.transaction(async (tx) => {
+        await tx
+          .update(donationsTable)
+          .set({
+            fulfillmentStatus: next,
+            // Se sella la fecha en la que el aporte se da por recibido.
+            receivedAt:
+              next === "recibida" || next === "verificada" ? (donation.receivedAt ?? now) : donation.receivedAt,
+            fulfillmentUpdatedAt: now,
+            fulfillmentUpdatedBy: actor.username ?? null,
+          })
+          .where(eq(donationsTable.id, id));
+
+        for (const update of receivedUpdates) {
+          await tx
+            .update(donationItemsTable)
+            .set({ receivedQuantity: String(update.quantity) })
+            .where(
+              and(
+                eq(donationItemsTable.id, update.itemId),
+                eq(donationItemsTable.donationId, id),
+              ),
+            );
+        }
+      });
+
+      await logAuditAction({
+        ...actor,
+        // El estado CONTABLE no cambia aquí: se reutiliza la acción de «estado
+        // cambiado» y los detalles distinguen que es el CUMPLIMIENTO del aporte.
+        action: AUDIT_ACTIONS.donationStatusChanged,
+        resource: AUDIT_RESOURCES.donations,
+        resourceId: String(id),
+        details: {
+          changed: "fulfillment",
+          fulfillmentStatusFrom: current,
+          fulfillmentStatusTo: next,
+          fulfillmentStatusLabel: fulfillmentLabel(next),
+          receivedItems: receivedUpdates.length,
+        },
+      });
+
+      const [updated] = await db.select().from(donationsTable).where(eq(donationsTable.id, id));
+      const items = await db
+        .select()
+        .from(donationItemsTable)
+        .where(eq(donationItemsTable.donationId, id));
+      return res.json(await formatDonation(updated ?? donation, null, items));
+    } catch (err) {
+      req.log.error({ err, id }, "Failed to update donation fulfillment");
+      return res.status(500).json({
+        error: "server_error",
+        message: "No se pudo actualizar el estado del aporte.",
+      });
+    }
+  },
+);
+
 async function formatDonation(
   d: typeof donationsTable.$inferSelect,
   campaignTitle: string | null = null,
+  items: unknown[] | null = null,
 ) {
   if (campaignTitle === null && d.campaignId) {
     const [campaign] = await db
@@ -1087,6 +1278,15 @@ async function formatDonation(
     voidedAt: d.voidedAt instanceof Date && !Number.isNaN(d.voidedAt.getTime()) ? d.voidedAt.toISOString() : null,
     voidedBy: d.voidedBy,
     voidReason: d.voidReason,
+    // V20: cumplimiento del aporte (columna paralela al estado contable) y el
+    // código de seguimiento que se le dio al donante.
+    fulfillmentStatus: d.fulfillmentStatus,
+    trackingCode: d.trackingCode,
+    contactConsent: d.contactConsent,
+    orgName: d.orgName,
+    // Ítems de una donación en especie. Se pasan desde el llamador (solo el
+    // detalle y la creación los cargan) para no provocar un N+1 en los listados.
+    items,
     createdAt,
   };
 }
@@ -1134,6 +1334,14 @@ function formatDonationRow(r: Record<string, unknown>) {
     voidedAt,
     voidedBy: r.voided_by ?? null,
     voidReason: r.void_reason ?? null,
+    // V20: se devuelven tal cual venga la consulta. Si el SQL del listado aún no
+    // selecciona las columnas nuevas, quedan en `null` (nunca se inventa un
+    // estado): así el panel no muestra un cumplimiento falso.
+    fulfillmentStatus: r.fulfillment_status ?? null,
+    trackingCode: r.tracking_code ?? null,
+    contactConsent: r.contact_consent ?? null,
+    orgName: r.org_name ?? null,
+    items: null,
     createdAt,
   };
 }
@@ -1256,4 +1464,3 @@ router.post("/donations/:id/consents", ...adminOnly, adminActionLimiter, async (
 });
 
 export default router;
-

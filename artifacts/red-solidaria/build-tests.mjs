@@ -36,6 +36,8 @@ await build({
     "./src/lib/admin-session.ts",
     "./src/lib/structured-data.ts",
     "./src/lib/cms.ts",
+    "./src/lib/donation-products.ts",
+    "./src/lib/phone.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",
   ],

@@ -5,6 +5,7 @@ import {
   DONOR_TYPES,
   collaborationRequiresAmount,
 } from "./donor-identity";
+import { isValidPePhone } from "./donation-tracking";
 
 /**
  * Validación de negocio del flujo de donación (registro y comprobación).
@@ -33,7 +34,30 @@ export const donationInputSchema = z
     firstName: z.string().trim().min(2, "El nombre es requerido").max(100),
     lastName: z.string().trim().min(2, "El apellido es requerido").max(100),
     email: z.string().trim().email("Email inválido").max(200),
-    phone: z.string().trim().max(30).nullish(),
+    // WhatsApp del donante. OPCIONAL por compatibilidad con las donaciones
+    // históricas y con los registros del panel, pero SI viene debe ser un móvil
+    // peruano válido: 9 dígitos que empiezan por 9, con o sin el prefijo +51.
+    phone: z
+      .string()
+      .trim()
+      .max(30)
+      .refine((v) => v === "" || isValidPePhone(v), {
+        message: "El WhatsApp debe ser un número peruano válido de 9 dígitos.",
+      })
+      .nullish(),
+    // Ítems de una donación en especie (productos). La validación FINA (producto,
+    // cantidad > 0, unidad) se hace con `normalizeDonationItems` para poder dar un
+    // mensaje comprensible por producto; aquí solo se declara para que zod no lo
+    // descarte al parsear.
+    items: z.array(z.unknown()).nullish(),
+    // Autorización para ser CONTACTADO. Separada del consentimiento de
+    // publicación (`anonymous` / `publicProof`).
+    contactConsent: z.boolean().nullish(),
+    // Organización, para donaciones de empresas (opcional).
+    orgName: z.string().trim().max(120).nullish(),
+    // Clave de idempotencia del formulario público: evita que un doble envío cree
+    // dos donaciones. Se valida con `normalizeDedupeToken` en la ruta.
+    dedupeToken: z.string().trim().max(64).nullish(),
     // QUÉ aporta el donante. Ausente = dinero (compatibilidad con el flujo
     // anterior, que solo conocía donaciones de dinero).
     collaborationType: z

@@ -39,18 +39,49 @@ export const donationsTable = pgTable("donations", {
   voidedAt: timestamp("voided_at"),
   voidedBy: text("voided_by"),
   voidReason: text("void_reason"),
+  // ── Migración 034 (V20): CUMPLIMIENTO del aporte ──────────────────────────
+  // Estado del CICLO DE VIDA real del aporte, SEPARADO del estado CONTABLE
+  // (`status`). `status` sigue siendo la única fuente de las cifras y del libro
+  // (approved|reconciled): una promesa NUNCA cuenta como ingreso. Aquí se
+  // describe si el aporte está coordinándose, comprometido, recibido o verificado.
+  fulfillmentStatus: text("fulfillment_status")
+    .notNull()
+    .default("pendiente_coordinacion"),
+  // Código único de seguimiento que se muestra al donante al terminar.
+  trackingCode: text("tracking_code"),
+  // Clave de IDEMPOTENCIA del formulario público: un doble envío (doble clic,
+  // reconexión) devuelve la MISMA donación en vez de crear otra. Índice único
+  // parcial (ver migración 034).
+  dedupeToken: text("dedupe_token"),
+  // Cuándo se recibió físicamente el aporte y quién gestionó el cambio.
+  receivedAt: timestamp("received_at"),
+  fulfillmentUpdatedAt: timestamp("fulfillment_updated_at"),
+  fulfillmentUpdatedBy: text("fulfillment_updated_by"),
+  // Autorización para ser CONTACTADO. Se guarda APARTE de la de publicación
+  // (`anonymous`/`publicProof` y los consentimientos `public_*`): son decisiones
+  // distintas y deben poder auditarse por separado.
+  contactConsent: boolean("contact_consent").notNull().default(false),
+  // Organización, para donaciones de empresas (opcional).
+  orgName: text("org_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Los campos de anulación contable son de SERVIDOR: nunca se aceptan desde el
-// formulario público (anti mass-assignment), igual que el estado o la
-// conciliación. Solo los escribe `POST /donations/:id/void`.
+// formulario público (anti mass-assignment), igual que el estado, la
+// conciliación, el CUMPLIMIENTO, el código de seguimiento y la idempotencia.
+// Solo los escriben las rutas administrativas correspondientes.
 export const insertDonationSchema = createInsertSchema(donationsTable).omit({
   id: true,
   createdAt: true,
   voidedAt: true,
   voidedBy: true,
   voidReason: true,
+  fulfillmentStatus: true,
+  trackingCode: true,
+  dedupeToken: true,
+  receivedAt: true,
+  fulfillmentUpdatedAt: true,
+  fulfillmentUpdatedBy: true,
 });
 export type InsertDonation = z.infer<typeof insertDonationSchema>;
 export type Donation = typeof donationsTable.$inferSelect;
