@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, HandCoins, ReceiptText, ShieldCheck } from "lucide-react";
 import { useGetDonationStats, useGetStats } from "@workspace/api-client-react";
+import { useCmsPage } from "@/hooks/use-cms-page";
+import { cmsText, resolveLocale } from "@/lib/cms";
 
 /**
  * "Tu ayuda tiene rostro y destino." — transparencia protagonista con
@@ -11,7 +13,13 @@ import { useGetDonationStats, useGetStats } from "@workspace/api-client-react";
  * Si no hay datos, muestra un estado vacío elegante (no inventa cifras).
  */
 export function TransparencySection() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = resolveLocale(i18n.language);
+  // Bloque de REFERENCIA: solo aporta encabezado y subtítulo. Las CIFRAS se calculan
+  // siempre desde Neon (donations/stats + impact stats) y NO son editables.
+  const { data: cms } = useCmsPage("inicio");
+  const sectionTitle = cmsText(cms, "refStats", "heading", locale, t("home.transparencySectionTitle"));
+  const sectionSubtitle = cmsText(cms, "refStats", "subtitle", locale, t("home.transparencySectionSubtitle"));
 
   const { data: donationStats } = useGetDonationStats();
   const { data: impactStats } = useGetStats();
@@ -65,10 +73,10 @@ export function TransparencySection() {
               {t("home.transparencyStep3Title")}
             </p>
             <h2 className="mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              {t("home.transparencySectionTitle")}
+              {sectionTitle}
             </h2>
             <p className="mt-4 text-base leading-relaxed text-white/70 sm:text-lg">
-              {t("home.transparencySectionSubtitle")}
+              {sectionSubtitle}
             </p>
             <div className="mt-7">
               <Button

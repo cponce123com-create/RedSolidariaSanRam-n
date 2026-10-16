@@ -50,6 +50,15 @@ export const AUDIT_ACTIONS = {
   identityUnpublished: "IDENTITY_UNPUBLISHED",
   // V18: se descartaron activos (imágenes) que se reemplazaron antes de guardar.
   identityAssetsDiscarded: "IDENTITY_ASSETS_DISCARDED",
+  // CMS (Fase 2): edición del contenido de las páginas del sitio. Publicar o
+  // despublicar cambia lo que ve el público, así que queda trazado con quién,
+  // cuándo y sobre qué página.
+  cmsUpdated: "CMS_UPDATED",
+  cmsPublished: "CMS_PUBLISHED",
+  cmsUnpublished: "CMS_UNPUBLISHED",
+  cmsScheduled: "CMS_SCHEDULED",
+  cmsVersionRestored: "CMS_VERSION_RESTORED",
+  cmsAssetsDiscarded: "CMS_ASSETS_DISCARDED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -61,6 +70,7 @@ export const AUDIT_RESOURCES = {
   observations: "observations",
   volunteers: "volunteers",
   identity: "identity",
+  cms: "cms",
 } as const;
 
 const ACTION_LABEL: Record<string, string> = {
@@ -93,6 +103,12 @@ const ACTION_LABEL: Record<string, string> = {
   [AUDIT_ACTIONS.identityPublished]: "Identidad institucional publicada",
   [AUDIT_ACTIONS.identityUnpublished]: "Identidad institucional despublicada",
   [AUDIT_ACTIONS.identityAssetsDiscarded]: "Activos de identidad descartados (reemplazados sin guardar)",
+  [AUDIT_ACTIONS.cmsUpdated]: "Página del CMS actualizada (borrador)",
+  [AUDIT_ACTIONS.cmsPublished]: "Página del CMS publicada",
+  [AUDIT_ACTIONS.cmsUnpublished]: "Página del CMS despublicada",
+  [AUDIT_ACTIONS.cmsScheduled]: "Publicación de página del CMS programada",
+  [AUDIT_ACTIONS.cmsVersionRestored]: "Versión de página del CMS restaurada",
+  [AUDIT_ACTIONS.cmsAssetsDiscarded]: "Activos del CMS descartados (reemplazados sin guardar)",
 };
 
 export function auditActionLabel(action: string): string {

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { optimizeImageUrl } from "@/lib/image-url";
 import SEO from "@/components/shared/SEO";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 import { motion } from "framer-motion";
 import {
   Dog, Cat, Heart, Search, Filter, Plus, Star, Shield, Syringe,
@@ -199,10 +200,13 @@ export default function Adoptions() {
         </div>
         <div className="flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
           <div>
-            <h1 className="text-4xl sm:text-5xl font-display font-black text-foreground mb-3">{t("adoptions.title")}</h1>
-            <p className="text-muted-foreground text-lg max-w-2xl">
-              {t("adoptions.subtitle")}
-            </p>
+            <CmsPageHeading
+              slug="adopciones"
+              title={t("adoptions.title")}
+              subtitle={t("adoptions.subtitle")}
+              titleClassName="text-4xl sm:text-5xl font-display font-black text-foreground mb-3"
+              subtitleClassName="text-muted-foreground text-lg max-w-2xl"
+            />
           </div>
           <div className="flex flex-wrap gap-3 shrink-0">
             <Link href="/publicar-mascota">

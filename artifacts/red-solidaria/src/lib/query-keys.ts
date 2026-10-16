@@ -47,6 +47,11 @@ export const ADOPTION_REQUESTS_KEY = "/api/admin/adoption-requests";
 // misma entidad con dos claves; ambas se invalidan juntas.
 export const IDENTITY_KEY = "institutional-identity";
 export const ADMIN_IDENTITY_KEY = "admin-institutional-identity";
+// CMS (Fase 2): página pública por slug, borrador administrativo por slug y listado
+// de páginas del panel. Comparten la entidad `cms` para invalidarse juntas.
+export const CMS_KEY = "cms-page";
+export const ADMIN_CMS_KEY = "admin-cms-page";
+export const ADMIN_CMS_LIST_KEY = "admin-cms-pages";
 
 /**
  * `true` si la primera parte de la clave es `prefix` o un recurso colgante de
@@ -121,6 +126,18 @@ export function isIdentityQueryKey(key: readonly unknown[]): boolean {
 }
 
 /**
+ * CMS: página pública, borrador administrativo, listado de páginas y el historial de
+ * versiones (`[ADMIN_CMS_KEY, slug, "versions"]`).
+ */
+export function isCmsQueryKey(key: readonly unknown[]): boolean {
+  return (
+    key[0] === CMS_KEY ||
+    key[0] === ADMIN_CMS_KEY ||
+    key[0] === ADMIN_CMS_LIST_KEY
+  );
+}
+
+/**
  * `true` si la clave pertenece a alguna de las entidades indicadas. Se usa para
  * invalidar «todo lo que depende de X» sin repetir predicados por el código.
  */
@@ -134,7 +151,8 @@ export type QueryEntity =
   | "testimonials"
   | "faq"
   | "reports"
-  | "identity";
+  | "identity"
+  | "cms";
 
 const ENTITY_PREDICATES: Record<
   QueryEntity,
@@ -150,6 +168,7 @@ const ENTITY_PREDICATES: Record<
   faq: isFaqQueryKey,
   reports: isReportQueryKey,
   identity: isIdentityQueryKey,
+  cms: isCmsQueryKey,
 };
 
 export function isEntityQueryKey(

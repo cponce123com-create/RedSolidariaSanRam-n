@@ -60,6 +60,8 @@ await build({
     "./src/lib/rich-text.ts",
     "./src/lib/institutional-identity.ts",
     "./src/routes/institutional-identity.ts",
+    "./src/lib/cms-content.ts",
+    "./src/routes/cms.ts",
     "./src/lib/audit.ts",
     "./src/lib/csv.ts",
     "./src/lib/supervisor.ts",

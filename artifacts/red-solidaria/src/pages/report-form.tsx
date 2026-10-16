@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 import {
   AlertTriangle, Heart, Baby, PersonStanding, Cat, Home, Zap,
   Camera, Send, CheckCircle, Shield, MapPin, Phone, Mail, User, ArrowLeft
@@ -142,10 +143,13 @@ export default function ReportForm() {
           </div>
           <span className="bg-primary/10 text-primary text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">{t("urgentCases.reportCase")}</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-display font-black text-foreground mb-3">{t("reportForm.title")}</h1>
-        <p className="text-muted-foreground text-lg leading-relaxed">
-          {t("reportForm.subtitle")}
-        </p>
+        <CmsPageHeading
+          slug="necesito-ayuda"
+          title={t("reportForm.title")}
+          subtitle={t("reportForm.subtitle")}
+          titleClassName="text-4xl sm:text-5xl font-display font-black text-foreground mb-3"
+          subtitleClassName="text-muted-foreground text-lg leading-relaxed"
+        />
       </div>
 
       {/* Privacy notice */}

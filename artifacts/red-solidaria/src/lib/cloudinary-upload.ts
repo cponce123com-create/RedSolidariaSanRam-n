@@ -72,18 +72,24 @@ export async function uploadImageToCloudinary(
   endpoint:
     | "/api/uploads/signature"
     | "/api/uploads/admin-signature"
-    | "/api/uploads/institutional-signature",
-  opts: { kind?: string } = {},
+    | "/api/uploads/institutional-signature"
+    | "/api/uploads/cms-signature",
+  opts: { kind?: string; page?: string } = {},
 ): Promise<UploadedImage> {
   // ─── 1) Firma del servidor ────────────────────────────────────────────────
   let sig: UploadSignaturePayload;
   try {
-    // El TIPO de activo solo lo usa la firma institucional (fija carpeta y formatos
-    // permitidos); los demás endpoints ignoran el cuerpo.
+    // El cuerpo de la firma lo usa cada endpoint según su necesidad: la firma
+    // institucional recibe el TIPO de activo (`kind`) y la del CMS la PÁGINA
+    // (`page`), con la que el SERVIDOR fija la carpeta `cms/<slug>`. El cliente
+    // nunca elige la carpeta.
+    const signatureBody: Record<string, string> = {};
+    if (opts.kind) signatureBody.kind = opts.kind;
+    if (opts.page) signatureBody.page = opts.page;
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(opts.kind ? { kind: opts.kind } : {}),
+      body: JSON.stringify(signatureBody),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { message?: string } | null;

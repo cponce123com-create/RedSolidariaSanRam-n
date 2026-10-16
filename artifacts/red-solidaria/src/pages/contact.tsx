@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import SEO from "@/components/shared/SEO";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -58,10 +59,13 @@ export default function Contact() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           
           <div className="text-center max-w-2xl mx-auto mb-16">
-            <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">{t("contact.title")}</h1>
-            <p className="text-lg text-muted-foreground">
-              {t("contact.subtitle")}
-            </p>
+            <CmsPageHeading
+              slug="contacto"
+              title={t("contact.title")}
+              subtitle={t("contact.subtitle")}
+              titleClassName="text-4xl md:text-5xl font-display font-bold mb-6"
+              subtitleClassName="text-lg text-muted-foreground"
+            />
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 mb-16">

@@ -8,6 +8,7 @@ import { Package, Map as MapIcon, LayoutGrid } from "lucide-react";
 import { isUrgent, mostUrgentCampaign } from "@/lib/campaign-urgency";
 import { useTranslation } from "react-i18next";
 import SEO from "@/components/shared/SEO";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 import { prioritizeCampaign } from "@/lib/chocofest";
 import { useProtagonistId } from "@/components/home/ProtagonistCampaignSection";
 
@@ -42,10 +43,13 @@ export default function Campaigns() {
       />
       <section className="py-12 bg-secondary/30 border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">{t("campaigns.title")}</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            {t("campaigns.subtitle")}
-          </p>
+          <CmsPageHeading
+            slug="campanas"
+            title={t("campaigns.title")}
+            subtitle={t("campaigns.subtitle")}
+            titleClassName="text-4xl md:text-5xl font-display font-bold mb-6"
+            subtitleClassName="text-xl text-muted-foreground max-w-2xl mx-auto"
+          />
           
           <div className="flex flex-wrap justify-center gap-3 mt-10">
             <Button 
