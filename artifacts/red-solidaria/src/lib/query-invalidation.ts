@@ -47,3 +47,41 @@ export function invalidateDonationQueries(queryClient: QueryClient): void {
 export function invalidateAllyQueries(queryClient: QueryClient): void {
   invalidateEntities(queryClient, ["allies"]);
 }
+
+// ─── V15: invalidación de las entidades que faltaban ─────────────────────────
+// Cada función refresca a la vez el listado, el detalle y la vista pública de la
+// entidad, para que una mutación del panel se refleje sin recargar la página.
+
+/** Mascotas y solicitudes de adopción (panel + web pública). */
+export function invalidatePetQueries(queryClient: QueryClient): void {
+  invalidateEntities(queryClient, ["pets"]);
+}
+
+/** Noticias: listado público, detalle y panel administrativo. */
+export function invalidateNewsQueries(queryClient: QueryClient): void {
+  invalidateEntities(queryClient, ["news"]);
+}
+
+/** Testimonios: página pública y panel. */
+export function invalidateTestimonialQueries(queryClient: QueryClient): void {
+  invalidateEntities(queryClient, ["testimonials"]);
+}
+
+/** Preguntas frecuentes: página pública y panel. */
+export function invalidateFaqQueries(queryClient: QueryClient): void {
+  invalidateEntities(queryClient, ["faq"]);
+}
+
+/** Reportes ciudadanos: listado del panel y detalle. */
+export function invalidateReportQueries(queryClient: QueryClient): void {
+  invalidateEntities(queryClient, ["reports"]);
+}
+
+/**
+ * Identidad institucional: el contenido publicado que consume la web y la
+ * configuración que lo acompaña (la portada y el logotipo también viven en la
+ * entidad `settings` en algunas vistas).
+ */
+export function invalidateIdentityQueries(queryClient: QueryClient): void {
+  invalidateEntities(queryClient, ["identity", "settings"]);
+}

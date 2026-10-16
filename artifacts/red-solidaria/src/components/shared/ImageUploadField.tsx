@@ -12,7 +12,10 @@ interface ImageUploadFieldProps {
   label?: string;
   // Endpoint de firma: admin por defecto; formularios públicos usan
   // "/api/uploads/signature" (rate limitado por IP, sin sesión).
-  endpoint?: "/api/uploads/signature" | "/api/uploads/admin-signature";
+  endpoint?:
+    | "/api/uploads/signature"
+    | "/api/uploads/admin-signature"
+    | "/api/uploads/institutional-signature";
 }
 
 /**

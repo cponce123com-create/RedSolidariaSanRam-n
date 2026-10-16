@@ -8,6 +8,10 @@ import {
   Syringe, Scissors, Shield, Edit2, Trash2, Star
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ApiError, errorMessage } from "@/lib/api-error";
+import { adminRequestJson, adminRequestNoContent } from "@/lib/admin-request";
+import { interpretDeleteStatus, describeDeleteOutcome } from "@/lib/delete-outcome";
+import { invalidatePetQueries } from "@/lib/query-invalidation";
 
 interface Pet {
   id: number; name: string; species: string; breed: string | null;
@@ -22,6 +26,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   available: { label: "Disponible", color: "bg-green-100 text-green-800" },
   "in-process": { label: "En proceso", color: "bg-blue-100 text-blue-800" },
   adopted: { label: "Adoptado", color: "bg-purple-100 text-purple-800" },
+  inactive: { label: "Despublicada", color: "bg-secondary text-foreground" },
 };
 
 const STATUS_FILTERS = [
@@ -30,6 +35,7 @@ const STATUS_FILTERS = [
   { value: "available", label: "Disponibles" },
   { value: "in-process", label: "En proceso" },
   { value: "adopted", label: "Adoptados" },
+  { value: "inactive", label: "Despublicadas" },
 ];
 
 const SIZE_LABELS: Record<string, string> = { small: "Peq.", medium: "Med.", large: "Gran.", giant: "Gig." };
@@ -38,6 +44,9 @@ const AGE_LABELS: Record<string, string> = { puppy: "Cachorro", adult: "Adulto",
 export default function AdminAdoptions() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+  // Conflicto de borrado: la mascota tiene solicitudes vinculadas (409). No se
+  // destruyen: se ofrece despublicar en su lugar.
+  const [deleteConflict, setDeleteConflict] = useState<{ pet: Pet; message: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -45,37 +54,49 @@ export default function AdminAdoptions() {
     queryKey: ["/api/admin/pets", statusFilter],
     queryFn: async () => {
       const url = statusFilter === "all" ? "/api/admin/pets" : `/api/admin/pets?status=${statusFilter}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Error cargando mascotas");
-      return res.json();
+      return adminRequestJson<Pet[]>(url);
     },
   });
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await fetch(`/api/admin/pets/${id}`, {
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      adminRequestJson(`/api/admin/pets/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Error");
-      return res.json();
-    },
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pets"] });
-      toast({ title: "Estado actualizado" });
+      // Mascotas es UNA entidad: se refrescan panel y web pública (lista + ficha).
+      invalidatePetQueries(queryClient);
+      setDeleteConflict(null);
+      toast({ title: "Estado actualizado", description: "La web pública refleja el cambio." });
     },
-    onError: () => toast({ title: "Error", variant: "destructive" }),
+    onError: (error: unknown) =>
+      toast({
+        title: "No se pudo actualizar el estado",
+        description: errorMessage(error),
+        variant: "destructive",
+      }),
   });
 
   const deletePet = useMutation({
-    mutationFn: async (id: number) => {
-      await fetch(`/api/admin/pets/${id}`, { method: "DELETE", credentials: "include" });
+    mutationFn: (pet: Pet) =>
+      adminRequestNoContent(`/api/admin/pets/${pet.id}`, { method: "DELETE" }),
+    onSuccess: (_data, pet) => {
+      invalidatePetQueries(queryClient);
+      setDeleteConflict(null);
+      toast({ title: `«${pet.name}» se eliminó correctamente` });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pets"] });
-      toast({ title: "Mascota eliminada" });
+    // El servidor responde 409 si hay solicitudes vinculadas y 404 si no borró
+    // ninguna fila. Antes se mostraba «eliminada» siempre: aquí se traduce el
+    // código REAL y, si el borrado está bloqueado, se ofrece despublicar.
+    onError: (error: unknown, pet: Pet) => {
+      invalidatePetQueries(queryClient);
+      const status = error instanceof ApiError ? error.status : 0;
+      const outcome = interpretDeleteStatus(status);
+      const info = describeDeleteOutcome(outcome, "la mascota", errorMessage(error, ""));
+      if (info.canUnpublish) setDeleteConflict({ pet, message: info.description });
+      toast({ title: info.title, description: info.description, variant: "destructive" });
     },
   });
 
@@ -110,6 +131,26 @@ export default function AdminAdoptions() {
           </Link>
         </div>
       </div>
+
+      {/* Conflicto de borrado: no se destruyen las solicitudes, se ofrece despublicar */}
+      {deleteConflict && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold text-amber-900">No se eliminó «{deleteConflict.pet.name}»</p>
+            <p className="text-amber-800 mt-0.5">{deleteConflict.message}</p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" className="rounded-xl" disabled={updateStatus.isPending}
+              onClick={() => updateStatus.mutate({ id: deleteConflict.pet.id, status: "inactive" })}>
+              Despublicar
+            </Button>
+            <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setDeleteConflict(null)}>
+              Cerrar
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -203,8 +244,16 @@ export default function AdminAdoptions() {
                         <Check className="w-3 h-3 mr-1" /> Adoptado
                       </Button>
                     )}
+                    {pet.status === "inactive" && (
+                      <Button size="sm" variant="outline" className="rounded-lg h-7 text-xs px-2"
+                        onClick={() => updateStatus.mutate({ id: pet.id, status: "available" })}
+                        disabled={updateStatus.isPending}>
+                        Restaurar
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" className="rounded-lg h-7 text-xs px-2 text-destructive hover:bg-destructive/10 ml-auto"
-                      onClick={() => { if (confirm(`¿Eliminar a ${pet.name}?`)) deletePet.mutate(pet.id); }}>
+                      disabled={deletePet.isPending}
+                      onClick={() => { if (confirm(`¿Eliminar a ${pet.name}? Si tiene solicitudes de adopción no se podrá eliminar.`)) deletePet.mutate(pet); }}>
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
@@ -243,20 +292,24 @@ function AdminAdoptionRequestsPreview() {
   });
 
   const updateRequest = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await fetch(`/api/admin/adoption-requests/${id}`, {
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      adminRequestJson(`/api/admin/adoption-requests/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ status }),
-      });
-      return res.json();
-    },
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/adoption-requests"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/pets"] });
+      // Cambiar el estado de una solicitud también cambia el estado de la mascota.
+      invalidatePetQueries(queryClient);
       toast({ title: "Solicitud actualizada" });
     },
+    // Antes no había onError: un 404/400 mostraba «actualizada» sin cambiar nada.
+    onError: (error: unknown) =>
+      toast({
+        title: "No se pudo actualizar la solicitud",
+        description: errorMessage(error),
+        variant: "destructive",
+      }),
   });
 
   if (isLoading) return <div className="h-24 bg-secondary rounded-2xl animate-pulse" />;

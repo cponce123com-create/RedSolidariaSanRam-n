@@ -11,6 +11,12 @@
  * Funciones PURAS y testeables.
  */
 
+// NOTA (Fase 3 — identidad institucional): el logotipo, la portada y «Nuestra
+// historia» NO viven aquí ni se exponen por `GET /api/settings`. Tienen su propia
+// tabla y su propio endpoint público (`GET /api/institutional-identity`) con un
+// DTO de allowlist explícita (`publicIdentityDto`), donde el identificador interno
+// de Cloudinary (`publicId`) nunca se publica. Si algún día se guardara un dato de
+// identidad en `settings`, habría que añadirlo EXPLÍCITAMENTE a esta lista.
 export const PUBLIC_SETTING_KEYS = [
   // Portada: campaña protagonista (identificador estable).
   "protagonist_campaign_id",

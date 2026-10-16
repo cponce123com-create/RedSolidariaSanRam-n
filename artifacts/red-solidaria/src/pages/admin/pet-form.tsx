@@ -58,6 +58,7 @@ export default function AdminPetForm() {
     queryKey: ["/api/admin/pets", id],
     queryFn: async () => {
       const res = await fetch(`/api/admin/pets/${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("No se pudo cargar la mascota");
       return res.json();
     },
     enabled: isEdit,

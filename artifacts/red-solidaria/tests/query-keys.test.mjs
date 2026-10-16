@@ -146,3 +146,69 @@ test("invalidateEntities: una sola consulta con predicado para varias entidades"
   assert.equal(matched(client, ["/api/donations"]), true);
   assert.equal(matched(client, ["settings"]), false);
 });
+
+// ─── V15: entidades que faltaban (mascotas, noticias, testimonios, FAQ,
+//     reportes e identidad institucional) ────────────────────────────────────
+
+test("V15: predicados de mascotas, noticias, testimonios, FAQ, reportes e identidad", async () => {
+  const {
+    isPetQueryKey,
+    isNewsQueryKey,
+    isTestimonialQueryKey,
+    isFaqQueryKey,
+    isReportQueryKey,
+    isIdentityQueryKey,
+  } = await import("./dist/query-keys.mjs");
+
+  assert.equal(isPetQueryKey(["/api/pets"]), true);
+  assert.equal(isPetQueryKey(["/api/admin/pets"]), true);
+  assert.equal(isPetQueryKey(["/api/admin/pets", "available"]), true);
+  assert.equal(isPetQueryKey(["/api/admin/pets/5"]), true);
+  assert.equal(isPetQueryKey(["/api/admin/adoption-requests"]), true);
+  assert.equal(isPetQueryKey(["/api/news"]), false);
+
+  assert.equal(isNewsQueryKey(["/api/news"]), true);
+  assert.equal(isNewsQueryKey(["/api/news/5"]), true);
+  assert.equal(isNewsQueryKey(["/api/news-archivadas"]), false);
+
+  assert.equal(isTestimonialQueryKey(["/api/testimonials"]), true);
+  assert.equal(isTestimonialQueryKey(["/api/admin/testimonials"]), true);
+
+  assert.equal(isFaqQueryKey(["/api/faq"]), true);
+  assert.equal(isFaqQueryKey(["/api/admin/faq"]), true);
+
+  assert.equal(isReportQueryKey(["/api/reports"]), true);
+  assert.equal(isReportQueryKey(["/api/admin/reports"]), true);
+  assert.equal(isReportQueryKey(["/api/admin/reports/5"]), true);
+
+  assert.equal(isIdentityQueryKey(["institutional-identity"]), true);
+  assert.equal(isIdentityQueryKey(["admin-institutional-identity"]), true);
+  assert.equal(isIdentityQueryKey(["settings"]), false);
+});
+
+test("V15: invalidar mascotas refresca panel, web pública y solicitudes", async () => {
+  const { invalidatePetQueries, invalidateNewsQueries, invalidateIdentityQueries } =
+    await import("./dist/query-invalidation.mjs");
+
+  const client = fakeQueryClient();
+  invalidatePetQueries(client);
+  assert.equal(matched(client, ["/api/admin/pets"]), true);
+  assert.equal(matched(client, ["/api/admin/pets", "available"]), true);
+  assert.equal(matched(client, ["/api/pets"]), true);
+  assert.equal(matched(client, ["/api/admin/pets/5"]), true);
+  assert.equal(matched(client, ["/api/admin/adoption-requests"]), true);
+  assert.equal(matched(client, ["/api/news"]), false);
+
+  const newsClient = fakeQueryClient();
+  invalidateNewsQueries(newsClient);
+  assert.equal(matched(newsClient, ["/api/news"]), true);
+  assert.equal(matched(newsClient, ["/api/news/5"]), true);
+  assert.equal(matched(newsClient, ["/api/admin/pets"]), false);
+
+  const identityClient = fakeQueryClient();
+  invalidateIdentityQueries(identityClient);
+  assert.equal(matched(identityClient, ["institutional-identity"]), true);
+  assert.equal(matched(identityClient, ["admin-institutional-identity"]), true);
+  assert.equal(matched(identityClient, ["settings"]), true);
+  assert.equal(matched(identityClient, ["/api/campaigns"]), false);
+});

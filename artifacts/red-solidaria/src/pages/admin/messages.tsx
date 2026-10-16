@@ -64,6 +64,9 @@ export default function AdminMessages() {
     queryKey: ["/api/contact/messages"],
     queryFn: async () => {
       const res = await fetch("/api/contact/messages", { credentials: "include" });
+      // Sin comprobar `ok`, un 401/500 devolvía el cuerpo de error como si fuera la
+      // lista de mensajes (el panel rompía o mostraba «0 mensajes» sin explicar el fallo).
+      if (!res.ok) throw new Error("No se pudieron cargar los mensajes");
       return res.json();
     },
   });

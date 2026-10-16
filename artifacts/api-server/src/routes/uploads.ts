@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import {
   getUploadSignature,
   isCloudinaryConfigured,
+  INSTITUTIONAL_IDENTITY_FOLDER,
 } from "../lib/cloudinary";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
@@ -36,6 +37,25 @@ router.post(
       });
     }
     return res.json(getUploadSignature("campaign-evidence"));
+  },
+);
+
+// Firma para la IDENTIDAD INSTITUCIONAL (Fase 3): logotipo, portada y fotos de
+// «Nuestra historia». Solo superadmin. La carpeta la fija el SERVIDOR (el cliente
+// no puede pedir una carpeta arbitraria), así que el borrado de assets solo actúa
+// sobre nuestra carpeta y nunca sobre archivos compartidos.
+router.post(
+  "/uploads/institutional-signature",
+  requireRole(ROLES.SUPERADMIN),
+  adminActionLimiter,
+  (_req, res) => {
+    if (!isCloudinaryConfigured()) {
+      return res.status(503).json({
+        error: "upload_unavailable",
+        message: "Cloudinary no está configurado.",
+      });
+    }
+    return res.json(getUploadSignature(INSTITUTIONAL_IDENTITY_FOLDER));
   },
 );
 

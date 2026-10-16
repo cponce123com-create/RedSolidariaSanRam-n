@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { errorMessage } from "@/lib/api-error";
+import { adminRequestNoContent, adminRequestJson } from "@/lib/admin-request";
+import { invalidateFaqQueries } from "@/lib/query-invalidation";
 import { Plus, Edit2, Trash2, Check, HelpCircle, Eye, EyeOff } from "lucide-react";
 
 interface FaqItem {
@@ -108,19 +111,35 @@ export default function AdminFaq() {
 
   const { data: faqs = [], isLoading } = useQuery<FaqItem[]>({
     queryKey: ["/api/admin/faq"],
-    queryFn: async () => { const r = await fetch("/api/admin/faq", { credentials: "include" }); return r.json(); },
+    queryFn: async () => {
+      const r = await fetch("/api/admin/faq", { credentials: "include" });
+      if (!r.ok) throw new Error("No se pudieron cargar las preguntas");
+      return r.json();
+    },
   });
 
   const deleteItem = useMutation({
-    mutationFn: async (id: number) => { await fetch(`/api/admin/faq/${id}`, { method: "DELETE", credentials: "include" }); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/faq"] }); toast({ title: "Pregunta eliminada" }); },
+    mutationFn: (id: number) => adminRequestNoContent(`/api/admin/faq/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      invalidateFaqQueries(queryClient);
+      toast({ title: "Pregunta eliminada" });
+    },
+    onError: (error: unknown) =>
+      toast({ title: "No se pudo eliminar la pregunta", description: errorMessage(error), variant: "destructive" }),
   });
 
   const toggleActive = useMutation({
-    mutationFn: async ({ id, active }: { id: number; active: boolean }) => {
-      await fetch(`/api/admin/faq/${id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ active }) });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/faq"] }),
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      adminRequestJson(`/api/admin/faq/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active }),
+      }),
+    onSuccess: () => invalidateFaqQueries(queryClient),
+    // Antes un 404/500 no se detectaba: el interruptor parecía funcionar y la FAQ
+    // seguía (o dejaba de estar) visible sin explicación.
+    onError: (error: unknown) =>
+      toast({ title: "No se pudo cambiar la visibilidad", description: errorMessage(error), variant: "destructive" }),
   });
 
   const handleSave = () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/faq"] }); setShowForm(false); setEditing(null); };

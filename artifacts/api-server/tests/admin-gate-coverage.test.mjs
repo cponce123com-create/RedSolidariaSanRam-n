@@ -60,6 +60,8 @@ const ADMIN_PATHS = [
   "/api/admin/faq",
   "/api/admin/adoption-requests",
   "/api/admin/protagonist-campaign",
+  // Identidad institucional (Fase 3): la parte administrativa exige sesión.
+  "/api/admin/institutional-identity",
   // Ruta inexistente: el gate debe ser un comodín y responder 401 igualmente.
   "/api/admin/esta-ruta-no-existe",
 ];

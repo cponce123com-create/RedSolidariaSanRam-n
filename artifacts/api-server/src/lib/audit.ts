@@ -41,6 +41,11 @@ export const AUDIT_ACTIONS = {
   volunteerTeamAssigned: "VOLUNTEER_TEAM_ASSIGNED",
   volunteerTeamLeft: "VOLUNTEER_TEAM_LEFT",
   volunteerParticipationRecorded: "VOLUNTEER_PARTICIPATION_RECORDED",
+  // V15 (Fase 3): identidad institucional. Publicar/despublicar cambia lo que ve
+  // el público, así que queda trazado con quién y cuándo.
+  identityUpdated: "IDENTITY_UPDATED",
+  identityPublished: "IDENTITY_PUBLISHED",
+  identityUnpublished: "IDENTITY_UNPUBLISHED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -51,6 +56,7 @@ export const AUDIT_RESOURCES = {
   donors: "donors",
   observations: "observations",
   volunteers: "volunteers",
+  identity: "identity",
 } as const;
 
 const ACTION_LABEL: Record<string, string> = {
@@ -79,6 +85,9 @@ const ACTION_LABEL: Record<string, string> = {
   [AUDIT_ACTIONS.volunteerTeamAssigned]: "Voluntario asignado a un equipo",
   [AUDIT_ACTIONS.volunteerTeamLeft]: "Voluntario retirado de un equipo",
   [AUDIT_ACTIONS.volunteerParticipationRecorded]: "Participación registrada",
+  [AUDIT_ACTIONS.identityUpdated]: "Identidad institucional actualizada (borrador)",
+  [AUDIT_ACTIONS.identityPublished]: "Identidad institucional publicada",
+  [AUDIT_ACTIONS.identityUnpublished]: "Identidad institucional despublicada",
 };
 
 export function auditActionLabel(action: string): string {

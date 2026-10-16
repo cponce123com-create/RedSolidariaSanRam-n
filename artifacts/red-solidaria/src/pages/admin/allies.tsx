@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { errorMessage } from "@/lib/api-error";
+import { adminRequestNoContent, adminRequestJson } from "@/lib/admin-request";
 import { invalidateAllyQueries } from "@/lib/query-invalidation";
 import {
   Building2, Plus, Star, Globe, Trash2, Edit2,
@@ -194,26 +196,27 @@ export default function AdminAllies() {
   });
 
   const deleteAlly = useMutation({
-    mutationFn: async (id: number) => {
-      await fetch(`/api/admin/allies/${id}`, { method: "DELETE", credentials: "include" });
-    },
+    mutationFn: (id: number) => adminRequestNoContent(`/api/admin/allies/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       // Aliados es UNA entidad: se refrescan el panel y la página pública.
       invalidateAllyQueries(queryClient);
       toast({ title: "Aliado eliminado" });
     },
+    // Antes no había onError: un 404/500 mostraba «eliminado» sin borrar nada.
+    onError: (error: unknown) =>
+      toast({ title: "No se pudo eliminar el aliado", description: errorMessage(error), variant: "destructive" }),
   });
 
   const toggleActive = useMutation({
-    mutationFn: async ({ id, active }: { id: number; active: boolean }) => {
-      const res = await fetch(`/api/admin/allies/${id}`, {
-        method: "PATCH", credentials: "include",
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      adminRequestJson(`/api/admin/allies/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active }),
-      });
-      return res.json();
-    },
+      }),
     onSuccess: () => invalidateAllyQueries(queryClient),
+    onError: (error: unknown) =>
+      toast({ title: "No se pudo cambiar la visibilidad", description: errorMessage(error), variant: "destructive" }),
   });
 
   const handleSave = () => {

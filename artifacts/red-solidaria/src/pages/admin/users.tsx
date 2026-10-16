@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { errorMessage } from "@/lib/api-error";
+import { adminRequestNoContent } from "@/lib/admin-request";
 import { Plus, Edit2, Trash2, Check, Shield, ShieldCheck, UserCog, Eye, EyeOff } from "lucide-react";
 
 interface AdminUser {
@@ -186,8 +188,14 @@ export default function AdminUsers() {
   });
 
   const deleteUser = useMutation({
-    mutationFn: async (id: number) => { await fetch(`/api/admin/users/${id}`, { method: "DELETE", credentials: "include" }); },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); toast({ title: "Usuario eliminado" }); },
+    mutationFn: (id: number) => adminRequestNoContent(`/api/admin/users/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Usuario eliminado" });
+    },
+    // Antes no había onError: un 404/403/500 mostraba «Usuario eliminado» sin borrar nada.
+    onError: (error: unknown) =>
+      toast({ title: "No se pudo eliminar el usuario", description: errorMessage(error), variant: "destructive" }),
   });
 
   const handleSave = () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] }); setShowForm(false); setEditing(null); };

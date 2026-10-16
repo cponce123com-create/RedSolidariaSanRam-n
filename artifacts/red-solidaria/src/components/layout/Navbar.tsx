@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AdminAccessLink } from "./AdminAccessLink";
+import { BrandLogo } from "./BrandLogo";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
@@ -157,27 +158,7 @@ export function Navbar() {
         <div className="flex justify-between items-center h-full">
           {/* Logo + marca */}
           <Link href="/" className="flex items-center gap-3 group" aria-label={t("nav.brand")}>
-            <div className="relative w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-              {/* Fallback siempre presente: si el logo falla, la imagen se oculta y queda el corazón. */}
-              <svg
-                className="w-6 h-6 text-primary"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                aria-hidden="true"
-              >
-                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-              </svg>
-              <img
-                src={`${import.meta.env.BASE_URL}images/logo.webp`}
-                alt={t("nav.logoAlt")}
-                className="absolute w-8 h-8 rounded-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            </div>
+            <BrandLogo />
             <span className="hidden sm:flex flex-col leading-none">
               <span className="font-display font-bold text-base text-foreground tracking-[0.14em]">
                 {t("nav.brand").toUpperCase()}

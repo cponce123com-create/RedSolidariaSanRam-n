@@ -91,7 +91,13 @@ export default function AdminNews() {
 
   const { data: news = [], isLoading } = useQuery<NewsItem[]>({
     queryKey: ["/api/news"],
-    queryFn: async () => { const r = await fetch("/api/news"); return r.json(); },
+    queryFn: async () => {
+      const r = await fetch("/api/news");
+      // Sin comprobar `ok`, un error del servidor devolvía un objeto (no un array)
+      // y el panel rompía al intentar recorrerlo.
+      if (!r.ok) throw new Error("No se pudieron cargar las noticias");
+      return r.json();
+    },
   });
 
   const deleteNews = useMutation({
