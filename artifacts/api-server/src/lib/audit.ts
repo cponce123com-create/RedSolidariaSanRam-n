@@ -27,6 +27,8 @@ export const AUDIT_ACTIONS = {
   campaignsDemoDeclaredBulk: "CAMPAIGNS_DEMO_DECLARED_BULK",
   expenseDemoPurged: "EXPENSE_DEMO_PURGED",
   expenseClassified: "EXPENSE_CLASSIFIED",
+  // V16: se apiló el asiento que faltaba de un gasto REAL (regularización).
+  expenseRegularized: "EXPENSE_REGULARIZED",
   campaignClosed: "CAMPAIGN_CLOSED",
   campaignReopened: "CAMPAIGN_REOPENED",
   adminReauthFailed: "ADMIN_REAUTH_FAILED",

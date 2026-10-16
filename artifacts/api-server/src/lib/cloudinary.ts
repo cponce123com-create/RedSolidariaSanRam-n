@@ -9,9 +9,18 @@ export function isCloudinaryConfigured(): boolean {
 }
 
 /**
- * Firma para upload directo del navegador (signed upload de Cloudinary).
+ * Firma para upload directo del navegador (SIGNED upload de Cloudinary).
+ *
  * El cliente sube el archivo a https://api.cloudinary.com/v1_1/<cloud>/image/upload
  * con estos parámetros + el archivo; sin la firma Cloudinary rechaza el upload.
+ *
+ * NO se usa un «upload preset» sin firmar: con firma, las restricciones (carpeta,
+ * formatos permitidos, public_id) van DENTRO de la firma y el cliente no puede
+ * alterarlas. El `cloud name` sale de `CLOUDINARY_CLOUD_NAME` (entorno del
+ * servidor) y se devuelve al cliente para construir la URL; el
+ * `CLOUDINARY_API_SECRET` NUNCA sale del servidor (no aparece en esta respuesta).
+ * El límite de tamaño se valida en el navegador (`validateProofImage`): la API de
+ * Cloudinary no acepta un parámetro de tamaño máximo en la subida.
  */
 export function createUploadSignature(
   params: Record<string, string>,

@@ -56,6 +56,7 @@ await build({
     "./src/lib/donation-annulment.ts",
     "./src/lib/donor-identity.ts",
     "./src/lib/public-settings.ts",
+    "./src/lib/expense-regularization.ts",
     "./src/lib/rich-text.ts",
     "./src/lib/institutional-identity.ts",
     "./src/routes/institutional-identity.ts",

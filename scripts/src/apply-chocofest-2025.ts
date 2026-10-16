@@ -31,6 +31,7 @@ import {
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { planDonationInsert } from "../../artifacts/api-server/src/lib/donation-reconcile";
+import { appendMovement } from "../../artifacts/api-server/src/lib/ledger";
 import {
   CHOCOLATADA_2025_CAMPAIGN,
   CHOCOLATADA_2025_DONATIONS,
@@ -136,10 +137,36 @@ async function main(): Promise<void> {
       console.log("• Galería ya existente (sin cambios)");
     }
     if (!(await campaignHasRows("campaign_expenses"))) {
-      await tx.insert(campaignExpensesTable).values(
-        CHOCOLATADA_2025_EXPENSES.map((e) => ({ ...e, campaignId })),
+      const insertedExpenses = await tx
+        .insert(campaignExpensesTable)
+        .values(CHOCOLATADA_2025_EXPENSES.map((e) => ({ ...e, campaignId })))
+        .returning({
+          id: campaignExpensesTable.id,
+          description: campaignExpensesTable.description,
+          amount: campaignExpensesTable.amount,
+          isPublic: campaignExpensesTable.isPublic,
+          createdAt: campaignExpensesTable.createdAt,
+        });
+      // V16 — CAUSA RAÍZ de los «gastos sin asiento»: la API crea el ASIENTO al
+      // registrar un gasto público (`if (exp.isPublic) appendMovement(...)`), pero
+      // este script insertaba los gastos DIRECTAMENTE, así que se quedaban sin
+      // asiento y aparecían como «Corrección autorizada (le falta asiento)» en el
+      // módulo Gastos DEMO. Se replican aquí para que la carga deje el libro
+      // cuadrado y no haga falta regularizar después.
+      const withEntry = insertedExpenses.filter((expense) => expense.isPublic);
+      for (const expense of withEntry) {
+        await appendMovement(tx, campaignId, {
+          kind: "gasto",
+          amount: expense.amount,
+          description: expense.description,
+          sourceType: "expense",
+          sourceId: expense.id,
+          createdAt: new Date(expense.createdAt),
+        });
+      }
+      console.log(
+        `✔ Gastos insertados (${insertedExpenses.length}); asientos creados: ${withEntry.length}`,
       );
-      console.log("✔ Gastos insertados");
     } else {
       console.log("• Gastos ya existentes (sin cambios)");
     }

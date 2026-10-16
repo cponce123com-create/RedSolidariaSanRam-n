@@ -73,8 +73,21 @@ export function buildCspDirectives({ isDev, indexHtmlPath }: CspOptions): Record
     scriptSrcAttr: isDev ? ["'unsafe-inline'"] : ["'none'"],
     styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
     fontSrc: ["'self'", "https://fonts.gstatic.com"],
+    // img-src: `https:` ya cubre las imágenes servidas por Cloudinary
+    // (`res.cloudinary.com`) y las fotos del seed (`images.unsplash.com`). No se
+    // toca: el problema era `connect-src`, no la carga de imágenes.
     imgSrc: ["'self'", "data:", "https:", "blob:"],
-    connectSrc: ["'self'", process.env.API_URL || "https://api.redsolidaria.com"],
+    // connect-src: la SPA habla con su propia API ('self' en producción, que sirve
+    // web y API desde el mismo origen) y, ADEMÁS, SUBE imágenes DIRECTAMENTE a
+    // Cloudinary con una firma del servidor (ImageUploadField →
+    // lib/cloudinary-upload.ts). Sin `https://api.cloudinary.com` el navegador
+    // bloquea el POST del upload con una violación de CSP antes de que la petición
+    // salga. Se listan orígenes EXACTOS: nada de comodines.
+    connectSrc: [
+      "'self'",
+      process.env.API_URL || "https://api.redsolidaria.com",
+      "https://api.cloudinary.com",
+    ],
     frameSrc: ["'none'"],
     objectSrc: ["'none'"],
     upgradeInsecureRequests: [],
