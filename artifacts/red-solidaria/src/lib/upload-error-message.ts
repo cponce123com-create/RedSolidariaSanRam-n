@@ -68,6 +68,17 @@ export function describeUploadFailure(input: UploadFailureInput): UploadFailure 
       message: "La imagen supera el tamaño máximo permitido (8 MB). Redúcela e inténtalo de nuevo.",
     };
   }
+  // El mensaje de Cloudinary es la causa AUTORITATIVA (p. ej. «Invalid Signature …» o
+  // «Invalid credentials»). Antes se descartaba en los 401 y se mostraba un texto
+  // genérico sobre la sesión, que despistaba: el problema es de configuración de
+  // Cloudinary, no de la sesión del administrador.
+  if (cloud) {
+    const isAuth = input.status === 401 || input.status === 403;
+    return {
+      kind: isAuth ? "signature" : "unknown",
+      message: `Cloudinary rechazó la subida: ${cloud}`,
+    };
+  }
 
   const status = input.status ?? null;
   if (status === 401 || status === 403) {

@@ -7,6 +7,7 @@ import { ApiError, errorMessage } from "@/lib/api-error";
 import { optimizeImageUrl } from "@/lib/image-url";
 import { ImageUploadField } from "@/components/shared/ImageUploadField";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
+import { CloudinaryDiagnostic } from "@/components/admin/CloudinaryDiagnostic";
 import {
   Loader2,
   Save,
@@ -679,6 +680,9 @@ export default function AdminInstitutionalIdentity() {
           </div>
         )}
       </Section>
+
+      {/* ── Diagnóstico de subida (solo si algo falla) ───────────── */}
+      <CloudinaryDiagnostic />
 
       {/* ── Barra de acciones fija ───────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:px-8 md:left-64">

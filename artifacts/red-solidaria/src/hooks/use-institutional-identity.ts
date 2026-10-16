@@ -177,3 +177,29 @@ export function useDiscardIdentityAssets() {
       }),
   });
 }
+
+/**
+ * Resultado del diagnóstico de Cloudinary (V18.1). `cloudinaryMessage` es el mensaje
+ * LITERAL de Cloudinary (p. ej. «Invalid Signature …»), que es la causa real.
+ */
+export interface CloudinaryCheckResult {
+  ok: boolean;
+  configured: boolean;
+  status: number | null;
+  cloudName: string | null;
+  cloudinaryMessage: string | null;
+  hints: string[];
+}
+
+/**
+ * Ejecuta en el SERVIDOR la misma subida firmada que hace el navegador (un PNG de
+ * 1×1 que se borra acto seguido) para saber por qué falla una subida. Solo superadmin.
+ */
+export function useCloudinaryCheck() {
+  return useMutation({
+    mutationFn: () =>
+      adminRequestJson<CloudinaryCheckResult>("/api/uploads/cloudinary-check", {
+        method: "POST",
+      }),
+  });
+}

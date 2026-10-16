@@ -49,6 +49,9 @@ vi.mock("@workspace/api-client-react", () => ({
   useGetDonationStats: () => ({ data: donationsMock.stats }),
   useUpdateDonationStatus: () => ({ mutate: updateStatusMock.mutate, isPending: false }),
   useAddDonationProof: () => ({ mutate: addProofMock.mutate, isPending: false }),
+  // DonationVoidAction consulta la sesión para saber si puede anular: sin este
+  // export el render fallaba con "No useGetAdminMe export is defined".
+  useGetAdminMe: () => ({ data: { role: "superadmin" } }),
 }));
 
 describe("AdminDonations", () => {

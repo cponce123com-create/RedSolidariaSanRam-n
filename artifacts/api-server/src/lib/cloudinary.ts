@@ -1,11 +1,24 @@
 import { createHash, randomUUID } from "node:crypto";
 
-const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-const apiKey = process.env.CLOUDINARY_API_KEY;
-const apiSecret = process.env.CLOUDINARY_API_SECRET;
+/**
+ * Credenciales de Cloudinary.
+ *
+ * Se hace `trim()` a propósito: al pegar las variables en Render es facil que se
+ * cuele un espacio o un salto de linea al final. Un secreto con un salto de linea
+ * produce una FIRMA VÁLIDA para nosotros pero INVÁLIDA para Cloudinary → la subida
+ * falla con `401 Invalid Signature` sin ninguna pista. El trim elimina esa causa.
+ */
+const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
 export function isCloudinaryConfigured(): boolean {
   return Boolean(cloudName && apiKey && apiSecret);
+}
+
+/** Cloud name configurado (es público: aparece en las URLs de entrega). */
+export function getCloudName(): string | null {
+  return cloudName ?? null;
 }
 
 /**
@@ -14,13 +27,16 @@ export function isCloudinaryConfigured(): boolean {
  * El cliente sube el archivo a https://api.cloudinary.com/v1_1/<cloud>/image/upload
  * con estos parámetros + el archivo; sin la firma Cloudinary rechaza el upload.
  *
+ * REGLA CRÍTICA: la firma se calcula EXACTAMENTE sobre los parámetros que el cliente
+ * envía, y solo sobre parámetros que Cloudinary RECONOCE. Firmar un parámetro
+ * desconocido (o enviar uno sin firmar) hace que Cloudinary responda 401
+ * «Invalid Signature». Por eso ya NO se firma `max_bytes`: no es un parámetro de la
+ * API de subida de Cloudinary (el límite de tamaño se valida en el navegador, en
+ * `image-validation`).
+ *
  * NO se usa un «upload preset» sin firmar: con firma, las restricciones (carpeta,
  * formatos permitidos, public_id) van DENTRO de la firma y el cliente no puede
- * alterarlas. El `cloud name` sale de `CLOUDINARY_CLOUD_NAME` (entorno del
- * servidor) y se devuelve al cliente para construir la URL; el
- * `CLOUDINARY_API_SECRET` NUNCA sale del servidor (no aparece en esta respuesta).
- * El límite de tamaño se valida en el navegador (`validateProofImage`): la API de
- * Cloudinary no acepta un parámetro de tamaño máximo en la subida.
+ * alterarlas. El `CLOUDINARY_API_SECRET` NUNCA sale del servidor.
  */
 export function createUploadSignature(
   params: Record<string, string>,
@@ -39,24 +55,21 @@ export interface UploadSignature {
   timestamp: string;
   publicId: string;
   folder: string;
-  // Restricciones firmadas: el cliente debe enviarlas tal cual al subir o
-  // Cloudinary rechaza la petición (formato y tamaño máximos).
+  // Restricción firmada: el cliente debe enviarla tal cual o Cloudinary invalida la
+  // subida. `allowed_formats` SÍ es un parámetro reconocido por Cloudinary.
   allowedFormats: string;
-  maxBytes: string;
   signature: string;
 }
 
-// Formatos y tamaño máximo permitidos en las subidas firmadas. Coinciden con
-// la validación del cliente (validateProofImage): imágenes JPG/PNG/WebP ≤ 8 MB.
-// Al estar firmados, el cliente no puede alterarlos sin invalidar la firma.
+// Formatos y tamaño máximo permitidos. Coinciden con la validación del cliente
+// (`image-validation`): imágenes JPG/PNG/WebP ≤ 8 MB.
 const ALLOWED_UPLOAD_FORMATS = "jpg,png,webp";
-const MAX_UPLOAD_BYTES = String(8 * 1024 * 1024);
 
 /**
- * Carpeta de Cloudinary para la identidad institucional (Fase 3). Se fija en el
- * servidor: la firma solo se emite para esta carpeta, así el cliente no puede
- * subir a carpetas arbitrarias. El borrado de assets solo actúa sobre publicIds
- * con este prefijo (nunca archivos compartidos).
+ * Carpeta raíz de Cloudinary para la identidad institucional (Fase 3). Se fija en
+ * el servidor: la firma solo se emite para nuestras carpetas, así el cliente no
+ * puede subir a carpetas arbitrarias. El borrado de assets solo actúa sobre
+ * publicIds con este prefijo (nunca archivos compartidos).
  */
 export const INSTITUTIONAL_IDENTITY_FOLDER = "institutional-identity";
 
@@ -88,12 +101,12 @@ export function getUploadSignature(
   const allowedFormats = opts.allowedFormats ?? ALLOWED_UPLOAD_FORMATS;
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const publicId = randomUUID();
+  // SOLO parámetros que Cloudinary reconoce en /image/upload.
   const params: Record<string, string> = {
     folder,
     public_id: publicId,
     timestamp,
     allowed_formats: allowedFormats,
-    max_bytes: MAX_UPLOAD_BYTES,
   };
   return {
     cloudName: cloudName!,
@@ -102,7 +115,6 @@ export function getUploadSignature(
     publicId,
     folder,
     allowedFormats,
-    maxBytes: MAX_UPLOAD_BYTES,
     signature: createUploadSignature(params, apiSecret!),
   };
 }

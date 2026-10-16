@@ -33,29 +33,59 @@ test("cloudinary: la firma es determinista y sensible al secreto", async () => {
   assert.notEqual(a, c);
 });
 
-test("cloudinary: la firma incluye restricciones firmadas de formato y tamaño", async () => {
+test("cloudinary: firma la restricción de formato y SOLO parámetros reconocidos", async () => {
   process.env.CLOUDINARY_CLOUD_NAME = "test-cloud";
   process.env.CLOUDINARY_API_KEY = "key123";
   process.env.CLOUDINARY_API_SECRET = "secret123";
   const mod = await import("./dist/lib/cloudinary.mjs?restric=" + Date.now());
   const sig = mod.getUploadSignature("donation-proofs");
   assert.equal(sig.allowedFormats, "jpg,png,webp");
-  assert.equal(sig.maxBytes, String(8 * 1024 * 1024));
-  // Las restricciones forman parte de la firma: omitirlas o alterarlas
-  // invalida la firma → Cloudinary rechaza la subida.
+
+  // `max_bytes` NO se firma ni se devuelve: no es un parámetro de la API de subida de
+  // Cloudinary y, al no coincidir con lo que Cloudinary recalcula, provocaba
+  // 401 «Invalid Signature» (regresión V18.1).
+  assert.equal("maxBytes" in sig, false);
+
   const base = { folder: sig.folder, public_id: sig.publicId, timestamp: sig.timestamp };
   const signed = mod.createUploadSignature(
-    { ...base, allowed_formats: sig.allowedFormats, max_bytes: sig.maxBytes },
-    "secret123",
-  );
-  const withoutRestrictions = mod.createUploadSignature(base, "secret123");
-  const tampered = mod.createUploadSignature(
-    { ...base, allowed_formats: sig.allowedFormats, max_bytes: "999999" },
+    { ...base, allowed_formats: sig.allowedFormats },
     "secret123",
   );
   assert.equal(signed, sig.signature);
-  assert.notEqual(withoutRestrictions, sig.signature);
+
+  // Alterar la restricción invalida la firma.
+  const tampered = mod.createUploadSignature({ ...base, allowed_formats: "gif" }, "secret123");
   assert.notEqual(tampered, sig.signature);
+
+  // Enviar un parámetro EXTRA que no se firmó también la invalida: el cliente debe
+  // mandar exactamente lo que se firmó.
+  const extra = mod.createUploadSignature(
+    { ...base, allowed_formats: sig.allowedFormats, max_bytes: "1" },
+    "secret123",
+  );
+  assert.notEqual(extra, sig.signature);
+});
+
+test("cloudinary: tolera espacios o saltos de línea en las credenciales (trim)", async () => {
+  process.env.CLOUDINARY_CLOUD_NAME = "test-cloud\n";
+  process.env.CLOUDINARY_API_KEY = " key123 ";
+  process.env.CLOUDINARY_API_SECRET = "secret123\n";
+  const mod = await import("./dist/lib/cloudinary.mjs?trim=" + Date.now());
+  const sig = mod.getUploadSignature("donation-proofs");
+  assert.ok(sig, "debe devolver una firma");
+  assert.equal(sig.cloudName, "test-cloud");
+  assert.equal(sig.apiKey, "key123");
+  // La firma se calcula con el secreto YA recortado.
+  const expected = mod.createUploadSignature(
+    {
+      folder: sig.folder,
+      public_id: sig.publicId,
+      timestamp: sig.timestamp,
+      allowed_formats: sig.allowedFormats,
+    },
+    "secret123",
+  );
+  assert.equal(sig.signature, expected);
 });
 
 test("cloudinary: la respuesta de firma NO expone el api_secret", async () => {
