@@ -249,6 +249,11 @@ export const en: TranslationSchema = {
     upload: "Upload image",
     formats: "JPG/PNG/WebP · max 8MB",
     placeholder: "https://...",
+    // V18: permanent upload/replace button and states.
+    replace: "Upload / Replace",
+    current: "Current image",
+    useUrl: "Use a URL",
+    checking: "Checking the image...",
   },
   home: {
     heroTitleWord1: "Red",

@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { DynamicFavicon } from "@/components/shared/DynamicFavicon";
 import { MotionConfig } from "framer-motion";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -387,6 +388,9 @@ function App() {
               </Switch>
             </Suspense>
           </WouterRouter>
+          {/* Favicon administrable (V18): aplica el favicon PUBLICADO a la
+              pestaña. Se monta aquí dentro para tener el QueryClientProvider. */}
+          <DynamicFavicon />
           <Toaster />
         </MotionConfig>
       </TooltipProvider>

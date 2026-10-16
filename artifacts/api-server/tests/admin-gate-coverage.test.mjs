@@ -62,6 +62,8 @@ const ADMIN_PATHS = [
   "/api/admin/protagonist-campaign",
   // Identidad institucional (Fase 3): la parte administrativa exige sesión.
   "/api/admin/institutional-identity",
+  // V18: descartar activos reemplazados también exige sesión.
+  "/api/admin/institutional-identity/discard-assets",
   // Ruta inexistente: el gate debe ser un comodín y responder 401 igualmente.
   "/api/admin/esta-ruta-no-existe",
 ];

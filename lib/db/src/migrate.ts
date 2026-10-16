@@ -913,6 +913,21 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON CONFLICT (id) DO NOTHING;
     `,
   },
+  {
+    name: "032_institutional_identity_version.sql",
+    sql: `
+      -- V18: control de concurrencia OPTIMISTA de la identidad institucional.
+      --
+      -- Dos pestañas o dos superadmins podian sobrescribirse el borrador sin
+      -- aviso. La columna version se incrementa en cada guardado/publicacion y el
+      -- cliente debe enviar la version que leyo: si no coincide, la API responde
+      -- 409 y no escribe NADA.
+      --
+      -- ADITIVA: añade una columna con valor por defecto. Rollback: DROP COLUMN.
+      ALTER TABLE institutional_identity
+        ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
+    `,
+  },
 ];
 
 /**

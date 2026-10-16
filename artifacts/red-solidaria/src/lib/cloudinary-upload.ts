@@ -73,11 +73,18 @@ export async function uploadImageToCloudinary(
     | "/api/uploads/signature"
     | "/api/uploads/admin-signature"
     | "/api/uploads/institutional-signature",
+  opts: { kind?: string } = {},
 ): Promise<UploadedImage> {
   // ─── 1) Firma del servidor ────────────────────────────────────────────────
   let sig: UploadSignaturePayload;
   try {
-    const res = await fetch(endpoint, { method: "POST" });
+    // El TIPO de activo solo lo usa la firma institucional (fija carpeta y formatos
+    // permitidos); los demás endpoints ignoran el cuerpo.
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(opts.kind ? { kind: opts.kind } : {}),
+    });
     if (!res.ok) {
       const body = (await res.json().catch(() => null)) as { message?: string } | null;
       const failure = describeUploadFailure({

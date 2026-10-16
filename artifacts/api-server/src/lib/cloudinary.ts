@@ -60,17 +60,39 @@ const MAX_UPLOAD_BYTES = String(8 * 1024 * 1024);
  */
 export const INSTITUTIONAL_IDENTITY_FOLDER = "institutional-identity";
 
+/**
+ * Carpeta y formatos permitidos por TIPO de activo de la identidad institucional
+ * (V18). El favicon solo admite PNG/WebP: un icono a 32 px no debe ser JPG (pierde
+ * transparencia y nitidez). La carpeta la fija el SERVIDOR, así el cliente no puede
+ * subir a carpetas arbitrarias.
+ */
+export const INSTITUTIONAL_ASSET_KINDS = {
+  logo: { folder: "institutional-identity/logo", allowedFormats: "jpg,png,webp" },
+  cover: { folder: "institutional-identity/cover", allowedFormats: "jpg,png,webp" },
+  favicon: { folder: "institutional-identity/favicon", allowedFormats: "png,webp" },
+  story: { folder: "institutional-identity/story", allowedFormats: "jpg,png,webp" },
+} as const;
+
+export type InstitutionalAssetKind = keyof typeof INSTITUTIONAL_ASSET_KINDS;
+
+export function isInstitutionalAssetKind(value: unknown): value is InstitutionalAssetKind {
+  return typeof value === "string" && value in INSTITUTIONAL_ASSET_KINDS;
+}
+
 export function getUploadSignature(
   folder: string,
+  opts: { allowedFormats?: string } = {},
 ): UploadSignature | null {
   if (!isCloudinaryConfigured()) return null;
+  // Los formatos viajan DENTRO de la firma: el cliente no puede ampliarlos.
+  const allowedFormats = opts.allowedFormats ?? ALLOWED_UPLOAD_FORMATS;
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const publicId = randomUUID();
   const params: Record<string, string> = {
     folder,
     public_id: publicId,
     timestamp,
-    allowed_formats: ALLOWED_UPLOAD_FORMATS,
+    allowed_formats: allowedFormats,
     max_bytes: MAX_UPLOAD_BYTES,
   };
   return {
@@ -79,7 +101,7 @@ export function getUploadSignature(
     timestamp,
     publicId,
     folder,
-    allowedFormats: ALLOWED_UPLOAD_FORMATS,
+    allowedFormats,
     maxBytes: MAX_UPLOAD_BYTES,
     signature: createUploadSignature(params, apiSecret!),
   };

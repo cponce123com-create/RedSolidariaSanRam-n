@@ -107,26 +107,45 @@ export async function cleanupCloudinaryAssets(
   log: CleanupLogger,
   opts: { attempts?: number } = {},
 ): Promise<CleanupResult> {
-  const credentials = readCredentials();
   const publicIds = [...new Set(urls.map(extractCloudinaryPublicId).filter((v): v is string => v !== null))];
+  const result = await cleanupCloudinaryAssetsByPublicId(publicIds, log, opts);
+  // Las URLs que no son de Cloudinary no se pueden limpiar en el CDN.
+  result.skipped += urls.length - publicIds.length;
+  return result;
+}
+
+/**
+ * Igual que `cleanupCloudinaryAssets` pero partiendo de `public_id` YA conocidos
+ * (V18). Al reemplazar imágenes de la identidad institucional guardamos el
+ * `publicId` en la propia fila, así que no hace falta re-deducirlo de la URL.
+ */
+export async function cleanupCloudinaryAssetsByPublicId(
+  publicIds: readonly string[],
+  log: CleanupLogger,
+  opts: { attempts?: number } = {},
+): Promise<CleanupResult> {
+  const credentials = readCredentials();
+  const ids = [
+    ...new Set(publicIds.filter((id): id is string => typeof id === "string" && id.length > 0)),
+  ];
 
   const result: CleanupResult = {
-    attempted: publicIds.length,
+    attempted: ids.length,
     deleted: 0,
-    skipped: urls.length - publicIds.length,
+    skipped: 0,
     failed: [],
   };
 
-  if (publicIds.length === 0) return result;
+  if (ids.length === 0) return result;
   if (!credentials) {
     // Sin CDN configurado no hay nada que borrar (los archivos son locales).
-    result.skipped += publicIds.length;
+    result.skipped += ids.length;
     result.attempted = 0;
     return result;
   }
 
   const attempts = Math.max(1, opts.attempts ?? DEFAULT_ATTEMPTS);
-  for (const publicId of publicIds) {
+  for (const publicId of ids) {
     let ok = false;
     let lastError: unknown = null;
     for (let attempt = 1; attempt <= attempts && !ok; attempt += 1) {
