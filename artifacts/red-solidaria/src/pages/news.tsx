@@ -6,6 +6,7 @@ import { formatSafeDate, getDateFormatLocale } from "@/lib/i18n/date";
 import { optimizeImageUrl } from "@/lib/image-url";
 import { useTranslation } from "react-i18next";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 import { Newspaper } from "lucide-react";
 
 export default function News() {
@@ -16,10 +17,13 @@ export default function News() {
     <div className="min-h-screen pt-20 bg-background">
       <section className="py-12 bg-secondary/30 border-b border-border/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-display font-bold mb-6">{t("footer.newsBlog")}</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            {t("news.subtitle")}
-          </p>
+          <CmsPageHeading
+            slug="noticias"
+            title={t("footer.newsBlog")}
+            subtitle={t("news.subtitle")}
+            titleClassName="text-4xl md:text-5xl font-display font-bold mb-6"
+            subtitleClassName="text-xl text-muted-foreground max-w-2xl mx-auto"
+          />
         </div>
       </section>
 

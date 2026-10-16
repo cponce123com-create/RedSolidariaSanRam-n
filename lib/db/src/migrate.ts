@@ -928,6 +928,45 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1;
     `,
   },
+  {
+    name: "033_cms_pages.sql",
+    sql: `
+      -- CMS institucional (Fase 2): páginas editables con borrador/publicado.
+      --
+      -- Reutiliza el patrón de institutional_identity: draft y published en
+      -- columnas JSONB separadas + version para concurrencia optimista. El
+      -- contenido lo normaliza/sanea la API, no la base.
+      --
+      -- ADITIVA: dos tablas nuevas y un índice; no toca ninguna otra tabla (en
+      -- particular, NINGUNA tabla financiera). Rollback: DROP TABLE.
+      CREATE TABLE IF NOT EXISTS cms_pages (
+        slug text PRIMARY KEY,
+        draft jsonb NOT NULL DEFAULT '{}'::jsonb,
+        published jsonb,
+        status text NOT NULL DEFAULT 'draft',
+        published_at timestamp,
+        scheduled_at timestamp,
+        version integer NOT NULL DEFAULT 1,
+        updated_at timestamp NOT NULL DEFAULT now(),
+        updated_by text
+      );
+
+      -- Historial de versiones por página (auditoría + restaurar).
+      CREATE TABLE IF NOT EXISTS cms_page_versions (
+        id serial PRIMARY KEY,
+        slug text NOT NULL,
+        version integer NOT NULL,
+        content jsonb NOT NULL,
+        action text NOT NULL,
+        note text,
+        created_at timestamp NOT NULL DEFAULT now(),
+        created_by text
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_cms_page_versions_slug
+        ON cms_page_versions (slug, version);
+    `,
+  },
 ];
 
 /**

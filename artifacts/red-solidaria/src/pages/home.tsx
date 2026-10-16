@@ -2,6 +2,8 @@ import { lazy, Suspense } from "react";
 import { useTranslation } from "react-i18next";
 import SEO from "@/components/shared/SEO";
 import { buildSiteJsonLd } from "@/lib/structured-data";
+import { useCmsPage } from "@/hooks/use-cms-page";
+import { isBlockEnabled } from "@/lib/cms";
 import { InstitutionalCover } from "@/components/home/InstitutionalCover";
 import { HomeHero } from "@/components/home/HomeHero";
 import { HowToHelpSection } from "@/components/home/HowToHelpSection";
@@ -39,10 +41,14 @@ const AdoptionsSection = lazy(() =>
  *  8. Voluntariado → VolunteerSection
  *  9. Cierre → FinalCtaSection
  *
- * Todos los datos provienen del backend existente; sin cifras inventadas.
+ * El CMS decide aquí si cada sección se muestra: un bloque DESACTIVADO en el editor
+ * oculta su sección; sin CMS (o bloque inexistente) se muestra el contenido por defecto.
+ * Los DATOS (campañas, donaciones, mapa, mascotas) siguen viniendo del backend.
  */
 export default function Home() {
   const { t } = useTranslation();
+  const { data: inicio } = useCmsPage("inicio");
+  const { data: historia } = useCmsPage("historia");
 
   return (
     <>
@@ -58,18 +64,18 @@ export default function Home() {
       {/* Portada institucional administrable: no renderiza nada si no hay
           contenido publicado, así el home nunca se rompe por falta de identidad. */}
       <InstitutionalCover />
-      <HomeHero />
+      {isBlockEnabled(inicio, "hero") && <HomeHero />}
       {/* Campaña protagonista (ChocoFest 2026): solo si está configurada,
           publicada y activa. Si no, no renderiza nada y la portada general
           se mantiene igual. */}
       <ProtagonistCampaignSection />
-      <HowToHelpSection />
+      {isBlockEnabled(inicio, "help") && <HowToHelpSection />}
       <ActiveCampaignsSection />
       <Suspense fallback={null}>
         <UrgentCasesSection />
       </Suspense>
-      <TransparencySection />
-      <StorySection />
+      {isBlockEnabled(inicio, "refStats") && <TransparencySection />}
+      {isBlockEnabled(historia, "imageText") && <StorySection />}
       <Suspense fallback={null}>
         <CommunityMapSection />
       </Suspense>
@@ -77,7 +83,7 @@ export default function Home() {
         <AdoptionsSection />
       </Suspense>
       <VolunteerSection />
-      <FinalCtaSection />
+      {isBlockEnabled(inicio, "cta") && <FinalCtaSection />}
     </>
   );
 }

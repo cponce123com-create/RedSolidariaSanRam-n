@@ -92,6 +92,18 @@ export function isInstitutionalAssetKind(value: unknown): value is Institutional
   return typeof value === "string" && value in INSTITUTIONAL_ASSET_KINDS;
 }
 
+/**
+ * Carpeta raíz de Cloudinary para las imágenes del CMS. La subcarpeta es por
+ * PÁGINA (`cms/<slug>`), y el `slug` se valida contra el registro de páginas en el
+ * servidor: el cliente no puede pedir una carpeta arbitraria. El borrado de assets
+ * solo actúa sobre publicIds con el prefijo `cms/`.
+ */
+export const CMS_FOLDER = "cms";
+
+export function cmsAssetFolder(slug: string): string {
+  return `${CMS_FOLDER}/${slug}`;
+}
+
 export function getUploadSignature(
   folder: string,
   opts: { allowedFormats?: string } = {},

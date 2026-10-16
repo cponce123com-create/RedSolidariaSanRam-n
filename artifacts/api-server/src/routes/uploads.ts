@@ -4,11 +4,13 @@ import {
   isCloudinaryConfigured,
   INSTITUTIONAL_ASSET_KINDS,
   isInstitutionalAssetKind,
+  cmsAssetFolder,
 } from "../lib/cloudinary";
 import {
   cleanupCloudinaryAssetsByPublicId,
   type CleanupLogger,
 } from "../lib/asset-cleanup";
+import { isCmsPageSlug } from "../lib/cms-content";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
 
@@ -76,6 +78,43 @@ router.post(
       });
     }
     return res.json({ ...signature, kind });
+  },
+);
+
+/**
+ * Firma para las imágenes del CMS (Fase 2–4). Solo superadmin.
+ *
+ * El cliente indica la PÁGINA (`page`), pero la CARPETA la fija el SERVIDOR a partir
+ * del registro de páginas (`cms/<slug>`): el cliente no puede pedir una carpeta
+ * arbitraria. El borrado de assets solo actúa sobre publicIds con el prefijo `cms/`.
+ */
+router.post(
+  "/uploads/cms-signature",
+  requireRole(ROLES.SUPERADMIN),
+  adminActionLimiter,
+  (req, res) => {
+    if (!isCloudinaryConfigured()) {
+      return res.status(503).json({
+        error: "upload_unavailable",
+        message: "Cloudinary no está configurado.",
+      });
+    }
+    const requested = (req.body ?? {}) as { page?: unknown };
+    if (!isCmsPageSlug(requested.page)) {
+      return res.status(400).json({
+        error: "validation_error",
+        message: "Indica una página válida del CMS.",
+      });
+    }
+    const folder = cmsAssetFolder(requested.page);
+    const signature = getUploadSignature(folder, { allowedFormats: "jpg,png,webp" });
+    if (!signature) {
+      return res.status(503).json({
+        error: "upload_unavailable",
+        message: "Cloudinary no está configurado.",
+      });
+    }
+    return res.json({ ...signature, page: requested.page });
   },
 );
 

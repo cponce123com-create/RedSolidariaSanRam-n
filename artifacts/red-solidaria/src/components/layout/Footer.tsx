@@ -1,6 +1,8 @@
 import { Link } from "wouter";
 import { Heart, Mail, MapPin, Phone } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useCmsPage } from "@/hooks/use-cms-page";
+import { cmsItems, cmsText, isBlockEnabled, resolveLocale, resolveText } from "@/lib/cms";
 
 // Iconos sociales inline: lucide eliminó los iconos de marca en v1.x
 // (Facebook/Instagram ya no se exportan). Mismos trazos que lucide 0.545.0
@@ -47,8 +49,47 @@ function InstagramIcon({ className }: { className?: string }) {
   );
 }
 
+/** Enlaces por defecto de la columna «Enlaces rápidos». */
+const DEFAULT_LINKS = [
+  { href: "/", labelKey: "nav.home" },
+  { href: "/nosotros", labelKey: "footer.aboutUs" },
+  { href: "/casos-urgentes", labelKey: "nav.urgentCases" },
+  { href: "/como-ayudar", labelKey: "nav.howToHelp" },
+  { href: "/noticias", labelKey: "footer.newsBlog" },
+];
+
+/**
+ * Pie de página. El lema, la dirección, el texto de transparencia y los enlaces
+ * rápidos son administrables (CMS → «Menú y pie de página» → bloque «Pie de página»);
+ * sin CMS se conserva el contenido por defecto. Un bloque DESACTIVADO oculta el pie.
+ */
 export function Footer() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = resolveLocale(i18n.language);
+  const { data: menu } = useCmsPage("menu");
+
+  if (!isBlockEnabled(menu, "footer")) return null;
+
+  const tagline = cmsText(menu, "footer", "tagline", locale, t("footer.tagline"));
+  const address = cmsText(menu, "footer", "address", locale, t("footer.address"));
+  const transparencyText = cmsText(
+    menu,
+    "footer",
+    "transparencyText",
+    locale,
+    t("footer.transparencyText"),
+  );
+
+  const cmsLinks = cmsItems(menu, "footer", "links")
+    .map((item) => ({
+      href: resolveText(item.href, locale),
+      label: resolveText(item.label, locale),
+    }))
+    .filter((item) => item.href && item.label);
+
+  const quickLinks = cmsLinks.length
+    ? cmsLinks
+    : DEFAULT_LINKS.map((link) => ({ href: link.href, label: t(link.labelKey) }));
 
   return (
     <footer className="bg-card border-t border-border/50 pt-14 pb-6">
@@ -70,7 +111,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              {t("footer.tagline")}
+              {tagline}
             </p>
             <div className="flex gap-3">
               <a
@@ -100,11 +141,16 @@ export function Footer() {
               {t("footer.quickLinks")}
             </h3>
             <ul className="space-y-2.5 text-sm">
-              <li><Link href="/" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.home")}</Link></li>
-              <li><Link href="/nosotros" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.aboutUs")}</Link></li>
-              <li><Link href="/casos-urgentes" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.urgentCases")}</Link></li>
-              <li><Link href="/como-ayudar" className="text-muted-foreground hover:text-primary transition-colors">{t("nav.howToHelp")}</Link></li>
-              <li><Link href="/noticias" className="text-muted-foreground hover:text-primary transition-colors">{t("footer.newsBlog")}</Link></li>
+              {quickLinks.map((link) => (
+                <li key={`${link.href}-${link.label}`}>
+                  <Link
+                    href={link.href}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </nav>
 
@@ -127,7 +173,7 @@ export function Footer() {
               {t("footer.transparencyTitle")}
             </h3>
             <p className="text-sm leading-relaxed text-muted-foreground mb-3">
-              {t("footer.transparencyText")}
+              {transparencyText}
             </p>
             <Link href="/transparencia" className="inline-block text-sm font-semibold text-primary hover:underline">
               {t("footer.seeReport")} →
@@ -137,7 +183,7 @@ export function Footer() {
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                 <span>
-                  {t("footer.address")} · {t("footer.country")}
+                  {address} · {t("footer.country")}
                 </span>
               </li>
               <li className="flex items-center gap-2.5">
@@ -157,7 +203,7 @@ export function Footer() {
         {/* Barra inferior */}
         <div className="pt-6 border-t border-border/50 flex flex-col md:flex-row justify-between items-center gap-3">
           <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} {t("footer.brand")} · {t("footer.address")}. {t("footer.rights")}
+            © {new Date().getFullYear()} {t("footer.brand")} · {address}. {t("footer.rights")}
           </p>
           <div className="flex gap-4 text-xs text-muted-foreground">
             <Link href="/contacto" className="hover:text-primary transition-colors">{t("nav.contact")}</Link>

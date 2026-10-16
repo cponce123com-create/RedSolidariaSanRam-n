@@ -85,3 +85,12 @@ export function invalidateReportQueries(queryClient: QueryClient): void {
 export function invalidateIdentityQueries(queryClient: QueryClient): void {
   invalidateEntities(queryClient, ["identity", "settings"]);
 }
+
+/**
+ * CMS: al guardar, publicar, despublicar, programar o restaurar se refrescan a la vez
+ * la página pública (`GET /api/cms/pages/:slug`), el borrador del panel y el listado
+ * de páginas, para que el cambio se vea sin recargar.
+ */
+export function invalidateCmsQueries(queryClient: QueryClient): void {
+  invalidateEntities(queryClient, ["cms"]);
+}

@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { ImageUploadField } from "@/components/shared/ImageUploadField";
 import SEO from "@/components/shared/SEO";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 import {
   Heart, CheckCircle, ArrowLeft, Users, Clock, Star,
   MapPin, Phone, Mail, Briefcase, HandHeart
@@ -147,10 +148,13 @@ export default function Volunteer() {
             <div className="p-3 bg-primary/10 rounded-2xl"><HandHeart className="w-7 h-7 text-primary" /></div>
             <span className="bg-primary/10 text-primary text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">{t("volunteer.badge")}</span>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-display font-black mb-4">{t("volunteer.title")}</h1>
-          <p className="text-muted-foreground text-lg leading-relaxed">
-            {t("volunteer.subtitle")}
-          </p>
+          <CmsPageHeading
+            slug="voluntariado"
+            title={t("volunteer.title")}
+            subtitle={t("volunteer.subtitle")}
+            titleClassName="text-4xl sm:text-5xl font-display font-black mb-4"
+            subtitleClassName="text-muted-foreground text-lg leading-relaxed"
+          />
         </div>
         {/* Stats */}
         <div className="grid grid-cols-2 gap-4 content-start">

@@ -16,12 +16,14 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { AdminAccessLink } from "./AdminAccessLink";
 import { BrandLogo } from "./BrandLogo";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/hooks/use-theme";
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { cn } from "@/lib/utils";
+import { useCmsPage } from "@/hooks/use-cms-page";
+import { cmsItems, isBlockEnabled, resolveLocale, resolveText } from "@/lib/cms";
 
 type NavLinkItem = {
   href: string;
@@ -137,12 +139,22 @@ function MoreDropdown({ location }: { location: string }) {
   );
 }
 
+/**
+ * Barra de navegación principal.
+ *
+ * Los enlaces del menú son administrables (CMS → «Menú y pie de página» → bloque
+ * «Menú principal»): el superadmin puede cambiar ETIQUETAS, ENLACES y ORDEN, y
+ * desactivar el bloque para ocultar la barra. Sin CMS se conserva el menú por defecto.
+ * Los iconos y los estilos se conservan por enlace conocido.
+ */
 export function Navbar() {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = resolveLocale(i18n.language);
+  const { data: menu } = useCmsPage("menu");
 
   // Compacta el header al hacer scroll (sticky no invasivo).
   useEffect(() => {
@@ -151,6 +163,38 @@ export function Navbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const navItems = useMemo<NavLinkItem[]>(() => {
+    const fromCms = cmsItems(menu, "nav", "items")
+      .map((item) => ({
+        href: resolveText(item.href, locale),
+        label: resolveText(item.label, locale),
+      }))
+      .filter((item) => item.href && item.label);
+    if (fromCms.length === 0) return DIRECT_LINKS;
+    return fromCms.map((item) => {
+      const known = ALL_LINKS.find((link) => link.href === item.href);
+      return {
+        href: item.href,
+        labelKey: item.label,
+        icon: known?.icon,
+        urgent: known?.urgent,
+        animal: known?.animal,
+      };
+    });
+  }, [menu, locale]);
+
+  const labelFor = (link: NavLinkItem) =>
+    navItems === DIRECT_LINKS ? t(link.labelKey) : link.labelKey;
+
+  const mobileLinks = useMemo(() => {
+    const extra = MORE_LINKS.filter(
+      (more) => !navItems.some((item) => item.href === more.href),
+    );
+    return [...navItems, ...extra];
+  }, [navItems]);
+
+  if (!isBlockEnabled(menu, "nav")) return null;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass-nav transition-shadow duration-300">
@@ -171,7 +215,7 @@ export function Navbar() {
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center gap-0.5" aria-label={t("nav.mainMenu")}>
-            {DIRECT_LINKS.map((link) => (
+            {navItems.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -182,7 +226,7 @@ export function Navbar() {
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                {t(link.labelKey)}
+                {labelFor(link)}
               </Link>
             ))}
             <MoreDropdown location={location} />
@@ -270,8 +314,11 @@ export function Navbar() {
                 </Link>
               </div>
 
-              {ALL_LINKS.filter((l) => l.href !== "/reportar" && l.href !== "/como-ayudar").map((link) => {
+              {mobileLinks.filter((l) => l.href !== "/reportar" && l.href !== "/como-ayudar").map((link) => {
                 const Icon = link.icon;
+                const label = navItems === DIRECT_LINKS && MORE_LINKS.some((m) => m.href === link.href)
+                  ? t(link.labelKey)
+                  : labelFor(link);
                 return (
                   <Link
                     key={link.href}
@@ -291,7 +338,7 @@ export function Navbar() {
                     {link.urgent && <AlertTriangle className="w-4 h-4 text-orange-500" />}
                     {link.animal && <Dog className="w-4 h-4 text-amber-500" />}
                     {Icon && <Icon className="w-4 h-4" />}
-                    {t(link.labelKey)}
+                    {label}
                   </Link>
                 );
               })}

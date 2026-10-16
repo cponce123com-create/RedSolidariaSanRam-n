@@ -135,6 +135,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       ],
     },
     ...(isSuperAdmin ? [{
+      label: "Contenido",
+      items: [
+        { href: "/admin/contenido", icon: FileText, label: "Editor de páginas", system: true },
+      ],
+    }] : []),
+    ...(isSuperAdmin ? [{
       label: "Sistema",
       items: [
         { href: "/admin/mantenimiento/gastos", icon: Eraser, label: "Gastos DEMO", system: true },

@@ -4,21 +4,49 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ChevronDown, HandHeart, LifeBuoy } from "lucide-react";
 import { useGetCampaigns, useGetDonationStats } from "@workspace/api-client-react";
+import { useCmsPage } from "@/hooks/use-cms-page";
+import { cmsAsset, cmsLink, cmsText, resolveImage, resolveLocale } from "@/lib/cms";
+import { buildSrcSet, DEFAULT_IMAGE_SIZES } from "@/lib/image-url";
 
 const HERO_PHOTO = `${import.meta.env.BASE_URL}images/hero-comunidad.jpg`;
 
 /**
- * Hero editorial del nuevo home: texto a la izquierda, fotografía real de
- * la comunidad a la derecha. Responde en <5s a: qué es, pedir ayuda, ayudar.
+ * Hero editorial del nuevo home: texto a la izquierda, fotografía real de la comunidad
+ * a la derecha. Responde en <5s a: qué es, pedir ayuda, ayudar.
+ *
+ * El texto, los botones y la imagen son administrables desde el CMS (página «Inicio» →
+ * bloque «Encabezado principal»). Los DATOS (monto recaudado y nº de campañas activas)
+ * NO son editables: se calculan desde Neon y se muestran tal cual.
  */
 export function HomeHero() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = resolveLocale(i18n.language);
+  const { data: cms } = useCmsPage("inicio");
 
   const { data: campaigns } = useGetCampaigns({ status: "active" });
   const { data: donationStats } = useGetDonationStats();
 
   const activeCount = Array.isArray(campaigns) ? campaigns.length : 0;
   const totalAmount = donationStats?.totalAmount ?? 0;
+
+  const eyebrow = cmsText(cms, "hero", "eyebrow", locale, t("home.heroEyebrow"));
+  const title = cmsText(cms, "hero", "title", locale, t("nav.brand"));
+  const titleAccent = cmsText(cms, "hero", "titleAccent", locale, t("nav.brandLocation"));
+  // El `subtitle` del CMS reemplaza la línea de entrada; si no hay, se conserva el
+  // texto por defecto (con su acento).
+  const leadOverride = cmsText(cms, "hero", "subtitle", locale, "");
+  const helpLabel = cmsText(cms, "hero", "ctaLabel", locale, t("home.heroCtaHelp"));
+  const helpHref = cmsLink(cms, "hero", "ctaHref", locale, "/como-ayudar");
+  const needLabel = cmsText(cms, "hero", "ctaLabel2", locale, t("home.heroCtaNeedHelp"));
+  const needHref = cmsLink(cms, "hero", "ctaHref2", locale, "/reportar");
+
+  const image = resolveImage(cmsAsset(cms, "hero", "image"), locale, {
+    src: HERO_PHOTO,
+    alt: t("home.heroPhotoAlt"),
+    focus: "50% 50%",
+    ratio: "4/3",
+  });
+  const srcSet = buildSrcSet(image.src);
 
   return (
     <section
@@ -45,7 +73,7 @@ export function HomeHero() {
               transition={{ duration: 0.5 }}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary shadow-sm"
             >
-              {t("home.heroEyebrow")}
+              {eyebrow}
             </motion.p>
 
             <motion.h1
@@ -54,8 +82,8 @@ export function HomeHero() {
               transition={{ duration: 0.6, delay: 0.08 }}
               className="mt-5 font-display text-4xl sm:text-5xl lg:text-[3.4rem] font-bold leading-[1.05] tracking-tight text-foreground"
             >
-              {t("nav.brand")}
-              <span className="block text-primary">{t("nav.brandLocation")}</span>
+              {title}
+              <span className="block text-primary">{titleAccent}</span>
             </motion.h1>
 
             <motion.p
@@ -64,8 +92,14 @@ export function HomeHero() {
               transition={{ duration: 0.6, delay: 0.16 }}
               className="mt-6 font-display text-xl sm:text-2xl font-semibold leading-snug text-foreground"
             >
-              {t("home.heroLead")}{" "}
-              <span className="text-primary">{t("home.heroLeadAccent")}</span>
+              {leadOverride ? (
+                leadOverride
+              ) : (
+                <>
+                  {t("home.heroLead")}{" "}
+                  <span className="text-primary">{t("home.heroLeadAccent")}</span>
+                </>
+              )}
             </motion.p>
 
             <motion.p
@@ -89,9 +123,9 @@ export function HomeHero() {
                 size="lg"
                 className="h-14 rounded-xl bg-primary px-7 text-base font-semibold shadow-md hover:bg-primary/90 hover:shadow-lg transition-all"
               >
-                <Link href="/como-ayudar">
+                <Link href={helpHref}>
                   <HandHeart className="mr-2 h-5 w-5" />
-                  {t("home.heroCtaHelp")}
+                  {helpLabel}
                 </Link>
               </Button>
               <Button
@@ -100,9 +134,9 @@ export function HomeHero() {
                 variant="outline"
                 className="h-14 rounded-xl border-primary/30 bg-card px-7 text-base font-semibold text-primary hover:border-primary/60 hover:bg-secondary/60 transition-all"
               >
-                <Link href="/reportar">
+                <Link href={needHref}>
                   <LifeBuoy className="mr-2 h-5 w-5" />
-                  {t("home.heroCtaNeedHelp")}
+                  {needLabel}
                 </Link>
               </Button>
               <Link
@@ -114,7 +148,7 @@ export function HomeHero() {
               </Link>
             </motion.div>
 
-            {/* Datos reales de confianza */}
+            {/* Datos reales de confianza (calculados desde Neon, NO editables) */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -152,10 +186,14 @@ export function HomeHero() {
               />
               <div className="overflow-hidden rounded-3xl border border-border/60 shadow-xl">
                 <img
-                  src={HERO_PHOTO}
-                  alt={t("home.heroPhotoAlt")}
+                  src={image.src}
+                  srcSet={srcSet || undefined}
+                  sizes={srcSet ? DEFAULT_IMAGE_SIZES : undefined}
+                  alt={image.alt}
                   loading="eager"
                   decoding="async"
+                  fetchPriority="high"
+                  style={{ objectPosition: image.focus }}
                   className="aspect-[4/3] w-full object-cover"
                 />
               </div>

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { usePublicSettings } from "@/hooks/use-public-settings";
 import { resolveWhatsAppContact } from "@/lib/whatsapp";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 
 export default function HowToHelp() {
   const { t } = useTranslation();
@@ -156,10 +157,13 @@ export default function HowToHelp() {
           <div className="p-3 bg-primary/10 rounded-2xl"><HandHeart className="w-7 h-7 text-primary" /></div>
           <span className="bg-primary/10 text-primary text-sm font-bold px-3 py-1 rounded-full uppercase tracking-wider">{t("howToHelp.participate")}</span>
         </div>
-        <h1 className="text-4xl sm:text-5xl font-display font-black mb-4">{t("howToHelp.title")}</h1>
-        <p className="text-muted-foreground text-lg leading-relaxed">
-          {t("howToHelp.subtitle")}
-        </p>
+        <CmsPageHeading
+          slug="donaciones"
+          title={t("howToHelp.title")}
+          subtitle={t("howToHelp.subtitle")}
+          titleClassName="text-4xl sm:text-5xl font-display font-black mb-4"
+          subtitleClassName="text-muted-foreground text-lg leading-relaxed"
+        />
       </div>
 
       {/* Ways to help grid */}

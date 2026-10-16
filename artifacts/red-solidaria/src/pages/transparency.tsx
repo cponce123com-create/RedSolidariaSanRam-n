@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Progress } from "@/components/ui/progress";
 import { Shield, Target, TrendingUp, Users, Receipt, ArrowRight, Heart } from "lucide-react";
 import SEO from "@/components/shared/SEO";
+import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 
 interface CampaignSummary {
   id: number;
@@ -61,10 +62,13 @@ export default function Transparency() {
           <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
             <Shield className="w-8 h-8" />
           </div>
-          <h1 className="text-4xl font-display font-black mb-3">{t("transparency.title")}</h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            {t("transparency.heroDescription")}
-          </p>
+          <CmsPageHeading
+            slug="transparencia"
+            title={t("transparency.title")}
+            subtitle={t("transparency.heroDescription")}
+            titleClassName="text-4xl font-display font-black mb-3"
+            subtitleClassName="text-muted-foreground max-w-2xl mx-auto"
+          />
         </div>
 
         {/* Resumen general */}

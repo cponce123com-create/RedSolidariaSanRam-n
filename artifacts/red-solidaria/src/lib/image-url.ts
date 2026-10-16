@@ -38,3 +38,27 @@ export function optimizeImageUrl(
   if (!insert) return url;
   return `${before}${hasTransform ? existing + "," : ""}${insert}/${hasTransform ? after.slice(existing.length + 1) : after}`;
 }
+
+/** Anchuras estándar de las variantes responsivas del sitio. */
+export const RESPONSIVE_WIDTHS = [400, 800, 1200, 1600] as const;
+
+/**
+ * `srcSet` con variantes responsivas para Cloudinary. Devuelve "" para URLs que no
+ * son de Cloudinary (así el `<img>` cae a su `src` normal sin romperse).
+ */
+export function buildSrcSet(
+  url: string | null | undefined,
+  widths: readonly number[] = RESPONSIVE_WIDTHS,
+): string {
+  if (!url || url.indexOf("/image/upload/") === -1) return "";
+  return widths
+    .filter((width) => width > 0)
+    .map((width) => `${optimizeImageUrl(url, { width })} ${width}w`)
+    .join(", ");
+}
+
+/**
+ * `sizes` por defecto: a pantalla completa en móvil, media en tableta y una anchura
+ * acotada en escritorio. Evita descargar la variante de 1600 px en un móvil.
+ */
+export const DEFAULT_IMAGE_SIZES = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 800px";

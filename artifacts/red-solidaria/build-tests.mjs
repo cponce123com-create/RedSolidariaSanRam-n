@@ -35,6 +35,7 @@ await build({
     "./src/lib/allies.ts",
     "./src/lib/admin-session.ts",
     "./src/lib/structured-data.ts",
+    "./src/lib/cms.ts",
     "./src/lib/i18n/locales/es.ts",
     "./src/lib/i18n/locales/en.ts",
   ],
