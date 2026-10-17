@@ -113,10 +113,9 @@ import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
  * donación, después de la reautenticación).
  */
 
-// POST /donations — público, con rate limit anti-spam.
-// El donante puede adjuntar el comprobante (captura de Yape/transferencia)
-// subido previamente a Cloudinary.
-router.post("/donations", donationLimiter, async (req, res) => {
+// POST /donations — registro solo desde el panel admin. Los aportes públicos
+// se coordinan por WhatsApp; el equipo registra y revisa cada ingreso.
+router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
   // La validación se resuelve ANTES del try (patrón del resto del API): un dato
   // inválido es un 400 explícito y el catch queda reservado para fallos
   // inesperados, que responden 500 en lugar de disfrazarse de validación.
