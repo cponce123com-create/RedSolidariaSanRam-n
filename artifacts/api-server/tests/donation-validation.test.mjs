@@ -33,6 +33,15 @@ test("donationInputSchema: donación válida pasa y anula el status del cliente"
   assert.equal(parsed.data.anonymous, undefined); // nullish → default en DB
 });
 
+test("donationInputSchema: conserva una clave de idempotencia válida", () => {
+  const parsed = donationInputSchema.safeParse({
+    ...VALID,
+    dedupeToken: "manual-reintento-123",
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) assert.equal(parsed.data.dedupeToken, "manual-reintento-123");
+});
+
 test("donationInputSchema: rechaza montos inválidos (negativo, 0, >2 decimales)", () => {
   for (const amount of [-5, 0, 1, 4.99, 50.123, 50.001, 5.005]) {
     const r = donationInputSchema.safeParse({ ...VALID, amount });

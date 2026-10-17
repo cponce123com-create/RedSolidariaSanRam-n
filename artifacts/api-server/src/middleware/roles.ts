@@ -37,6 +37,11 @@ export function hasRole(
   return allowed.includes(user.role);
 }
 
+/** El moderador queda fuera de los datos contables privados. */
+export function canReadFinance(user: { role?: string | null } | null | undefined): boolean {
+  return hasRole(user ?? undefined, ...READ_ROLES);
+}
+
 /**
  * Middleware factory: exige sesión de administrador con alguno de los roles
  * permitidos. Se usa DESPUÉS de requireAdmin (autenticación) para autorizar.

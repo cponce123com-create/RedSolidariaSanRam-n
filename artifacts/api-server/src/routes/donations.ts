@@ -26,7 +26,7 @@ import {
   type AnnulmentDonation,
 } from "../lib/donation-annulment";
 import { requireAdmin } from "../middleware/require-admin";
-import { requireRole, ROLES } from "../middleware/roles";
+import { canReadFinance, requireRole, ROLES } from "../middleware/roles";
 import {
   adminActionLimiter,
   donationLimiter,
@@ -50,6 +50,7 @@ import {
 import { toSafeAmount } from "../lib/amount-format";
 import { consentState, validateConsentDecision } from "../lib/donor-consent";
 import { CONSENT_VERSION } from "../lib/donor-consent";
+import { hasPgErrorCode } from "../lib/pg-errors";
 import {
   approvalRequiresProof,
   donationInputSchema,
@@ -125,6 +126,7 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
     return res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
   }
 
+  let dedupeToken: string | null = null;
   try {
     const data = parsed.data;
 
@@ -197,7 +199,7 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
     // ── Idempotencia (V20 · Fase 3) ──────────────────────────────────────────
     // Si el navegador reintenta el mismo envío (doble clic, red que se corta), se
     // devuelve la donación YA creada en lugar de registrar una segunda.
-    const dedupeToken = normalizeDedupeToken(data.dedupeToken);
+    dedupeToken = normalizeDedupeToken(data.dedupeToken);
     if (dedupeToken) {
       const [existing] = await db
         .select()
@@ -284,6 +286,7 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
           publicProof: data.publicProof ?? false,
           receiptNote: data.receiptNote ?? null,
           status: "pending",
+          dedupeToken,
         })
         .returning();
 
@@ -336,6 +339,16 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
     // el donante en la pantalla de agradecimiento.
     return res.status(201).json(await formatDonation(donation, null, items));
   } catch (err) {
+    // Dos solicitudes simultáneas con la misma clave pueden pasar la lectura
+    // inicial; el índice único asegura que solo una cree la fila. La segunda
+    // devuelve esa fila en vez de mostrar un error temporal al admin.
+    if (dedupeToken && hasPgErrorCode(err, "23505")) {
+      const [existing] = await db
+        .select()
+        .from(donationsTable)
+        .where(eq(donationsTable.dedupeToken, dedupeToken));
+      if (existing) return res.status(200).json(await formatDonation(existing));
+    }
     // API-06: un fallo inesperado (base de datos caída, error de programación)
     // NO es un error de validación del cliente. Devolver 400 aquí hacía que la
     // interfaz dijera «datos inválidos» y que nadie viera una señal de 500.
@@ -350,6 +363,7 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
 // GET /donations/stats — público (solo agregados, sin datos personales)
 router.get("/donations/stats", async (req, res) => {
   try {
+    const financeReader = canReadFinance(req.session?.adminUser);
     // Casts ::int / ::float8: pg devuelve count como string y sum(numeric)
     // como string; el contrato DonationStats es number → normalizamos en SQL.
     const [stats] = await db
@@ -359,7 +373,7 @@ router.get("/donations/stats", async (req, res) => {
         // Así un importe colado en una donación en especie (histórica o futura)
         // jamás puede inflar el recaudado: bienes y dinero no se mezclan.
         totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled') and ${donationsTable.collaborationType} = 'dinero'), 0)::float8`,
-        pendingCount: req.session?.adminUser ? sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int` : sql<number>`0::int`,
+        pendingCount: financeReader ? sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int` : sql<number>`0::int`,
         approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
         totalDonors: sql<number>`count(distinct CASE
           WHEN ${donationsTable.email} LIKE 'registro-%@sin-correo.redsolidaria.invalid'
