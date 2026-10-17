@@ -54,8 +54,7 @@ router.get("/transparency/ledger", async (req, res) => {
           FROM donations d
           LEFT JOIN campaigns c ON c.id = d.campaign_id
           WHERE d.status IN ('approved', 'reconciled')
-            AND d.collaboration_type = 'dinero'
-            AND d.amount > 0
+            AND (d.collaboration_type <> 'dinero' OR d.amount > 0)
           UNION ALL
           SELECT
             e.id,
