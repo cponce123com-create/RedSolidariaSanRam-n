@@ -283,6 +283,19 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
         })
         .returning();
 
+      if (items.length > 0) {
+        await tx.insert(donationItemsTable).values(
+          items.map((item) => ({
+            donationId: row.id,
+            product: item.product,
+            quantity: String(item.quantity),
+            unit: item.unit,
+            description: item.description,
+            estimatedValue: String(item.estimatedValue),
+          })),
+        );
+      }
+
       if (proofUrl) {
         await tx.insert(donationProofsTable).values({
           donationId: row.id,
