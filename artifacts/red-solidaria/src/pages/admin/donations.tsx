@@ -48,6 +48,8 @@ export default function AdminDonations() {
     unit: "unidad", estimatedValue: "", campaignId: "", message: "",
   });
   const proofFileRef = useRef<HTMLInputElement>(null);
+  const manualDedupeToken = useRef<string | null>(null);
+  const manualSyntheticEmail = useRef<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -60,7 +62,7 @@ export default function AdminDonations() {
     fetch("/api/campaigns?limit=100")
       .then((res) => (res.ok ? res.json() : []))
       .then((rows: { id: number; title: string; status: string }[]) => {
-        if (active && Array.isArray(rows)) setManualCampaigns(rows.filter((row) => row.status === "active" || row.status === "completed"));
+        if (active && Array.isArray(rows)) setManualCampaigns(rows.filter((row) => row.status === "active"));
       })
       .catch(() => {});
     return () => { active = false; };
@@ -208,8 +210,12 @@ export default function AdminDonations() {
     setManualError("");
     setManualSaving(true);
     try {
-      const email = manualForm.email.trim() ||
-        `registro-${Date.now()}@sin-correo.redsolidaria.invalid`;
+      manualDedupeToken.current ??= globalThis.crypto?.randomUUID?.() ??
+        `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      if (!manualForm.email.trim()) {
+        manualSyntheticEmail.current ??= `registro-${Date.now()}-${Math.random().toString(36).slice(2)}@sin-correo.redsolidaria.invalid`;
+      }
+      const email = manualForm.email.trim() || manualSyntheticEmail.current!;
       const isMoney = manualForm.collaborationType === "dinero";
       const payload = {
         firstName: manualForm.firstName.trim(),
@@ -228,13 +234,13 @@ export default function AdminDonations() {
           estimatedValue: Number(manualForm.estimatedValue || 0),
         }],
         campaignId: manualForm.campaignId ? Number(manualForm.campaignId) : null,
-        message: isMoney
-          ? (manualForm.message.trim() || "Aporte coordinado por WhatsApp y registrado por el equipo.")
-          : `${manualForm.quantity} ${manualForm.unit} ${manualForm.product === "otros" ? manualForm.productOther.trim() : manualForm.product}${manualForm.message.trim() ? ` — ${manualForm.message.trim()}` : ""}`,
+        message: isMoney ? undefined : `${manualForm.quantity} ${manualForm.unit} ${manualForm.product === "otros" ? manualForm.productOther.trim() : manualForm.product}`,
+        adminNote: manualForm.message.trim() || undefined,
         receiptNote: isMoney ? "Registro administrativo de aporte coordinado por WhatsApp" : undefined,
-        anonymous: false,
+        anonymous: true,
         publicProof: false,
         contactConsent: false,
+        dedupeToken: manualDedupeToken.current,
       };
       const response = await fetch("/api/donations", {
         method: "POST",
@@ -249,6 +255,8 @@ export default function AdminDonations() {
         description: "Quedó pendiente de revisión. Adjunta el comprobante si corresponde y apruébalo para que aparezca en transparencia.",
       });
       setManualOpen(false);
+      manualDedupeToken.current = null;
+      manualSyntheticEmail.current = null;
       setManualForm({ firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash", collaborationType: "dinero", product: "panetones", productOther: "", quantity: "1", unit: "unidad", estimatedValue: "", campaignId: "", message: "" });
       invalidateDonationQueries(queryClient);
     } catch (error) {
@@ -343,7 +351,7 @@ export default function AdminDonations() {
         </div>
       </div>
 
-      <Dialog open={manualOpen} onOpenChange={(open) => { setManualOpen(open); if (!open) setManualError(""); }}>
+      <Dialog open={manualOpen} onOpenChange={(open) => { setManualOpen(open); if (!open) { setManualError(""); manualDedupeToken.current = null; manualSyntheticEmail.current = null; } }}>
         <DialogContent className="rounded-2xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Registrar aporte coordinado</DialogTitle>
