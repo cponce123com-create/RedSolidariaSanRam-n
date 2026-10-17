@@ -221,7 +221,7 @@ export default function Transparency() {
                     <div className="min-w-0">
                       <div className="mb-1 flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${entry.type === "income" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}>
-                          {entry.type === "income" ? "Ingreso confirmado" : "Gasto publicado"}
+                          {entry.type === "income" ? (entry.amount > 0 ? "Ingreso confirmado" : "Aporte recibido") : "Gasto publicado"}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {entry.date ? new Date(entry.date).toLocaleDateString("es-PE") : "Fecha no disponible"}
@@ -231,7 +231,7 @@ export default function Transparency() {
                       <p className="text-sm text-muted-foreground">{entry.campaignTitle}</p>
                     </div>
                     <p className={`shrink-0 text-lg font-bold ${entry.type === "income" ? "text-emerald-700" : "text-rose-700"}`}>
-                      {entry.type === "income" ? "+" : "−"}{formatCurrency(entry.amount)}
+                      {entry.amount > 0 ? `${entry.type === "income" ? "+" : "−"}${formatCurrency(entry.amount)}` : "Aporte no monetario"}
                     </p>
                   </article>
                 ))}
