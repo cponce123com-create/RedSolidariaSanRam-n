@@ -29,6 +29,7 @@ test("donationInputSchema: donación válida pasa y anula el status del cliente"
   if (!parsed.success) return;
   assert.equal(parsed.data.status, undefined); // no está en el contrato
   assert.equal(parsed.data.message, "¡Gracias!"); // trim
+  assert.equal(parsed.data.adminNote, undefined);
   assert.equal(parsed.data.anonymous, undefined); // nullish → default en DB
 });
 
