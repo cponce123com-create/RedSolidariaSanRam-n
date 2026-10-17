@@ -49,6 +49,7 @@ import {
 } from "../lib/ledger";
 import { toSafeAmount } from "../lib/amount-format";
 import { consentState, validateConsentDecision } from "../lib/donor-consent";
+import { CONSENT_VERSION } from "../lib/donor-consent";
 import {
   approvalRequiresProof,
   donationInputSchema,
@@ -276,12 +277,27 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
           paymentMethod: data.paymentMethod ?? "other",
           collaborationType: normalizeCollaborationType(data.collaborationType),
           message: data.message ?? null,
-          anonymous: data.anonymous ?? false,
+          // Los registros hechos por el equipo son privados de forma
+          // predeterminada; el nombre solo se publica con consentimiento.
+          anonymous: data.anonymous ?? true,
+          adminNote: data.adminNote ?? null,
           publicProof: data.publicProof ?? false,
           receiptNote: data.receiptNote ?? null,
           status: "pending",
         })
         .returning();
+
+      if (data.anonymous === false) {
+        await tx.insert(donationConsentsTable).values({
+          donationId: row.id,
+          donorId,
+          scope: "public_name",
+          granted: true,
+          version: CONSENT_VERSION,
+          reason: null,
+          recordedBy: req.session?.adminUser?.username ?? null,
+        });
+      }
 
       if (items.length > 0) {
         await tx.insert(donationItemsTable).values(
@@ -345,7 +361,11 @@ router.get("/donations/stats", async (req, res) => {
         totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled') and ${donationsTable.collaborationType} = 'dinero'), 0)::float8`,
         pendingCount: req.session?.adminUser ? sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int` : sql<number>`0::int`,
         approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
-        totalDonors: sql<number>`count(distinct ${donationsTable.email}) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
+        totalDonors: sql<number>`count(distinct CASE
+          WHEN ${donationsTable.email} LIKE 'registro-%@sin-correo.redsolidaria.invalid'
+            THEN lower(trim(${donationsTable.firstName}) || '|' || trim(${donationsTable.lastName}) || '|' || coalesce(trim(${donationsTable.phone}), ''))
+          ELSE lower(trim(${donationsTable.email}))
+        END) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
       })
       .from(donationsTable);
     res.json(stats);
@@ -491,9 +511,9 @@ router.put("/donations/:id", ...adminOnly, adminActionLimiter, async (req, res) 
         await appendMovement(tx, updated.campaignId, {
           kind: "ingreso",
           amount: toSafeAmount(updated.amount),
-          description: updated.anonymous
-            ? "Donación anónima"
-            : `Donación de ${updated.firstName} ${updated.lastName}`.trim(),
+          // Los nombres quedan fuera del ledger público, incluso si existe
+          // consentimiento; el listado de donantes es la única vitrina.
+          description: "Donación recibida",
           sourceType: "donation",
           sourceId: updated.id,
           createdAt: new Date(),
