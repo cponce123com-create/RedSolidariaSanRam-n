@@ -18,6 +18,86 @@ import { formatLeftover } from "./campaign-leftovers";
 
 const router = Router();
 
+/**
+ * GET /transparency/ledger — registro público global, paginado.
+ * Solo incluye donaciones confirmadas y gastos marcados como públicos.
+ * No devuelve nombres, correos, teléfonos ni comprobantes de donantes.
+ */
+router.get("/transparency/ledger", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    const [countResult, entriesResult] = await Promise.all([
+      db.execute(sql`
+        SELECT COUNT(*)::int AS total
+        FROM (
+          SELECT id FROM donations
+          WHERE status IN ('approved', 'reconciled')
+            AND collaboration_type = 'dinero'
+            AND amount > 0
+          UNION ALL
+          SELECT id FROM campaign_expenses
+          WHERE is_public = true
+        ) public_entries
+      `),
+      db.execute(sql`
+        SELECT id, entry_type, campaign_id, campaign_title, created_at,
+               amount, description
+        FROM (
+          SELECT
+            d.id,
+            'income'::text AS entry_type,
+            d.campaign_id,
+            COALESCE(c.title, 'Fondo general') AS campaign_title,
+            d.created_at,
+            d.amount::float8 AS amount,
+            CASE WHEN d.anonymous THEN 'Aporte recibido' ELSE 'Donación recibida' END AS description
+          FROM donations d
+          LEFT JOIN campaigns c ON c.id = d.campaign_id
+          WHERE d.status IN ('approved', 'reconciled')
+            AND d.collaboration_type = 'dinero'
+            AND d.amount > 0
+          UNION ALL
+          SELECT
+            e.id,
+            'expense'::text AS entry_type,
+            e.campaign_id,
+            COALESCE(c.title, 'Fondo general') AS campaign_title,
+            e.created_at,
+            e.amount::float8 AS amount,
+            e.description
+          FROM campaign_expenses e
+          LEFT JOIN campaigns c ON c.id = e.campaign_id
+          WHERE e.is_public = true
+        ) public_entries
+        ORDER BY created_at DESC, entry_type ASC, id DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `),
+    ]);
+    const [countRow] = countResult.rows as [{ total: number }?];
+    const rows = entriesResult.rows as Record<string, unknown>[];
+    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    return res.json({
+      total: Number(countRow?.total ?? 0),
+      limit,
+      offset,
+      entries: rows.map((row) => ({
+        id: Number(row.id),
+        type: row.entry_type,
+        campaignId: row.campaign_id == null ? null : Number(row.campaign_id),
+        campaignTitle: String(row.campaign_title ?? "Fondo general"),
+        date: toIsoSafe(row.created_at as Date | string | null),
+        amount: Number(row.amount ?? 0),
+        description: String(row.description ?? ""),
+      })),
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to get public transparency ledger");
+    return res.status(500).json({ error: "server_error", message: "No se pudo cargar el registro público" });
+  }
+});
+
+
 // GET /campaigns/:id/transparency — público.
 // Arma el panel de transparencia de una campaña en UN solo request: agregados
 // (recaudado, gastado, donantes) calculados en SQL con FILTER + las listas
