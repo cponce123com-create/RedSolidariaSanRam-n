@@ -199,8 +199,12 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
     // donaciones, así que una campaña con recaudación histórica mostraba 0.
     const funding = campaignFunding(campaign.raised, donationRow?.total_raised);
     const totalRaised = funding.reconciledRaised;
+    const isAdmin = Boolean(req.session?.adminUser);
     const totalSpent = Number(expenseRow?.total_spent ?? 0);
     const publicSpent = Number(expenseRow?.public_spent ?? 0);
+    const reportedSpent = isAdmin ? totalSpent : publicSpent;
+    if (isAdmin) res.setHeader("Cache-Control", "private, no-store");
+    else res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     const goal = campaign.goal || 0;
 
     return res.json({
@@ -211,27 +215,27 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       verifiedRaised: funding.verifiedRaised,
       historicalRaised: funding.historicalRaised,
       historicalCounted: funding.historicalCounted,
-      totalSpent,
+      totalSpent: reportedSpent,
       publicSpent,
-      balance: totalRaised - totalSpent,
+      balance: totalRaised - reportedSpent,
       // Fecha de la consulta: los datos se leen en vivo de la base, así que el
       // panel puede mostrar cuándo se actualizó por última vez (Fase 3.2).
       updatedAt: new Date().toISOString(),
       donorCount: donationRow?.donor_count ?? 0,
-      executionPercent: goal > 0 ? Math.min(100, Math.round((totalSpent / goal) * 100)) : 0,
+      executionPercent: goal > 0 ? Math.min(100, Math.round((reportedSpent / goal) * 100)) : 0,
       raisedPercent: goal > 0 ? Math.min(100, Math.round((totalRaised / goal) * 100)) : 0,
-      expenseCount: expenseRow?.expense_count ?? 0,
+      expenseCount: isAdmin ? (expenseRow?.expense_count ?? 0) : (expenseRow?.public_expense_count ?? 0),
       publicExpenseCount: expenseRow?.public_expense_count ?? 0,
-      evidenceCount: evidenceRow?.evidence_count ?? 0,
+      evidenceCount: isAdmin ? (evidenceRow?.evidence_count ?? 0) : (evidenceRow?.public_evidence_count ?? 0),
       publicEvidenceCount: evidenceRow?.public_evidence_count ?? 0,
-      leftoverCount: leftoverRow?.leftover_count ?? 0,
+      leftoverCount: isAdmin ? (leftoverRow?.leftover_count ?? 0) : (leftoverRow?.public_leftover_count ?? 0),
       publicLeftoverCount: leftoverRow?.public_leftover_count ?? 0,
       publicExpenses: publicExpenses.map(formatExpense),
       publicEvidence: publicEvidence.map(formatEvidence),
       publicLeftovers: publicLeftovers.map(formatLeftover),
       recentMovements: recentMovements.map((m) => ({
         type: m.kind,
-        description: m.description,
+        description: m.sourceType === "donation" ? "Donación recibida" : m.description,
         amount: toSafeAmount(m.amount),
         date: toIsoSafe(m.createdAt),
       })),
