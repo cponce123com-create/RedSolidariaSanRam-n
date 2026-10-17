@@ -86,6 +86,8 @@ export const donationInputSchema = z
       })
       .nullish(),
     message: z.string().trim().max(1000).nullish(),
+    // Nota privada para el equipo. No se muestra en listados públicos.
+    adminNote: z.string().trim().max(1000).nullish(),
     anonymous: z.boolean().nullish(),
     publicProof: z.boolean().nullish(),
     // Tipo de donante declarado en el formulario público (identidad del perfil).
