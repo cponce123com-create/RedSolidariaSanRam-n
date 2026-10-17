@@ -102,7 +102,8 @@ function formatMovement(m: typeof campaignMovementsTable.$inferSelect) {
     campaignId: m.campaignId,
     kind: m.kind,
     amount: m.amount,
-    description: m.description,
+    // Sanitiza también movimientos históricos que guardaban nombres.
+    description: m.sourceType === "donation" ? "Donación recibida" : m.description,
     sourceType: m.sourceType,
     sourceId: m.sourceId,
     prevHash: m.prevHash,
