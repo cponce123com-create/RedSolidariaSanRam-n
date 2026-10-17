@@ -33,8 +33,7 @@ router.get("/transparency/ledger", async (req, res) => {
         FROM (
           SELECT id FROM donations
           WHERE status IN ('approved', 'reconciled')
-            AND collaboration_type = 'dinero'
-            AND amount > 0
+            AND (collaboration_type <> 'dinero' OR amount > 0)
           UNION ALL
           SELECT id FROM campaign_expenses
           WHERE is_public = true
@@ -51,7 +50,7 @@ router.get("/transparency/ledger", async (req, res) => {
             COALESCE(c.title, 'Fondo general') AS campaign_title,
             d.created_at,
             d.amount::float8 AS amount,
-            CASE WHEN d.anonymous THEN 'Aporte recibido' ELSE 'Donación recibida' END AS description
+            CASE WHEN d.collaboration_type = 'dinero' THEN 'Donación recibida' ELSE 'Aporte no monetario recibido' END AS description
           FROM donations d
           LEFT JOIN campaigns c ON c.id = d.campaign_id
           WHERE d.status IN ('approved', 'reconciled')
