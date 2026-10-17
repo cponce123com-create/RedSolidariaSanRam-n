@@ -325,14 +325,14 @@ router.get("/donations/stats", async (req, res) => {
     // como string; el contrato DonationStats es number → normalizamos en SQL.
     const [stats] = await db
       .select({
-        totalDonations: sql<number>`count(*)::int`,
+        totalDonations: sql<number>`count(*) filter (where status in ('approved','reconciled'))::int`,
         // El total es DINERO: se exige además `collaboration_type = 'dinero'`.
         // Así un importe colado en una donación en especie (histórica o futura)
         // jamás puede inflar el recaudado: bienes y dinero no se mezclan.
         totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled') and ${donationsTable.collaborationType} = 'dinero'), 0)::float8`,
-        pendingCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int`,
+        pendingCount: req.session?.adminUser ? sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int` : sql<number>`0::int`,
         approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
-        totalDonors: sql<number>`count(distinct ${donationsTable.email})::int`,
+        totalDonors: sql<number>`count(distinct ${donationsTable.email}) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
       })
       .from(donationsTable);
     res.json(stats);
