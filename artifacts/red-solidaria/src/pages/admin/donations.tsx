@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { 
   useGetDonations, 
   useUpdateDonationStatus, 
@@ -38,6 +38,15 @@ export default function AdminDonations() {
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
   const [proofUploadId, setProofUploadId] = useState<number | null>(null);
   const [proofUploading, setProofUploading] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualError, setManualError] = useState("");
+  const [manualCampaigns, setManualCampaigns] = useState<{ id: number; title: string; status: string }[]>([]);
+  const [manualForm, setManualForm] = useState({
+    firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash",
+    collaborationType: "dinero", product: "panetones", productOther: "", quantity: "1",
+    unit: "unidad", estimatedValue: "", campaignId: "", message: "",
+  });
   const proofFileRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
@@ -45,6 +54,17 @@ export default function AdminDonations() {
   const updateStatus = useUpdateDonationStatus();
   const reconcile = useReconcileDonation();
   const addProof = useAddDonationProof();
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/campaigns?limit=100")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((rows: { id: number; title: string; status: string }[]) => {
+        if (active && Array.isArray(rows)) setManualCampaigns(rows.filter((row) => row.status === "active" || row.status === "completed"));
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   // Fetch stats unconditionally
   const { data: stats } = useGetDonationStats();
@@ -65,6 +85,7 @@ export default function AdminDonations() {
       (d.email ?? "").toLowerCase().includes(query) ||
       (d.campaignTitle ?? "").toLowerCase().includes(query) ||
       (d.paymentMethod ?? "").toLowerCase().includes(query) ||
+      (d.message ?? "").toLowerCase().includes(query) ||
       (d.collaborationType ? collaborationTypeLabel(d.collaborationType) : "")
         .toLowerCase()
         .includes(query)
@@ -183,6 +204,60 @@ export default function AdminDonations() {
     }
   };
 
+  const handleManualSubmit = async () => {
+    setManualError("");
+    setManualSaving(true);
+    try {
+      const email = manualForm.email.trim() ||
+        `registro-${Date.now()}@sin-correo.redsolidaria.invalid`;
+      const isMoney = manualForm.collaborationType === "dinero";
+      const payload = {
+        firstName: manualForm.firstName.trim(),
+        lastName: manualForm.lastName.trim(),
+        email,
+        phone: manualForm.phone.trim() || undefined,
+        amount: isMoney ? Number(manualForm.amount) : 0,
+        paymentMethod: isMoney ? manualForm.paymentMethod : undefined,
+        collaborationType: manualForm.collaborationType,
+        items: isMoney ? undefined : [{
+          product: manualForm.product,
+          productOther: manualForm.product === "otros" ? manualForm.productOther.trim() : undefined,
+          quantity: Number(manualForm.quantity),
+          unit: manualForm.unit,
+          description: manualForm.message.trim() || undefined,
+          estimatedValue: Number(manualForm.estimatedValue || 0),
+        }],
+        campaignId: manualForm.campaignId ? Number(manualForm.campaignId) : null,
+        message: isMoney
+          ? (manualForm.message.trim() || "Aporte coordinado por WhatsApp y registrado por el equipo.")
+          : `${manualForm.quantity} ${manualForm.unit} ${manualForm.product === "otros" ? manualForm.productOther.trim() : manualForm.product}${manualForm.message.trim() ? ` — ${manualForm.message.trim()}` : ""}`,
+        receiptNote: isMoney ? "Registro administrativo de aporte coordinado por WhatsApp" : undefined,
+        anonymous: false,
+        publicProof: false,
+        contactConsent: false,
+      };
+      const response = await fetch("/api/donations", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => null) as { message?: string } | null;
+      if (!response.ok) throw new Error(result?.message || "No se pudo registrar el aporte.");
+      toast({
+        title: "Aporte registrado",
+        description: "Quedó pendiente de revisión. Adjunta el comprobante si corresponde y apruébalo para que aparezca en transparencia.",
+      });
+      setManualOpen(false);
+      setManualForm({ firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash", collaborationType: "dinero", product: "panetones", productOther: "", quantity: "1", unit: "unidad", estimatedValue: "", campaignId: "", message: "" });
+      invalidateDonationQueries(queryClient);
+    } catch (error) {
+      setManualError(error instanceof Error ? error.message : "No se pudo registrar el aporte.");
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-500 hover:bg-yellow-600 text-white",
     approved: "bg-accent hover:bg-accent text-white",
@@ -212,6 +287,11 @@ export default function AdminDonations() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-display">Gestión de Donaciones</h1>
         <p className="text-muted-foreground mt-1">Revisa, aprueba y administra las donaciones recibidas.</p>
+        <div className="mt-4">
+          <Button onClick={() => setManualOpen(true)} className="rounded-xl" data-testid="btn-register-manual-donation">
+            Registrar aporte coordinado
+          </Button>
+        </div>
       </div>
 
       {/* Stats Row */}
@@ -262,6 +342,107 @@ export default function AdminDonations() {
           />
         </div>
       </div>
+
+      <Dialog open={manualOpen} onOpenChange={(open) => { setManualOpen(open); if (!open) setManualError(""); }}>
+        <DialogContent className="rounded-2xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Registrar aporte coordinado</DialogTitle>
+            <DialogDescription>
+              Usa este formulario cuando el aporte se haya coordinado por WhatsApp o se haya recibido directamente.
+              Se guardará como pendiente hasta que el equipo lo revise.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void handleManualSubmit(); }}>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-sm font-medium">Nombres
+                <Input required minLength={2} value={manualForm.firstName} onChange={(e) => setManualForm({ ...manualForm, firstName: e.target.value })} />
+              </label>
+              <label className="space-y-1 text-sm font-medium">Apellidos
+                <Input required minLength={2} value={manualForm.lastName} onChange={(e) => setManualForm({ ...manualForm, lastName: e.target.value })} />
+              </label>
+              <label className="space-y-1 text-sm font-medium">Correo (opcional)
+                <Input type="email" value={manualForm.email} onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })} placeholder="correo@ejemplo.com" />
+              </label>
+              <label className="space-y-1 text-sm font-medium">WhatsApp (opcional)
+                <Input value={manualForm.phone} onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })} placeholder="9 dígitos" />
+              </label>
+              <label className="space-y-1 text-sm font-medium">Tipo de aporte
+                <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.collaborationType} onChange={(e) => setManualForm({ ...manualForm, collaborationType: e.target.value })}>
+                  <option value="dinero">Dinero</option>
+                  <option value="productos">Productos</option>
+                </select>
+              </label>
+              {manualForm.collaborationType === "dinero" ? (
+                <label className="space-y-1 text-sm font-medium">Monto recibido (S/)
+                  <Input type="number" min="5" step="0.01" required value={manualForm.amount} onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })} />
+                </label>
+              ) : (
+                <>
+                  <label className="space-y-1 text-sm font-medium">Producto
+                    <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.product} onChange={(e) => setManualForm({ ...manualForm, product: e.target.value })}>
+                      <option value="panetones">Panetones</option><option value="leche">Leche</option>
+                      <option value="chocolate">Chocolate</option><option value="arroz">Arroz</option>
+                      <option value="azucar">Azúcar</option><option value="aceite">Aceite</option>
+                      <option value="juguetes">Juguetes</option><option value="ropa">Ropa</option>
+                      <option value="otros">Otros</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-sm font-medium">Cantidad y unidad
+                    <div className="flex gap-2">
+                      <Input type="number" min="0.001" step="0.001" required value={manualForm.quantity} onChange={(e) => setManualForm({ ...manualForm, quantity: e.target.value })} />
+                      <select className="h-10 rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.unit} onChange={(e) => setManualForm({ ...manualForm, unit: e.target.value })}>
+                        <option value="unidad">Unidad</option><option value="caja">Caja</option>
+                        <option value="paquete">Paquete</option><option value="saco">Saco</option>
+                        <option value="kilogramo">Kilogramo</option><option value="litro">Litro</option>
+                      </select>
+                    </div>
+                  </label>
+                  {manualForm.product === "otros" && (
+                    <label className="space-y-1 text-sm font-medium">Describe el producto
+                      <Input required minLength={2} maxLength={60} value={manualForm.productOther} onChange={(e) => setManualForm({ ...manualForm, productOther: e.target.value })} />
+                    </label>
+                  )}
+                  <label className="space-y-1 text-sm font-medium">Valor estimado (S/, opcional)
+                    <Input type="number" min="0" step="0.01" value={manualForm.estimatedValue} onChange={(e) => setManualForm({ ...manualForm, estimatedValue: e.target.value })} />
+                  </label>
+                </>
+              )}
+              {manualForm.collaborationType === "dinero" && (
+              <label className="space-y-1 text-sm font-medium">Medio de recepción
+                <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.paymentMethod} onChange={(e) => setManualForm({ ...manualForm, paymentMethod: e.target.value })}>
+                  <option value="cash">Efectivo</option>
+                  <option value="other">Otro / coordinado</option>
+                  <option value="yape">Yape</option>
+                  <option value="plin">Plin</option>
+                  <option value="transfer">Transferencia</option>
+                </select>
+              </label>
+              )}
+              <label className="space-y-1 text-sm font-medium sm:col-span-2">Campaña (opcional)
+                <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.campaignId} onChange={(e) => setManualForm({ ...manualForm, campaignId: e.target.value })}>
+                  <option value="">Fondo general</option>
+                  {manualCampaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.title}</option>)}
+                </select>
+              </label>
+              <label className="space-y-1 text-sm font-medium sm:col-span-2">Nota interna (opcional)
+                <Textarea rows={2} value={manualForm.message} onChange={(e) => setManualForm({ ...manualForm, message: e.target.value })} placeholder="Detalle útil para el equipo" />
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Los aportes digitales quedarán pendientes hasta que adjuntes el comprobante y los apruebes.
+              Sin correo se guarda un identificador interno, no se publica en la página.
+            </p>
+            {manualError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{manualError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setManualOpen(false)} className="rounded-xl">Cancelar</Button>
+              <Button type="submit" disabled={manualSaving} className="rounded-xl">
+                {manualSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Guardar como pendiente
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Reject Dialog */}
       <Dialog open={!!rejectDialogId} onOpenChange={(open) => !open && setRejectDialogId(null)}>
@@ -366,6 +547,7 @@ export default function AdminDonations() {
                         <div className="font-medium text-foreground">{d.firstName} {d.lastName}</div>
                         <div className="text-xs text-muted-foreground">{d.email}</div>
                         {d.phone && <div className="text-xs text-muted-foreground">{d.phone}</div>}
+                        {d.message && <div className="mt-1 max-w-[240px] text-xs text-muted-foreground">{d.message}</div>}
                       </div>
                     )}
                   </TableCell>

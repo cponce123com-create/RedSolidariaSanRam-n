@@ -4,8 +4,7 @@ import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import {
   Heart, HandHeart, Package, Dog, Users, Building2, Megaphone,
-  ArrowRight, CheckCircle, Phone, QrCode, Banknote, CreditCard,
-  Gift, Leaf, Star
+  ArrowRight, CheckCircle
 } from "lucide-react";
 import { usePublicSettings } from "@/hooks/use-public-settings";
 import { resolveWhatsAppContact } from "@/lib/whatsapp";
@@ -35,7 +34,7 @@ export default function HowToHelp() {
         t("howToHelp.moneyStep3"),
       ],
       cta: t("howToHelp.moneyCta"),
-      ctaHref: "/campanas",
+      ctaHref: whatsapp?.url ?? "/contacto",
       ctaStyle: "bg-red-500 hover:bg-red-600",
     },
     {
@@ -54,7 +53,7 @@ export default function HowToHelp() {
         t("howToHelp.productsStep3"),
       ],
       cta: t("howToHelp.productsCta"),
-      ctaHref: "/contacto",
+      ctaHref: whatsapp?.url ?? "/contacto",
       ctaStyle: "bg-blue-500 hover:bg-blue-600",
     },
     {
@@ -73,7 +72,7 @@ export default function HowToHelp() {
         t("howToHelp.animalFoodStep3"),
       ],
       cta: t("howToHelp.animalFoodCta"),
-      ctaHref: "/ayuda-animal",
+      ctaHref: whatsapp?.url ?? "/contacto",
       ctaStyle: "bg-amber-500 hover:bg-amber-600",
     },
     {
@@ -135,13 +134,6 @@ export default function HowToHelp() {
     },
   ];
 
-  const PAYMENT_METHODS = [
-    { icon: QrCode, label: "Yape", value: "921 615 737", color: "text-purple-600" },
-    { icon: QrCode, label: "Plin", value: "921 615 737", color: "text-blue-600" },
-    { icon: Banknote, label: "BCP", value: "193-12345678-0-55", color: "text-orange-700" },
-    { icon: CreditCard, label: t("howToHelp.cash"), value: t("howToHelp.coordinateInSanRamon"), color: "text-green-700" },
-  ];
-
   const FAQS = [
     { q: t("howToHelp.faq1q"), a: t("howToHelp.faq1a") },
     { q: t("howToHelp.faq2q"), a: t("howToHelp.faq2a") },
@@ -195,40 +187,52 @@ export default function HowToHelp() {
                 </div>
               ))}
             </div>
-            <Link href={way.ctaHref}>
-              <Button size="sm" className={`rounded-xl mt-auto gap-1.5 ${way.ctaStyle} text-white`}>
-                {way.cta} <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
-            </Link>
+            {way.ctaHref.startsWith("https://") ? (
+              <a href={way.ctaHref} target="_blank" rel="noopener noreferrer" className="mt-auto inline-flex">
+                <Button size="sm" className={`rounded-xl gap-1.5 ${way.ctaStyle} text-white`}>
+                  {way.cta} <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </a>
+            ) : (
+              <Link href={way.ctaHref}>
+                <Button size="sm" className={`rounded-xl mt-auto gap-1.5 ${way.ctaStyle} text-white`}>
+                  {way.cta} <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </Link>
+            )}
           </motion.div>
         ))}
       </div>
 
-      {/* Payment methods */}
-      <div className="bg-card border border-border rounded-3xl p-8 mb-12">
-        <h2 className="text-2xl font-display font-bold mb-2 text-center">{t("howToHelp.paymentTitle")}</h2>
-        <p className="text-muted-foreground text-center mb-8 text-sm">{t("howToHelp.paymentDesc")}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {PAYMENT_METHODS.map((pm, i) => (
-            <div key={i} className="bg-secondary/40 rounded-2xl p-5 text-center border border-border">
-              <pm.icon className={`w-8 h-8 mx-auto mb-3 ${pm.color}`} />
-              <h3 className="font-bold mb-1">{pm.label}</h3>
-              <p className="text-xs text-muted-foreground">{pm.value}</p>
-            </div>
-          ))}
+      {/* Donaciones: coordinación directa por WhatsApp */}
+      <div className="bg-card border border-border rounded-3xl p-8 mb-12 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-100 text-green-700">
+          <Heart className="h-7 w-7" />
         </div>
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          {t("howToHelp.afterDonation")}{" "}
-          {whatsapp && (
-            <a
-              href={whatsapp.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-green-700 font-semibold hover:underline"
-            >
-              WhatsApp {whatsapp.display}
-            </a>
-          )}
+        <h2 className="text-2xl font-display font-bold mb-2">¿Quieres hacer un aporte?</h2>
+        <p className="text-muted-foreground mx-auto mb-6 max-w-2xl text-sm">
+          Escríbenos por WhatsApp. Te explicaremos cómo coordinarlo y el equipo registrará el aporte
+          para que puedas consultarlo en la página pública de transparencia.
+        </p>
+        {whatsapp ? (
+          <a
+            href={whatsapp.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-11 items-center justify-center rounded-xl bg-green-600 px-6 font-semibold text-white transition-colors hover:bg-green-700"
+          >
+            <HandHeart className="mr-2 h-4 w-4" />
+            Coordinar por WhatsApp {whatsapp.display}
+          </a>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            El número de WhatsApp aún no está configurado.{" "}
+            <Link href="/contacto" className="font-semibold text-primary underline">Contáctanos</Link>
+          </p>
+        )}
+        <p className="mt-4 text-xs text-muted-foreground">
+          Consulta los aportes confirmados y los gastos publicados en{" "}
+          <Link href="/transparencia" className="font-semibold text-primary underline">Transparencia</Link>.
         </p>
       </div>
 

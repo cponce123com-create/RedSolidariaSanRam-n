@@ -113,10 +113,9 @@ import { closedCampaignError, isCampaignClosed } from "./campaign-closure";
  * donación, después de la reautenticación).
  */
 
-// POST /donations — público, con rate limit anti-spam.
-// El donante puede adjuntar el comprobante (captura de Yape/transferencia)
-// subido previamente a Cloudinary.
-router.post("/donations", donationLimiter, async (req, res) => {
+// POST /donations — registro solo desde el panel admin. Los aportes públicos
+// se coordinan por WhatsApp; el equipo registra y revisa cada ingreso.
+router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
   // La validación se resuelve ANTES del try (patrón del resto del API): un dato
   // inválido es un 400 explícito y el catch queda reservado para fallos
   // inesperados, que responden 500 en lugar de disfrazarse de validación.
@@ -284,6 +283,19 @@ router.post("/donations", donationLimiter, async (req, res) => {
         })
         .returning();
 
+      if (items.length > 0) {
+        await tx.insert(donationItemsTable).values(
+          items.map((item) => ({
+            donationId: row.id,
+            product: item.product,
+            quantity: String(item.quantity),
+            unit: item.unit,
+            description: item.description,
+            estimatedValue: String(item.estimatedValue),
+          })),
+        );
+      }
+
       if (proofUrl) {
         await tx.insert(donationProofsTable).values({
           donationId: row.id,
@@ -326,14 +338,14 @@ router.get("/donations/stats", async (req, res) => {
     // como string; el contrato DonationStats es number → normalizamos en SQL.
     const [stats] = await db
       .select({
-        totalDonations: sql<number>`count(*)::int`,
+        totalDonations: sql<number>`count(*) filter (where status in ('approved','reconciled'))::int`,
         // El total es DINERO: se exige además `collaboration_type = 'dinero'`.
         // Así un importe colado en una donación en especie (histórica o futura)
         // jamás puede inflar el recaudado: bienes y dinero no se mezclan.
         totalAmount: sql<number>`coalesce(sum(${donationsTable.amount}) filter (where ${donationsTable.status} in ('approved','reconciled') and ${donationsTable.collaborationType} = 'dinero'), 0)::float8`,
-        pendingCount: sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int`,
+        pendingCount: req.session?.adminUser ? sql<number>`count(*) filter (where ${donationsTable.status} = 'pending')::int` : sql<number>`0::int`,
         approvedCount: sql<number>`count(*) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
-        totalDonors: sql<number>`count(distinct ${donationsTable.email})::int`,
+        totalDonors: sql<number>`count(distinct ${donationsTable.email}) filter (where ${donationsTable.status} in ('approved','reconciled'))::int`,
       })
       .from(donationsTable);
     res.json(stats);

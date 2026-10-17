@@ -72,12 +72,24 @@ test("PUT /api/donations/1 con status inválido y sesión → 400 (validación a
   });
 });
 
-test("POST /api/donations con tipo inválido → 400 (schema Zod antes de DB)", async () => {
+test("POST /api/donations sin sesión → 401 (solo el panel registra aportes)", async () => {
   const app = buildApp();
   await withServer(app, async (base) => {
     const res = await fetch(`${base}/api/donations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "no-es-un-numero" }),
+    });
+    assert.equal(res.status, 401);
+  });
+});
+
+test("POST /api/donations con datos inválidos y sesión admin → 400", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await fetch(`${base}/api/donations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-test-admin": "1" },
       body: JSON.stringify({ amount: "no-es-un-numero" }),
     });
     assert.equal(res.status, 400);
@@ -97,7 +109,7 @@ const VALID_BODY = {
 async function postDonation(base, body) {
   const res = await fetch(`${base}/api/donations`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-test-admin": "1" },
     body: JSON.stringify(body),
   });
   return res;

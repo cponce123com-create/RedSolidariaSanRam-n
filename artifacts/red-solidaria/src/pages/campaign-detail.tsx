@@ -220,33 +220,18 @@ export default function CampaignDetail() {
                 )}
               </section>
 
-              {/* Payment Info Box */}
-              {campaign.status === 'active' && (
+              {/* Donation coordination */}
+              {campaign.status === "active" && (
                 <section className="bg-primary/5 rounded-3xl p-8 border border-primary/20">
-                  <h3 className="font-display font-bold text-2xl mb-4 flex items-center gap-3 text-foreground">
-                    <Landmark className="text-primary w-6 h-6" /> {t("campaignDetail.otherWaysTitle")}
+                  <h3 className="font-display font-bold text-2xl mb-3 flex items-center gap-3 text-foreground">
+                    <Landmark className="text-primary w-6 h-6" /> Coordina tu aporte
                   </h3>
-                  <div className="space-y-4 text-base text-muted-foreground">
-                    <p>{t("campaignDetail.otherWaysText")}</p>
-                    <div className="grid sm:grid-cols-2 gap-4 mt-4">
-                      <div className="bg-card dark:bg-black rounded-xl p-4 border border-border shadow-sm">
-                        <div className="font-bold text-foreground mb-1">{t("campaignDetail.bcpAccount")}</div>
-                        <div className="font-mono text-lg flex items-center justify-between">
-                          193-12345678-0-55
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => navigator.clipboard.writeText("193-12345678-0-55")}><Copy className="w-4 h-4"/></Button>
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">CCI: 00219312345678055</div>
-                      </div>
-                      <div className="bg-card dark:bg-black rounded-xl p-4 border border-border shadow-sm">
-                        <div className="font-bold text-foreground mb-1">Yape / Plin</div>
-                        <div className="font-mono text-lg flex items-center justify-between">
-                          921 615 737
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors" onClick={() => navigator.clipboard.writeText("987654321")}><Copy className="w-4 h-4"/></Button>
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">{t("campaignDetail.accountHolder", { name: "Juan Pérez (Red Solidaria)" })}</div>
-                      </div>
-                    </div>
-                  </div>
+                  <p className="mb-5 text-muted-foreground">
+                    Escríbenos por WhatsApp para coordinar tu aporte. El equipo lo registrará y podrás verlo en transparencia cuando esté confirmado.
+                  </p>
+                  <Button onClick={() => setIsDonationModalOpen(true)} className="rounded-xl">
+                    Consultar por WhatsApp
+                  </Button>
                 </section>
               )}
             </div>
