@@ -85,6 +85,7 @@ export default function AdminDonations() {
       (d.email ?? "").toLowerCase().includes(query) ||
       (d.campaignTitle ?? "").toLowerCase().includes(query) ||
       (d.paymentMethod ?? "").toLowerCase().includes(query) ||
+      (d.message ?? "").toLowerCase().includes(query) ||
       (d.collaborationType ? collaborationTypeLabel(d.collaborationType) : "")
         .toLowerCase()
         .includes(query)
@@ -227,9 +228,9 @@ export default function AdminDonations() {
           estimatedValue: Number(manualForm.estimatedValue || 0),
         }],
         campaignId: manualForm.campaignId ? Number(manualForm.campaignId) : null,
-        message: manualForm.message.trim() || (isMoney
-          ? "Aporte coordinado por WhatsApp y registrado por el equipo."
-          : "Aporte en especie coordinado por WhatsApp y registrado por el equipo."),
+        message: isMoney
+          ? (manualForm.message.trim() || "Aporte coordinado por WhatsApp y registrado por el equipo.")
+          : `${manualForm.quantity} ${manualForm.unit} ${manualForm.product === "otros" ? manualForm.productOther.trim() : manualForm.product}${manualForm.message.trim() ? ` — ${manualForm.message.trim()}` : ""}`,
         receiptNote: isMoney ? "Registro administrativo de aporte coordinado por WhatsApp" : undefined,
         anonymous: false,
         publicProof: false,
@@ -546,6 +547,7 @@ export default function AdminDonations() {
                         <div className="font-medium text-foreground">{d.firstName} {d.lastName}</div>
                         <div className="text-xs text-muted-foreground">{d.email}</div>
                         {d.phone && <div className="text-xs text-muted-foreground">{d.phone}</div>}
+                        {d.message && <div className="mt-1 max-w-[240px] text-xs text-muted-foreground">{d.message}</div>}
                       </div>
                     )}
                   </TableCell>
