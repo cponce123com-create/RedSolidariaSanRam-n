@@ -333,7 +333,6 @@ router.get("/campaigns/:id/donors", async (req, res) => {
         firstName: donationsTable.firstName,
         lastName: donationsTable.lastName,
         amount: donationsTable.amount,
-        message: donationsTable.message,
         anonymous: donationsTable.anonymous,
         publicProof: donationsTable.publicProof,
         receiptUrl: donationsTable.receiptUrl,

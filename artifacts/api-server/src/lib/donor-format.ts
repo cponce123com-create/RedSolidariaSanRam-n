@@ -5,7 +5,6 @@ export interface PublicDonorRow {
   firstName: string;
   lastName: string;
   amount: number;
-  message: string | null;
   anonymous: boolean;
   publicProof: boolean;
   receiptUrl: string | null;
@@ -18,7 +17,6 @@ export interface PublicDonor {
   id: number;
   name: string | null;
   amount: number;
-  message: string | null;
   date: string;
   publicProof: boolean;
   proofUrl: string | null;
@@ -47,7 +45,6 @@ export function formatPublicDonor(d: PublicDonorRow): PublicDonor {
     id: d.id,
     name: recognition.publishName ? `${d.firstName} ${d.lastName}`.trim() : null,
     amount: d.amount,
-    message: d.message,
     date: d.createdAt.toISOString(),
     publicProof: recognition.publishProof,
     proofUrl: recognition.publishProof ? d.receiptUrl : null,

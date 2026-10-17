@@ -15,6 +15,7 @@ import { toIsoSafe } from "../lib/date-format";
 import { formatExpense } from "./campaign-expenses";
 import { formatEvidence } from "./campaign-evidence";
 import { formatLeftover } from "./campaign-leftovers";
+import { canReadFinance } from "../middleware/roles";
 
 const router = Router();
 
@@ -199,11 +200,13 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
     // donaciones, así que una campaña con recaudación histórica mostraba 0.
     const funding = campaignFunding(campaign.raised, donationRow?.total_raised);
     const totalRaised = funding.reconciledRaised;
-    const isAdmin = Boolean(req.session?.adminUser);
+    // Solo roles con permiso contable reciben cifras privadas. Un moderador
+    // autenticado sigue viendo la misma proyección pública que cualquier visitante.
+    const financeReader = canReadFinance(req.session?.adminUser);
     const totalSpent = Number(expenseRow?.total_spent ?? 0);
     const publicSpent = Number(expenseRow?.public_spent ?? 0);
-    const reportedSpent = isAdmin ? totalSpent : publicSpent;
-    if (isAdmin) res.setHeader("Cache-Control", "private, no-store");
+    const reportedSpent = financeReader ? totalSpent : publicSpent;
+    if (req.session?.adminUser) res.setHeader("Cache-Control", "private, no-store");
     else res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     const goal = campaign.goal || 0;
 
@@ -224,11 +227,11 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
       donorCount: donationRow?.donor_count ?? 0,
       executionPercent: goal > 0 ? Math.min(100, Math.round((reportedSpent / goal) * 100)) : 0,
       raisedPercent: goal > 0 ? Math.min(100, Math.round((totalRaised / goal) * 100)) : 0,
-      expenseCount: isAdmin ? (expenseRow?.expense_count ?? 0) : (expenseRow?.public_expense_count ?? 0),
+      expenseCount: financeReader ? (expenseRow?.expense_count ?? 0) : (expenseRow?.public_expense_count ?? 0),
       publicExpenseCount: expenseRow?.public_expense_count ?? 0,
-      evidenceCount: isAdmin ? (evidenceRow?.evidence_count ?? 0) : (evidenceRow?.public_evidence_count ?? 0),
+      evidenceCount: financeReader ? (evidenceRow?.evidence_count ?? 0) : (evidenceRow?.public_evidence_count ?? 0),
       publicEvidenceCount: evidenceRow?.public_evidence_count ?? 0,
-      leftoverCount: isAdmin ? (leftoverRow?.leftover_count ?? 0) : (leftoverRow?.public_leftover_count ?? 0),
+      leftoverCount: financeReader ? (leftoverRow?.leftover_count ?? 0) : (leftoverRow?.public_leftover_count ?? 0),
       publicLeftoverCount: leftoverRow?.public_leftover_count ?? 0,
       publicExpenses: publicExpenses.map(formatExpense),
       publicEvidence: publicEvidence.map(formatEvidence),

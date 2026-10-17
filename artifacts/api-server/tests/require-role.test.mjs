@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { hasRole, requireRole, ROLES } from "./dist/middleware/roles.mjs";
+import { canReadFinance, hasRole, requireRole, ROLES } from "./dist/middleware/roles.mjs";
 
 function mockRes() {
   const res = { statusCode: 200, body: null };
@@ -27,6 +27,14 @@ test("hasRole: rol permitido pasa y no permitido falla", () => {
   assert.equal(hasRole({ role: "moderador" }, ROLES.ADMIN), false);
   assert.equal(hasRole(undefined, ROLES.ADMIN), false);
   assert.equal(hasRole({ role: null }, ROLES.ADMIN), false);
+});
+
+test("lectura contable: admin, supervisor y superadmin; nunca moderador", () => {
+  assert.equal(canReadFinance({ role: ROLES.ADMIN }), true);
+  assert.equal(canReadFinance({ role: ROLES.SUPERVISOR }), true);
+  assert.equal(canReadFinance({ role: ROLES.SUPERADMIN }), true);
+  assert.equal(canReadFinance({ role: ROLES.MODERATOR }), false);
+  assert.equal(canReadFinance(undefined), false);
 });
 
 test("requireRole: rechaza con 403 sin sesión", () => {

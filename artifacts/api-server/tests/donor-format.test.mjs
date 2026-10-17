@@ -7,7 +7,6 @@ const base = {
   firstName: "María",
   lastName: "Gómez",
   amount: 50,
-  message: null,
   anonymous: false,
   publicProof: false,
   receiptUrl: null,
@@ -17,6 +16,11 @@ const base = {
 test("donor: muestra nombre completo si no es anónimo", () => {
   const donor = formatPublicDonor({ ...base });
   assert.equal(donor.name, "María Gómez");
+});
+
+test("donor: no expone mensajes libres que pudieron contener notas internas", () => {
+  const donor = formatPublicDonor({ ...base, message: "Nota interna confidencial" });
+  assert.equal(Object.hasOwn(donor, "message"), false);
 });
 
 test("donor: oculta el nombre si la donación es anónima", () => {
