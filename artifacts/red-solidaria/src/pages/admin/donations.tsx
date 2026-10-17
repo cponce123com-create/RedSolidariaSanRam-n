@@ -44,7 +44,8 @@ export default function AdminDonations() {
   const [manualCampaigns, setManualCampaigns] = useState<{ id: number; title: string; status: string }[]>([]);
   const [manualForm, setManualForm] = useState({
     firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash",
-    campaignId: "", message: "",
+    collaborationType: "dinero", product: "panetones", productOther: "", quantity: "1",
+    unit: "unidad", estimatedValue: "", campaignId: "", message: "",
   });
   const proofFileRef = useRef<HTMLInputElement>(null);
 
@@ -208,17 +209,28 @@ export default function AdminDonations() {
     try {
       const email = manualForm.email.trim() ||
         `registro-${Date.now()}@sin-correo.redsolidaria.invalid`;
+      const isMoney = manualForm.collaborationType === "dinero";
       const payload = {
         firstName: manualForm.firstName.trim(),
         lastName: manualForm.lastName.trim(),
         email,
         phone: manualForm.phone.trim() || undefined,
-        amount: Number(manualForm.amount),
-        paymentMethod: manualForm.paymentMethod,
-        collaborationType: "dinero",
+        amount: isMoney ? Number(manualForm.amount) : 0,
+        paymentMethod: isMoney ? manualForm.paymentMethod : undefined,
+        collaborationType: manualForm.collaborationType,
+        items: isMoney ? undefined : [{
+          product: manualForm.product,
+          productOther: manualForm.product === "otros" ? manualForm.productOther.trim() : undefined,
+          quantity: Number(manualForm.quantity),
+          unit: manualForm.unit,
+          description: manualForm.message.trim() || undefined,
+          estimatedValue: Number(manualForm.estimatedValue || 0),
+        }],
         campaignId: manualForm.campaignId ? Number(manualForm.campaignId) : null,
-        message: manualForm.message.trim() || "Aporte coordinado por WhatsApp y registrado por el equipo.",
-        receiptNote: "Registro administrativo de aporte coordinado por WhatsApp",
+        message: manualForm.message.trim() || (isMoney
+          ? "Aporte coordinado por WhatsApp y registrado por el equipo."
+          : "Aporte en especie coordinado por WhatsApp y registrado por el equipo."),
+        receiptNote: isMoney ? "Registro administrativo de aporte coordinado por WhatsApp" : undefined,
         anonymous: false,
         publicProof: false,
         contactConsent: false,
@@ -236,7 +248,7 @@ export default function AdminDonations() {
         description: "Quedó pendiente de revisión. Adjunta el comprobante si corresponde y apruébalo para que aparezca en transparencia.",
       });
       setManualOpen(false);
-      setManualForm({ firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash", campaignId: "", message: "" });
+      setManualForm({ firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash", collaborationType: "dinero", product: "panetones", productOther: "", quantity: "1", unit: "unidad", estimatedValue: "", campaignId: "", message: "" });
       invalidateDonationQueries(queryClient);
     } catch (error) {
       setManualError(error instanceof Error ? error.message : "No se pudo registrar el aporte.");
@@ -353,9 +365,48 @@ export default function AdminDonations() {
               <label className="space-y-1 text-sm font-medium">WhatsApp (opcional)
                 <Input value={manualForm.phone} onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })} placeholder="9 dígitos" />
               </label>
-              <label className="space-y-1 text-sm font-medium">Monto recibido (S/)
-                <Input type="number" min="5" step="0.01" required value={manualForm.amount} onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })} />
+              <label className="space-y-1 text-sm font-medium">Tipo de aporte
+                <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.collaborationType} onChange={(e) => setManualForm({ ...manualForm, collaborationType: e.target.value })}>
+                  <option value="dinero">Dinero</option>
+                  <option value="productos">Productos</option>
+                </select>
               </label>
+              {manualForm.collaborationType === "dinero" ? (
+                <label className="space-y-1 text-sm font-medium">Monto recibido (S/)
+                  <Input type="number" min="5" step="0.01" required value={manualForm.amount} onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })} />
+                </label>
+              ) : (
+                <>
+                  <label className="space-y-1 text-sm font-medium">Producto
+                    <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.product} onChange={(e) => setManualForm({ ...manualForm, product: e.target.value })}>
+                      <option value="panetones">Panetones</option><option value="leche">Leche</option>
+                      <option value="chocolate">Chocolate</option><option value="arroz">Arroz</option>
+                      <option value="azucar">Azúcar</option><option value="aceite">Aceite</option>
+                      <option value="juguetes">Juguetes</option><option value="ropa">Ropa</option>
+                      <option value="otros">Otros</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1 text-sm font-medium">Cantidad y unidad
+                    <div className="flex gap-2">
+                      <Input type="number" min="0.001" step="0.001" required value={manualForm.quantity} onChange={(e) => setManualForm({ ...manualForm, quantity: e.target.value })} />
+                      <select className="h-10 rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.unit} onChange={(e) => setManualForm({ ...manualForm, unit: e.target.value })}>
+                        <option value="unidad">Unidad</option><option value="caja">Caja</option>
+                        <option value="paquete">Paquete</option><option value="saco">Saco</option>
+                        <option value="kilogramo">Kilogramo</option><option value="litro">Litro</option>
+                      </select>
+                    </div>
+                  </label>
+                  {manualForm.product === "otros" && (
+                    <label className="space-y-1 text-sm font-medium">Describe el producto
+                      <Input required minLength={2} maxLength={60} value={manualForm.productOther} onChange={(e) => setManualForm({ ...manualForm, productOther: e.target.value })} />
+                    </label>
+                  )}
+                  <label className="space-y-1 text-sm font-medium">Valor estimado (S/, opcional)
+                    <Input type="number" min="0" step="0.01" value={manualForm.estimatedValue} onChange={(e) => setManualForm({ ...manualForm, estimatedValue: e.target.value })} />
+                  </label>
+                </>
+              )}
+              {manualForm.collaborationType === "dinero" && (
               <label className="space-y-1 text-sm font-medium">Medio de recepción
                 <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.paymentMethod} onChange={(e) => setManualForm({ ...manualForm, paymentMethod: e.target.value })}>
                   <option value="cash">Efectivo</option>
@@ -365,6 +416,7 @@ export default function AdminDonations() {
                   <option value="transfer">Transferencia</option>
                 </select>
               </label>
+              )}
               <label className="space-y-1 text-sm font-medium sm:col-span-2">Campaña (opcional)
                 <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.campaignId} onChange={(e) => setManualForm({ ...manualForm, campaignId: e.target.value })}>
                   <option value="">Fondo general</option>
