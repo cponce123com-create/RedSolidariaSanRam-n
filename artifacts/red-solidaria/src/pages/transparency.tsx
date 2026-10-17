@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { Shield, Target, TrendingUp, Users, Receipt, ArrowRight, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import SEO from "@/components/shared/SEO";
 import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
