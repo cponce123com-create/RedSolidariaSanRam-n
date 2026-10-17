@@ -34,7 +34,7 @@ export default function HowToHelp() {
         t("howToHelp.moneyStep3"),
       ],
       cta: t("howToHelp.moneyCta"),
-      ctaHref: "/campanas",
+      ctaHref: whatsapp?.url ?? "/contacto",
       ctaStyle: "bg-red-500 hover:bg-red-600",
     },
     {
@@ -53,7 +53,7 @@ export default function HowToHelp() {
         t("howToHelp.productsStep3"),
       ],
       cta: t("howToHelp.productsCta"),
-      ctaHref: "/contacto",
+      ctaHref: whatsapp?.url ?? "/contacto",
       ctaStyle: "bg-blue-500 hover:bg-blue-600",
     },
     {
@@ -72,7 +72,7 @@ export default function HowToHelp() {
         t("howToHelp.animalFoodStep3"),
       ],
       cta: t("howToHelp.animalFoodCta"),
-      ctaHref: "/ayuda-animal",
+      ctaHref: whatsapp?.url ?? "/contacto",
       ctaStyle: "bg-amber-500 hover:bg-amber-600",
     },
     {
@@ -187,11 +187,19 @@ export default function HowToHelp() {
                 </div>
               ))}
             </div>
-            <Link href={way.ctaHref}>
-              <Button size="sm" className={`rounded-xl mt-auto gap-1.5 ${way.ctaStyle} text-white`}>
-                {way.cta} <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
-            </Link>
+            {way.ctaHref.startsWith("https://") ? (
+              <a href={way.ctaHref} target="_blank" rel="noopener noreferrer" className="mt-auto inline-flex">
+                <Button size="sm" className={`rounded-xl gap-1.5 ${way.ctaStyle} text-white`}>
+                  {way.cta} <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </a>
+            ) : (
+              <Link href={way.ctaHref}>
+                <Button size="sm" className={`rounded-xl mt-auto gap-1.5 ${way.ctaStyle} text-white`}>
+                  {way.cta} <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </Link>
+            )}
           </motion.div>
         ))}
       </div>
