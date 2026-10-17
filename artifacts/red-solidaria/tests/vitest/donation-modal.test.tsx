@@ -15,7 +15,7 @@ describe("DonationModal", () => {
 
     expect(screen.getByRole("heading", { name: "Coordina tu aporte por WhatsApp" })).toBeInTheDocument();
     const link = screen.getByRole("link", { name: /Escribir al WhatsApp/ });
-    expect(link).toHaveAttribute("href", expect.stringContaining("wa.me/51921615737"));
+    expect(link.getAttribute("href")).toContain("wa.me/51921615737");
     expect(decodeURIComponent(link.getAttribute("href") || "")).toContain("ChocoFest 2026");
     expect(screen.queryByRole("button", { name: /Confirmar donación/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/correo/i)).not.toBeInTheDocument();
