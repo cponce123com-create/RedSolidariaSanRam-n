@@ -101,6 +101,7 @@ export default function Transparency() {
             titleClassName="text-4xl font-display font-black mb-3"
             subtitleClassName="text-muted-foreground max-w-2xl mx-auto"
           />
+        </div>
 
         <div className="mb-10 flex justify-center">
           <ShareButtons
