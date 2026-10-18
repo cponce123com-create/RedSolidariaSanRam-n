@@ -161,12 +161,21 @@ const budgetSchema = z.object({
   isPublic: z.boolean().default(true),
 });
 
+type CampaignTab = "info" | "gallery" | "updates" | "gastos" | "evidencias" | "sobrantes";
+const CAMPAIGN_TABS: readonly CampaignTab[] = ["info", "gallery", "updates", "gastos", "evidencias", "sobrantes"];
+
+function initialCampaignTab(): CampaignTab {
+  if (typeof window === "undefined") return "info";
+  const section = new URLSearchParams(window.location.search).get("section");
+  return CAMPAIGN_TABS.includes(section as CampaignTab) ? (section as CampaignTab) : "info";
+}
+
 export default function AdminCampaignDetail() {
   const { id } = useParams();
   const campaignId = Number(id);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"info"|"gallery"|"updates"|"gastos"|"evidencias"|"sobrantes">("info");
+  const [activeTab, setActiveTab] = useState<CampaignTab>(initialCampaignTab);
 
   const { data: campaign, isLoading } = useGetCampaign(campaignId);
   const { data: images } = useGetCampaignImages(campaignId);
@@ -570,7 +579,18 @@ export default function AdminCampaignDetail() {
               </div>
 
               <FormField control={infoForm.control} name="imageUrl" render={({ field }) => (
-                <FormItem><FormLabel>URL de Imagen de Portada</FormLabel><FormControl><Input className="rounded-xl bg-secondary/30" value={field.value || ""} onChange={field.onChange} placeholder="https://..."/></FormControl></FormItem>
+                <FormItem className="rounded-2xl border border-border bg-secondary/20 p-4 md:p-5">
+                  <FormLabel>Portada de la campaña</FormLabel>
+                  <ImageUploadField
+                    value={field.value}
+                    onChange={(url) => field.onChange(url)}
+                    label="Sube una imagen de portada o pega una URL"
+                    previewSize={144}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    La portada se mostrará en las tarjetas y página pública de la campaña. Después de subirla, pulsa «Guardar cambios» para publicarla.
+                  </p>
+                </FormItem>
               )} />
 
               {/* Geolocalización (vista de mapa — fase 2 del rediseño) */}

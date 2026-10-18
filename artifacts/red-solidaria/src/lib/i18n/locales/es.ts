@@ -1390,7 +1390,7 @@ export const es = {
     readinessProgress: "{{done}} de {{total}} secciones listas ({{percent}}%)",
     readinessReady: "Todo listo para difundir el evento",
     readinessNote:
-      "Cada punto se calcula con datos reales: cuando la sección tenga contenido, se marcará sola.",
+      "Cada punto se calcula con datos reales. Pulsa una sección pendiente para abrir dónde completarla; los cambios se reflejan aquí al guardar.",
     detailsObjectives: "Objetivos del evento",
     detailsObjectivesHint: "Se publica en la sección de objetivos de la página del evento",
     detailsOrganizers: "Equipo responsable",
