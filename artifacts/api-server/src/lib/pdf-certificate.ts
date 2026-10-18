@@ -21,7 +21,8 @@ const ACCENT = rgb(0.15, 0.39, 0.32);
 const DANGER = rgb(0.68, 0.15, 0.15);
 const GOLD = rgb(0.68, 0.55, 0.25);
 
-const A4_LANDSCAPE: [number, number] = [841.89, 595.28];
+// Mantiene la proporción 3:2 de la plantilla original para que no se deforme.
+const CERTIFICATE_PAGE: [number, number] = [841.89, (841.89 * 1024) / 1536];
 const CHOCOFEST_TEMPLATE = new URL("./assets/certificate-chocofest-2026.jpg", import.meta.url);
 
 export interface CertificatePdfInput {
@@ -66,69 +67,53 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
   doc.setCreator("Panel administrativo");
   doc.setSubject(toWinAnsi(`Certificado ${input.code}`));
 
-  const page = doc.addPage(A4_LANDSCAPE);
+  const page = doc.addPage(CERTIFICATE_PAGE);
   const { width, height } = page.getSize();
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const margin = 34;
+  const margin = 28;
 
-  // Plantilla ChocoFest 2026 proporcionada por la organización. Se ajusta a A4
-  // horizontal para impresión; el nombre y el QR ocupan el recuadro vacío.
+  // Plantilla ChocoFest 2026 proporcionada por la organización. Conservamos
+  // su proporción 3:2 y resolución; el nombre y el QR van en los espacios vacíos.
   const templateBytes = await readFile(CHOCOFEST_TEMPLATE);
   const template = await doc.embedJpg(templateBytes);
   page.drawImage(template, { x: 0, y: 0, width, height });
 
-  // El QR ocupa una tarjeta propia en el margen inferior derecho. Así queda
-  // separado del nombre y con tamaño suficiente para escanearlo desde el papel.
-  const qrCard = { x: width - 34 - 180, y: 40, width: 180, height: 112 };
-  const qrSize = 78;
-  const qrX = qrCard.x + qrCard.width - qrSize - 11;
-  const qrY = qrCard.y + 17;
-  const holderArea = { x: width * 0.34, y: height * 0.45, width: width * 0.55 };
+  // Coordenadas medidas sobre la plantilla 1536×1024, convertidas a puntos.
+  // El QR llena el recuadro blanco reservado del sello de verificación.
+  const imageScale = width / 1536;
+  const holderArea = {
+    x: 454 * imageScale,
+    y: height - 583 * imageScale,
+    width: (1082 - 454) * imageScale,
+    height: (583 - 519) * imageScale,
+  };
+  const qrSize = 138 * imageScale;
+  const qrCenterX = 1342 * imageScale;
+  const qrCenterY = height - 704 * imageScale;
+  const qrX = qrCenterX - qrSize / 2;
+  const qrY = qrCenterY - qrSize / 2;
 
   const safeHolder = toWinAnsi(input.holderName);
-  let holderSize = 24;
+  let holderSize = 27;
   while (holderSize > 13 && bold.widthOfTextAtSize(safeHolder, holderSize) > holderArea.width) {
     holderSize -= 1;
   }
   page.drawText(safeHolder, {
     x: holderArea.x + Math.max(0, (holderArea.width - bold.widthOfTextAtSize(safeHolder, holderSize)) / 2),
-    y: holderArea.y,
+    y: holderArea.y + (holderArea.height - holderSize) / 2,
     size: holderSize,
     font: bold,
     color: ACCENT,
   });
 
-  page.drawRectangle({
-    ...qrCard,
-    color: rgb(1, 1, 1),
-    borderColor: GOLD,
-    borderWidth: 1,
+  const qrPng = await QRCode.toBuffer(input.verificationUrl, {
+    type: "png",
+    width: 840,
+    margin: 1,
+    errorCorrectionLevel: "H",
   });
-  const qrPng = await QRCode.toBuffer(input.verificationUrl, { type: "png", width: 420, margin: 2 });
   const qrImage = await doc.embedPng(qrPng);
   page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
-  const labelX = qrCard.x + 12;
-  page.drawText("VERIFICA AQUÍ", {
-    x: labelX,
-    y: qrCard.y + 82,
-    size: 8,
-    font: bold,
-    color: ACCENT,
-  });
-  page.drawText("Escanea el QR", {
-    x: labelX,
-    y: qrCard.y + 66,
-    size: 6.5,
-    font: bold,
-    color: ACCENT,
-  });
-  page.drawText(toWinAnsi(`Código: ${input.code}`), {
-    x: labelX,
-    y: qrCard.y + 48,
-    size: 5.5,
-    font: bold,
-    color: ACCENT,
-  });
 
   const centerX = width / 2;
   // ─── Sello de ANULADO ──────────────────────────────────────────────────────

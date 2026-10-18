@@ -50,7 +50,7 @@ test("la revocación se reconoce por estado O por fecha", () => {
   assert.equal(isRevokedCertificate({ status: "issued", revokedAt: new Date() }), true);
 });
 
-test("el certificado vigente es un PDF A4 horizontal válido y releíble", async () => {
+test("el certificado conserva la proporción 3:2 de la plantilla y es releíble", async () => {
   const { bytes, filename } = await renderCertificatePdf(BASE);
   assert.equal(Buffer.from(bytes.slice(0, 5)).toString(), "%PDF-");
   assert.equal(Buffer.from(bytes.slice(-5)).toString().trim(), "%%EOF");
@@ -61,7 +61,8 @@ test("el certificado vigente es un PDF A4 horizontal válido y releíble", async
   assert.equal(doc.getPageCount(), 1);
   const { width, height } = doc.getPages()[0].getSize();
   assert.equal(Math.round(width), 842);
-  assert.equal(Math.round(height), 595);
+  assert.equal(Math.round(height), 561);
+  assert.ok(Math.abs(width / height - 1.5) < 0.002, "no debe deformar la plantilla 3:2");
   assert.match(doc.getTitle() ?? "", /Constancia de donación/);
   const content = await drawnContent(bytes);
   const encodedName = Buffer.from(BASE.holderName, "latin1").toString("hex").toUpperCase();
