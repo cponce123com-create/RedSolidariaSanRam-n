@@ -25,25 +25,22 @@ const BASE = {
   verificationUrl: "https://redsolidaria.org/certificados/CERT-2026-0001",
 };
 
-/** Extrae el contenido dibujado (descomprimido) para poder inspeccionarlo. */
-function drawnContent(bytes) {
-  const raw = Buffer.from(bytes);
-  const parts = [];
-  for (let cursor = 0; ; ) {
-    const keyword = raw.indexOf("stream", cursor);
-    if (keyword < 0) break;
-    const end = raw.indexOf("endstream", keyword);
-    if (end < 0) break;
-    let start = keyword + "stream".length;
-    while (start < end && (raw[start] === 0x0d || raw[start] === 0x0a)) start += 1;
-    try {
-      parts.push(zlib.inflateSync(raw.subarray(start, end)).toString("latin1"));
-    } catch {
-      /* flujo no comprimido con zlib */
-    }
-    cursor = end + 1;
-  }
-  return parts.join(" ");
+/** Extrae los streams reales de contenido (sin confundirlos con el JPEG base). */
+async function drawnContent(bytes) {
+  const doc = await PDFDocument.load(bytes);
+  const page = doc.getPages()[0];
+  const contents = doc.context.lookup(page.node.Contents());
+  const refs = typeof contents?.asArray === "function" ? contents.asArray() : [page.node.Contents()];
+  return refs
+    .map((ref) => {
+      const stream = doc.context.lookup(ref);
+      try {
+        return zlib.inflateSync(stream.contents).toString("latin1");
+      } catch {
+        return Buffer.from(stream.contents).toString("latin1");
+      }
+    })
+    .join(" ");
 }
 
 test("la revocación se reconoce por estado O por fecha", () => {
@@ -58,7 +55,7 @@ test("el certificado vigente es un PDF A4 horizontal válido y releíble", async
   assert.equal(Buffer.from(bytes.slice(0, 5)).toString(), "%PDF-");
   assert.equal(Buffer.from(bytes.slice(-5)).toString().trim(), "%%EOF");
   assert.equal(filename, "certificado-CERT-2026-0001.pdf");
-  assert.ok(bytes.length > 2000, `demasiado pequeño: ${bytes.length}`);
+  assert.ok(bytes.length > 200_000, `debe incluir la plantilla gráfica: ${bytes.length}`);
 
   const doc = await PDFDocument.load(bytes);
   assert.equal(doc.getPageCount(), 1);
@@ -66,11 +63,14 @@ test("el certificado vigente es un PDF A4 horizontal válido y releíble", async
   assert.equal(Math.round(width), 842);
   assert.equal(Math.round(height), 595);
   assert.match(doc.getTitle() ?? "", /Constancia de donación/);
+  const content = await drawnContent(bytes);
+  const encodedName = Buffer.from(BASE.holderName, "latin1").toString("hex").toUpperCase();
+  assert.ok(content.includes(`<${encodedName}> Tj`), "el nombre del donante debe estar impreso sobre la plantilla");
 });
 
 test("un certificado vigente NO lleva el sello de anulado", async () => {
   const { bytes } = await renderCertificatePdf(BASE);
-  const content = drawnContent(bytes);
+  const content = await drawnContent(bytes);
   assert.ok(!content.includes("ANULADO"), "un certificado vigente no debe llevar el sello");
   assert.ok(!/certificado-anulado/.test("certificado-" + BASE.code), "el nombre no debe decir anulado");
 });
@@ -87,7 +87,7 @@ test("un certificado REVOCADO sale marcado como ANULADO y con su motivo", async 
 
   // El texto va codificado por pdf-lib, así que se comprueba el RASTRO del sello: el
   // color de peligro y el texto de anulación deben estar dibujados.
-  const content = drawnContent(bytes);
+  const content = await drawnContent(bytes);
   assert.ok(content.length > 500, "debe haber contenido dibujado");
   assert.ok(content.includes("Tj"), "el sello se dibuja como texto");
   assert.ok(/0\.68 0\.15 0\.15/.test(content), "el rojo de anulación debe estar en el contenido");

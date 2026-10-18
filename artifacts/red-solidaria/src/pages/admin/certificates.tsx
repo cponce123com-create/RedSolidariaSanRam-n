@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Award, Copy, Loader2, Plus, QrCode, RefreshCw, XCircle } from "lucide-react";
+import { Award, Copy, Download, Loader2, Plus, QrCode, RefreshCw, Share2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -257,6 +257,22 @@ export default function AdminCertificates() {
                             <Copy className="w-4 h-4" aria-hidden />
                             Enlace
                           </Button>
+                          <a href={`/api/certificates/${encodeURIComponent(cert.code)}/pdf`}>
+                            <Button variant="ghost" size="sm" className="gap-1" title="Descargar certificado PDF">
+                              <Download className="w-4 h-4" aria-hidden />
+                              PDF
+                            </Button>
+                          </a>
+                          <a
+                            href={`https://wa.me/?text=${encodeURIComponent(`Certificado de agradecimiento para ${cert.holderName}. Verifica su autenticidad aquí: ${window.location.origin}/certificados/${cert.code}`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Button variant="ghost" size="sm" className="gap-1" title="Compartir por WhatsApp">
+                              <Share2 className="w-4 h-4" aria-hidden />
+                              WhatsApp
+                            </Button>
+                          </a>
                           <a
                             href={`/certificados/${cert.code}`}
                             target="_blank"
@@ -307,7 +323,7 @@ export default function AdminCertificates() {
                 id="holderName"
                 value={holderName}
                 onChange={(event) => setHolderName(event.target.value)}
-                placeholder="Nombre de la persona o entidad"
+                placeholder="Persona, familia (Familia Pérez) o empresa"
                 maxLength={160}
               />
             </div>

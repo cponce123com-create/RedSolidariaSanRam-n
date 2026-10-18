@@ -1,5 +1,5 @@
 import { build } from "esbuild";
-import { rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import esbuildPluginPino from "esbuild-plugin-pino";
@@ -11,6 +11,8 @@ globalThis.__dirname = new URL(".", import.meta.url).pathname;
 
 // Limpia salidas previas para no dejar módulos stale que rompan los tests
 rmSync("tests/dist", { recursive: true, force: true });
+mkdirSync("tests/dist/lib/assets", { recursive: true });
+copyFileSync("src/assets/certificate-chocofest-2026.jpg", "tests/dist/lib/assets/certificate-chocofest-2026.jpg");
 
 // Compila los módulos bajo test a JS puro para que node:test funcione
 // en cualquier versión de Node (sin depender de type-stripping).

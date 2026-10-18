@@ -1,4 +1,5 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import { readFile } from "node:fs/promises";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import QRCode from "qrcode";
 import { toWinAnsi } from "./pdf-closure-report";
 
@@ -16,14 +17,11 @@ import { toWinAnsi } from "./pdf-closure-report";
  * seguir usándolo.
  */
 
-const INK = rgb(0.11, 0.13, 0.16);
-const MUTED = rgb(0.44, 0.47, 0.52);
 const ACCENT = rgb(0.15, 0.39, 0.32);
-const GOLD = rgb(0.68, 0.55, 0.25);
 const DANGER = rgb(0.68, 0.15, 0.15);
-const PAPER = rgb(0.99, 0.98, 0.96);
 
 const A4_LANDSCAPE: [number, number] = [841.89, 595.28];
+const CHOCOFEST_TEMPLATE = new URL("./assets/certificate-chocofest-2026.jpg", import.meta.url);
 
 export interface CertificatePdfInput {
   code: string;
@@ -52,23 +50,6 @@ function formatDate(value: Date | string | null): string {
   return date.toISOString().slice(0, 10);
 }
 
-function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let current = "";
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
-    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
-      current = candidate;
-    } else {
-      if (current) lines.push(current);
-      current = word;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
-
 /** ¿Está revocado? La revocación se reconoce por estado o por fecha de revocación. */
 export function isRevokedCertificate(input: Pick<CertificatePdfInput, "status" | "revokedAt">): boolean {
   return input.status === "revoked" || input.revokedAt !== null;
@@ -86,120 +67,45 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
 
   const page = doc.addPage(A4_LANDSCAPE);
   const { width, height } = page.getSize();
-  const regular = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const italic = await doc.embedFont(StandardFonts.HelveticaOblique);
   const margin = 34;
 
-  // Fondo y doble marco: el documento se ve como un certificado, no como un informe.
-  page.drawRectangle({ x: 0, y: 0, width, height, color: PAPER });
-  page.drawRectangle({
-    x: margin,
-    y: margin,
-    width: width - margin * 2,
-    height: height - margin * 2,
-    borderColor: GOLD,
-    borderWidth: 2,
-  });
-  page.drawRectangle({
-    x: margin + 6,
-    y: margin + 6,
-    width: width - margin * 2 - 12,
-    height: height - margin * 2 - 12,
-    borderColor: GOLD,
-    borderWidth: 0.5,
-  });
+  // Plantilla ChocoFest 2026 proporcionada por la organización. Se ajusta a A4
+  // horizontal para impresión; el nombre y el QR ocupan el recuadro vacío.
+  const templateBytes = await readFile(CHOCOFEST_TEMPLATE);
+  const template = await doc.embedJpg(templateBytes);
+  page.drawImage(template, { x: 0, y: 0, width, height });
 
-  const centerX = width / 2;
-  const centered = (text: string, font: PDFFont, size: number, y: number, color = INK) => {
-    const safe = toWinAnsi(text);
-    page.drawText(safe, { x: centerX - font.widthOfTextAtSize(safe, size) / 2, y, size, font, color });
-  };
+  const qrSize = 47;
+  const qrX = width * 0.816;
+  const qrY = height * 0.425;
+  const holderArea = { x: width * 0.37, y: height * 0.45, width: width * 0.43 };
 
-  // ─── Encabezado ────────────────────────────────────────────────────────────
-  centered(orgName.toUpperCase(), bold, 13, height - 78, ACCENT);
-  centered("Otorga el presente", regular, 10, height - 96, MUTED);
-
-  // ─── Título y destinatario ─────────────────────────────────────────────────
-  const titleLines = wrap(toWinAnsi(input.title), bold, 26, width - margin * 2 - 120);
-  let y = height - 140;
-  for (const line of titleLines.slice(0, 2)) {
-    centered(line, bold, 26, y, INK);
-    y -= 32;
+  const safeHolder = toWinAnsi(input.holderName);
+  let holderSize = 24;
+  while (holderSize > 13 && bold.widthOfTextAtSize(safeHolder, holderSize) > holderArea.width) {
+    holderSize -= 1;
   }
-  y -= 4;
-  centered("a", italic, 11, y, MUTED);
-  y -= 30;
-  const holderLines = wrap(toWinAnsi(input.holderName), bold, 22, width - margin * 2 - 160);
-  for (const line of holderLines.slice(0, 2)) {
-    centered(line, bold, 22, y, ACCENT);
-    y -= 27;
-  }
-  // Línea bajo el nombre, como en un certificado impreso.
-  page.drawLine({
-    start: { x: centerX - 200, y: y + 12 },
-    end: { x: centerX + 200, y: y + 12 },
-    thickness: 0.5,
-    color: GOLD,
-  });
-
-  // ─── Descripción ───────────────────────────────────────────────────────────
-  if (input.description) {
-    y -= 14;
-    for (const line of wrap(toWinAnsi(input.description), regular, 10, width - margin * 2 - 200).slice(0, 4)) {
-      centered(line, regular, 10, y, INK);
-      y -= 14;
-    }
-  }
-
-  // ─── Pie: fecha, código y verificación ─────────────────────────────────────
-  const footerY = margin + 62;
-  page.drawText(toWinAnsi(`Emitido el ${formatDate(input.issuedAt)}`), {
-    x: margin + 40,
-    y: footerY,
-    size: 9,
-    font: regular,
-    color: MUTED,
-  });
-  page.drawText(toWinAnsi(`Código: ${input.code}`), {
-    x: margin + 40,
-    y: footerY - 13,
-    size: 9,
+  page.drawText(safeHolder, {
+    x: holderArea.x + Math.max(0, (holderArea.width - bold.widthOfTextAtSize(safeHolder, holderSize)) / 2),
+    y: holderArea.y,
+    size: holderSize,
     font: bold,
-    color: INK,
-  });
-  page.drawText(toWinAnsi(`Tipo: ${input.type}`), {
-    x: margin + 40,
-    y: footerY - 26,
-    size: 8,
-    font: regular,
-    color: MUTED,
-  });
-
-  const qrSize = 74;
-  const qrX = width - margin - 40 - qrSize;
-  try {
-    const qrPng = await QRCode.toBuffer(input.verificationUrl, { type: "png", width: 320, margin: 1 });
-    const qrImage = await doc.embedPng(qrPng);
-    page.drawImage(qrImage, { x: qrX, y: footerY - 22, width: qrSize, height: qrSize });
-    page.drawText("Comprueba su autenticidad", {
-      x: qrX - 4,
-      y: footerY + qrSize - 16,
-      size: 7.5,
-      font: regular,
-      color: MUTED,
-    });
-  } catch {
-    page.drawText("Verifica en la web", { x: qrX, y: footerY + 20, size: 8, font: regular, color: MUTED });
-  }
-  page.drawText(toWinAnsi(input.verificationUrl), {
-    x: margin + 40,
-    y: margin + 40,
-    size: 7.5,
-    font: regular,
     color: ACCENT,
   });
 
+  const qrPng = await QRCode.toBuffer(input.verificationUrl, { type: "png", width: 320, margin: 1 });
+  const qrImage = await doc.embedPng(qrPng);
+  page.drawRectangle({
+    x: qrX - 3,
+    y: qrY - 3,
+    width: qrSize + 6,
+    height: qrSize + 6,
+    color: rgb(1, 1, 1),
+  });
+  page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+
+  const centerX = width / 2;
   // ─── Sello de ANULADO ──────────────────────────────────────────────────────
   if (revoked) {
     // Se dibuja en diagonal, en grande y sin ambigüedad: quien tenga el papel impreso
@@ -216,8 +122,9 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
       opacity: 0.28,
       rotate: { type: "degrees", angle: 18 } as never,
     });
-    page.drawText(toWinAnsi(`Certificado anulado el ${formatDate(input.revokedAt)}`), {
-      x: centerX - regular.widthOfTextAtSize(toWinAnsi(`Certificado anulado el ${formatDate(input.revokedAt)}`), 10) / 2,
+    const revokedText = toWinAnsi(`Certificado anulado el ${formatDate(input.revokedAt)}`);
+    page.drawText(revokedText, {
+      x: centerX - bold.widthOfTextAtSize(revokedText, 10) / 2,
       y: margin + 108,
       size: 10,
       font: bold,
@@ -226,10 +133,10 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
     if (input.revocationReason) {
       const reason = toWinAnsi(`Motivo: ${input.revocationReason}`);
       page.drawText(reason, {
-        x: centerX - regular.widthOfTextAtSize(reason, 9) / 2,
+        x: centerX - bold.widthOfTextAtSize(reason, 9) / 2,
         y: margin + 94,
         size: 9,
-        font: regular,
+        font: bold,
         color: DANGER,
       });
     }
