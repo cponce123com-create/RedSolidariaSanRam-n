@@ -130,7 +130,19 @@ router.post("/admin/reports/:id/convert", async (req, res) => {
 // ─── ADMIN: Delete report ─────────────────────────────────────────────────────
 router.delete("/admin/reports/:id", async (req, res) => {
   const id = Number(req.params.id);
-  await db.delete(communityReportsTable).where(eq(communityReportsTable.id, id));
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({
+      error: "validation_error",
+      message: "El identificador del reporte no es válido.",
+    });
+  }
+  const [deleted] = await db
+    .delete(communityReportsTable)
+    .where(eq(communityReportsTable.id, id))
+    .returning({ id: communityReportsTable.id });
+  if (!deleted) {
+    return res.status(404).json({ error: "not_found", message: "Reporte no encontrado." });
+  }
   return res.status(204).send();
 });
 

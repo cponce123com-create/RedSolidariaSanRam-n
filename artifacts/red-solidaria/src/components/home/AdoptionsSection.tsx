@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { optimizeImageUrl } from "@/lib/image-url";
+import { HOME_PETS_KEY } from "@/lib/query-keys";
 import { SectionContainer, SectionHeading } from "./SectionHeading";
 
 /** Subconjunto de Pet devuelto por GET /api/pets. */
@@ -30,7 +31,7 @@ export function AdoptionsSection() {
   const { t } = useTranslation();
 
   const { data: pets, isLoading } = useQuery<HomePet[]>({
-    queryKey: ["home-pets-available"],
+    queryKey: [HOME_PETS_KEY],
     queryFn: async () => {
       const res = await fetch("/api/pets?status=available");
       if (!res.ok) throw new Error("failed");

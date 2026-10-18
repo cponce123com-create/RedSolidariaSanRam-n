@@ -103,3 +103,14 @@ test("POST /api/admin/reports/:id/convert con tipos inválidos → 400 (schema Z
     assert.equal(body.message, "Datos inválidos");
   });
 });
+
+test("DELETE /api/admin/reports/:id con ID inválido → 400 antes de tocar la DB", async () => {
+  const mod = await fresh("community-reports", "delete-invalid-id");
+  await withServer(buildApp(mod.default), async (base) => {
+    const res = await fetch(`${base}/api/admin/reports/no-es-un-id`, { method: "DELETE" });
+    assert.equal(res.status, 400);
+    const body = await res.json();
+    assert.equal(body.error, "validation_error");
+    assert.equal(body.message, "El identificador del reporte no es válido.");
+  });
+});

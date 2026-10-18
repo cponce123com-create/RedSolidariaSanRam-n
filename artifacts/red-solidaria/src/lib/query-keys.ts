@@ -32,9 +32,14 @@ export const ADMIN_SETTINGS_KEY = "admin-settings";
 // de caché y la web pública leía otra distinta: el cambio no se reflejaba.
 export const PETS_KEY = "/api/pets";
 export const ADMIN_PETS_KEY = "/api/admin/pets";
+// Claves de secciones de portada que no usan una ruta API como encabezado.
+// Deben participar en la misma invalidación para que bajas/cambios hechos en
+// el panel se reflejen también en la portada, no solo en los listados públicos.
+export const HOME_PETS_KEY = "home-pets-available";
 export const NEWS_KEY = "/api/news";
 export const ADMIN_REPORTS_KEY = "/api/admin/reports";
 export const REPORTS_KEY = "/api/reports";
+export const HOME_FEATURED_REPORTS_KEY = "home-featured-reports";
 export const FAQ_KEY = "/api/faq";
 export const ADMIN_FAQ_KEY = "/api/admin/faq";
 export const TESTIMONIALS_KEY = "/api/testimonials";
@@ -94,6 +99,7 @@ export function isSettingsQueryKey(key: readonly unknown[]): boolean {
 /** Mascotas (pública + panel) y solicitudes de adopción. */
 export function isPetQueryKey(key: readonly unknown[]): boolean {
   return (
+    key[0] === HOME_PETS_KEY ||
     headIs(key, PETS_KEY) ||
     headIs(key, ADMIN_PETS_KEY) ||
     headIs(key, ADOPTION_REQUESTS_KEY)
@@ -117,7 +123,11 @@ export function isFaqQueryKey(key: readonly unknown[]): boolean {
 
 /** Reportes ciudadanos: listado público y panel. */
 export function isReportQueryKey(key: readonly unknown[]): boolean {
-  return headIs(key, REPORTS_KEY) || headIs(key, ADMIN_REPORTS_KEY);
+  return (
+    key[0] === HOME_FEATURED_REPORTS_KEY ||
+    headIs(key, REPORTS_KEY) ||
+    headIs(key, ADMIN_REPORTS_KEY)
+  );
 }
 
 /** Identidad institucional: vista pública y borrador administrativo. */
