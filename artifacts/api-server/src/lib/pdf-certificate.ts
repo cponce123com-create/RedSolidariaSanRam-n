@@ -19,6 +19,7 @@ import { toWinAnsi } from "./pdf-closure-report";
 
 const ACCENT = rgb(0.15, 0.39, 0.32);
 const DANGER = rgb(0.68, 0.15, 0.15);
+const GOLD = rgb(0.68, 0.55, 0.25);
 
 const A4_LANDSCAPE: [number, number] = [841.89, 595.28];
 const CHOCOFEST_TEMPLATE = new URL("./assets/certificate-chocofest-2026.jpg", import.meta.url);
@@ -76,10 +77,13 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
   const template = await doc.embedJpg(templateBytes);
   page.drawImage(template, { x: 0, y: 0, width, height });
 
-  const qrSize = 47;
-  const qrX = width * 0.816;
-  const qrY = height * 0.425;
-  const holderArea = { x: width * 0.37, y: height * 0.45, width: width * 0.43 };
+  // El QR ocupa una tarjeta propia en el margen inferior derecho. Así queda
+  // separado del nombre y con tamaño suficiente para escanearlo desde el papel.
+  const qrCard = { x: width - 34 - 180, y: 40, width: 180, height: 112 };
+  const qrSize = 78;
+  const qrX = qrCard.x + qrCard.width - qrSize - 11;
+  const qrY = qrCard.y + 17;
+  const holderArea = { x: width * 0.34, y: height * 0.45, width: width * 0.55 };
 
   const safeHolder = toWinAnsi(input.holderName);
   let holderSize = 24;
@@ -94,16 +98,37 @@ export async function renderCertificatePdf(input: CertificatePdfInput): Promise<
     color: ACCENT,
   });
 
-  const qrPng = await QRCode.toBuffer(input.verificationUrl, { type: "png", width: 320, margin: 1 });
-  const qrImage = await doc.embedPng(qrPng);
   page.drawRectangle({
-    x: qrX - 3,
-    y: qrY - 3,
-    width: qrSize + 6,
-    height: qrSize + 6,
+    ...qrCard,
     color: rgb(1, 1, 1),
+    borderColor: GOLD,
+    borderWidth: 1,
   });
+  const qrPng = await QRCode.toBuffer(input.verificationUrl, { type: "png", width: 420, margin: 2 });
+  const qrImage = await doc.embedPng(qrPng);
   page.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize });
+  const labelX = qrCard.x + 12;
+  page.drawText("VERIFICA AQUÍ", {
+    x: labelX,
+    y: qrCard.y + 82,
+    size: 8,
+    font: bold,
+    color: ACCENT,
+  });
+  page.drawText("Escanea el QR", {
+    x: labelX,
+    y: qrCard.y + 66,
+    size: 6.5,
+    font: bold,
+    color: ACCENT,
+  });
+  page.drawText(toWinAnsi(`Código: ${input.code}`), {
+    x: labelX,
+    y: qrCard.y + 48,
+    size: 5.5,
+    font: bold,
+    color: ACCENT,
+  });
 
   const centerX = width / 2;
   // ─── Sello de ANULADO ──────────────────────────────────────────────────────
