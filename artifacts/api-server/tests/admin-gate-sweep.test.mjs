@@ -47,6 +47,8 @@ const ADMIN_WRITE_PATHS = [
   ["PUT", "/api/admin/settings"],
   ["PATCH", "/api/admin/campaigns/1"],
   ["DELETE", "/api/admin/campaigns/1"],
+  ["DELETE", "/api/admin/pets/1"],
+  ["DELETE", "/api/admin/reports/1"],
   ["POST", "/api/admin/users"],
   ["POST", "/api/admin/uploads"],
 ];

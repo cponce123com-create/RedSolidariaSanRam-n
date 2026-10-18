@@ -165,6 +165,7 @@ test("V15: predicados de mascotas, noticias, testimonios, FAQ, reportes e identi
   assert.equal(isPetQueryKey(["/api/admin/pets", "available"]), true);
   assert.equal(isPetQueryKey(["/api/admin/pets/5"]), true);
   assert.equal(isPetQueryKey(["/api/admin/adoption-requests"]), true);
+  assert.equal(isPetQueryKey(["home-pets-available"]), true);
   assert.equal(isPetQueryKey(["/api/news"]), false);
 
   assert.equal(isNewsQueryKey(["/api/news"]), true);
@@ -180,6 +181,7 @@ test("V15: predicados de mascotas, noticias, testimonios, FAQ, reportes e identi
   assert.equal(isReportQueryKey(["/api/reports"]), true);
   assert.equal(isReportQueryKey(["/api/admin/reports"]), true);
   assert.equal(isReportQueryKey(["/api/admin/reports/5"]), true);
+  assert.equal(isReportQueryKey(["home-featured-reports"]), true);
 
   assert.equal(isIdentityQueryKey(["institutional-identity"]), true);
   assert.equal(isIdentityQueryKey(["admin-institutional-identity"]), true);
@@ -187,7 +189,7 @@ test("V15: predicados de mascotas, noticias, testimonios, FAQ, reportes e identi
 });
 
 test("V15: invalidar mascotas refresca panel, web pública y solicitudes", async () => {
-  const { invalidatePetQueries, invalidateNewsQueries, invalidateIdentityQueries } =
+  const { invalidatePetQueries, invalidateNewsQueries, invalidateIdentityQueries, invalidateReportQueries } =
     await import("./dist/query-invalidation.mjs");
 
   const client = fakeQueryClient();
@@ -197,6 +199,9 @@ test("V15: invalidar mascotas refresca panel, web pública y solicitudes", async
   assert.equal(matched(client, ["/api/pets"]), true);
   assert.equal(matched(client, ["/api/admin/pets/5"]), true);
   assert.equal(matched(client, ["/api/admin/adoption-requests"]), true);
+  // La portada usa una clave propia en vez de una ruta, así que también debe
+  // invalidarse al borrar o cambiar el estado de una mascota.
+  assert.equal(matched(client, ["home-pets-available"]), true);
   assert.equal(matched(client, ["/api/news"]), false);
 
   const newsClient = fakeQueryClient();
@@ -211,4 +216,11 @@ test("V15: invalidar mascotas refresca panel, web pública y solicitudes", async
   assert.equal(matched(identityClient, ["admin-institutional-identity"]), true);
   assert.equal(matched(identityClient, ["settings"]), true);
   assert.equal(matched(identityClient, ["/api/campaigns"]), false);
+
+  const reportClient = fakeQueryClient();
+  invalidateReportQueries(reportClient);
+  assert.equal(matched(reportClient, ["/api/admin/reports", "all"]), true);
+  assert.equal(matched(reportClient, ["/api/reports/urgent"]), true);
+  assert.equal(matched(reportClient, ["home-featured-reports"]), true);
+  assert.equal(matched(reportClient, ["home-pets-available"]), false);
 });

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle, ArrowRight, Megaphone } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { optimizeImageUrl } from "@/lib/image-url";
+import { HOME_FEATURED_REPORTS_KEY } from "@/lib/query-keys";
 
 /** Subconjunto de CommunityReport devuelto por GET /api/reports/featured. */
 interface FeaturedReport {
@@ -33,7 +34,7 @@ export function UrgentCasesSection() {
   const { t } = useTranslation();
 
   const { data: reports, isLoading } = useQuery<FeaturedReport[]>({
-    queryKey: ["home-featured-reports"],
+    queryKey: [HOME_FEATURED_REPORTS_KEY],
     queryFn: async () => {
       const res = await fetch("/api/reports/featured");
       if (!res.ok) throw new Error("failed");

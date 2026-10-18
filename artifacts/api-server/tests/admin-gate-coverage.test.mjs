@@ -90,6 +90,13 @@ test("POST /api/admin/ledger/regularize sin sesión → 401", async () => {
   });
 });
 
+test("DELETE /api/admin/reports/:id sin sesión → 401 antes de tocar datos", async () => {
+  await withServer(buildApp(), async (base) => {
+    const res = await fetch(`${base}/api/admin/reports/1`, { method: "DELETE" });
+    assert.equal(res.status, 401);
+  });
+});
+
 test("POST /api/admin/login es público (no exige sesión previa)", async () => {
   await withServer(buildApp(), async (base) => {
     const res = await fetch(`${base}/api/admin/login`, {

@@ -7,9 +7,12 @@ import { Input } from "@/components/ui/input";
 import {
   AlertTriangle, Heart, Baby, PersonStanding, Cat, Home, Zap,
   Clock, MapPin, Eye, CheckCircle, XCircle, RefreshCw, Archive,
-  Target, Search, Filter, Star
+  Target, Search, Filter, Star, Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { adminRequestJson, adminRequestNoContent } from "@/lib/admin-request";
+import { errorMessage } from "@/lib/api-error";
+import { invalidateReportQueries } from "@/lib/query-invalidation";
 
 interface CommunityReport {
   id: number;
@@ -91,36 +94,53 @@ export default function AdminReports() {
   });
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await fetch(`/api/admin/reports/${id}`, {
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      adminRequestJson<CommunityReport>(`/api/admin/reports/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error("Error actualizando estado");
-      return res.json();
-    },
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/reports"] });
+      invalidateReportQueries(queryClient);
       toast({ title: "Estado actualizado" });
     },
-    onError: () => toast({ title: "Error", variant: "destructive" }),
+    onError: (error: unknown) => toast({
+      title: "No se pudo actualizar el reporte",
+      description: errorMessage(error),
+      variant: "destructive",
+    }),
   });
 
   const toggleFeatured = useMutation({
-    mutationFn: async ({ id, featuredOnHome }: { id: number; featuredOnHome: boolean }) => {
-      const res = await fetch(`/api/admin/reports/${id}`, {
+    mutationFn: ({ id, featuredOnHome }: { id: number; featuredOnHome: boolean }) =>
+      adminRequestJson<CommunityReport>(`/api/admin/reports/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ featuredOnHome }),
-      });
-      return res.json();
-    },
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/reports"] });
+      invalidateReportQueries(queryClient);
+      toast({ title: "Destacado actualizado" });
     },
+    onError: (error: unknown) => toast({
+      title: "No se pudo actualizar el destacado",
+      description: errorMessage(error),
+      variant: "destructive",
+    }),
+  });
+
+  const deleteReport = useMutation({
+    mutationFn: (id: number) =>
+      adminRequestNoContent(`/api/admin/reports/${id}`, { method: "DELETE" }),
+    onSuccess: (_data, id) => {
+      invalidateReportQueries(queryClient);
+      toast({ title: "Reporte eliminado", description: `Se eliminó el reporte #${id}.` });
+    },
+    onError: (error: unknown) => toast({
+      title: "No se pudo eliminar el reporte",
+      description: errorMessage(error),
+      variant: "destructive",
+    }),
   });
 
   const filtered = reports.filter(r =>
@@ -294,6 +314,22 @@ export default function AdminReports() {
                         <Archive className="w-3.5 h-3.5 mr-1" /> Archivar
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-xl h-8 text-xs text-destructive hover:bg-destructive/10"
+                      disabled={deleteReport.isPending}
+                      onClick={() => {
+                        const campaignNote = report.campaignId
+                          ? " La campaña creada a partir de este reporte se conservará."
+                          : "";
+                        if (window.confirm(`¿Eliminar definitivamente «${report.title}»? Esta acción no se puede deshacer.${campaignNote}`)) {
+                          deleteReport.mutate(report.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1" /> Eliminar
+                    </Button>
                   </div>
                 </div>
               </div>
