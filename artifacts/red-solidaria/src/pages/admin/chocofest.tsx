@@ -56,26 +56,50 @@ function Readiness({
   label,
   ready,
   hint,
+  href,
 }: {
   label: string;
   ready: boolean;
   hint?: string;
+  href?: string;
 }) {
   const { t } = useTranslation();
-  return (
-    <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4">
+  const content = (
+    <>
       {ready ? (
         <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
       ) : (
         <XCircle className="w-5 h-5 text-muted-foreground mt-0.5 flex-shrink-0" />
       )}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="font-semibold text-foreground">{label}</p>
         <p className="text-xs text-muted-foreground">
           {ready ? t("adminChocofest.ready") : t("adminChocofest.pending")}
           {hint ? ` · ${hint}` : ""}
         </p>
+        {!ready && href && (
+          <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+            Completar sección <ArrowRight className="h-3.5 w-3.5" />
+          </span>
+        )}
       </div>
+    </>
+  );
+
+  if (!ready && href) {
+    return (
+      <Link
+        href={href}
+        className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4">
+      {content}
     </div>
   );
 }
@@ -277,6 +301,21 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
     itemCount: items?.length ?? 0,
   });
 
+  const readinessLinks: Record<string, string> = {
+    published: `/admin/campanas/${campaign.id}?section=info`,
+    protagonist: "/admin/chocofest#protagonist",
+    presentation: `/admin/campanas/${campaign.id}?section=info`,
+    goal: `/admin/campanas/${campaign.id}?section=info`,
+    dates: `/admin/campanas/${campaign.id}?section=info`,
+    cover: `/admin/campanas/${campaign.id}?section=info`,
+    donations: "/admin/donaciones",
+    gallery: `/admin/campanas/${campaign.id}?section=gallery`,
+    timeline: `/admin/campanas/${campaign.id}?section=updates`,
+    transparency: `/admin/campanas/${campaign.id}?section=gastos`,
+    budget: `/admin/campanas/${campaign.id}?section=gastos`,
+    inventory: `/admin/campanas/${campaign.id}?section=sobrantes`,
+  };
+
   const saveDetails = () => {
     saveSettings.mutate([
       {
@@ -389,7 +428,7 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
       </div>
 
       {/* Portada / protagonista */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div id="protagonist" className="scroll-mt-24 rounded-3xl border border-border bg-card p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -664,6 +703,7 @@ function FoundPanel({ campaign }: { campaign: Campaign }) {
               )}
               ready={check.ok}
               hint={check.ok ? undefined : t("adminChocofest.pending")}
+              href={readinessLinks[check.key]}
             />
           ))}
         </div>
