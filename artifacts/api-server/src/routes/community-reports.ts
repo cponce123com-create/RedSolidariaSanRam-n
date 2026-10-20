@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { communityReportsTable, insertCommunityReportSchema, updateCommunityReportSchema, campaignsTable } from "@workspace/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { reportLimiter } from "../middleware/rate-limit";
+import { PUBLIC_REPORT_COLUMNS } from "../lib/public-projections";
 
 const router = Router();
 
@@ -13,14 +14,16 @@ router.post("/reports", reportLimiter, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
   }
-  const [report] = await db.insert(communityReportsTable).values(parsed.data).returning();
+  // La respuesta al formulario solo confirma el alta: no devuelve los datos
+  // personales del reportante ni las notas internas (que aún no existen).
+  const [report] = await db.insert(communityReportsTable).values(parsed.data).returning(PUBLIC_REPORT_COLUMNS);
   return res.status(201).json(report);
 });
 
 // ─── PUBLIC: List approved urgent reports (for public page) ──────────────────
 router.get("/reports/urgent", async (req, res) => {
   const reports = await db
-    .select()
+    .select(PUBLIC_REPORT_COLUMNS)
     .from(communityReportsTable)
     .where(eq(communityReportsTable.status, "approved"))
     .orderBy(desc(communityReportsTable.createdAt));
@@ -30,7 +33,7 @@ router.get("/reports/urgent", async (req, res) => {
 // ─── PUBLIC: Featured urgent reports for home page ───────────────────────────
 router.get("/reports/featured", async (req, res) => {
   const reports = await db
-    .select()
+    .select(PUBLIC_REPORT_COLUMNS)
     .from(communityReportsTable)
     .where(and(eq(communityReportsTable.status, "approved"), eq(communityReportsTable.featuredOnHome, true)))
     .orderBy(desc(communityReportsTable.createdAt));

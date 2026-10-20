@@ -19,9 +19,7 @@ interface CommunityReport {
   location: string;
   urgency: string;
   photos: string[] | null;
-  reporterName: string;
   isAnonymous: boolean;
-  status: string;
   campaignId: number | null;
   featuredOnHome: boolean;
   createdAt: string;

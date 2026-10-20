@@ -29,7 +29,7 @@ describe("AdminLogin (login + 2FA)", () => {
   it("con 2FA activo pide el código TOTP y otorga acceso", async () => {
     const user = userEvent.setup();
     loginMutateMock.mockImplementation((_args: unknown, opts?: { onSuccess?: (d: unknown) => void }) => {
-      opts?.onSuccess?.({ success: false, twoFactorRequired: true, userId: 5 });
+      opts?.onSuccess?.({ success: false, twoFactorRequired: true });
     });
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
@@ -53,7 +53,7 @@ describe("AdminLogin (login + 2FA)", () => {
       "/api/admin/2fa/login",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ userId: 5, code: "123456" }),
+        body: JSON.stringify({ code: "123456" }),
       }),
     );
   });
@@ -61,9 +61,16 @@ describe("AdminLogin (login + 2FA)", () => {
   it("rechaza un código TOTP incorrecto", async () => {
     const user = userEvent.setup();
     loginMutateMock.mockImplementation((_args: unknown, opts?: { onSuccess?: (d: unknown) => void }) => {
-      opts?.onSuccess?.({ success: false, twoFactorRequired: true, userId: 5 });
+      opts?.onSuccess?.({ success: false, twoFactorRequired: true });
     });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: "unauthorized", message: "Código incorrecto" }),
+      }),
+    );
 
     renderWithProviders(<AdminLogin />);
     await user.type(screen.getByLabelText("Usuario"), "admin");
@@ -82,7 +89,7 @@ describe("AdminLogin (login + 2FA)", () => {
   it("muestra el mensaje del servidor cuando la cuenta está bloqueada (429)", async () => {
     const user = userEvent.setup();
     loginMutateMock.mockImplementation((_args: unknown, opts?: { onSuccess?: (d: unknown) => void }) => {
-      opts?.onSuccess?.({ success: false, twoFactorRequired: true, userId: 5 });
+      opts?.onSuccess?.({ success: false, twoFactorRequired: true });
     });
     vi.stubGlobal(
       "fetch",

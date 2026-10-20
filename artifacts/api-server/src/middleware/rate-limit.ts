@@ -33,6 +33,24 @@ export const loginLimiter = rateLimit({
   },
 });
 
+// Rate limiter específico para el paso 2 del login (contraseña ya validada).
+// La cuenta sale del RETO de la sesión, no de un `userId` del cuerpo: el límite
+// se comparte por IP + cuenta real, así una IP no puede repartir intentos entre
+// cuentas y un atacante no puede elegir la clave enviando otro id.
+export const twoFactorLoginLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000,
+  max: 10,
+  message: { error: "Demasiados intentos de verificación. Por favor espera 30 minutos." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  keyGenerator: (req) => {
+    const pending = (req as any).session?.pendingAdminTwoFactor;
+    const account = pending ? `admin:${pending.userId}` : "no-challenge";
+    return `${ipKeyGenerator(req.ip ?? "unknown")}-${account}`;
+  },
+});
+
 // Presupuesto de acciones administrativas según el rol de la sesión.
 // Superadmin: holgado (gestión de usuarios y config). Admin/moderador:
 // presupuesto medio. Sin sesión: mínimo (protege el gate /admin de fuerza

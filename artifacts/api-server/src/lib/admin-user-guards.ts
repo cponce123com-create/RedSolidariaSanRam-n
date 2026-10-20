@@ -131,8 +131,18 @@ export function guardUpdateAdminUser(ctx: UpdateGuardContext): GuardResult {
  */
 export function shouldRevokeSessions(
   before: AdminUserSnapshot,
-  changes: { role?: string; active?: boolean },
+  changes: { role?: string; active?: boolean; password?: boolean; username?: string },
 ): { revoke: boolean; reason: string | null } {
+  // Cambiar la contraseña invalida las sesiones abiertas (incluida la del propio
+  // administrador): una cookie robada antes del cambio no debe sobrevivir.
+  if (changes.password === true) {
+    return { revoke: true, reason: "password_changed" };
+  }
+  // Cambiar el nombre de usuario también invalida la sesión: es el identificador
+  // con el que se autentica y con el que se auditan sus acciones.
+  if (changes.username !== undefined && changes.username !== before.username) {
+    return { revoke: true, reason: "username_changed" };
+  }
   if (changes.active === false && before.active === true) {
     return { revoke: true, reason: "deactivated" };
   }
@@ -149,11 +159,40 @@ export function shouldRevokeSessions(
  * usuario en `sess->'adminUser'`. Se borran sus filas: la próxima petición con esa
  * cookie ya no encuentra sesión y el usuario vuelve al login. Se usa para que
  * desactivar o cambiar el rol de alguien surta efecto INMEDIATO.
+ *
+ * También borra los RETOS de 2FA pendientes (`pendingAdminTwoFactor`): un login
+ * a medias con la contraseña antigua no debe poder completarse después de un
+ * cambio de contraseña, nombre de usuario o factor.
  */
 export async function revokeAdminSessions(userId: number): Promise<number> {
   const result = await db.execute(sql`
     DELETE FROM session
     WHERE (sess -> 'adminUser' ->> 'id') = ${String(userId)}
+       OR (sess -> 'pendingAdminTwoFactor' ->> 'userId') = ${String(userId)}
+  `);
+  return result.rowCount ?? 0;
+}
+
+/**
+ * Igual que `revokeAdminSessions`, pero conserva la sesión actual.
+ *
+ * Se usa en cambios de 2FA hechos por el propio usuario: las demás sesiones
+ * (posiblemente robadas) se cierran, pero la que está ejecutando la operación
+ * sigue válida para que el panel no expulse al usuario justo después de activar
+ * su segundo factor.
+ */
+export async function revokeOtherAdminSessions(
+  userId: number,
+  currentSessionId?: string | null,
+): Promise<number> {
+  if (!currentSessionId) return revokeAdminSessions(userId);
+  const result = await db.execute(sql`
+    DELETE FROM session
+    WHERE (
+      (sess -> 'adminUser' ->> 'id') = ${String(userId)}
+      OR (sess -> 'pendingAdminTwoFactor' ->> 'userId') = ${String(userId)}
+    )
+    AND sid <> ${currentSessionId}
   `);
   return result.rowCount ?? 0;
 }

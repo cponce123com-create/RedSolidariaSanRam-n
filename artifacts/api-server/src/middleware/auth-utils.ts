@@ -15,9 +15,29 @@ export type SessionAdminUser = {
   role: string;
 };
 
+/**
+ * Paso 1 del login superado (contraseña correcta) a la espera del TOTP.
+ *
+ * El reto vive EN LA SESIÓN del servidor, no en el cuerpo de la petición: el
+ * cliente no recibe ni envía un `userId`. Así, conocer/ adivinar el id de un
+ * administrador no basta para saltarse la contraseña: sin la cookie de esta
+ * sesión (y su reto) `/admin/2fa/login` no tiene a quién autenticar.
+ */
+export type PendingAdminTwoFactor = {
+  userId: number;
+  /** epoch ms; el reto caduca a los 5 minutos. */
+  issuedAt: number;
+  /** Origen que inició el login (defensa contra robo de la cookie). */
+  ip: string | null;
+  userAgent: string | null;
+  /** Intentos fallidos acumulados dentro de este reto. */
+  attempts: number;
+};
+
 declare module "express-session" {
   interface SessionData {
     adminUser?: SessionAdminUser | null;
+    pendingAdminTwoFactor?: PendingAdminTwoFactor | null;
   }
 }
 

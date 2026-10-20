@@ -12,7 +12,10 @@ import {
   ENV_SUPERADMIN_ID,
   envSuperadminTwoFactorRequired,
 } from "../lib/two-factor-account";
-import { establishAdminSession } from "../lib/session-security";
+import {
+  establishAdminSession,
+  startAdminTwoFactorChallenge,
+} from "../lib/session-security";
 
 const router: IRouter = Router();
 
@@ -20,6 +23,14 @@ const loginSchema = z.object({
   username: z.string(),
   password: z.string(),
 });
+
+function ipOf(req: any): string | null {
+  return req.ip || req.connection?.remoteAddress || null;
+}
+
+function uaOf(req: any): string | null {
+  return req.get("user-agent") || null;
+}
 
 // Hash dummy precalculado al arrancar el módulo (NO por request): se compara
 // contra él cuando el flujo del login llegaría al 401 sin haber ejecutado un
@@ -42,21 +53,33 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       
       if (isValid) {
         // 2FA activo: exigir el código TOTP antes de abrir la sesión (paso 2).
-        // Se devuelve el userId para completar el login en /admin/2fa/login.
+        // El reto queda guardado en la SESIÓN del servidor: no se devuelve el
+        // userId, así que /admin/2fa/login no puede autenticar solo con un id
+        // conocido/adivinado. El paso 2 usa la cookie de esta misma sesión.
         if (dbUser.twoFactorEnabled && dbUser.twoFactorSecret) {
           await logAuditAction({
             userId: dbUser.id,
             username: dbUser.username,
             action: "LOGIN_2FA_PENDING",
             resource: "admin_users",
-            ipAddress: req.ip || req.connection?.remoteAddress || null,
-            userAgent: req.get("user-agent") || null,
+            ipAddress: ipOf(req),
+            userAgent: uaOf(req),
             details: { success: true },
           });
+          await startAdminTwoFactorChallenge(
+            req,
+            {
+              id: dbUser.id,
+              username: dbUser.username,
+              name: dbUser.name,
+              role: dbUser.role,
+            },
+            { ip: ipOf(req), userAgent: uaOf(req) },
+          );
           return res.json({
             success: false,
             twoFactorRequired: true,
-            userId: dbUser.id,
+            expiresInSeconds: 300,
             message: "Se requiere el código de verificación",
           });
         }
@@ -106,24 +129,27 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       if (isValid) {
         // 2FA del superadmin de respaldo (migración 028): su secreto no cabe en
         // `admin_users` (no tiene fila), así que vive en `env_superadmin_2fa`.
-        // Antes esta cuenta quedaba SIEMPRE solo con contraseña y, como app.ts
-        // exige sus variables en producción, el panel tenía una entrada sin
-        // segundo factor. Se devuelve el mismo contrato que el flujo de tabla
-        // (`twoFactorRequired` + userId) para que el paso 2 sea el mismo.
+        // El reto se guarda en la sesión, igual que en el flujo de tabla: ya no
+        // se devuelve `userId: 0` ni se acepta como credencial en el paso 2.
         if (await envSuperadminTwoFactorRequired()) {
           await logAuditAction({
             userId: 0,
             username,
             action: "LOGIN_2FA_PENDING",
             resource: "admin_users",
-            ipAddress: req.ip || req.connection?.remoteAddress || null,
-            userAgent: req.get("user-agent") || null,
+            ipAddress: ipOf(req),
+            userAgent: uaOf(req),
             details: { success: true, source: "env_superadmin" },
           });
+          await startAdminTwoFactorChallenge(
+            req,
+            { id: ENV_SUPERADMIN_ID, username, name: "Superadmin", role: "superadmin" },
+            { ip: ipOf(req), userAgent: uaOf(req) },
+          );
           return res.json({
             success: false,
             twoFactorRequired: true,
-            userId: ENV_SUPERADMIN_ID,
+            expiresInSeconds: 300,
             message: "Se requiere el código de verificación",
           });
         }

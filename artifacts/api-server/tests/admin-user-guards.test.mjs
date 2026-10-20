@@ -139,4 +139,19 @@ test("un cambio que no altera permisos no revoca nada", () => {
     reason: null,
   });
   assert.deepEqual(shouldRevokeSessions(moderator(4), {}), { revoke: false, reason: null });
+  assert.deepEqual(shouldRevokeSessions(moderator(4), { username: "mod4" }), {
+    revoke: false,
+    reason: null,
+  });
+});
+
+test("cambiar la contraseña o el nombre de usuario revoca las sesiones abiertas", () => {
+  assert.deepEqual(shouldRevokeSessions(moderator(4), { password: true }), {
+    revoke: true,
+    reason: "password_changed",
+  });
+  assert.deepEqual(shouldRevokeSessions(moderator(4), { username: "nuevo" }), {
+    revoke: true,
+    reason: "username_changed",
+  });
 });

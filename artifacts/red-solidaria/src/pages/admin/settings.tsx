@@ -35,6 +35,15 @@ function TwoFactorCard() {
   const { toast } = useToast();
   const [setup, setSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
   const [code, setCode] = useState("");
+  // Step-up: cualquier cambio de 2FA exige volver a demostrar la contraseña.
+  // Una cookie de sesión robada, por sí sola, ya no puede activar/desactivar el
+  // segundo factor.
+  const [password, setPassword] = useState("");
+
+  const readError = async (res: Response, fallback: string) => {
+    const body = await res.json().catch(() => null);
+    return (body as { message?: string } | null)?.message || fallback;
+  };
 
   const status = useQuery({
     queryKey: ["2fa-status"],
@@ -53,11 +62,13 @@ function TwoFactorCard() {
 
   const startSetup = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/admin/2fa/setup", { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const e = await res.json().catch(() => null);
-        throw new Error((e as { message?: string } | null)?.message || "Error al configurar 2FA");
-      }
+      const res = await fetch("/api/admin/2fa/setup", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) throw new Error(await readError(res, "Error al configurar 2FA"));
       return res.json() as Promise<{ secret: string; otpauthUri: string }>;
     },
     onSuccess: (data) => { setSetup(data); setCode(""); },
@@ -70,17 +81,18 @@ function TwoFactorCard() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ password, code }),
       });
-      if (!res.ok) throw new Error("Código incorrecto");
+      if (!res.ok) throw new Error(await readError(res, "Código incorrecto"));
     },
     onSuccess: () => {
       toast({ title: "2FA activado", description: "En el próximo login se pedirá el código." });
       setSetup(null);
       setCode("");
+      setPassword("");
       status.refetch();
     },
-    onError: () => toast({ title: "Código incorrecto", variant: "destructive" }),
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const disable = useMutation({
@@ -89,12 +101,17 @@ function TwoFactorCard() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ password, code }),
       });
-      if (!res.ok) throw new Error("Código incorrecto");
+      if (!res.ok) throw new Error(await readError(res, "Código incorrecto"));
     },
-    onSuccess: () => { toast({ title: "2FA desactivado" }); setCode(""); status.refetch(); },
-    onError: () => toast({ title: "Código incorrecto", variant: "destructive" }),
+    onSuccess: () => {
+      toast({ title: "2FA desactivado" });
+      setCode("");
+      setPassword("");
+      status.refetch();
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
   });
 
   const enabled = status.data?.enabled ?? false;
@@ -124,6 +141,23 @@ function TwoFactorCard() {
             operaciones irreversibles. Quita esa variable para volver a exigirlo.
           </p>
         )}
+
+        <div>
+          <Label htmlFor="2fa-password">Contraseña actual</Label>
+          <Input
+            id="2fa-password"
+            className="mt-1"
+            type="password"
+            autoComplete="current-password"
+            placeholder="Confirma tu contraseña"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Por seguridad, cualquier cambio de 2FA exige volver a introducir tu contraseña.
+          </p>
+        </div>
+
         {enabled ? (
           <>
             <div className="flex items-center gap-2 text-sm">
@@ -145,7 +179,7 @@ function TwoFactorCard() {
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 />
               </div>
-              <Button variant="outline" className="rounded-xl" onClick={() => disable.mutate()} disabled={code.length !== 6 || disable.isPending}>
+              <Button variant="outline" className="rounded-xl" onClick={() => disable.mutate()} disabled={code.length !== 6 || password.length === 0 || disable.isPending}>
                 Desactivar 2FA
               </Button>
             </div>
@@ -175,7 +209,7 @@ function TwoFactorCard() {
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
                 />
               </div>
-              <Button className="rounded-xl" onClick={() => verify.mutate()} disabled={code.length !== 6 || verify.isPending}>
+              <Button className="rounded-xl" onClick={() => verify.mutate()} disabled={code.length !== 6 || password.length === 0 || verify.isPending}>
                 <Smartphone className="w-4 h-4 mr-1" /> Activar 2FA
               </Button>
             </div>
@@ -186,7 +220,7 @@ function TwoFactorCard() {
               Añade una capa extra de seguridad a tu cuenta. Necesitarás una aplicación autenticadora (Google
               Authenticator, Authy, etc.).
             </p>
-            <Button className="rounded-xl" onClick={() => startSetup.mutate()} disabled={startSetup.isPending}>
+            <Button className="rounded-xl" onClick={() => startSetup.mutate()} disabled={startSetup.isPending || password.length === 0}>
               {startSetup.isPending ? "Generando..." : "Configurar 2FA"}
             </Button>
           </>

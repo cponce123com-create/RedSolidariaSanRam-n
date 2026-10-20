@@ -20,6 +20,22 @@ function buildApp() {
     if (req.headers["x-test-admin"] === "1") {
       req.session = { adminUser: { id: 1, username: "admin", role: "superadmin" } };
     }
+    // Simula el reto que /admin/login dejó en la sesión del servidor. El cuerpo
+    // del paso 2 ya NO lleva userId: la cuenta sale de aquí.
+    if (req.headers["x-test-pending-user"] !== undefined) {
+      req.session = {
+        pendingAdminTwoFactor: {
+          userId: Number(req.headers["x-test-pending-user"]),
+          issuedAt: Date.now(),
+          ip: null,
+          userAgent: null,
+          attempts: 0,
+        },
+        save(callback) {
+          callback?.(null);
+        },
+      };
+    }
     next();
   });
   app.use("/api", twoFactorRouter);
@@ -40,12 +56,13 @@ async function withServer(app, fn) {
   }
 }
 
-async function post(base, path, body, admin = false) {
+async function post(base, path, body, admin = false, headers = {}) {
   return fetch(`${base}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(admin ? { "x-test-admin": "1" } : {}),
+      ...headers,
     },
     body: JSON.stringify(body),
   });
@@ -62,8 +79,27 @@ test("POST /admin/2fa/login con body inválido → 400 (antes de tocar la DB)", 
 test("POST /admin/2fa/login con código no numérico → 400", async () => {
   const app = buildApp();
   await withServer(app, async (base) => {
-    const res = await post(base, "/api/admin/2fa/login", { userId: 1, code: "abc123" });
+    const res = await post(base, "/api/admin/2fa/login", { code: "abc123" });
     assert.equal(res.status, 400);
+  });
+});
+
+test("el antiguo userId en el cuerpo se rechaza: la cuenta sale de la SESIÓN, no del cliente", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    // El contrato vulnerable aceptaba { userId, code }. Ahora es un campo
+    // desconocido: 400 antes de mirar ninguna cuenta.
+    const res = await post(base, "/api/admin/2fa/login", { userId: 0, code: "123456" });
+    assert.equal(res.status, 400);
+  });
+});
+
+test("sin reto en la sesión, un código válido NO abre sesión (401)", async () => {
+  const app = buildApp();
+  await withServer(app, async (base) => {
+    const res = await post(base, "/api/admin/2fa/login", { code: "123456" });
+    assert.equal(res.status, 401);
+    assert.equal((await res.json()).error, "unauthorized");
   });
 });
 
@@ -107,13 +143,14 @@ test("POST /admin/users/1/2fa/reset sin sesión → 401", async () => {
   });
 });
 
-test("POST /admin/users/1/2fa/reset con sesión admin → no 401 (rol se evalúa en el handler)", async () => {
+test("POST /admin/users/1/2fa/reset con sesión admin y contraseña → llega a la DB (500)", async () => {
   const app = buildApp();
   await withServer(app, async (base) => {
-    const res = await post(base, "/api/admin/users/1/2fa/reset", {}, true);
-    // Con sesión superadmin el handler intenta la DB (500) o responde 200;
-    // sin sesión o sin rol daría 401/403 — ninguno de los dos debe ocurrir aquí.
-    assert.notEqual(res.status, 401);
+    const res = await post(base, "/api/admin/users/1/2fa/reset", { password: "x" }, true);
+    // El step-up consulta la base ficticia y falla con 500; lo importante es que
+    // ya no se autoriza solo con la cookie (antes respondía 200/500 sin probar
+    // la contraseña).
+    assert.equal(res.status, 500);
   });
 });
 
@@ -129,7 +166,9 @@ test("POST /admin/2fa/login con cuenta bloqueada → 429 (antes de tocar la DB)"
     }
     const app = buildApp();
     await withServer(app, async (base) => {
-      const res = await post(base, "/api/admin/2fa/login", { userId: 99, code: "123456" });
+      const res = await post(base, "/api/admin/2fa/login", { code: "123456" }, false, {
+        "x-test-pending-user": "99",
+      });
       assert.equal(res.status, 429);
       const body = await res.json();
       assert.equal(body.error, "too_many_attempts");
@@ -141,13 +180,15 @@ test("POST /admin/2fa/login con cuenta bloqueada → 429 (antes de tocar la DB)"
   }
 });
 
-test("POST /admin/2fa/login con cuenta sin bloqueo → nunca 429", async () => {
+test("POST /admin/2fa/login con reto sin bloqueo → nunca 429 (llega a la DB)", async () => {
   lockout.resetLockoutStore();
   const app = buildApp();
   await withServer(app, async (base) => {
-    const res = await post(base, "/api/admin/2fa/login", { userId: 1, code: "123456" });
-    // Sin DB el flujo cae en el catch (500); el punto es que el pre-check
-    // no bloquea a cuentas limpias.
+    const res = await post(base, "/api/admin/2fa/login", { code: "123456" }, false, {
+      "x-test-pending-user": "1",
+    });
+    // Sin DB el flujo cae en el catch (500); el punto es que el pre-check no
+    // bloquea a cuentas limpias.
     assert.notEqual(res.status, 429);
   });
 });

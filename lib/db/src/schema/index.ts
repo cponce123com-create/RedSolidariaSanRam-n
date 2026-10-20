@@ -29,6 +29,7 @@ export * from "./volunteer-teams";
 export * from "./certificates";
 export * from "./campaign-purge-backups";
 export * from "./env-superadmin-2fa";
+export * from "./totp-login-usage";
 export * from "./expense-classifications";
 export * from "./campaign-closures";
 export * from "./institutional-identity";

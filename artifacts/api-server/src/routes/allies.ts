@@ -2,12 +2,15 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { alliesTable, insertAllySchema } from "@workspace/db/schema";
 import { eq, desc, asc } from "drizzle-orm";
+import { PUBLIC_ALLY_COLUMNS } from "../lib/public-projections";
 
 const router = Router();
 
 // ─── PUBLIC: List active allies ───────────────────────────────────────────────
+// `contactName`, `contactEmail` y `contactPhone` son datos internos del panel:
+// la proyección pública evita enviarlos aunque la fila los tenga.
 router.get("/allies", async (req, res) => {
-  const allies = await db.select().from(alliesTable)
+  const allies = await db.select(PUBLIC_ALLY_COLUMNS).from(alliesTable)
     .where(eq(alliesTable.active, true))
     .orderBy(desc(alliesTable.featured), asc(alliesTable.sortOrder), desc(alliesTable.createdAt));
   res.json(allies);
