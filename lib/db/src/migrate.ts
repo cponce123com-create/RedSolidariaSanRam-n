@@ -1018,6 +1018,20 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
         ON donation_items (donation_id);
     `,
   },
+  {
+    name: "035_totp_login_usage.sql",
+    sql: `
+      -- Anti-replay del segundo factor: un código TOTP ya usado para abrir una
+      -- sesión no puede volver a usarse dentro de su ventana de validez.
+      -- La clave es la CUENTA ("user:<id>" o "env:0"), no la IP: el mismo código
+      -- no debe servir ni siquiera desde otro origen.
+      CREATE TABLE IF NOT EXISTS totp_login_usage (
+        account_key text PRIMARY KEY,
+        last_step integer NOT NULL,
+        updated_at timestamp NOT NULL DEFAULT now()
+      );
+    `,
+  },
 ];
 
 /**

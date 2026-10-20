@@ -113,7 +113,12 @@ router.patch("/admin/users/:id", async (req, res) => {
   
   const userId = Number(req.params.id);
   const actor = req.session?.adminUser ?? null;
-  const changes = { role: parsed.data.role, active: parsed.data.active };
+  const changes = {
+    role: parsed.data.role,
+    active: parsed.data.active,
+    password: !!password,
+    username: parsed.data.username,
+  };
 
   // V14-1.3: mismas guardas que en el borrado — no se puede degradar ni desactivar al
   // ÚLTIMO superadmin activo, ni desactivarse a uno mismo — y todo dentro de una

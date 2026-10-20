@@ -36,7 +36,9 @@ async function call(method, path, body, { auth = false } = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const setCookie = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [];
-  if (auth && setCookie.length > 0) {
+  // Se guarda CUALQUIER cookie de sesión, no solo en llamadas con `auth`: el
+  // paso 1 del login con 2FA crea una sesión pendiente y el paso 2 debe enviarla.
+  if (setCookie.length > 0) {
     cookie = setCookie.map((c) => c.split(";")[0]).join("; ");
   }
   const text = await res.text();
@@ -865,7 +867,7 @@ check(
   `status=${statusBefore.status} ${JSON.stringify(statusBefore.body ?? null)}`,
 );
 
-const setup2fa = await call("POST", "/api/admin/2fa/setup", undefined, { auth: true });
+const setup2fa = await call("POST", "/api/admin/2fa/setup", { password: PASS }, { auth: true });
 check(
   "CONFIGURAR 2FA en el superadmin de entorno ya funciona (antes 404)",
   setup2fa.status === 200 &&
@@ -883,10 +885,20 @@ check(
   settingsDump.status === 200 && !settingsDump.text.includes(envSecret),
 );
 
-const verifyWrong = await call("POST", "/api/admin/2fa/verify", { code: "000000" }, { auth: true });
+const verifyWrong = await call(
+  "POST",
+  "/api/admin/2fa/verify",
+  { code: "000000", password: PASS },
+  { auth: true },
+);
 check("un código incorrecto no activa el 2FA (401)", verifyWrong.status === 401, `status=${verifyWrong.status}`);
 
-const verifyOk = await call("POST", "/api/admin/2fa/verify", { code: totpCode(envSecret) }, { auth: true });
+const verifyOk = await call(
+  "POST",
+  "/api/admin/2fa/verify",
+  { code: totpCode(envSecret), password: PASS },
+  { auth: true },
+);
 check(
   "el 2FA del superadmin de entorno queda ACTIVO",
   verifyOk.status === 200,
@@ -902,17 +914,22 @@ check(
   "el login del superadmin de entorno exige el código 2FA",
   loginPending.status === 200 &&
     loginPending.body?.twoFactorRequired === true &&
-    loginPending.body?.userId === 0,
+    loginPending.body?.userId === undefined,
   JSON.stringify(loginPending.body ?? null),
 );
 
-const loginBadCode = await call("POST", "/api/admin/2fa/login", { userId: 0, code: "000000" });
+const loginBadCode = await call(
+  "POST",
+  "/api/admin/2fa/login",
+  { code: "000000" },
+  { auth: true },
+);
 check("el paso 2 con código incorrecto → 401", loginBadCode.status === 401, `status=${loginBadCode.status}`);
 
 const loginGoodCode = await call(
   "POST",
   "/api/admin/2fa/login",
-  { userId: 0, code: totpCode(envSecret) },
+  { code: totpCode(envSecret) },
   { auth: true },
 );
 check(
@@ -960,13 +977,18 @@ check(
 );
 
 // Desactivación: vuelve al estado inicial y deja de ser una vía de entrada.
-const disableWrong = await call("POST", "/api/admin/2fa/disable", { code: "000000" }, { auth: true });
+const disableWrong = await call(
+  "POST",
+  "/api/admin/2fa/disable",
+  { code: "000000", password: PASS },
+  { auth: true },
+);
 check("desactivar con código incorrecto → 401", disableWrong.status === 401, `status=${disableWrong.status}`);
 
 const disableOk = await call(
   "POST",
   "/api/admin/2fa/disable",
-  { code: totpCode(envSecret) },
+  { code: totpCode(envSecret), password: PASS },
   { auth: true },
 );
 check("desactivar con el código correcto → 200", disableOk.status === 200, `status=${disableOk.status}`);
@@ -982,9 +1004,8 @@ check(
 );
 
 const loginAfterDisable = await call("POST", "/api/admin/2fa/login", {
-  userId: 0,
   code: totpCode(envSecret),
-});
+}, { auth: true });
 check(
   "desactivado, un código válido ya NO abre sesión por sí solo (401)",
   loginAfterDisable.status === 401,

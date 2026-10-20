@@ -26,7 +26,7 @@ type LoginResponse = {
   message: string;
   user?: unknown;
   twoFactorRequired?: boolean;
-  userId?: number;
+  expiresInSeconds?: number;
 };
 
 export default function AdminLogin() {
@@ -34,9 +34,9 @@ export default function AdminLogin() {
   const { toast } = useToast();
   const loginMutation = useAdminLogin();
 
-  // Paso 2 del login: 2FA activo → pedir código TOTP antes de abrir sesión
+  // Paso 2 del login: 2FA activo → pedir código TOTP antes de abrir sesión.
+  // El reto vive en la sesión del servidor; el navegador NO envía un userId.
   const [totpStep, setTotpStep] = useState(false);
-  const [pendingUserId, setPendingUserId] = useState<number | null>(null);
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
 
@@ -52,7 +52,6 @@ export default function AdminLogin() {
         onSuccess: (data) => {
           const d = data as unknown as LoginResponse;
           if (d.twoFactorRequired) {
-            setPendingUserId(d.userId ?? null);
             setTotpStep(true);
             toast({ title: "Verificación en dos pasos", description: "Ingresa el código de tu aplicación autenticadora." });
             return;
@@ -73,23 +72,21 @@ export default function AdminLogin() {
       toast({ title: "Código inválido", description: "Ingresa los 6 dígitos de tu aplicación.", variant: "destructive" });
       return;
     }
-    if (pendingUserId === null) return;
+    if (!totpStep) return;
     setVerifying(true);
     try {
       const res = await fetch("/api/admin/2fa/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: pendingUserId, code: parsed.data.code }),
+        body: JSON.stringify({ code: parsed.data.code }),
       });
       if (!res.ok) {
-        // 429 → la cuenta está temporalmente bloqueada por intentos fallidos;
-        // el mensaje del servidor es más útil que el error genérico.
-        if (res.status === 429) {
-          const body = await res.json().catch(() => null);
-          throw new Error(body?.message ?? "Demasiados intentos fallidos de 2FA");
-        }
-        throw new Error("Código incorrecto");
+        const body = await res.json().catch(() => null);
+        throw new Error(
+          (body as { message?: string } | null)?.message ??
+            (res.status === 401 ? "Código incorrecto o verificación expirada" : "No se pudo verificar el código"),
+        );
       }
       toast({ title: "Acceso concedido" });
       setLocation("/admin/campanas");
@@ -192,7 +189,7 @@ export default function AdminLogin() {
               type="button"
               variant="ghost"
               className="w-full h-10 rounded-xl text-muted-foreground"
-              onClick={() => { setTotpStep(false); setCode(""); setPendingUserId(null); }}
+              onClick={() => { setTotpStep(false); setCode(""); }}
             >
               <ArrowLeft className="w-4 h-4 mr-1" /> Volver
             </Button>

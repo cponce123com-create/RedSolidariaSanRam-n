@@ -68,14 +68,19 @@ export function generateTOTP(secret: string, timestampMs: number = Date.now()): 
   return totpForCounter(secret, counter, DEFAULT_DIGITS);
 }
 
-/** Verifica un código TOTP con tolerancia de ±window pasos (comparación en tiempo constante). */
-export function verifyTOTP(
+/**
+ * Verifica un código TOTP con tolerancia de ±window pasos y devuelve el paso
+ * concreto que coincidió (o `null`). Es la base del anti-replay: el llamador
+ * puede registrar ese paso como consumido para que el mismo código no se use
+ * dos veces.
+ */
+export function verifyTOTPStep(
   secret: string,
   code: string,
   timestampMs: number = Date.now(),
   window: number = DEFAULT_WINDOW,
-): boolean {
-  if (typeof code !== "string" || !/^\d{6}$/.test(code)) return false;
+): number | null {
+  if (typeof code !== "string" || !/^\d{6}$/.test(code)) return null;
   const counter = Math.floor(timestampMs / 1000 / DEFAULT_STEP_SECONDS);
   const expected = Buffer.from(code, "utf8");
   for (let i = -window; i <= window; i++) {
@@ -84,10 +89,20 @@ export function verifyTOTP(
     if (candidateCounter < 0) continue;
     const candidate = Buffer.from(totpForCounter(secret, candidateCounter, DEFAULT_DIGITS), "utf8");
     if (candidate.length === expected.length && timingSafeEqual(candidate, expected)) {
-      return true;
+      return candidateCounter;
     }
   }
-  return false;
+  return null;
+}
+
+/** Verifica un código TOTP con tolerancia de ±window pasos (comparación en tiempo constante). */
+export function verifyTOTP(
+  secret: string,
+  code: string,
+  timestampMs: number = Date.now(),
+  window: number = DEFAULT_WINDOW,
+): boolean {
+  return verifyTOTPStep(secret, code, timestampMs, window) !== null;
 }
 
 /** Construye la URI otpauth:// para escanear con Google Authenticator/Authy. */

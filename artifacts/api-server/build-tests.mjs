@@ -67,6 +67,7 @@ await build({
     "./src/lib/donation-fulfillment.ts",
     "./src/lib/donation-items.ts",
     "./src/lib/donation-tracking.ts",
+    "./src/lib/public-projections.ts",
     "./src/lib/audit.ts",
     "./src/lib/csv.ts",
     "./src/lib/supervisor.ts",
@@ -117,7 +118,7 @@ await build({
       name: "external-two-factor-lockout",
       setup(build) {
         build.onResolve({ filter: /two-factor-lockout$/ }, (args) => {
-          if (args.importer && /\/routes\/admin-2fa\.ts$/.test(args.importer)) {
+          if (args.importer && /[\\/]routes[\\/]admin-2fa\.ts$/.test(args.importer)) {
             return { path: "../lib/two-factor-lockout.mjs", external: true };
           }
           return undefined;

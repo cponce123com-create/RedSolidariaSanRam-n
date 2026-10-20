@@ -8,6 +8,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 
+// La reautenticación de las rutas de 2FA exige la contraseña del superadmin de
+// entorno; se define ANTES de cargar el bundle para que superadmin-credentials
+// la vea al importarse.
+process.env.ADMIN_USERNAME = "e2e-admin";
+process.env.ADMIN_PASSWORD = "e2e-password";
 process.env.DATABASE_URL ??= "postgres://localhost:5432/nonexistent";
 
 const { default: twoFactorRouter } = await import("./dist/routes/admin-2fa.mjs");
@@ -26,6 +31,21 @@ function buildApp() {
           username: req.headers["x-test-username"] ?? "tester",
           name: "Tester",
           role,
+        },
+      };
+    }
+    // Reto de 2FA guardado por /admin/login en la sesión del servidor.
+    if (req.headers["x-test-pending-user"] !== undefined) {
+      req.session = {
+        pendingAdminTwoFactor: {
+          userId: Number(req.headers["x-test-pending-user"]),
+          issuedAt: Date.now(),
+          ip: null,
+          userAgent: null,
+          attempts: 0,
+        },
+        save(callback) {
+          callback?.(null);
         },
       };
     }
@@ -48,13 +68,14 @@ async function withServer(fn) {
   }
 }
 
-function call(base, path, { role, id, username, method = "POST", body } = {}) {
+function call(base, path, { role, id, username, method = "POST", body, pending } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (role) {
     headers["x-test-role"] = role;
     if (id !== undefined) headers["x-test-admin-id"] = String(id);
     if (username !== undefined) headers["x-test-username"] = username;
   }
+  if (pending !== undefined) headers["x-test-pending-user"] = String(pending);
   return fetch(`${base}${path}`, {
     method,
     headers,
@@ -63,6 +84,7 @@ function call(base, path, { role, id, username, method = "POST", body } = {}) {
 }
 
 const ENV_SESSION = { role: "superadmin", id: 0, username: "e2e-admin" };
+const ENV_PASSWORD = "e2e-password";
 
 // ─── La sesión de entorno deja de ser un 404 ─────────────────────────────────
 
@@ -77,9 +99,21 @@ test("status del superadmin de entorno ya NO responde 404", async () => {
 
 test("setup del superadmin de entorno ya NO responde 404 (era el bug reportado)", async () => {
   await withServer(async (base) => {
-    const res = await call(base, "/api/admin/2fa/setup", ENV_SESSION);
+    const res = await call(base, "/api/admin/2fa/setup", {
+      ...ENV_SESSION,
+      body: { password: ENV_PASSWORD },
+    });
     assert.notEqual(res.status, 404);
     assert.equal(res.status, 500);
+  });
+});
+
+test("setup sin contraseña no genera ningún secreto (401 reauth_required)", async () => {
+  await withServer(async (base) => {
+    const res = await call(base, "/api/admin/2fa/setup", { ...ENV_SESSION, body: {} });
+    assert.equal(res.status, 401);
+    const body = await res.json();
+    assert.equal(body.code, "reauth_required");
   });
 });
 
@@ -87,7 +121,7 @@ test("verify del superadmin de entorno ya NO responde 404", async () => {
   await withServer(async (base) => {
     const res = await call(base, "/api/admin/2fa/verify", {
       ...ENV_SESSION,
-      body: { code: "123456" },
+      body: { code: "123456", password: ENV_PASSWORD },
     });
     assert.notEqual(res.status, 404);
     assert.equal(res.status, 500);
@@ -98,7 +132,7 @@ test("disable del superadmin de entorno ya NO responde 404", async () => {
   await withServer(async (base) => {
     const res = await call(base, "/api/admin/2fa/disable", {
       ...ENV_SESSION,
-      body: { code: "123456" },
+      body: { code: "123456", password: ENV_PASSWORD },
     });
     assert.notEqual(res.status, 404);
     assert.equal(res.status, 500);
@@ -110,9 +144,9 @@ test("disable del superadmin de entorno ya NO responde 404", async () => {
 test("las rutas de 2FA siguen exigiendo sesión (401 sin ella)", async () => {
   await withServer(async (base) => {
     assert.equal((await call(base, "/api/admin/2fa/status", { method: "GET" })).status, 401);
-    assert.equal((await call(base, "/api/admin/2fa/setup")).status, 401);
-    assert.equal((await call(base, "/api/admin/2fa/verify", { body: { code: "123456" } })).status, 401);
-    assert.equal((await call(base, "/api/admin/2fa/disable", { body: { code: "123456" } })).status, 401);
+    assert.equal((await call(base, "/api/admin/2fa/setup", { body: { password: ENV_PASSWORD } })).status, 401);
+    assert.equal((await call(base, "/api/admin/2fa/verify", { body: { code: "123456", password: ENV_PASSWORD } })).status, 401);
+    assert.equal((await call(base, "/api/admin/2fa/disable", { body: { code: "123456", password: ENV_PASSWORD } })).status, 401);
   });
 });
 
@@ -127,32 +161,50 @@ test("un administrador normal sigue pudiendo gestionar SU 2FA (no el del entorno
 test("un código con formato inválido se rechaza antes de tocar la base (400)", async () => {
   await withServer(async (base) => {
     for (const code of ["abc", "12345", "1234567", ""]) {
-      const res = await call(base, "/api/admin/2fa/verify", { ...ENV_SESSION, body: { code } });
+      const res = await call(base, "/api/admin/2fa/verify", {
+        ...ENV_SESSION,
+        body: { code, password: ENV_PASSWORD },
+      });
       assert.equal(res.status, 400, `code=${JSON.stringify(code)}`);
     }
-    const disable = await call(base, "/api/admin/2fa/disable", { ...ENV_SESSION, body: { code: "x" } });
+    const disable = await call(base, "/api/admin/2fa/disable", {
+      ...ENV_SESSION,
+      body: { code: "x", password: ENV_PASSWORD },
+    });
     assert.equal(disable.status, 400);
   });
 });
 
 // ─── Paso 2 del login ────────────────────────────────────────────────────────
 
-test("el paso 2 del login exige userId y código de 6 dígitos (400)", async () => {
+test("el paso 2 del login exige un código de 6 dígitos y NO acepta userId (400)", async () => {
   await withServer(async (base) => {
     assert.equal((await call(base, "/api/admin/2fa/login", { body: {} })).status, 400);
-    assert.equal((await call(base, "/api/admin/2fa/login", { body: { userId: 0 } })).status, 400);
+    assert.equal((await call(base, "/api/admin/2fa/login", { body: { code: "abc" } })).status, 400);
+    // El contrato vulnerable: userId ya no es un campo admitido.
     assert.equal(
-      (await call(base, "/api/admin/2fa/login", { body: { userId: 0, code: "abc" } })).status,
+      (await call(base, "/api/admin/2fa/login", { body: { userId: 0, code: "123456" } })).status,
       400,
     );
   });
 });
 
-test("el paso 2 acepta userId 0 (superadmin de entorno) y consulta su 2FA", async () => {
+test("el paso 2 sin reto en la sesión no autentica a nadie (401)", async () => {
   await withServer(async (base) => {
-    const res = await call(base, "/api/admin/2fa/login", { body: { userId: 0, code: "123456" } });
-    // Llega a leer el estado del 2FA del entorno (500 con la URL ficticia); lo que
-    // NO puede es ignorar el caso con un 401 inmediato por «usuario inexistente».
+    const res = await call(base, "/api/admin/2fa/login", { body: { code: "123456" } });
+    assert.equal(res.status, 401);
+  });
+});
+
+test("el reto guardado en la sesión sí resuelve al superadmin de entorno (consulta su 2FA)", async () => {
+  await withServer(async (base) => {
+    const res = await call(base, "/api/admin/2fa/login", {
+      body: { code: "123456" },
+      pending: 0,
+    });
+    // Llega a leer el estado del 2FA del entorno (500 con la URL ficticia); lo
+    // que NO puede es ignorar el caso con un 401 inmediato por «usuario
+    // inexistente».
     assert.equal(res.status, 500);
   });
 });

@@ -153,7 +153,7 @@ router.get("/campaigns/:id/leftovers", async (req, res) => {
         ),
       )
       .orderBy(desc(campaignLeftoversTable.createdAt));
-    res.json(leftovers.map(formatLeftover));
+    res.json(leftovers.map(formatPublicLeftover));
   } catch (err) {
     req.log.error({ err }, "Failed to get campaign leftovers");
     res.status(500).json({ error: "server_error", message: "Failed to get leftovers" });
@@ -295,6 +295,28 @@ export function formatLeftover(e: typeof campaignLeftoversTable.$inferSelect) {
     composition: e.composition,
     donorId: e.donorId,
     evidenceId: e.evidenceId,
+    createdAt: toIsoSafe(e.createdAt),
+  };
+}
+
+/**
+ * DTO público de un bien. `donorId` y `evidenceId` son claves internas que
+ * permiten enlazar el bien con la ficha de una persona o una prueba privada;
+ * no aportan nada a la web y no deben salir por el endpoint anónimo.
+ */
+export function formatPublicLeftover(e: typeof campaignLeftoversTable.$inferSelect) {
+  return {
+    id: e.id,
+    campaignId: e.campaignId,
+    item: e.item,
+    quantity: e.quantity,
+    unit: e.unit,
+    notes: e.notes,
+    category: e.category,
+    targetQty: e.targetQty,
+    receivedQty: e.receivedQty,
+    usedQty: e.usedQty,
+    composition: e.composition,
     createdAt: toIsoSafe(e.createdAt),
   };
 }
