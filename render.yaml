@@ -32,3 +32,5 @@ services:
         sync: false
       - key: FACEBOOK_PAGE_ACCESS_TOKEN
         sync: false
+      - key: FACEBOOK_AUTO_PUBLISH_ENABLED
+        value: "true"
