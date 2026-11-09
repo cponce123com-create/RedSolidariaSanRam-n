@@ -17,6 +17,6 @@ export const facebookPublicationsTable = pgTable("facebook_publications", {
 }, t => [
   unique("facebook_publications_source_unique").on(t.sourceType, t.sourceId),
   index("facebook_publications_pending_idx").on(t.status, t.nextAttemptAt),
-  check("facebook_publications_source_check", sql`${t.sourceType} in ('news','campaign')`),
-  check("facebook_publications_status_check", sql`${t.status} in ('pending','processing','published','failed','uncertain','cancelled')`),
+  check("facebook_publications_source_check", sql`${t.sourceType} in ('news','campaign','donation','pet','report','update','campaign_result')`),
+  check("facebook_publications_status_check", sql`${t.status} in ('pending','pending_v2','processing','published','failed','uncertain','cancelled')`),
 ]);
