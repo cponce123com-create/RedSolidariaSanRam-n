@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState } from "react";
-import { useGetCampaigns } from "@workspace/api-client-react";
+import { getCampaigns } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { CampaignCard } from "@/components/shared/CampaignCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { UrgencyBanner } from "@/components/shared/UrgencyBanner";
@@ -20,10 +21,17 @@ export default function Campaigns() {
   const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
   const [view, setView] = useState<"grid" | "map">("grid");
   
+  const [offset, setOffset] = useState(0);
+  const pageSize = 24;
+  const changeFilter = (value: typeof filter) => { setFilter(value); setOffset(0); };
   const protagonistId = useProtagonistId();
 
   // Using generated hook from Orval
-  const { data: campaigns, isLoading } = useGetCampaigns({ status: filter === "all" ? undefined : filter });
+  const queryParams = { status: filter === "all" ? undefined : filter, limit: pageSize, offset };
+  const { data: campaigns, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ["/api/campaigns", queryParams],
+    queryFn: ({ signal }) => getCampaigns(queryParams, { signal }),
+  });
 
   // La campaña protagonista se muestra primero, respetando el filtro de estado
   // (si el filtro no la incluye, el orden no cambia).
@@ -54,21 +62,21 @@ export default function Campaigns() {
           <div className="flex flex-wrap justify-center gap-3 mt-10">
             <Button 
               variant={filter === "all" ? "default" : "outline"}
-              onClick={() => setFilter("all")}
+              onClick={() => changeFilter("all")}
               className="rounded-full px-6"
             >
               {t("campaigns.filterAll")}
             </Button>
             <Button 
               variant={filter === "active" ? "default" : "outline"}
-              onClick={() => setFilter("active")}
+              onClick={() => changeFilter("active")}
               className="rounded-full px-6"
             >
               {t("campaigns.filterActive")}
             </Button>
             <Button 
               variant={filter === "completed" ? "default" : "outline"}
-              onClick={() => setFilter("completed")}
+              onClick={() => changeFilter("completed")}
               className="rounded-full px-6"
             >
               {t("campaigns.filterCompleted")}
@@ -110,6 +118,11 @@ export default function Campaigns() {
                 <div key={i} className="h-96 bg-muted animate-pulse rounded-2xl" />
               ))}
             </div>
+          ) : isError ? (
+            <div role="alert" className="rounded-2xl border border-destructive/30 p-8 text-center">
+              <p>{t("campaigns.loadError")}</p>
+              <Button onClick={() => void refetch()} disabled={isFetching} className="mt-4">{t("campaigns.retry")}</Button>
+            </div>
           ) : view === "map" ? (
             <Suspense fallback={<div className="h-[520px] bg-muted animate-pulse rounded-3xl" />}>
               <CampaignMap campaigns={orderedCampaigns} />
@@ -126,6 +139,13 @@ export default function Campaigns() {
               title={t("campaigns.emptyTitle")}
               description={t("campaigns.emptyDescription")}
             />
+          )}
+          {!isLoading && !isError && (
+            <nav aria-label={t("campaigns.pagination")} className="mt-10 flex flex-wrap items-center justify-center gap-4">
+              <Button variant="outline" disabled={offset === 0 || isFetching} onClick={() => setOffset(Math.max(0, offset - pageSize))}>{t("campaigns.previous")}</Button>
+              <span aria-live="polite">{t("campaigns.pageNumber", { page: offset / pageSize + 1 })}</span>
+              <Button variant="outline" disabled={(campaigns?.length ?? 0) < pageSize || isFetching} onClick={() => setOffset(offset + pageSize)}>{t("campaigns.next")}</Button>
+            </nav>
           )}
         </div>
       </section>

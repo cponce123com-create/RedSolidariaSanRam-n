@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,7 +101,7 @@ export default function AdminTestimonials() {
       toast({ title: "No se pudo eliminar el testimonio", description: errorMessage(error), variant: "destructive" }),
   });
 
-  const handleSave = () => { queryClient.invalidateQueries({ queryKey: ["/api/testimonials"] }); setShowForm(false); setEditing(null); };
+  const handleSave = () => { invalidateTestimonialQueries(queryClient); setShowForm(false); setEditing(null); };
 
   return (
     <div className="p-6 sm:p-8 max-w-4xl">

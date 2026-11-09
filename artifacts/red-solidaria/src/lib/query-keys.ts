@@ -73,6 +73,7 @@ function headIs(key: readonly unknown[], prefix: string): boolean {
 /** Campañas: lista, detalle, subrecursos públicos y administrativos. */
 export function isCampaignQueryKey(key: readonly unknown[]): boolean {
   return (
+    key[0] === "transparency-campaigns" || key[0] === "transparency-ledger" || key[0] === "campaign-donors" ||
     headIs(key, CAMPAIGNS_KEY) || headIs(key, ADMIN_CAMPAIGNS_KEY)
   );
 }
@@ -80,6 +81,7 @@ export function isCampaignQueryKey(key: readonly unknown[]): boolean {
 /** Donaciones: listado, estadísticas, comprobantes y duplicados. */
 export function isDonationQueryKey(key: readonly unknown[]): boolean {
   return (
+    key[0] === "transparency-stats" || key[0] === "transparency-ledger" || key[0] === "campaign-donors" ||
     headIs(key, DONATIONS_KEY) || headIs(key, ADMIN_DONATIONS_KEY)
   );
 }

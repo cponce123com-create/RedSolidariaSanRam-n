@@ -1,4 +1,5 @@
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { publicRefreshInterval, subscribeToEntityChanges } from "@/lib/query-sync";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DynamicFavicon } from "@/components/shared/DynamicFavicon";
@@ -71,16 +72,15 @@ const AdminInstitutionalIdentity = lazy(() => import("./pages/admin/institutiona
 const AdminContent = lazy(() => import("./pages/admin/content"));
 const AdminPageEditor = lazy(() => import("./pages/admin/page-editor"));
 
-// Caché de 60s y refresco al volver a la pestaña: los datos ya cacheados se
-// muestran al instante y, si tienen más de 60s, se revalidan al enfocar la
-// ventana. Antes `refetchOnWindowFocus: false` mantenía la web pública con datos
-// viejos hasta una recarga manual, lo que hacía parecer que el panel de
-// administración «no guardaba» (Fase 1 — sincronización admin↔público).
+// Revalidate on navigation/focus and while visible. Entity invalidation also
+// crosses tabs; the server revalidates HTTP caches after publication changes.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60_000,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: "always",
+      refetchOnMount: "always",
+      refetchInterval: query => query.state.error ? false : publicRefreshInterval(query.queryKey),
     },
   },
 });
@@ -116,6 +116,7 @@ function PageLoader() {
 }
 
 function App() {
+  useEffect(() => subscribeToEntityChanges(queryClient), []);
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

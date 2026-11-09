@@ -62,7 +62,7 @@ export const donationInputSchema = z
     // anterior, que solo conocía donaciones de dinero).
     collaborationType: z
       .enum(COLLABORATION_TYPES, {
-        errorMap: () => ({ message: "Tipo de colaboración inválido" }),
+        error: "Tipo de colaboración inválido",
       })
       .default(DEFAULT_COLLABORATION_TYPE),
     // Valor: en dinero es el monto donado; en especie es un estimado que puede
@@ -82,7 +82,7 @@ export const donationInputSchema = z
     // Opcional: una donación en especie no tiene método de pago.
     paymentMethod: z
       .enum(PAYMENT_METHODS, {
-        errorMap: () => ({ message: "Método de pago inválido" }),
+        error: "Método de pago inválido",
       })
       .nullish(),
     message: z.string().trim().max(1000).nullish(),

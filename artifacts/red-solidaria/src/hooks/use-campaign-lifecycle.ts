@@ -1,3 +1,4 @@
+import { invalidateEntities } from "@/lib/query-invalidation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -131,7 +132,7 @@ export function useSaveSettings() {
   return useMutation({
     mutationFn: (entries: SettingEntry[]) => saveSettings(entries),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+      invalidateEntities(queryClient, ["settings"]);
       toast({ title: "Datos del evento guardados" });
     },
     onError: (err) => {

@@ -287,7 +287,7 @@ router.get("/campaigns/:id", async (req, res) => {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
     // Un borrador no publicado no se expone al público (404 como si no existiera).
-    if (!isAdminRequest(req) && row.campaign.status === "draft") {
+    if (!isAdminRequest(req) && isHiddenStatus(row.campaign.status)) {
       return res.status(404).json({ error: "not_found", message: "Campaign not found" });
     }
     if (isAdminRequest(req)) res.setHeader("Cache-Control", "private, no-store");

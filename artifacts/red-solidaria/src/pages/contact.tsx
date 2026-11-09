@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import SEO from "@/components/shared/SEO";
 import { CmsPageHeading } from "@/components/shared/CmsPageHeading";
 import { useTranslation } from "react-i18next";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import * as z from "zod";
 import { useSendContactMessage } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";

@@ -1,5 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { isEntityQueryKey, type QueryEntity } from "@/lib/query-keys";
+import { broadcastEntityChanges } from "./query-sync";
 
 /**
  * Invalidación de caché por ENTIDAD (Prompt Maestro, Fase 1 — sincronización).
@@ -19,6 +20,7 @@ export function invalidateEntities(
   queryClient: QueryClient,
   entities: readonly QueryEntity[],
 ): void {
+  broadcastEntityChanges(entities);
   void queryClient.invalidateQueries({
     predicate: (query) =>
       Array.isArray(query.queryKey) &&

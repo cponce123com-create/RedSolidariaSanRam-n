@@ -1,3 +1,4 @@
+import notificationsRouter from "./notifications";
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import campaignsRouter from "./campaigns";
@@ -55,6 +56,7 @@ router.use(adminTwoFactorRouter);
 router.use("/admin", requireAdmin, adminActionLimiter);
 
 router.use(healthRouter);
+router.use(notificationsRouter);
 router.use(campaignsRouter);
 router.use(campaignUpdatesRouter);
 router.use(campaignImagesRouter);

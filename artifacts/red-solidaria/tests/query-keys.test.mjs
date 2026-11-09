@@ -224,3 +224,14 @@ test("V15: invalidar mascotas refresca panel, web pública y solicitudes", async
   assert.equal(matched(reportClient, ["home-featured-reports"]), true);
   assert.equal(matched(reportClient, ["home-pets-available"]), false);
 });
+
+
+test("transparency aliases and campaign donor lists participate in entity invalidation", () => {
+  for (const key of [["transparency-campaigns"], ["transparency-ledger", 2], ["campaign-donors", 5]]) {
+    assert.equal(isEntityQueryKey(key, ["campaigns"]), true);
+  }
+  for (const key of [["transparency-stats"], ["transparency-ledger", 2], ["campaign-donors", 5]]) {
+    assert.equal(isEntityQueryKey(key, ["donations"]), true);
+  }
+  assert.equal(isEntityQueryKey(["transparency-stats"], ["pets"]), false);
+});

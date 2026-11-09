@@ -63,8 +63,8 @@ export default function Home() {
 
       {/* Portada institucional administrable: no renderiza nada si no hay
           contenido publicado, así el home nunca se rompe por falta de identidad. */}
-      <InstitutionalCover />
       {isBlockEnabled(inicio, "hero") && <HomeHero />}
+      <InstitutionalCover />
       {/* Campaña protagonista (ChocoFest 2026): solo si está configurada,
           publicada y activa. Si no, no renderiza nada y la portada general
           se mantiene igual. */}

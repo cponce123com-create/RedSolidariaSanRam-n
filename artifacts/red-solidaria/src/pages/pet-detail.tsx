@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { optimizeImageUrl } from "@/lib/image-url";
+import { ApiError, readErrorMessage } from "@/lib/api-error";
 import {
   Dog, Cat, Heart, ArrowLeft, MapPin, Syringe, Scissors, Shield,
   Phone, Mail, User, Home, Check, ChevronLeft, ChevronRight, Star,
@@ -61,7 +62,7 @@ export default function PetDetail() {
     hasPetExperience: z.boolean().default(false),
     previousPets: z.string().optional(),
     housingType: z.enum(["casa-propia", "casa-alquilada", "departamento", "cuarto"], {
-      required_error: t("petDetail.housingRequired"),
+      error: t("petDetail.housingRequired"),
     }),
     hasYard: z.boolean().default(false),
     adoptionReason: z.string().min(20, t("petDetail.reasonMin")),
@@ -69,13 +70,14 @@ export default function PetDetail() {
   });
   type AdoptFormValues = z.infer<typeof adoptSchema>;
 
-  const { data: pet, isLoading } = useQuery<Pet>({
+  const { data: pet, isLoading, error, refetch } = useQuery<Pet>({
     queryKey: ["/api/pets", id],
     queryFn: async () => {
-      const res = await fetch(`/api/pets/${id}`);
-      if (!res.ok) throw new Error("Mascota no encontrada");
+      const res = await fetch(`/api/pets/${id}`, { cache: "no-cache" });
+      if (!res.ok) throw new ApiError(res.status, await readErrorMessage(res));
       return res.json();
     },
+    retry: false,
   });
 
   const form = useForm<AdoptFormValues>({
@@ -121,7 +123,14 @@ export default function PetDetail() {
     );
   }
 
-  if (!pet) return (
+  if (error && (!(error instanceof ApiError) || error.status !== 404)) return (
+    <div role="alert" className="text-center py-20">
+      <p>No pudimos actualizar esta ficha. Comprueba tu conexión.</p>
+      <Button className="mt-4" onClick={() => void refetch()}>Reintentar</Button>
+    </div>
+  );
+
+  if (!pet || (error instanceof ApiError && error.status === 404)) return (
     <div className="text-center py-20">
       <p className="text-muted-foreground">{t("petDetail.notFound")}</p>
       <Link href="/adopciones"><Button className="mt-4 rounded-xl">{t("petDetail.viewAdoptions")}</Button></Link>

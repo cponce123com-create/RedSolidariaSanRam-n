@@ -396,6 +396,12 @@ export const es = {
     finalCtaNeedHelp: "Necesito ayuda",
   },
   campaigns: {
+    loadError: 'No pudimos cargar las campañas. Esto no significa que no existan.',
+    retry: 'Reintentar',
+    pagination: 'Páginas de campañas',
+    previous: 'Anterior',
+    next: 'Siguiente',
+    pageNumber: 'Página {{page}}',
     seoTitle: "Campañas Solidarias",
     seoDescription:
       "Conoce y apoya nuestras campañas activas. Cada donación transforma vidas en San Ramón, Chanchamayo, Perú.",

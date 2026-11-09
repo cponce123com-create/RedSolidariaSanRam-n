@@ -1,7 +1,7 @@
-import { PETS_KEY, ADMIN_PETS_KEY } from "../../lib/query-keys";
+import { invalidatePetQueries } from "@/lib/query-invalidation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import * as z from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useLocation } from "wouter";
@@ -97,8 +97,7 @@ export default function AdminPetForm() {
       // `/api/admin/pets`, así que la web pública seguía mostrando la mascota eliminada
       // (o los datos viejos) hasta que el visitante recargaba a mano: dos entradas de
       // caché distintas para el mismo dato.
-      queryClient.invalidateQueries({ queryKey: [ADMIN_PETS_KEY] });
-      queryClient.invalidateQueries({ queryKey: [PETS_KEY] });
+      invalidatePetQueries(queryClient);
       toast({ title: isEdit ? "Mascota actualizada" : "Mascota creada" });
       setLocation("/admin/adopciones");
     },

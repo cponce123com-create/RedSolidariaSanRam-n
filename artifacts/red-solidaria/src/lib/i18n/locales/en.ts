@@ -397,6 +397,12 @@ export const en: TranslationSchema = {
     finalCtaNeedHelp: "I need help",
   },
   campaigns: {
+    loadError: 'We could not load campaigns. This does not mean there are no campaigns.',
+    retry: 'Try again',
+    pagination: 'Campaign pages',
+    previous: 'Previous',
+    next: 'Next',
+    pageNumber: 'Page {{page}}',
     seoTitle: "Solidarity Campaigns",
     seoDescription:
       "Learn about and support our active campaigns. Every donation transforms lives in San Ramón, Chanchamayo, Peru.",
