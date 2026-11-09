@@ -35,7 +35,7 @@ export function DonationModal({ open, onClose, campaignTitle }: DonationModalPro
           <DialogTitle>Coordina tu aporte por WhatsApp</DialogTitle>
           <DialogDescription>
             Escríbenos y te ayudaremos a elegir la forma de colaborar. Nuestro equipo
-            registrará el aporte y podrás consultarlo en la página pública de transparencia.
+            registrará el aporte como pendiente de revisión. Solo después de confirmarlo se sumará a la recaudación pública y aparecerá en transparencia.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 pt-2">

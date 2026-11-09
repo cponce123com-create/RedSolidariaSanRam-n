@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.SubcomposeAsyncImage
@@ -33,21 +35,34 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        NoticeStore.initialize(applicationContext)
         enableEdgeToEdge()
         setContent {
             val colors = if (isSystemInDarkTheme()) darkColorScheme(primary = Color(0xFF81D98D))
                 else lightColorScheme(primary = Color(0xFF238B34), secondaryContainer = Color(0xFFE8F4E9))
-            MaterialTheme(colorScheme = colors) { CampaignApp() }
+            MaterialTheme(colorScheme = colors) { CampaignApp(initialCampaign = intent.getIntExtra("notice_campaign", 0), initialNotice = intent.getStringExtra("notice_key")) }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CampaignApp(model: CampaignViewModel = viewModel()) {
+private fun CampaignApp(model: CampaignViewModel = viewModel(), initialCampaign: Int = 0, initialNotice: String? = null) {
+    val context = LocalContext.current
+    var inbox by remember { mutableStateOf(initialNotice != null && initialCampaign == 0) }
+    val notices by NoticeStore.items.collectAsStateWithLifecycle()
+    val categories by NoticeStore.categories.collectAsStateWithLifecycle()
+    val unread = notices.count { !it.read && it.category in categories }
+    LaunchedEffect(Unit) {
+        initialNotice?.let { NoticeStore.markRead(context, it) }
+        if (initialCampaign > 0) model.open(initialCampaign)
+        try { NoticeStore.sync(context, false) } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { /* Inbox exposes retry and error. */ }
+    }
     val state by model.state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-    BackHandler(enabled = state.selectedId != null) { model.closeDetail() }
+    BackHandler(enabled = state.selectedId != null || inbox) {
+        if (state.selectedId != null) model.closeDetail() else inbox = false
+    }
     Scaffold(topBar = {
         TopAppBar(
             title = { Column {
@@ -55,12 +70,17 @@ private fun CampaignApp(model: CampaignViewModel = viewModel()) {
                 Text("San Ramón · Chanchamayo", style = MaterialTheme.typography.labelMedium)
             } },
             navigationIcon = {
-                if (state.selectedId != null) TextButton(onClick = model::closeDetail) { Text("Volver") }
+                if (state.selectedId != null || inbox) TextButton(onClick = {
+                    if (state.selectedId != null) model.closeDetail() else inbox = false
+                }) { Text("Volver") }
             },
             actions = {
-                TextButton(enabled = !state.loading && !state.detailLoading, onClick = {
+                IconButton(onClick = { inbox = true; model.closeDetail() }, modifier = Modifier.semantics { contentDescription = "Avisos importantes: $unread sin leer" }) {
+                    BadgedBox(badge = { if (unread > 0) Badge { Text(unread.toString()) } }) { Text("🔔") }
+                }
+                IconButton(enabled = !state.loading && !state.detailLoading && !inbox, modifier = Modifier.semantics { contentDescription = "Actualizar campañas" }, onClick = {
                     state.selectedId?.let(model::open) ?: model.load()
-                }) { Text("Actualizar") }
+                }) { Text("↻") }
             },
         )
     }) { padding ->
@@ -71,6 +91,8 @@ private fun CampaignApp(model: CampaignViewModel = viewModel()) {
                 state.detailError?.let { error -> item { ErrorMessage(error) { model.open(requireNotNull(state.selectedId)) } } }
                 state.detail?.let { campaign -> item { CampaignDetail(campaign) } }
             }
+        } else if (inbox) {
+            NoticePanel(padding = padding, onCampaign = { id -> model.open(id) })
         } else {
             LazyColumn(Modifier.fillMaxSize().padding(padding), state = listState,
                 contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {

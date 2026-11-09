@@ -35,7 +35,7 @@ jobs:
       - name: Upload installable test APK
         uses: actions/upload-artifact@v4
         with:
-          name: RedSolidaria-Android-debug
+          name: RedSolidaria-Android-0.2.0-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Upload verification reports

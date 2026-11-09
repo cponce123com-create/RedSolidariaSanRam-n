@@ -116,7 +116,7 @@ export function HomeHero() {
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.32 }}
-              className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center"
+              className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center"
             >
               <Button
                 asChild
@@ -140,10 +140,10 @@ export function HomeHero() {
                 </Link>
               </Button>
               <Link
-                href="/nosotros"
+                href="/transparencia"
                 className="group inline-flex items-center gap-1.5 px-2 py-2 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors"
               >
-                {t("home.heroCtaNetwork")}
+                {t("nav.transparency")}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </motion.div>
