@@ -1,0 +1,44 @@
+name: Android native APK
+
+on:
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
+  push:
+    branches: [main, 'android-native/**']
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;34.0.0'
+      - name: Test, lint and build native Android app
+        run: gradle -p android testDebugUnitTest lintDebug assembleDebug --stacktrace
+      - name: Upload installable test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedSolidaria-Android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-verification-reports
+          path: android/app/build/reports/
+          if-no-files-found: ignore
