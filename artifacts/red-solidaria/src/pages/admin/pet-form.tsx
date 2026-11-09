@@ -73,6 +73,7 @@ export default function AdminPetForm() {
       breed: "", ageApprox: "", photos: "", description: "", history: "",
       location: "", contactName: "", contactPhone: "", contactEmail: "", adoptionRequirements: "",
     },
+    resetOptions: { keepDirtyValues: true },
     values: isEdit && existingPet ? {
       ...existingPet,
       photos: Array.isArray(existingPet.photos) ? existingPet.photos.join(", ") : (existingPet.photos || ""),
