@@ -177,7 +177,7 @@ fun PetsScreen(padding: PaddingValues, community: CommunityViewModel, navigate: 
         item { SectionTitle("Ellos esperan una familia", "Adopta con responsabilidad. Conoce a los animales que buscan un hogar.") }
         item { TextButton(onClick = { community.load("pets", "pets") }, enabled = !feed.loading) { Text("Actualizar adopciones") } }
         item { OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("Buscar por nombre o ubicación") }, leadingIcon = { Icon(Icons.Outlined.Search, null) }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("all" to "Todos", "perro" to "Perros", "gato" to "Gatos").forEach { (key, label) ->
+        item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("all" to "Todos", "perro" to "Perros", "gato" to "Gatos").forEach { (key, label) ->
             FilterChip(selected = species == key, onClick = { species = key }, label = { Text(label) })
         } } }
         items(rows, key = { it.optInt("id") }) { pet -> PetTile(pet) { navigate("pet/${pet.optInt("id")}") } }
@@ -214,7 +214,7 @@ fun PetTile(pet: JSONObject, modifier: Modifier = Modifier, compact: Boolean = f
 @Composable
 fun PetDetailScreen(padding: PaddingValues, id: Int, community: CommunityViewModel, navigate: (String) -> Unit) {
     var adoption by rememberSaveable(id) { mutableStateOf(false) }
-    DetailLoader("pets/$id", community) { pet, error, retry ->
+    DetailLoader("pets/$id", community, refreshEnabled = !adoption) { pet, error, retry ->
         if (adoption && pet != null) AdoptionForm(padding, pet, community) { adoption = false }
         else LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             if (pet == null && error == null) item { LoadingBlock() }
@@ -313,17 +313,18 @@ fun TransparencyScreen(padding: PaddingValues, community: CommunityViewModel, op
 }
 
 @Composable
-fun DetailLoader(path: String, community: CommunityViewModel, content: @Composable (JSONObject?, String?, () -> Unit) -> Unit) {
+fun DetailLoader(path: String, community: CommunityViewModel, refreshEnabled: Boolean = true, content: @Composable (JSONObject?, String?, () -> Unit) -> Unit) {
     var revision by remember(path) { mutableIntStateOf(0) }
     var data by remember(path) { mutableStateOf<JSONObject?>(null) }
     var error by remember(path) { mutableStateOf<String?>(null) }
-    LaunchedEffect(path, revision) {
+    LaunchedEffect(path, revision, refreshEnabled) {
+        if (!refreshEnabled) return@LaunchedEffect
         error = null
         try { data = community.api.obj(path) }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) { data = null; error = failure.message ?: "No se pudo consultar la información." }
     }
-    RefreshWhileVisible(path) { revision++ }
+    if (refreshEnabled) RefreshWhileVisible(path) { revision++ }
     content(data, error) { revision++ }
 }
 

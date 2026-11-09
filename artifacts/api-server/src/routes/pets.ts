@@ -1,8 +1,9 @@
+import { adoptionPetStatus } from "../lib/adoption-state";
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "@workspace/db";
 import { petsTable, insertPetSchema, publicInsertPetSchema, updatePetSchema, adoptionRequestsTable, insertAdoptionRequestSchema } from "@workspace/db/schema";
-import { eq, desc, and, or } from "drizzle-orm";
+import { eq, desc, and, or, ne } from "drizzle-orm";
 import { adoptionLimiter } from "../middleware/rate-limit";
 
 const router = Router();
@@ -145,9 +146,9 @@ router.get("/admin/pets/:id", async (req, res) => {
 
 // ─── ADMIN: Create pet ────────────────────────────────────────────────────────
 router.post("/admin/pets", async (req, res) => {
-  const parsed = insertPetSchema.safeParse(req.body);
+  const parsed = insertPetSchema.extend({ status: z.enum(["available", "adopted", "in-process", "reviewing", "inactive"]).default("available") }).safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Datos inválidos", details: parsed.error.issues });
-  const [pet] = await db.insert(petsTable).values({ ...parsed.data, status: "available" }).returning();
+  const [pet] = await db.insert(petsTable).values(parsed.data).returning();
   return res.status(201).json(pet);
 });
 
@@ -227,22 +228,26 @@ router.patch("/admin/adoption-requests/:id", async (req, res) => {
   // Transaccional (hallazgo API-04): el estado de la solicitud y el de la
   // mascota deben cambiar juntos.
   const updated = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(adoptionRequestsTable)
-      .set({ status, adminNotes })
-      .where(eq(adoptionRequestsTable.id, id))
-      .returning();
-    if (!row) return null;
-
-    // If approved, mark pet as "adopted"
-    if (status === "approved") {
-      await tx.update(petsTable).set({ status: "adopted", updatedAt: new Date() }).where(eq(petsTable.id, row.petId));
-    }
-    // If in-process, mark pet as "in-process"
-    if (status === "in-process") {
-      await tx.update(petsTable).set({ status: "in-process", updatedAt: new Date() }).where(eq(petsTable.id, row.petId));
-    }
+    const [existing] = await tx.select().from(adoptionRequestsTable).where(eq(adoptionRequestsTable.id, id));
+    if (!existing) return null;
+    // Serialize all decisions for this animal before changing any request.
+    const [pet] = await tx.select().from(petsTable).where(eq(petsTable.id, existing.petId)).for("update");
+    if (!pet) return null;
+    const [current] = await tx.select().from(adoptionRequestsTable).where(eq(adoptionRequestsTable.id, id));
+    if (!current) return null;
+    const others = await tx.select().from(adoptionRequestsTable).where(and(
+      eq(adoptionRequestsTable.petId, pet.id), ne(adoptionRequestsTable.id, id),
+      or(eq(adoptionRequestsTable.status, "approved"), eq(adoptionRequestsTable.status, "in-process")),
+    ));
+    if ((status === "approved" || status === "in-process") && others.length) return { conflict: true } as const;
+    const [row] = await tx.update(adoptionRequestsTable).set({ status, adminNotes })
+      .where(eq(adoptionRequestsTable.id, id)).returning();
+    const nextStatus = adoptionPetStatus(pet.status, current.status, status, others.map(r => r.status));
+    await tx.update(petsTable).set({ status: nextStatus, updatedAt: new Date() }).where(eq(petsTable.id, pet.id));
     return row;
+  });
+  if (updated && "conflict" in updated) return res.status(409).json({
+    error: "conflict", message: "Esta mascota ya tiene otra solicitud aprobada o en proceso.",
   });
 
   if (!updated) return res.status(404).json({ error: "Solicitud no encontrada" });

@@ -33,6 +33,7 @@ fun HomeScreen(padding: PaddingValues, campaigns: CampaignViewModel, community: 
     val protagonist = active.firstOrNull { it.id == settings.optInt("protagonist_campaign_id") } ?: active.firstOrNull()
     val page = cms["inicio"]
     LaunchedEffect(Unit) { campaigns.load("all") }
+    RefreshWhileVisible("home-cms") { community.loadCms("inicio") }
     LazyColumn(Modifier.fillMaxSize().padding(padding), verticalArrangement = Arrangement.spacedBy(28.dp),
         contentPadding = PaddingValues(bottom = 32.dp)) {
         val cover = identity?.optJSONObject("cover")?.let { it.text("mobileUrl").ifBlank { it.text("desktopUrl") } }

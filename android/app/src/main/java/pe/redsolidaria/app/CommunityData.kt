@@ -80,10 +80,15 @@ class CommunityViewModel : ViewModel() {
         loadCms("inicio")
     }
 
+    private val cmsLoadedAt = mutableMapOf<String, Long>()
+
     fun loadCms(slug: String) {
-        if (mutableCms.value.containsKey(slug)) return
+        if (System.nanoTime() - (cmsLoadedAt[slug] ?: 0L) < 60_000_000_000L && mutableCms.value.containsKey(slug)) return
         viewModelScope.launch {
-            try { mutableCms.value = mutableCms.value + (slug to api.obj("cms/pages/$slug")) }
+            try {
+                mutableCms.value = mutableCms.value + (slug to api.obj("cms/pages/$slug"))
+                cmsLoadedAt[slug] = System.nanoTime()
+            }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { /* Public pages retain the same fallback as the web. */ }
         }

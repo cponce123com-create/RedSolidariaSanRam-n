@@ -75,7 +75,7 @@ router.get("/transparency/ledger", async (req, res) => {
     ]);
     const [countRow] = countResult.rows as [{ total: number }?];
     const rows = entriesResult.rows as Record<string, unknown>[];
-    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "public, no-cache");
     return res.json({
       total: Number(countRow?.total ?? 0),
       limit,
@@ -207,7 +207,7 @@ router.get("/campaigns/:id/transparency", async (req, res) => {
     const publicSpent = Number(expenseRow?.public_spent ?? 0);
     const reportedSpent = financeReader ? totalSpent : publicSpent;
     if (req.session?.adminUser) res.setHeader("Cache-Control", "private, no-store");
-    else res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+    else res.setHeader("Cache-Control", "public, no-cache");
     const goal = campaign.goal || 0;
 
     return res.json({

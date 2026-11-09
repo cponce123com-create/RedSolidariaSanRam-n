@@ -1,5 +1,5 @@
 import { invalidateEntities } from "@/lib/query-invalidation";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -236,6 +236,7 @@ export default function AdminSettings() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
+  const dirtyRef = useRef(false);
 
   const { data: settings = [], isLoading } = useQuery<SettingRow[]>({
     queryKey: ["admin-settings"],
@@ -245,7 +246,7 @@ export default function AdminSettings() {
       const rows: SettingRow[] = await res.json();
       const initial: Record<string, string> = {};
       for (const r of rows) initial[r.key] = r.value ?? "";
-      setForm(initial);
+      if (!dirtyRef.current) setForm(initial);
       return rows;
     },
   });
@@ -264,6 +265,7 @@ export default function AdminSettings() {
     onSuccess: () => {
       toast({ title: "Configuración guardada", description: "Los cambios se aplicaron correctamente." });
       invalidateEntities(queryClient, ["settings"]);
+      dirtyRef.current = false;
       setDirty(false);
     },
     onError: () => {
@@ -273,6 +275,7 @@ export default function AdminSettings() {
 
   const handleChange = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    dirtyRef.current = true;
     setDirty(true);
   };
 
@@ -297,7 +300,7 @@ export default function AdminSettings() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Configuración del Sitio</h1>
           <p className="text-sm text-muted-foreground mt-1">Datos generales de la organización usados en toda la web</p>
