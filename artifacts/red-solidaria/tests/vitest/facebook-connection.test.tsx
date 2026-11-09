@@ -3,10 +3,10 @@ import { fireEvent, screen } from "@testing-library/react";
 import { FacebookConnectionCard } from "@/components/admin/FacebookConnectionCard";
 import { renderWithProviders } from "./test-utils";
 
-it("checks Facebook only on request and shows the verified Page with publishing still pending", async () => {
+it("checks Facebook only on request and shows the verified Page and automatic publication setting", async () => {
   const request = vi.fn(async () => new Response(JSON.stringify({ status: "connected", pageIdConfigured: true,
     tokenConfigured: true, page: { id: "914513275073067", name: "Red Solidaria San Ramón" },
-    message: "La identidad de la página está verificada.", publishingVerified: false }), { status: 200 }));
+    message: "La identidad de la página está verificada.", publishingVerified: false, autoPublishEnabled: true, siteUrlConfigured: true }), { status: 200 }));
   vi.stubGlobal("fetch", request);
   renderWithProviders(<FacebookConnectionCard />);
   expect(request).not.toHaveBeenCalled();
@@ -14,7 +14,7 @@ it("checks Facebook only on request and shows the verified Page with publishing 
   await screen.findByText("Red Solidaria San Ramón");
   expect(request).toHaveBeenCalledTimes(1);
   expect(request).toHaveBeenCalledWith("/api/admin/integrations/facebook/status", expect.objectContaining({ credentials: "include" }));
-  expect(screen.getByText(/Publicar desde la web sigue pendiente/)).toBeInTheDocument();
+  expect(screen.getByText(/Publicación automática activada/)).toBeInTheDocument();
 });
 
 it("shows missing configuration without claiming a connection", async () => {
