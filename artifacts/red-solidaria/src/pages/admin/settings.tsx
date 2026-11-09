@@ -1,4 +1,5 @@
 import { invalidateEntities } from "@/lib/query-invalidation";
+import { FacebookConnectionCard } from "@/components/admin/FacebookConnectionCard";
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -371,6 +372,7 @@ export default function AdminSettings() {
         </div>
       )}
 
+      <FacebookConnectionCard />
       <TwoFactorCard />
     </div>
   );
