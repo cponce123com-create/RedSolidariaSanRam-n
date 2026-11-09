@@ -15,6 +15,10 @@ export async function readFacebookContent(kind: FacebookSource, id: number, data
     // Recognition requires a positive latest decision AND a non-anonymous donation.
     const { rows } = await database.query(`SELECT d.id,d.amount,d.collaboration_type AS "collaborationType",
       c.id AS "campaignId",c.title AS "campaignTitle",c.image_url AS "campaignImage",
+      d.publication_template AS "publicationTemplate",
+      CASE WHEN (SELECT dc.granted FROM donation_consents dc WHERE dc.donation_id=d.id AND dc.scope='public_photo'
+        ORDER BY dc.created_at DESC,dc.id DESC LIMIT 1) IS TRUE
+        THEN d.publication_image_url ELSE NULL END AS "publicationImageUrl",
       CASE WHEN NOT d.anonymous AND (SELECT dc.granted FROM donation_consents dc WHERE dc.donation_id=d.id AND dc.scope='public_name'
         ORDER BY dc.created_at DESC,dc.id DESC LIMIT 1) IS TRUE
         THEN trim(concat_ws(' ',d.first_name,d.last_name)) ELSE NULL END AS "recognitionName"
