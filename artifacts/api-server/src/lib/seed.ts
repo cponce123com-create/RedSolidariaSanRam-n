@@ -104,6 +104,12 @@ async function isEmpty(tableName: string): Promise<boolean> {
 // Se hace inline en cada seed*() con UPDATEs condicionados a IS NULL.
 
 export async function seedIfEmpty(): Promise<void> {
+  // An intentionally empty table is valid production data, not a request to
+  // restore examples. This also prevents demo photo backfills on real records.
+  if (process.env.NODE_ENV === "production") {
+    logger.info("Production: skipping demo seeds and demo backfills");
+    return;
+  }
   logger.info("Checking database seed state...");
 
   await seedAdminUsers();

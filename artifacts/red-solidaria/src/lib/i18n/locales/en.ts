@@ -385,6 +385,8 @@ export const en: TranslationSchema = {
     adoptionsViewAll: "View all adoptions",
     adoptionsMeet: "Meet",
     adoptionsEmptyTitle: "No pets available for adoption yet",
+    adoptionsLoadError: "We could not refresh the pets available for adoption.",
+    adoptionsRetry: "Retry",
     adoptionsEmptyDesc:
       "When animals become available, they will appear here. Meanwhile, you can support animal welfare in other ways.",
     volunteerSectionTitle: "Solidarity also needs people.",

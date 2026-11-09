@@ -384,6 +384,8 @@ export const es = {
     adoptionsViewAll: "Ver todas las adopciones",
     adoptionsMeet: "Conocer",
     adoptionsEmptyTitle: "Aún no hay mascotas en adopción",
+    adoptionsLoadError: "No pudimos actualizar las mascotas en adopción.",
+    adoptionsRetry: "Reintentar",
     adoptionsEmptyDesc:
       "Cuando haya animales disponibles, aparecerán aquí. Mientras tanto, puedes apoyar el bienestar animal de otras formas.",
     volunteerSectionTitle: "La solidaridad también necesita personas.",
