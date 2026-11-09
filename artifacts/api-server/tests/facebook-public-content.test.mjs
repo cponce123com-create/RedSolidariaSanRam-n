@@ -33,3 +33,16 @@ test("all supported public sources link to public pages, never private administr
   }
   for (const kind of ["messages", "users", "volunteers", "settings", "receipt"]) assert.equal(isFacebookSource(kind), false);
 });
+
+
+test("all donation templates retain verified facts, private fields stay excluded, and a public photo takes precedence", () => {
+  const titles = new Set();
+  for (const publicationTemplate of ["agradecimiento", "impacto", "comunidad"]) {
+    const content = donationFacebookContent({ ...donation, publicationTemplate, publicationImageUrl: "https://res.cloudinary.com/test/public.jpg" });
+    titles.add(content.title);
+    assert.equal(content.imageUrl, "https://res.cloudinary.com/test/public.jpg");
+    assert.match(content.summary, /50[.,]00/);
+    assert.ok(!JSON.stringify(content).includes("PRIVATE_"));
+  }
+  assert.equal(titles.size, 3);
+});
