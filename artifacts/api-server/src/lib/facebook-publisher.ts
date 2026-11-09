@@ -1,11 +1,15 @@
 import { checkFacebookConnection } from "./facebook";
 
-export type FacebookSource = "news" | "campaign";
+export const FACEBOOK_SOURCES = ["news", "campaign", "donation", "pet", "report", "update", "campaign_result"] as const;
+export type FacebookSource = typeof FACEBOOK_SOURCES[number];
+export function isFacebookSource(value: unknown): value is FacebookSource {
+  return typeof value === "string" && (FACEBOOK_SOURCES as readonly string[]).includes(value);
+}
 export interface FacebookPublishEnv {
   FACEBOOK_PAGE_ID?: string; FACEBOOK_PAGE_ACCESS_TOKEN?: string;
   FACEBOOK_AUTO_PUBLISH_ENABLED?: string; SITE_URL?: string;
 }
-export interface FacebookContent { kind: FacebookSource; id: number; title: string; summary: string; imageUrl?: string | null }
+export interface FacebookContent { kind: FacebookSource; id: number; title: string; summary: string; imageUrl?: string | null; path?: string }
 export type FacebookSendResult =
   | { kind: "published"; postId: string; postUrl: string }
   | { kind: "retry" | "failed" | "uncertain"; message: string };
@@ -25,7 +29,11 @@ export function facebookPublishConfiguration(env: FacebookPublishEnv = process.e
 
 export function facebookMessage(content: FacebookContent, siteUrl: string): { message: string; link: string } {
   const plain = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-  const link = `${siteUrl}/${content.kind === "news" ? "noticias" : "campanas"}/${content.id}`;
+  const routes: Record<FacebookSource, string> = {
+    news: `/noticias/${content.id}`, campaign: `/campanas/${content.id}`, donation: "/transparencia",
+    pet: `/adopciones/${content.id}`, report: "/casos-urgentes", update: "/campanas", campaign_result: `/campanas/${content.id}/transparencia`,
+  };
+  const link = `${siteUrl}${content.path ?? routes[content.kind]}`;
   return { message: `${plain(content.title).slice(0, 300)}\n\n${plain(content.summary).slice(0, 1800)}\n\n${link}`, link };
 }
 

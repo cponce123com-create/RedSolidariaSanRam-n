@@ -320,6 +320,7 @@ export default function AdminCampaigns() {
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">{c.category}</div>
                     <FacebookPublicationStatus kind="campaign" sourceId={c.id} publishable={c.status === "active"} />
+                    {c.status === "completed" && <FacebookPublicationStatus kind="campaign_result" sourceId={c.id} />}
                   </TableCell>
                   <TableCell>
                     <Badge className={`${campaignStatusBadge(c.status)} border-0 shadow-sm px-3`}>

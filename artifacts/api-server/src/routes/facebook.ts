@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { requireAdmin } from "../middleware/require-admin";
 import { requireRole, ROLES } from "../middleware/roles";
 import { checkFacebookConnection } from "../lib/facebook";
-import { facebookPublishConfiguration } from "../lib/facebook-publisher";
-import { readFacebookPublication, requestFacebookPublication } from "../lib/facebook-outbox";
+import { facebookPublishConfiguration, facebookMessage, isFacebookSource } from "../lib/facebook-publisher";
+import { readFacebookContent, readFacebookPublication, requestFacebookPublication } from "../lib/facebook-outbox";
 
 const router = Router();
 
@@ -14,22 +14,33 @@ router.get("/admin/integrations/facebook/status", requireAdmin, requireRole(ROLE
   return res.json({ ...connection, autoPublishEnabled: config.enabled, siteUrlConfigured: Boolean(config.siteUrl) });
 });
 
-const contentRoles = [requireAdmin, requireRole(ROLES.ADMIN, ROLES.MODERATOR)];
+function contentAccess(write: boolean): RequestHandler {
+  return (req, res, next) => {
+    const roles = req.params.kind === "donation"
+      ? write ? [ROLES.ADMIN] : [ROLES.ADMIN, ROLES.SUPERVISOR]
+      : [ROLES.ADMIN, ROLES.MODERATOR];
+    return requireRole(...roles)(req, res, next);
+  };
+}
 function resource(params: Record<string, unknown>) {
   const id = Number(params.id);
   const kind = params.kind;
-  return (kind === "news" || kind === "campaign") && Number.isSafeInteger(id) && id > 0 ? { kind, id } as const : null;
+  return isFacebookSource(kind) && Number.isSafeInteger(id) && id > 0 ? { kind, id } as const : null;
 }
 
-router.get("/admin/integrations/facebook/publications/:kind/:id", ...contentRoles, async (req, res) => {
+router.get("/admin/integrations/facebook/publications/:kind/:id", requireAdmin, contentAccess(false), async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   const source = resource(req.params);
   if (!source) return res.status(400).json({ message: "Contenido inválido." });
-  const publication = await readFacebookPublication(source.kind, source.id);
-  return res.json({ publication, autoPublishEnabled: facebookPublishConfiguration().enabled });
+  const [publication, content] = await Promise.all([readFacebookPublication(source.kind, source.id), readFacebookContent(source.kind, source.id)]);
+  const config = facebookPublishConfiguration();
+  return res.json({ publication, autoPublishEnabled: config.enabled, publishable: Boolean(content), canRequest: req.session?.adminUser?.role !== ROLES.SUPERVISOR,
+    preview: content ? { title: content.title, summary: content.summary, imageUrl: content.imageUrl ?? null,
+      link: config.siteUrl ? facebookMessage(content, config.siteUrl).link : null,
+      message: config.siteUrl ? facebookMessage(content, config.siteUrl).message : null } : null });
 });
 
-router.post("/admin/integrations/facebook/publications/:kind/:id", ...contentRoles, async (req, res) => {
+router.post("/admin/integrations/facebook/publications/:kind/:id", requireAdmin, contentAccess(true), async (req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
   const source = resource(req.params);
   if (!source) return res.status(400).json({ message: "Contenido inválido." });

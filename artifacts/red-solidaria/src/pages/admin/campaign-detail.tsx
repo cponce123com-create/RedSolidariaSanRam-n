@@ -1,4 +1,5 @@
 import { lazy, Suspense, useState, useEffect } from "react";
+import { FacebookPublicationStatus } from "@/components/admin/FacebookPublicationStatus";
 import { useParams, Link, useLocation } from "wouter";
 import { 
   useGetCampaign, 
@@ -710,6 +711,7 @@ export default function AdminCampaignDetail() {
                   </Button>
                 </div>
                 <p className="text-muted-foreground whitespace-pre-wrap text-sm">{update.content}</p>
+                <FacebookPublicationStatus kind="update" sourceId={update.id} />
               </div>
             ))}
             {updates?.length === 0 && <div className="py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-2xl h-full flex items-center justify-center">No hay actualizaciones publicadas.</div>}

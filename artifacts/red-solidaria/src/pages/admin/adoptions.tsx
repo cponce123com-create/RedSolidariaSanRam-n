@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FacebookPublicationStatus } from "@/components/admin/FacebookPublicationStatus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -205,6 +206,7 @@ export default function AdminAdoptions() {
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h3 className="font-bold text-base">{pet.name}</h3>
+                      <FacebookPublicationStatus kind="pet" sourceId={pet.id} publishable={pet.status === "available"} waitingText="Se enviará cuando la mascota esté aprobada y disponible para adopción." />
                       <p className="text-xs text-muted-foreground">{pet.species === "gato" ? "Gato" : "Perro"} · {AGE_LABELS[pet.ageCategory] || pet.ageCategory} · {SIZE_LABELS[pet.size] || pet.size}</p>
                     </div>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusConf.color}`}>{statusConf.label}</span>

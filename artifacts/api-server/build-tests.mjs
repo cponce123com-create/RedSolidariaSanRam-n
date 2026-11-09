@@ -18,6 +18,7 @@ copyFileSync("src/assets/certificate-chocofest-2026.jpg", "tests/dist/lib/assets
 // en cualquier versión de Node (sin depender de type-stripping).
 await build({
   entryPoints: [
+    "./src/lib/facebook-public-content.ts",
     "./src/lib/facebook-publisher.ts",
     "./src/lib/facebook-outbox.ts",
     "./src/lib/facebook.ts",

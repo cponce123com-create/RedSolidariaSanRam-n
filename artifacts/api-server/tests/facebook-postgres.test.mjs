@@ -12,18 +12,32 @@ if (!databaseUrl) {
   if (!["127.0.0.1", "localhost"].includes(target.hostname) || !target.pathname.endsWith("_test")) throw new Error("Use a dedicated local database ending in _test");
   process.env.DATABASE_URL ??= databaseUrl;
   const { facebookMigrationSql } = await import("../../../lib/db/src/facebook-migration.ts");
-  const { processFacebookOutbox, readFacebookPublication, requestFacebookPublication } = await import("./dist/lib/facebook-outbox.mjs");
+  const { facebookContentMigrationSql } = await import("../../../lib/db/src/facebook-content-migration.ts");
+  const { processFacebookOutbox, readFacebookContent, readFacebookPublication, requestFacebookPublication } = await import("./dist/lib/facebook-outbox.mjs");
   const schema = `fb_test_${randomBytes(6).toString("hex")}`;
   const admin = new pg.Pool({ connectionString: databaseUrl });
   await admin.query(`CREATE SCHEMA ${schema}`);
   const database = new pg.Pool({ connectionString: databaseUrl, options: `-c search_path=${schema}` });
   await database.query(`CREATE TABLE news(id serial PRIMARY KEY,title text,summary text,image_url text);
-    CREATE TABLE campaigns(id serial PRIMARY KEY,title text,description text,image_url text,status text,is_demo boolean DEFAULT false);`);
+    CREATE TABLE campaigns(id serial PRIMARY KEY,title text,description text,image_url text,status text,is_demo boolean DEFAULT false);
+    CREATE TABLE donations(id serial PRIMARY KEY,campaign_id integer,first_name text DEFAULT 'Nombre privado',last_name text DEFAULT 'Apellido privado',
+      email text DEFAULT 'private@example.org',phone text DEFAULT '987654321',receipt_url text DEFAULT 'https://private.example/receipt',admin_note text,
+      anonymous boolean NOT NULL DEFAULT false,amount numeric DEFAULT 50,collaboration_type text DEFAULT 'dinero',status text DEFAULT 'pending',fulfillment_status text DEFAULT 'pendiente_coordinacion');
+    CREATE TABLE donation_consents(id serial PRIMARY KEY,donation_id integer,scope text,granted boolean,created_at timestamptz DEFAULT now());
+    CREATE TABLE donation_items(id serial PRIMARY KEY,donation_id integer,product text,quantity numeric,received_quantity numeric,unit text);
+    CREATE TABLE pets(id serial PRIMARY KEY,name text,description text,photos text[],status text DEFAULT 'reviewing',contact_phone text);
+    CREATE TABLE community_reports(id serial PRIMARY KEY,title text,description text,photos text[],status text DEFAULT 'pending',reporter_phone text);
+    CREATE TABLE campaign_updates(id serial PRIMARY KEY,campaign_id integer,title text,content text);`);
   // Existing content is not sent just because the integration was deployed.
   await database.query("INSERT INTO news(title,summary) VALUES('Historical','Old content')");
   await database.query(facebookMigrationSql);
   assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0);
-  beforeEach(async () => { await database.query("TRUNCATE facebook_publications,news,campaigns RESTART IDENTITY"); });
+  await database.query("INSERT INTO donations(status) VALUES('approved')");
+  await database.query(facebookContentMigrationSql);
+  await database.query(facebookContentMigrationSql);
+  await database.query("UPDATE donations SET admin_note='Cambio privado'");
+  assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0, "migration and private edits never backfill old donations");
+  beforeEach(async () => { await database.query("TRUNCATE facebook_publications,news,campaigns,donations,donation_consents,donation_items,pets,community_reports,campaign_updates RESTART IDENTITY"); });
   after(async () => { await database.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end(); });
   const env = { FACEBOOK_PAGE_ID: "914513275073067", FACEBOOK_PAGE_ACCESS_TOKEN: "test-only", SITE_URL: "https://example.org" };
   const addNews = async () => (await database.query("INSERT INTO news(title,summary) VALUES('Nueva noticia','Resumen') RETURNING id")).rows[0].id;
@@ -109,5 +123,93 @@ if (!databaseUrl) {
     await requestFacebookPublication("news", id, false, database);
     await processFacebookOutbox(database, published, env);
     assert.equal((await readFacebookPublication("news", id, database)).attempts, 6);
+  });
+
+  test("money posts only after confirmation, uses the new-worker lane, and reconciliation does not duplicate", async () => {
+    await database.query("INSERT INTO donations DEFAULT VALUES");
+    assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0);
+    await database.query("UPDATE donations SET status='approved' WHERE id=1");
+    assert.equal((await readFacebookPublication("donation", 1, database)).status, "pending");
+    assert.equal((await database.query("SELECT * FROM facebook_publications WHERE status='pending'")).rowCount, 0, "old workers cannot claim new source kinds");
+    let sends = 0;
+    await processFacebookOutbox(database, async c => { sends++; assert.equal(c.kind, "donation"); return published(c); }, env);
+    await database.query("UPDATE donations SET status='reconciled' WHERE id=1");
+    await processFacebookOutbox(database, async c => { sends++; return published(c); }, env);
+    assert.equal(sends, 1);
+  });
+
+  test("latest explicit consent is rechecked and private donation fields never reach a post", async () => {
+    await database.query("INSERT INTO donations(status) VALUES('approved'),('approved'),('approved')");
+    await database.query("INSERT INTO donation_consents(donation_id,scope,granted) VALUES(1,'public_name',true)");
+    assert.ok((await readFacebookContent("donation", 1, database)).summary.includes("Nombre privado"));
+    await database.query("INSERT INTO donation_consents(donation_id,scope,granted) VALUES(1,'public_name',false),(2,'public_name',true)");
+    await database.query("UPDATE donations SET anonymous=true WHERE id=2");
+    const sent = [];
+    await processFacebookOutbox(database, async c => { sent.push(c); return published(c); }, env);
+    assert.equal(sent.length, 3);
+    const payload = JSON.stringify(sent);
+    for (const secret of ["Nombre privado", "Apellido privado", "private@example.org", "987654321", "private.example/receipt"]) assert.ok(!payload.includes(secret), secret);
+    assert.ok(sent.every(c => c.summary.includes("una persona solidaria")));
+  });
+
+  test("in-kind contributions wait for verification and announce received quantities, never estimated cash", async () => {
+    await database.query("INSERT INTO donations(status,collaboration_type,fulfillment_status,amount) VALUES('approved','productos','recibida',9999)");
+    await database.query("INSERT INTO donation_items(donation_id,product,quantity,received_quantity,unit) VALUES(1,'arroz',100,3.5,'kilogramo')");
+    assert.equal((await readFacebookContent("donation", 1, database)), null);
+    assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0);
+    await database.query("UPDATE donations SET fulfillment_status='verificada' WHERE id=1");
+    const content = await readFacebookContent("donation", 1, database);
+    assert.match(content.summary, /3[.,]5 kilogramo de arroz/);
+    assert.ok(!content.summary.includes("S/") && !content.summary.includes("9999") && !content.summary.includes("100"));
+    assert.equal((await readFacebookPublication("donation", 1, database)).status, "pending");
+    await database.query("INSERT INTO donations(collaboration_type,fulfillment_status) VALUES('servicios','verificada')");
+    assert.equal((await readFacebookContent("donation", 2, database)), null, "verification alone cannot bypass accounting confirmation");
+  });
+
+  test("pets and reports wait for approval; withdrawal cancels before sending", async () => {
+    await database.query("INSERT INTO pets(name,description,contact_phone) VALUES('Luna','Busca familia','PRIVATE_PHONE')");
+    await database.query("INSERT INTO community_reports(title,description,reporter_phone) VALUES('Caso aprobado','Descripción pública','PRIVATE_REPORTER')");
+    assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0);
+    await database.query("UPDATE pets SET status='available' WHERE id=1");
+    await database.query("UPDATE community_reports SET status='approved' WHERE id=1");
+    assert.ok(!JSON.stringify(await readFacebookContent("pet", 1, database)).includes("PRIVATE_PHONE"));
+    assert.ok(!JSON.stringify(await readFacebookContent("report", 1, database)).includes("PRIVATE_REPORTER"));
+    await database.query("UPDATE pets SET status='inactive' WHERE id=1");
+    await database.query("UPDATE community_reports SET status='archived' WHERE id=1");
+    await processFacebookOutbox(database, async () => { throw new Error("must not send withdrawn content"); }, env);
+    assert.equal((await readFacebookPublication("pet", 1, database)).status, "cancelled");
+    assert.equal((await readFacebookPublication("report", 1, database)).status, "cancelled");
+    await database.query("UPDATE pets SET status='available' WHERE id=1");
+    assert.equal((await database.query("SELECT status FROM facebook_publications WHERE source_type='pet'")).rows[0].status, "pending_v2");
+  });
+
+  test("campaign updates and completion get separate deduplicated announcements with public links", async () => {
+    await database.query("INSERT INTO campaigns(title,description,status) VALUES('ChocoFest','Actividad','draft')");
+    await database.query("INSERT INTO campaign_updates(campaign_id,title,content) VALUES(1,'Novedad','Avance público')");
+    assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0);
+    await database.query("UPDATE campaigns SET status='active' WHERE id=1");
+    await database.query("UPDATE campaign_updates SET title='Novedad publicada' WHERE id=1");
+    await database.query("UPDATE campaigns SET status='completed' WHERE id=1");
+    const sent = [];
+    await processFacebookOutbox(database, async c => { sent.push(c); return published(c); }, env);
+    assert.deepEqual(sent.map(c => c.kind).sort(), ["campaign_result", "update"]);
+    assert.equal(sent.find(c => c.kind === "update").path, "/campanas/1");
+    await database.query("UPDATE campaigns SET status='completed' WHERE id=1");
+    await processFacebookOutbox(database, async c => { sent.push(c); return published(c); }, env);
+    assert.equal(sent.length, 2);
+  });
+
+  test("unconfirmed, annulled and demo/hidden campaign donations cannot be queued or sent", async () => {
+    await database.query("INSERT INTO campaigns(title,status,is_demo) VALUES('Draft','draft',false),('Demo','active',true)");
+    await database.query("INSERT INTO donations(campaign_id,status) VALUES(1,'approved'),(2,'approved'),(NULL,'rejected'),(NULL,'annulled')");
+    for (let id = 1; id <= 4; id++) {
+      assert.equal(await readFacebookContent("donation", id, database), null);
+      assert.equal((await requestFacebookPublication("donation", id, false, database)).ok, false);
+    }
+    assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0);
+    await database.query("INSERT INTO donations(status) VALUES('approved')");
+    await database.query("UPDATE donations SET status='annulled' WHERE id=5");
+    await processFacebookOutbox(database, async () => { throw new Error("must not send annulled donation"); }, env);
+    assert.equal((await readFacebookPublication("donation", 5, database)).status, "cancelled");
   });
 }

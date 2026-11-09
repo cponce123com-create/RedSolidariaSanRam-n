@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FacebookPublicationStatus } from "@/components/admin/FacebookPublicationStatus";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -244,6 +245,7 @@ export default function AdminReports() {
                       )}
                     </div>
                     <h3 className="font-bold text-base leading-snug">{report.title}</h3>
+                    <FacebookPublicationStatus kind="report" sourceId={report.id} publishable={report.status === "approved"} waitingText="Se enviará cuando el caso esté aprobado para la web pública." />
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1">
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{report.location}</span>
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(report.createdAt)}</span>

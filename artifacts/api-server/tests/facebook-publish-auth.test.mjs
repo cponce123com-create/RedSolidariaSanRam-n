@@ -28,5 +28,9 @@ test("publishing and queue actions reject anonymous users and read-only supervis
       const response = await fetch(`${base}/admin/integrations/facebook/publications/invalid/0`, { method: "POST", headers: { "x-test-role": role } });
       assert.equal(response.status, 400, "authorized roles reach validation without a DB query");
     }
+    assert.equal((await fetch(`${base}/admin/integrations/facebook/publications/donation/0`, { headers: { "x-test-role": "moderador" } })).status, 403);
+    assert.equal((await fetch(`${base}/admin/integrations/facebook/publications/donation/0`, { method: "POST", headers: { "x-test-role": "moderador" } })).status, 403);
+    assert.equal((await fetch(`${base}/admin/integrations/facebook/publications/donation/0`, { headers: { "x-test-role": "supervisor" } })).status, 400, "finance readers reach validation");
+    assert.equal((await fetch(`${base}/admin/integrations/facebook/publications/donation/0`, { method: "POST", headers: { "x-test-role": "supervisor" } })).status, 403);
   } finally { await new Promise(r => server.close(r)); }
 });
