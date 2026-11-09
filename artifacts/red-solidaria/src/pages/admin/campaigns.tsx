@@ -23,7 +23,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import * as z from "zod";
 import { formatSafeDate } from "@/lib/i18n/date";
 import { Plus, Trash2, Edit, Star, Search, Loader2, MoreVertical, ShieldAlert, Undo2 } from "lucide-react";

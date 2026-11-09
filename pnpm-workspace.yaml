@@ -24,7 +24,7 @@ catalog:
   tailwindcss: ^4.1.14
   tsx: ^4.21.0
   vite: ^7.3.0
-  zod: 3.25.76
+  zod: 4.6.7
 
 minimumReleaseAge: 1440
 
@@ -39,8 +39,8 @@ overrides:
   # los rangos semver de los padres no alcanzan las versiones parcheadas
   # (qs DoS, body-parser DoS, path-to-regexp DoS/ReDoS, ip-address SSRF/XSS,
   # proxy-addr IP spoofing).
-  qs: ^6.16.0
-  body-parser: ^2.3.0
+  qs: ^6.16.1
+  body-parser: ^2.4.0
   path-to-regexp: ^8.4.0
   # DEP-03: >=10.7.1 corrige la clasificación de subredes/IP (SSRF/trust-boundary).
   ip-address: ^10.7.1

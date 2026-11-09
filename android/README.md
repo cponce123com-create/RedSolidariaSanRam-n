@@ -91,3 +91,45 @@ una nueva campaña desde el panel, actualizar el historial y abrir el aviso. Apr
 un aporte y comprobar agrupación, marcarlo como leído y verificar el contador.
 Archivar la campaña y actualizar: sus avisos deben desaparecer. Para la prueba en
 segundo plano, dejar la app sin forzar detención y permitir tiempo al planificador.
+
+
+## Versión 0.3.0 — interfaz basada en la web
+
+La aplicación abre en Inicio y reutiliza los recursos originales del sitio:
+logotipo de respaldo, fotos de comunidad e historia, colores y tipografías
+DM Sans/Outfit (licencias OFL adjuntas). Consulta además la identidad institucional
+publicada para actualizar logo y portada desde el mismo servidor de la web.
+
+| Sección | Implementación Android |
+| --- | --- |
+| Inicio | Portada, presentación, campaña protagonista, formas de ayudar, urgencias, transparencia, historia y adopciones |
+| Campañas | Listado con filtros/paginación, detalle, aportes, gastos, evidencias y novedades |
+| Noticias | Listado paginado y lectura de la publicación |
+| Adopciones | Búsqueda, filtros de especie, ficha y envío de solicitud |
+| Transparencia | Estadísticas públicas, campañas y registro de ingresos/gastos paginado |
+| Casos urgentes | Casos aprobados y acceso a campaña o contacto |
+| Contacto | WhatsApp configurable y envío de mensaje al servidor |
+| Necesito ayuda | Formulario de reporte para revisión, con anonimato público |
+| Voluntariado | Envío de postulación al mismo equipo |
+| Más | Nosotros, ayuda animal, formas de ayudar y catálogo informativo |
+| Avisos | Historial y preferencias del módulo 0.2.0 |
+
+La barra inferior reproduce las cinco entradas de la web: Inicio, Campañas,
+Noticias, Adopciones y Contacto. El menú superior abre el resto de secciones;
+los botones de colaboración conservan el flujo de coordinación por WhatsApp.
+Las solicitudes solo muestran éxito tras la confirmación HTTP del servidor.
+
+### Límites que quedan identificados
+
+El panel administrativo se abre explícitamente en el navegador y no se anuncia
+como un panel Android implementado. Faltan mapa embebido, QR, carga de fotos desde
+formularios, publicación de fichas de mascotas desde Android, seguimiento de la
+postulación dentro de la app y traducción completa al inglés. El catálogo es
+informativo y pide confirmar disponibilidad: no representa inventario en tiempo
+real. Las estadísticas y fichas usan la API; no se agregan cifras ficticias.
+La lista de campañas de la portada corresponde a la página pública cargada.
+
+El workflow Android incluye pruebas de navegación en un emulador y publica
+capturas de las pantallas reales. La revisión final en el teléfono del usuario
+continúa siendo necesaria. El archivo de esta versión es
+`RedSolidaria-Android-0.3.0-debug`.

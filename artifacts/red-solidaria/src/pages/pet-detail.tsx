@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/form-resolver";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,7 +61,7 @@ export default function PetDetail() {
     hasPetExperience: z.boolean().default(false),
     previousPets: z.string().optional(),
     housingType: z.enum(["casa-propia", "casa-alquilada", "departamento", "cuarto"], {
-      required_error: t("petDetail.housingRequired"),
+      error: t("petDetail.housingRequired"),
     }),
     hasYard: z.boolean().default(false),
     adoptionReason: z.string().min(20, t("petDetail.reasonMin")),

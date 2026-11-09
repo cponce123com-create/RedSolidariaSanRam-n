@@ -1,36 +1,31 @@
 package pe.redsolidaria.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.SubcomposeAsyncImage
-import java.text.NumberFormat
-import java.util.Locale
+import kotlinx.coroutines.CancellationException
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -38,168 +33,125 @@ class MainActivity : ComponentActivity() {
         NoticeStore.initialize(applicationContext)
         enableEdgeToEdge()
         setContent {
-            val colors = if (isSystemInDarkTheme()) darkColorScheme(primary = Color(0xFF81D98D))
-                else lightColorScheme(primary = Color(0xFF238B34), secondaryContainer = Color(0xFFE8F4E9))
-            MaterialTheme(colorScheme = colors) { CampaignApp(initialCampaign = intent.getIntExtra("notice_campaign", 0), initialNotice = intent.getStringExtra("notice_key")) }
+            val systemDark = isSystemInDarkTheme()
+            var dark by rememberSaveable { mutableStateOf(systemDark) }
+            BrandTheme(dark) {
+                RedSolidariaApp(initialCampaign = intent.getIntExtra("notice_campaign", 0),
+                    initialNotice = intent.getStringExtra("notice_key"), onTheme = { dark = !dark })
+            }
         }
     }
 }
+
+private data class NavTab(val key: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private val tabs = listOf(NavTab("home", "Inicio", Icons.Outlined.Home), NavTab("campaigns", "Campañas", Icons.Outlined.FavoriteBorder),
+    NavTab("news", "Noticias", Icons.Outlined.Article), NavTab("pets", "Adopciones", Icons.Outlined.Pets), NavTab("contact", "Contacto", Icons.Outlined.MailOutline))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CampaignApp(model: CampaignViewModel = viewModel(), initialCampaign: Int = 0, initialNotice: String? = null) {
+fun RedSolidariaApp(campaigns: CampaignViewModel = viewModel(), community: CommunityViewModel = viewModel(),
+    initialCampaign: Int = 0, initialNotice: String? = null, onTheme: () -> Unit) {
     val context = LocalContext.current
-    var inbox by remember { mutableStateOf(initialNotice != null && initialCampaign == 0) }
+    var route by rememberSaveable { mutableStateOf(if (initialNotice != null && initialCampaign == 0) "notices" else "home") }
+    var more by remember { mutableStateOf(false) }
+    var donation by remember { mutableStateOf(false) }
+    val campaignState by campaigns.state.collectAsStateWithLifecycle()
+    val identity by community.identity.collectAsStateWithLifecycle()
+    val settings by community.settings.collectAsStateWithLifecycle()
     val notices by NoticeStore.items.collectAsStateWithLifecycle()
     val categories by NoticeStore.categories.collectAsStateWithLifecycle()
     val unread = notices.count { !it.read && it.category in categories }
+    fun navigate(next: String) { campaigns.closeDetail(); route = next; more = false }
+    fun whatsapp(title: String? = null) {
+        val number = settings.text("org_whatsapp").filter(Char::isDigit)
+        if (number.length < 8) { donation = false; navigate("contact"); return }
+        val text = if (title != null) "Hola, quiero apoyar la campaña “$title”. ¿Me indican cómo coordinar mi aporte?"
+            else settings.text("whatsapp_message_general").ifBlank { "Hola, quisiera más información sobre cómo ayudar a Red Solidaria San Ramón." }
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number?text=${Uri.encode(text)}")))
+    }
     LaunchedEffect(Unit) {
         initialNotice?.let { NoticeStore.markRead(context, it) }
-        if (initialCampaign > 0) model.open(initialCampaign)
-        try { NoticeStore.sync(context, false) } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled } catch (_: Exception) { /* Inbox exposes retry and error. */ }
+        if (initialCampaign > 0) campaigns.open(initialCampaign)
+        try { NoticeStore.sync(context, false) } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { }
     }
-    val state by model.state.collectAsStateWithLifecycle()
-    val listState = rememberLazyListState()
-    BackHandler(enabled = state.selectedId != null || inbox) {
-        if (state.selectedId != null) model.closeDetail() else inbox = false
+    BackHandler(enabled = route != "home" || campaignState.selectedId != null) {
+        if (campaignState.selectedId != null) campaigns.closeDetail()
+        else route = if (route.startsWith("pet/")) "pets" else if (route.startsWith("article/")) "news" else "home"
     }
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Column {
-                Text("Red Solidaria", fontWeight = FontWeight.Bold)
-                Text("San Ramón · Chanchamayo", style = MaterialTheme.typography.labelMedium)
-            } },
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
+        TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
             navigationIcon = {
-                if (state.selectedId != null || inbox) TextButton(onClick = {
-                    if (state.selectedId != null) model.closeDetail() else inbox = false
-                }) { Text("Volver") }
-            },
-            actions = {
-                IconButton(onClick = { inbox = true; model.closeDetail() }, modifier = Modifier.semantics { contentDescription = "Avisos importantes: $unread sin leer" }) {
-                    BadgedBox(badge = { if (unread > 0) Badge { Text(unread.toString()) } }) { Text("🔔") }
-                }
-                IconButton(enabled = !state.loading && !state.detailLoading && !inbox, modifier = Modifier.semantics { contentDescription = "Actualizar campañas" }, onClick = {
-                    state.selectedId?.let(model::open) ?: model.load()
-                }) { Text("↻") }
-            },
-        )
-    }) { padding ->
-        if (state.selectedId != null) {
-            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(20.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                if (state.detailLoading) item { Loading() }
-                state.detailError?.let { error -> item { ErrorMessage(error) { model.open(requireNotNull(state.selectedId)) } } }
-                state.detail?.let { campaign -> item { CampaignDetail(campaign) } }
-            }
-        } else if (inbox) {
-            NoticePanel(padding = padding, onCampaign = { id -> model.open(id) })
-        } else {
-            LazyColumn(Modifier.fillMaxSize().padding(padding), state = listState,
-                contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Juntos hacemos más", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text("Conoce las campañas y el apoyo que recibe nuestra comunidad.")
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf("all" to "Todas", "active" to "Activas", "completed" to "Completadas").forEach { (value, label) ->
-                                FilterChip(selected = state.filter == value, onClick = { model.load(value) }, label = { Text(label) })
-                            }
-                        }
+                if (campaignState.selectedId != null || route !in tabs.map { it.key }) IconButton(onClick = {
+                    if (campaignState.selectedId != null) campaigns.closeDetail() else navigate(if (route.startsWith("pet/")) "pets" else if (route.startsWith("article/")) "news" else "home")
+                }) { Icon(Icons.Outlined.ArrowBack, "Volver") }
+            }, title = {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BrandPhoto(identity?.optJSONObject("logo")?.text("url")?.ifBlank { null } ?: R.drawable.brand_logo,
+                        "Logo de Red Solidaria", Modifier.size(35.dp), fallback = R.drawable.brand_logo,
+                        scale = androidx.compose.ui.layout.ContentScale.Fit)
+                    Column(Modifier.weight(1f)) {
+                        Text("RED SOLIDARIA", fontFamily = Outfit, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Text("SAN RAMÓN", fontFamily = DmSans, fontSize = 9.sp, color = MaterialTheme.colorScheme.primary, letterSpacing = 2.sp, maxLines = 1)
                     }
                 }
-                items(state.campaigns, key = { it.id }) { campaign ->
-                    Card(onClick = { model.open(campaign.id) }, modifier = Modifier.fillMaxWidth()) {
-                        CampaignImage(campaign)
-                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(statusLabel(campaign.status), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
-                            Text(campaign.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text(campaign.description, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                            Funding(campaign)
-                            Text("Ver campaña", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                        }
+            }, actions = {
+                FilledTonalButton(onClick = { donation = true }, shape = CircleShape,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)) { Text("Donar", fontSize = 12.sp) }
+                IconButton(onClick = { navigate("notices") }) {
+                    BadgedBox(badge = { if (unread > 0) Badge { Text(if (unread > 99) "99+" else unread.toString()) } }) {
+                        Icon(Icons.Outlined.NotificationsNone, "Avisos: $unread sin leer")
                     }
                 }
-                if (state.loading) item { Loading() }
-                state.error?.let { error -> item { ErrorMessage(error) { model.load(append = state.campaigns.isNotEmpty()) } } }
-                if (!state.loading && state.error == null && state.campaigns.isEmpty()) item {
-                    Text("No hay campañas en este filtro. Puedes elegir otro o actualizar.")
+                Box {
+                    IconButton(onClick = { more = true }) { Icon(Icons.Outlined.Menu, "Abrir menú de secciones") }
+                    DropdownMenu(expanded = more, onDismissRequest = { more = false }) {
+                        listOf("transparency" to "Transparencia", "urgent" to "Casos urgentes", "help" to "Cómo ayudar",
+                            "volunteer" to "Voluntariado", "report" to "Necesito ayuda", "about" to "Nosotros",
+                            "catalog" to "Catálogo solidario", "animal" to "Ayuda animal", "notices" to "Avisos").forEach { (key, label) ->
+                            DropdownMenuItem(text = { Text(label) }, onClick = { navigate(key) })
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(text = { Text("Cambiar tema claro / oscuro") }, onClick = { onTheme(); more = false })
+                        DropdownMenuItem(text = { Text("Administración · abrir panel web") }, onClick = { more = false; openWeb(context, "/admin/login") })
+                    }
                 }
-                if (state.hasMore && !state.loading && state.error == null) item {
-                    OutlinedButton(onClick = { model.load(append = true) }, modifier = Modifier.fillMaxWidth()) { Text("Cargar más campañas") }
-                }
+            })
+    }, bottomBar = {
+        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+            tabs.forEach { tab ->
+                NavigationBarItem(selected = route == tab.key || (route.startsWith("pet/") && tab.key == "pets") || (route.startsWith("article/") && tab.key == "news"),
+                    onClick = { navigate(tab.key) }, icon = { Icon(tab.icon, tab.label, Modifier.size(22.dp)) },
+                    label = { Text(tab.label, fontSize = 10.sp) },
+                    colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                        selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.primary))
             }
         }
-    }
-}
-
-@Composable
-private fun CampaignImage(campaign: Campaign) {
-    SubcomposeAsyncImage(
-        model = campaign.imageUrl, contentDescription = "Imagen de ${campaign.title}",
-        modifier = Modifier.fillMaxWidth().height(210.dp).background(MaterialTheme.colorScheme.secondaryContainer),
-        contentScale = ContentScale.Crop,
-        loading = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } },
-        error = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Red Solidaria · San Ramón") } },
-    )
-}
-
-@Composable
-private fun Funding(campaign: Campaign) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        LinearProgressIndicator(progress = { campaign.progress }, modifier = Modifier.fillMaxWidth())
-        Text("${money(campaign.raised)} recaudados", fontWeight = FontWeight.Bold)
-        Text("Meta: ${money(campaign.goal)} · ${campaign.donorCount} aportes de dinero", style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun CampaignDetail(campaign: Campaign) {
-    val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        CampaignImage(campaign)
-        Text(statusLabel(campaign.status), color = MaterialTheme.colorScheme.primary)
-        Text(campaign.title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(campaign.category, style = MaterialTheme.typography.labelLarge)
-        Funding(campaign)
-        Text(campaign.description, style = MaterialTheme.typography.bodyLarge)
-        HorizontalDivider()
-        Text("Origen de la recaudación", style = MaterialTheme.typography.titleMedium)
-        Text("Aportes verificados: ${money(campaign.verifiedRaised)}")
-        Text("Recaudación histórica: ${money(campaign.historicalRaised)}")
-        Text("Los importes se consultan en el mismo servidor que utiliza la web.", style = MaterialTheme.typography.bodySmall)
-        Button(onClick = {
-            val share = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "${campaign.title}\n${BuildConfig.API_BASE_URL}campanas/${campaign.id}")
+    }, floatingActionButton = {
+        if (route in setOf("home", "campaigns", "pets", "news", "about", "help")) {
+            SmallFloatingActionButton(onClick = { whatsapp() }, containerColor = BrandGreen, contentColor = Color.White, shape = CircleShape) {
+                Icon(Icons.Outlined.ChatBubbleOutline, "Coordinar por WhatsApp")
             }
-            context.startActivity(Intent.createChooser(share, "Compartir campaña"))
-        }, modifier = Modifier.fillMaxWidth()) { Text("Compartir campaña") }
+        }
+    }) { padding ->
+        if (campaignState.selectedId != null) {
+            NativeCampaignDetail(campaignState, padding, campaigns, community, onDonate = { donation = true })
+        } else when {
+            route == "home" -> HomeScreen(padding, campaigns, community, ::navigate, { campaigns.open(it) }, { donation = true })
+            route == "campaigns" -> CampaignListScreen(padding, campaignState, campaigns)
+            route == "notices" -> NoticePanel(padding, onCampaign = { campaigns.open(it) })
+            route == "news" -> NewsScreen(padding, community, ::navigate)
+            route == "pets" -> PetsScreen(padding, community, ::navigate)
+            route.startsWith("pet/") -> PetDetailScreen(padding, route.substringAfter('/').toInt(), community, ::navigate)
+            route.startsWith("article/") -> ArticleScreen(padding, route.substringAfter('/').toInt(), community)
+            route == "transparency" -> TransparencyScreen(padding, community, campaignState, { campaigns.open(it) })
+            route == "urgent" -> UrgentScreen(padding, community, ::navigate, { campaigns.open(it) })
+            route in setOf("report", "volunteer", "contact") -> PublicFormScreen(route, padding, community, ::navigate, { whatsapp() })
+            else -> InformationScreen(route, padding, community, ::navigate, { donation = true })
+        }
     }
-}
-
-@Composable
-private fun Loading() {
-    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        CircularProgressIndicator()
-        Text("Consultando campañas… El servidor puede tardar al iniciar.")
-    }
-}
-
-@Composable
-private fun ErrorMessage(message: String, retry: () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(message, color = MaterialTheme.colorScheme.error)
-        OutlinedButton(onClick = retry) { Text("Reintentar") }
-    }
-}
-
-private fun money(amount: Double): String = NumberFormat.getCurrencyInstance(Locale("es", "PE")).format(amount)
-private fun statusLabel(status: String): String = when (status) {
-    "active" -> "En curso"
-    "completed" -> "Completada"
-    "paused" -> "En pausa"
-    "cancelled" -> "Cancelada"
-    "closed" -> "Cerrada"
-    else -> status
+    if (donation) AlertDialog(onDismissRequest = { donation = false }, icon = { Icon(Icons.Outlined.Handshake, null) },
+        title = { Text("Coordina tu aporte por WhatsApp") },
+        text = { Text("Escríbenos y te ayudaremos a colaborar. El equipo registra el aporte como pendiente; solo después de confirmarlo se suma a la recaudación pública.") },
+        confirmButton = { Button(onClick = { donation = false; whatsapp(campaignState.detail?.title) }) { Text("Coordinar aporte") } },
+        dismissButton = { TextButton(onClick = { donation = false }) { Text("Cerrar") } })
 }

@@ -59,7 +59,7 @@ fun NoticePanel(padding: PaddingValues, onCampaign: (Int) -> Unit) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Avisos importantes", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("Versión 0.2.0 · Historial de novedades de la red")
+                Text("Versión ${BuildConfig.VERSION_NAME} · Historial de novedades de la red")
                 Text("Las consultas en segundo plano se programan cada 15 minutos. Android puede retrasarlas por batería o conexión; no son avisos push inmediatos.", style = MaterialTheme.typography.bodySmall)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Avisos en el teléfono", modifier = Modifier.weight(1f))
