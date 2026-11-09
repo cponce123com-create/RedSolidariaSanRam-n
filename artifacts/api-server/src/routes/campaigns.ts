@@ -379,7 +379,7 @@ router.get("/campaigns/:id/donors", async (req, res) => {
   }
 });
 
-router.post("/campaigns", requireAdmin, adminActionLimiter, async (req, res) => {
+router.post("/campaigns", requireAdmin, requireRole(ROLES.ADMIN, ROLES.MODERATOR), adminActionLimiter, async (req, res) => {
   let data: ReturnType<typeof insertCampaignSchema.parse>;
   try {
     data = insertCampaignSchema.parse(req.body);
@@ -401,7 +401,7 @@ router.post("/campaigns", requireAdmin, adminActionLimiter, async (req, res) => 
   }
 });
 
-router.put("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, res) => {
+router.put("/campaigns/:id", requireAdmin, requireRole(ROLES.ADMIN, ROLES.MODERATOR), adminActionLimiter, async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });
@@ -457,7 +457,7 @@ router.put("/campaigns/:id", requireAdmin, adminActionLimiter, async (req, res) 
  * Valida la transición desde el estado actual (409 si no está permitida) y
  * limpia la campaña protagonista si el nuevo estado la oculta.
  */
-router.patch("/campaigns/:id/status", requireAdmin, adminActionLimiter, async (req, res) => {
+router.patch("/campaigns/:id/status", requireAdmin, requireRole(ROLES.ADMIN, ROLES.MODERATOR), adminActionLimiter, async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) {
     return res.status(400).json({ error: "validation_error", message: "Identificador inválido" });

@@ -3,6 +3,7 @@ import { db, newsTable, insertNewsSchema } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { toIsoSafe } from "../lib/date-format";
 import { requireAdmin } from "../middleware/require-admin";
+import { requireRole, ROLES } from "../middleware/roles";
 import { adminActionLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
@@ -40,7 +41,7 @@ router.get("/news/:id", async (req, res) => {
   }
 });
 
-router.post("/news", requireAdmin, adminActionLimiter, async (req, res) => {
+router.post("/news", requireAdmin, requireRole(ROLES.ADMIN, ROLES.MODERATOR), adminActionLimiter, async (req, res) => {
   try {
     const data = insertNewsSchema.parse(req.body);
     const [post] = await db.insert(newsTable).values(data).returning();
@@ -55,7 +56,7 @@ router.post("/news", requireAdmin, adminActionLimiter, async (req, res) => {
   }
 });
 
-router.put("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
+router.put("/news/:id", requireAdmin, requireRole(ROLES.ADMIN, ROLES.MODERATOR), adminActionLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
     const data = insertNewsSchema.parse(req.body);
@@ -74,7 +75,7 @@ router.put("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
   }
 });
 
-router.delete("/news/:id", requireAdmin, adminActionLimiter, async (req, res) => {
+router.delete("/news/:id", requireAdmin, requireRole(ROLES.ADMIN, ROLES.MODERATOR), adminActionLimiter, async (req, res) => {
   try {
     const id = Number(req.params.id);
     // V14-3.1: se COMPRUEBA que el borrado afectó a una fila. Antes se devolvía 204

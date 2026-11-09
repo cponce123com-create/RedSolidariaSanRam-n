@@ -319,6 +319,7 @@ export default function AdminCampaigns() {
                       {c.featured && <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-500" />}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">{c.category}</div>
+                    <FacebookPublicationStatus kind="campaign" sourceId={c.id} publishable={c.status === "active"} />
                   </TableCell>
                   <TableCell>
                     <Badge className={`${campaignStatusBadge(c.status)} border-0 shadow-sm px-3`}>
@@ -457,3 +458,4 @@ export default function AdminCampaigns() {
     </div>
   );
 }
+import { FacebookPublicationStatus } from "@/components/admin/FacebookPublicationStatus";

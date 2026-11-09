@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedIfEmpty } from "./lib/seed";
 import { runMigrations } from "@workspace/db";
 import { startLedgerAnchorJob } from "./lib/anchor";
+import { startFacebookPublisher } from "./lib/facebook-outbox";
 
 const rawPort = process.env["PORT"];
 
@@ -39,6 +40,7 @@ app.listen(port, (err) => {
 
 // Ledger Trust Pay: ancla el root hash global al arranque y cada 24h.
 startLedgerAnchorJob();
+startFacebookPublisher();
 
 // El seed no bloquea el arranque: el servicio responde aunque el seed falle.
 seedIfEmpty().catch((err) => {

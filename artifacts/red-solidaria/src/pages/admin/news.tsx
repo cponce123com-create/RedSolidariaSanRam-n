@@ -1,4 +1,5 @@
 import { invalidateNewsQueries } from "@/lib/query-invalidation";
+import { FacebookPublicationStatus } from "@/components/admin/FacebookPublicationStatus";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -54,6 +55,7 @@ function NewsForm({ item, onSave, onCancel }: { item?: NewsItem; onSave: () => v
   return (
     <div className="bg-card border border-border rounded-2xl p-5">
       <h3 className="font-bold mb-4">{item ? "Editar noticia" : "Nueva noticia"}</h3>
+      <p className="text-sm text-muted-foreground mb-4">Al guardar, la noticia se publica en la web y se envía a Facebook. Editar una noticia ya enviada no crea otra publicación en Facebook.</p>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(v => save.mutate(v))} className="space-y-4">
           <FormField control={form.control} name="title" render={({ field }) => (
@@ -74,7 +76,7 @@ function NewsForm({ item, onSave, onCancel }: { item?: NewsItem; onSave: () => v
             )} />
           </div>
           <div className="flex gap-3">
-            <Button type="submit" disabled={save.isPending} className="rounded-xl"><Check className="w-4 h-4 mr-1" />{save.isPending ? "Guardando..." : "Guardar"}</Button>
+            <Button type="submit" disabled={save.isPending} className="rounded-xl"><Check className="w-4 h-4 mr-1" />{save.isPending ? "Guardando..." : item ? "Guardar cambios" : "Publicar en web y Facebook"}</Button>
             <Button type="button" variant="outline" className="rounded-xl" onClick={onCancel}>Cancelar</Button>
           </div>
         </form>
@@ -170,6 +172,7 @@ export default function AdminNews() {
                         <h3 className="font-bold">{item.title}</h3>
                         <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">{item.summary}</p>
                         <p className="text-xs text-muted-foreground mt-1">{new Date(item.publishedAt).toLocaleDateString("es-PE")}</p>
+                        <FacebookPublicationStatus kind="news" sourceId={item.id} />
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <Button size="sm" variant="outline" className="rounded-lg h-10 w-10 p-0" onClick={() => setEditing(item)} aria-label={`Editar ${item.title}`}>

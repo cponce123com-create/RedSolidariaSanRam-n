@@ -34,3 +34,4 @@ export * from "./expense-classifications";
 export * from "./campaign-closures";
 export * from "./institutional-identity";
 export * from "./cms-pages";
+export * from "./facebook-publications";
