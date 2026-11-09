@@ -29,7 +29,7 @@ export default function Campaigns() {
   // Using generated hook from Orval
   const queryParams = { status: filter === "all" ? undefined : filter, limit: pageSize, offset };
   const { data: campaigns, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ["public-campaigns-page", filter, offset],
+    queryKey: ["/api/campaigns", queryParams],
     queryFn: ({ signal }) => getCampaigns(queryParams, { signal }),
   });
 
