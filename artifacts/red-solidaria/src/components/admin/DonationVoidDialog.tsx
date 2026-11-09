@@ -344,10 +344,11 @@ export function DonationVoidDialog({
 
         {canConfirm && missing && <p role="status" className="text-sm text-amber-800">{missing}</p>}
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button variant="outline" className="rounded-xl" onClick={close} disabled={busy}>
+          <Button type="button" variant="outline" className="rounded-xl" onClick={close} disabled={busy}>
             Cancelar
           </Button>
           <Button
+            type="button"
             variant="destructive"
             className="rounded-xl gap-2"
             onClick={submit}

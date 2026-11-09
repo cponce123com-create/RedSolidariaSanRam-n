@@ -5,14 +5,16 @@ import { DonationVoidDialog } from "@/components/admin/DonationVoidDialog";
 import { canVoidDonation } from "@/lib/donation-annulment";
 import { Undo2 } from "lucide-react";
 
+export interface DonationVoidTarget {
+  id: number;
+  title: string;
+  amount: number;
+  status: string;
+  campaignId?: number | null;
+}
 interface DonationVoidActionProps {
-  donation: {
-    id: number;
-    title: string;
-    amount: number;
-    status: string;
-    campaignId?: number | null;
-  };
+  donation: DonationVoidTarget;
+  onRequest?: (donation: DonationVoidTarget) => void;
 }
 
 /**
@@ -23,7 +25,7 @@ interface DonationVoidActionProps {
  * conciliadas), que son las únicas con asiento en el libro. Una pendiente o
  * rechazada se gestiona con el rechazo normal.
  */
-export function DonationVoidAction({ donation }: DonationVoidActionProps) {
+export function DonationVoidAction({ donation, onRequest }: DonationVoidActionProps) {
   const [open, setOpen] = useState(false);
   const { data: adminUser } = useGetAdminMe({
     query: { queryKey: ["/api/admin/me"], retry: false },
@@ -34,20 +36,27 @@ export function DonationVoidAction({ donation }: DonationVoidActionProps) {
   return (
     <>
       <Button
-        size="icon"
+        type="button"
+        size="sm"
         variant="outline"
-        className="h-10 w-10 text-slate-600 border-slate-600/20 hover:bg-slate-600/10 hover:text-slate-700 rounded-lg"
-        onClick={() => setOpen(true)}
+        className="h-10 px-3 text-slate-600 border-slate-600/20 hover:bg-slate-600/10 hover:text-slate-700 rounded-lg"
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (onRequest) onRequest({ ...donation });
+          else setOpen(true);
+        }}
+        aria-label={`Anular aporte #${donation.id}`}
         title="Anular contablemente (irreversible sobre las cifras)"
         data-testid="btn-void-donation"
       >
-        <Undo2 className="w-4 h-4" />
+        <Undo2 className="w-4 h-4" /> Anular
       </Button>
-      <DonationVoidDialog
+      {!onRequest && <DonationVoidDialog
         donation={donation}
         open={open}
         onOpenChange={setOpen}
-      />
+      />}
     </>
   );
 }
