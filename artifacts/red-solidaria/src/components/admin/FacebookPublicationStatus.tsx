@@ -20,7 +20,7 @@ export function FacebookPublicationStatus({ kind, sourceId, publishable = true, 
   const client = useQueryClient();
   const key = ["facebook-publication", kind, sourceId];
   const url = `/api/admin/integrations/facebook/publications/${kind}/${sourceId}`;
-  const state = useQuery<{ publication: Delivery | null; autoPublishEnabled: boolean; publishable?: boolean; canRequest?: boolean;
+  const state = useQuery<{ publication: Delivery | null; autoPublishEnabled: boolean; publishable?: boolean; canRequest?: boolean; configurationIssues?: string[];
     preview?: { title: string; summary: string; imageUrl: string | null; link: string | null; message?: string | null } | null }>({
     queryKey: key, queryFn: () => adminRequestJson(url), enabled: expanded, staleTime: 60_000,
     retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false,
@@ -31,6 +31,9 @@ export function FacebookPublicationStatus({ kind, sourceId, publishable = true, 
     mutationFn: (confirmNotPublished: boolean) => adminRequestJson(url, { method: "POST",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmNotPublished }) }),
     onSuccess: () => { void client.invalidateQueries({ queryKey: key }); },
+  });
+  const diagnosis = useMutation({
+    mutationFn: () => adminRequestJson<{ status: string; message: string }>(`${url}/diagnosis`), retry: false,
   });
   const toggle = <button type="button" className="text-xs text-primary underline" aria-expanded={expanded}
     onClick={() => setExpanded(value => !value)}>{expanded ? "Ocultar estado de Facebook" : "Ver estado de Facebook"}</button>;
@@ -51,6 +54,11 @@ export function FacebookPublicationStatus({ kind, sourceId, publishable = true, 
       <p>Facebook: <strong>{delivery ? labels[delivery.status] ?? delivery.status : "Sin envío registrado"}</strong></p>
       {delivery?.lastError && <p className="text-muted-foreground">{delivery.lastError}</p>}
       {delivery?.postUrl && <a href={delivery.postUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">Ver publicación en Facebook</a>}
+      {state.data?.configurationIssues?.map(issue => <p key={issue} className="text-destructive">{issue}</p>)}
+      <Button type="button" variant="outline" size="sm" disabled={diagnosis.isPending} className="h-auto py-1 text-xs" onClick={() => diagnosis.mutate()}>{diagnosis.isPending ? "Comprobando…" : "Diagnosticar sin publicar"}</Button>
+      {diagnosis.data && <p role="status" className="text-muted-foreground">{diagnosis.data.message}</p>}
+      {diagnosis.isError && <p role="alert" className="text-destructive">{errorMessage(diagnosis.error)}</p>}
+      {!canPublish && kind === "donation" && <p className="text-muted-foreground">Este aporte no es elegible para un nuevo envío. Los aportes anulados o rechazados quedan fuera de las cifras confirmadas.</p>}
       {!state.data?.autoPublishEnabled && <p className="text-muted-foreground">Revisa la activación y credenciales en Configuración → Facebook.</p>}
       {!canPublish && !delivery && <p className="text-muted-foreground">{kind === "campaign" ? "Se enviará al activar la campaña." : waitingText}</p>}
       {!canPublish && kind !== "campaign" && delivery?.status === "published" && <p className="text-amber-800">El contenido ya no cumple los requisitos en la web. Revisa y, si corresponde, retira la publicación de Facebook.</p>}

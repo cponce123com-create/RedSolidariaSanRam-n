@@ -10,6 +10,7 @@ if (!databaseUrl) {
   const pg = createRequire(new URL("../../../lib/db/package.json", import.meta.url))("pg");
   const target = new URL(databaseUrl);
   if (!["127.0.0.1", "localhost"].includes(target.hostname) || !target.pathname.endsWith("_test")) throw new Error("Use a dedicated local database ending in _test");
+  const { facebookWithdrawalMigrationSql } = await import("../../../lib/db/src/facebook-withdrawal-migration.ts");
   const { donationPublicationMigrationSql } = await import("../../../lib/db/src/donation-publication-migration.ts");
   const { facebookMigrationSql } = await import("../../../lib/db/src/facebook-migration.ts");
   const { facebookContentMigrationSql } = await import("../../../lib/db/src/facebook-content-migration.ts");
@@ -59,11 +60,33 @@ if (!databaseUrl) {
   await database.query(facebookContentMigrationSql);
   await database.query("UPDATE donations SET admin_note='Cambio privado'");
   assert.equal((await database.query("SELECT * FROM facebook_publications")).rowCount, 0, "migration and private edits never backfill old donations");
+  await database.query(facebookWithdrawalMigrationSql);
+  await database.query(facebookWithdrawalMigrationSql);
   beforeEach(async () => { await database.query("TRUNCATE facebook_publications,news,campaigns,donations,donation_consents,donation_items,donors,donation_proofs,pets,community_reports,campaign_updates RESTART IDENTITY"); });
   after(async () => { await database.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end(); });
   const env = { FACEBOOK_PAGE_ID: "914513275073067", FACEBOOK_PAGE_ACCESS_TOKEN: "test-only", SITE_URL: "https://example.org" };
   const addNews = async () => (await database.query("INSERT INTO news(title,summary) VALUES('Nueva noticia','Resumen') RETURNING id")).rows[0].id;
   const published = async content => ({ kind: "published", postId: `914513275073067_${content.id}`, postUrl: `https://www.facebook.com/914513275073067_${content.id}` });
+
+  test("annulling a failed test contribution cancels its job and removes its amount from confirmed totals", async () => {
+    await database.query("INSERT INTO donations(status,amount) VALUES('reconciled',100)");
+    await processFacebookOutbox(database, async () => ({ kind: 'failed', message: 'Token expired' }), env);
+    assert.equal((await readFacebookPublication('donation', 1, database)).status, 'failed');
+    await database.query("UPDATE donations SET status='annulled' WHERE id=1");
+    assert.equal((await readFacebookPublication('donation', 1, database)).status, 'cancelled');
+    assert.equal((await requestFacebookPublication('donation', 1, false, database)).ok, false);
+    assert.equal(Number((await database.query("SELECT coalesce(sum(amount),0) AS total FROM donations WHERE status IN ('approved','reconciled') AND collaboration_type='dinero'")).rows[0].total), 0);
+    await processFacebookOutbox(database, async () => { throw new Error('must not send an annulled contribution'); }, env);
+  });
+
+  test("withdrawal preserves published links and ambiguous outcomes for explicit review", async () => {
+    await database.query("INSERT INTO donations(status) VALUES('approved'),('approved')");
+    await database.query("UPDATE facebook_publications SET status='published',post_id='123',post_url='https://www.facebook.com/123' WHERE source_id=1");
+    await database.query("UPDATE facebook_publications SET status='uncertain' WHERE source_id=2");
+    await database.query("UPDATE donations SET status='annulled'");
+    assert.equal((await readFacebookPublication('donation', 1, database)).status, 'published');
+    assert.equal((await readFacebookPublication('donation', 2, database)).status, 'uncertain');
+  });
 
   test("registration saves a private proof, public photo consent and template atomically; duplicate retries reuse the same record", async () => {
     const { default: express } = await import("express");

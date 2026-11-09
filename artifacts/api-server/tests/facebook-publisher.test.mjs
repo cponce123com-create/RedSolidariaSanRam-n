@@ -75,3 +75,17 @@ test("explicit throttling can retry, token or permission rejection needs interve
     assert.ok(!JSON.stringify(result).includes(env.FACEBOOK_PAGE_ACCESS_TOKEN));
   }
 });
+
+test("configuration diagnosis names only missing settings, never secrets", () => {
+  const config = facebookPublishConfiguration({ ...env, SITE_URL: "", FACEBOOK_AUTO_PUBLISH_ENABLED: "false" });
+  assert.equal(config.enabled, false);
+  assert.ok(config.issues.some(x => x.includes('SITE_URL')));
+  assert.ok(config.issues.some(x => x.includes('pausada')));
+  assert.ok(!JSON.stringify(config.issues).includes(env.FACEBOOK_PAGE_ACCESS_TOKEN));
+});
+test("Meta rejection preserves safe numeric codes while withholding its raw message", async () => {
+  const result = await sendFacebookPublication(news, env, meta(async () => response({ error: { code: 190, error_subcode: 463, message: env.FACEBOOK_PAGE_ACCESS_TOKEN } }, 400)));
+  assert.equal(result.kind, 'failed'); assert.match(result.message, /190/); assert.match(result.message, /463/);
+  assert.match(result.message, /FACEBOOK_PAGE_ACCESS_TOKEN/);
+  assert.ok(!result.message.includes(env.FACEBOOK_PAGE_ACCESS_TOKEN));
+});

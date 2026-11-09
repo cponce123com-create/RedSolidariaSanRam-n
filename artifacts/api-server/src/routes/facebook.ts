@@ -32,7 +32,7 @@ router.get("/admin/integrations/facebook/status", requireAdmin, requireRole(ROLE
   res.setHeader("Cache-Control", "private, no-store");
   const connection = await checkFacebookConnection();
   const config = facebookPublishConfiguration();
-  return res.json({ ...connection, autoPublishEnabled: config.enabled, siteUrlConfigured: Boolean(config.siteUrl) });
+  return res.json({ ...connection, autoPublishEnabled: config.enabled, siteUrlConfigured: Boolean(config.siteUrl), configurationIssues: config.issues });
 });
 
 function contentAccess(write: boolean): RequestHandler {
@@ -55,10 +55,25 @@ router.get("/admin/integrations/facebook/publications/:kind/:id", requireAdmin, 
   if (!source) return res.status(400).json({ message: "Contenido inválido." });
   const [publication, content] = await Promise.all([readFacebookPublication(source.kind, source.id), readFacebookContent(source.kind, source.id)]);
   const config = facebookPublishConfiguration();
-  return res.json({ publication, autoPublishEnabled: config.enabled, publishable: Boolean(content), canRequest: req.session?.adminUser?.role !== ROLES.SUPERVISOR,
+  return res.json({ publication, autoPublishEnabled: config.enabled, configurationIssues: config.issues, publishable: Boolean(content), canRequest: req.session?.adminUser?.role !== ROLES.SUPERVISOR,
     preview: content ? { title: content.title, summary: content.summary, imageUrl: content.imageUrl ?? null,
       link: config.siteUrl ? facebookMessage(content, config.siteUrl).link : null,
       message: config.siteUrl ? facebookMessage(content, config.siteUrl).message : null } : null });
+});
+
+// On-demand, read-only diagnosis. Never enqueues, retries or publishes a test contribution.
+router.get("/admin/integrations/facebook/publications/:kind/:id/diagnosis", requireAdmin, contentAccess(false), async (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const source = resource(req.params);
+  if (!source) return res.status(400).json({ message: "Contenido inválido." });
+  const config = facebookPublishConfiguration();
+  const [publication, content] = await Promise.all([readFacebookPublication(source.kind, source.id), readFacebookContent(source.kind, source.id)]);
+  if (!content) return res.json({ status: "ineligible", message: "El contenido está retirado, anulado o todavía no cumple las condiciones para publicarse. No se hará un nuevo envío.", publication });
+  if (!config.enabled) return res.json({ status: "configuration", message: config.issues.join(" "), publication });
+  const connection = await checkFacebookConnection();
+  return res.json({ status: connection.status, message: connection.status === "connected"
+    ? "El token identifica la página correcta. Esta consulta no comprueba el permiso de escritura ni crea publicaciones. Revisa el error del último intento antes de reintentar."
+    : connection.message, publication });
 });
 
 router.post("/admin/integrations/facebook/publications/:kind/:id", requireAdmin, contentAccess(true), async (req, res) => {
