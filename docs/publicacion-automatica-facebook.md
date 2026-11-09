@@ -78,3 +78,19 @@ Después de fusionar y desplegar:
 3. Abrir **Ver publicación en Facebook** y comprobar el enlace y la imagen. Si hay rechazo de Meta, corregir la causa y usar **Reintentar envío**.
 
 No se usaron tokens reales ni se hicieron publicaciones desde el entorno de desarrollo. La primera entrega real debe comprobarse tras desplegar. En un servicio de Render que se suspende por inactividad, los reintentos se pausan mientras duerme y se retoman al arrancar; para entrega continua se necesita un servicio siempre activo.
+
+### Registro de aportes con imágenes y plantillas
+
+En **Donaciones → Registrar aporte coordinado** se pueden registrar dinero, productos, servicios y apoyo logístico.
+
+- **Comprobante privado**: JPG/PNG/WebP hasta 8 MB. Se guarda en la misma transacción que el aporte; no es la foto de Facebook. Yape, Plin y transferencia siguen exigiendo evidencia antes de aprobar.
+- **Foto pública**: carga independiente y autorización explícita de uso. Se registra un consentimiento `public_photo`; el envío vuelve a consultar la última decisión. Si está revocado se omite la foto y se usa la portada pública de la campaña, si existe.
+- **Plantillas de texto**: Agradecimiento, Impacto solidario e Invitación a la comunidad. Se guardan con el aporte y usan datos confirmados, sin inventar beneficiarios, entregas o resultados.
+- **Nombre del donante**: autorización separada; sin ella el reconocimiento es anónimo. El panel financiero sigue mostrando la identidad interna y permite buscarla.
+- **Vista previa**: usa el mismo generador del servidor que el envío final; no guarda ni publica. Para productos, el envío final incorpora las cantidades efectivamente recibidas.
+
+Al guardar, el aporte queda pendiente. La publicación se activa con la aprobación del dinero o con aprobación y verificación del aporte en especie. Las notas internas y el valor estimado no se convierten en ingresos ni se incluyen en Facebook.
+
+Ante un resultado de registro incierto por fallo de red, el formulario conserva la misma solicitud y clave de idempotencia: «Reintentar el mismo registro» recupera el aporte sin crear otro. Durante la subida o el guardado se bloquea el cierre del diálogo. Una validación rechazada permite corregir los campos.
+
+La migración 039 añade columnas; no borra datos ni publica aportes anteriores. No se requieren nuevas variables de Facebook. Las subidas usan la configuración Cloudinary existente del servidor (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`).
