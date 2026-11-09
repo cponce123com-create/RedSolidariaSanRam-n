@@ -378,7 +378,7 @@ async function seedSettings() {
     { key: "chocofest_2026_results_leftovers_destination", value: "", label: "ChocoFest 2026: destino de los recursos sobrantes", group: "chocofest" },
     { key: "org_email", value: "contacto@redsolidariasanramon.org", label: "Correo electrónico", group: "contacto" },
     { key: "org_address", value: "Jr. Los Álamos 245, San Ramón, Chanchamayo, Junín, Perú", label: "Dirección", group: "contacto" },
-    { key: "org_facebook", value: "https://facebook.com/redsolidariasanramon", label: "Facebook URL", group: "redes" },
+    { key: "org_facebook", value: "https://www.facebook.com/redsolidariasr", label: "Facebook URL", group: "redes" },
     { key: "org_instagram", value: "https://instagram.com/redsolidariasanramon", label: "Instagram URL", group: "redes" },
     { key: "org_youtube", value: "", label: "YouTube URL", group: "redes" },
     { key: "donation_yape", value: "987 654 321", label: "Número Yape", group: "donaciones" },
