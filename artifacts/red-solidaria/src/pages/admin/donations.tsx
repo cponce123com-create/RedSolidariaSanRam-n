@@ -22,7 +22,8 @@ import { uploadImageToCloudinary, validateProofImage, UploadError } from "@/lib/
 import { useReconcileDonation } from "@/hooks/use-donors-admin";
 import { invalidateDonationQueries } from "@/lib/query-invalidation";
 import { collaborationTypeLabel, isMoneyCollaboration } from "@/lib/donors-admin";
-import { DonationVoidAction } from "@/components/admin/DonationVoidAction";
+import { DonationVoidDialog } from "@/components/admin/DonationVoidDialog";
+import { DonationVoidAction, type DonationVoidTarget } from "@/components/admin/DonationVoidAction";
 
 type FilterStatus =
   | "all"
@@ -33,6 +34,7 @@ type FilterStatus =
   | "annulled";
 
 export default function AdminDonations() {
+  const [voidTarget, setVoidTarget] = useState<DonationVoidTarget | null>(null);
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [search, setSearch] = useState("");
   const [rejectDialogId, setRejectDialogId] = useState<number | null>(null);
@@ -262,6 +264,8 @@ export default function AdminDonations() {
           {(["all", "pending", "approved", "rejected", "reconciled", "annulled"] as const).map(tab => (
             <button
               key={tab}
+              type="button"
+              aria-pressed={filter === tab}
               onClick={() => setFilter(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === tab ? 'bg-background shadow text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
               data-testid={`filter-tab-${tab}`}
@@ -282,6 +286,12 @@ export default function AdminDonations() {
           />
         </div>
       </div>
+
+      {voidTarget && <DonationVoidDialog
+        donation={voidTarget}
+        open
+        onOpenChange={(open) => { if (!open) setVoidTarget(null); }}
+      />}
 
       <Dialog open={manualOpen} onOpenChange={(open) => { if (!manualBusy) setManualOpen(open); }}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-2xl">
@@ -519,6 +529,7 @@ export default function AdminDonations() {
                       {/* Anular contablemente (solo superadmin y solo si está
                           confirmada): no borra, compensa en el libro. */}
                       <DonationVoidAction
+                        onRequest={setVoidTarget}
                         donation={{
                           id: d.id,
                           title: `${d.firstName} ${d.lastName}`.trim() || "Donación",
