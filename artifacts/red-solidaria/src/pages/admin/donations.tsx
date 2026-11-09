@@ -170,7 +170,7 @@ export default function AdminDonations() {
     setProofUploading(true);
     try {
       const { imageUrl, publicId } = await uploadImageToCloudinary(file, "/api/uploads/admin-signature");
-      addProof.mutate(
+      await addProof.mutateAsync(
         { id, data: { imageUrl, publicId, mimeType: file.type } },
         {
           onSuccess: () => {
@@ -179,9 +179,6 @@ export default function AdminDonations() {
             queryClient.invalidateQueries({ queryKey: [`/api/donations/${id}/proofs`] });
             setProofUploadId(null);
             if (proofFileRef.current) proofFileRef.current.value = "";
-          },
-          onError: (err) => {
-            toast({ title: "No se pudo adjuntar", description: mutationError(err), variant: "destructive" });
           },
         },
       );
@@ -193,7 +190,7 @@ export default function AdminDonations() {
             ? err.message
             : err instanceof Error
               ? err.message
-              : "No se pudo subir la imagen. Intenta más tarde.",
+              : mutationError(err),
         variant: "destructive",
       });
     } finally {
