@@ -235,3 +235,8 @@ test("transparency aliases and campaign donor lists participate in entity invali
   }
   assert.equal(isEntityQueryKey(["transparency-stats"], ["pets"]), false);
 });
+
+test("a donation change refreshes its Facebook status without affecting unrelated content", () => {
+  assert.equal(isDonationQueryKey(['facebook-publication','donation',73]), true);
+  assert.equal(isDonationQueryKey(['facebook-publication','news',73]), false);
+});
