@@ -1,4 +1,5 @@
 import notificationsRouter from "./notifications";
+import facebookRouter from "./facebook";
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import campaignsRouter from "./campaigns";
@@ -56,6 +57,7 @@ router.use(adminTwoFactorRouter);
 router.use("/admin", requireAdmin, adminActionLimiter);
 
 router.use(healthRouter);
+router.use(facebookRouter);
 router.use(notificationsRouter);
 router.use(campaignsRouter);
 router.use(campaignUpdatesRouter);
