@@ -37,7 +37,7 @@ export async function checkFacebookConnection(
     }
     if (data.id !== pageId) return { ...base, status: "wrong_page", message: "El token pertenece a otro usuario o página. Usa el token de la página configurada." };
     return { ...base, status: "connected", page: { id: data.id, name: data.name },
-      message: "La identidad de la página está verificada. La publicación todavía no está habilitada." };
+      message: "La identidad de la página está verificada." };
   } catch {
     // Exceptions can contain request headers or provider payloads. Do not expose/log them.
     return { ...base, status: "unavailable", message: "No se pudo contactar con Meta dentro del tiempo disponible. Intenta nuevamente." };
