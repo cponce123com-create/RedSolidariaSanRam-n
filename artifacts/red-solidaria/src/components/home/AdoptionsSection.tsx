@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -21,7 +22,18 @@ interface HomePet {
   photos: string[] | null;
 }
 
-const PET_FALLBACK_IMG = "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600&q=80";
+function PetPhoto({ pet }: { pet: HomePet }) {
+  const src = optimizeImageUrl(pet.photos?.[0], { width: 400 });
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!src || failedSrc === src) return (
+    <div className="flex h-full w-full items-center justify-center" role="img" aria-label={pet.name}>
+      <PawPrint className="h-16 w-16 text-muted-foreground/40" aria-hidden="true" />
+    </div>
+  );
+  return <img src={src} alt={pet.name} loading="lazy" decoding="async"
+    onError={() => setFailedSrc(src)}
+    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />;
+}
 
 /**
  * "Ellos también esperan una familia" — mascotas reales en adopción
@@ -30,7 +42,7 @@ const PET_FALLBACK_IMG = "https://images.unsplash.com/photo-1548199973-03cce0bbc
 export function AdoptionsSection() {
   const { t } = useTranslation();
 
-  const { data: pets, isLoading } = useQuery<HomePet[]>({
+  const { data: pets, isLoading, isError, refetch } = useQuery<HomePet[]>({
     queryKey: [HOME_PETS_KEY],
     queryFn: async () => {
       const res = await fetch("/api/pets?status=available");
@@ -77,6 +89,9 @@ export function AdoptionsSection() {
               </div>
             ))}
           </div>
+        ) : isError ? (
+          <EmptyState icon={PawPrint} title={t("home.adoptionsLoadError")}
+            action={<Button variant="outline" onClick={() => void refetch()}>{t("home.adoptionsRetry")}</Button>} />
         ) : visible.length > 0 ? (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {visible.map((pet, i) => (
@@ -92,17 +107,7 @@ export function AdoptionsSection() {
                   className="group block overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
                 >
                   <div className="relative aspect-square overflow-hidden bg-muted">
-                    <img
-                      src={
-                        pet.photos && pet.photos.length > 0
-                          ? optimizeImageUrl(pet.photos[0], { width: 400 })
-                          : PET_FALLBACK_IMG
-                      }
-                      alt={pet.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
+                    <PetPhoto pet={pet} />
                     {pet.urgent && (
                       <Badge className="absolute left-3 top-3 bg-red-600 text-white shadow-sm">
                         {t("adoptions.urgentBadge")}
@@ -115,7 +120,7 @@ export function AdoptionsSection() {
                         {pet.name}
                       </h3>
                       <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                        {pet.species === "cat" ? t("adoptions.speciesCat") : t("adoptions.speciesDog")}
+                        {pet.species === "gato" ? t("adoptions.speciesCat") : t("adoptions.speciesDog")}
                       </span>
                     </div>
                     <p className="mt-1 truncate text-xs text-muted-foreground">
