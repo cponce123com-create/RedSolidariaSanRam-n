@@ -1,5 +1,36 @@
 # Publicación automática en Facebook
 
+## Conexión de los módulos públicos (migración 038)
+
+| Módulo | Momento del envío | Contenido del anuncio |
+|---|---|---|
+| Noticias | Al guardar/publicar | Título, resumen, imagen y enlace a la noticia. |
+| Campañas | Al activar una campaña real | Presentación y enlace a la campaña. |
+| Aportes de dinero | Al aprobar o conciliar un importe positivo | Agradecimiento, monto confirmado y enlace a transparencia. |
+| Productos, servicios y logística | Con estado contable confirmado y entrega verificada | Tipo de colaboración; productos con cantidades realmente recibidas. El valor estimado no se anuncia como dinero recibido. |
+| Mascotas | Al aprobarlas como disponibles | Nombre, descripción pública, foto y enlace a adopción. |
+| Casos ciudadanos | Al aprobar su publicación | Título, descripción y foto públicos, con enlace a casos urgentes. |
+| Novedades de campaña | Al guardar en una campaña pública real | Título, novedad e imagen pública de la campaña. |
+| Cierres de campaña | Al marcar una campaña real como completada | Agradecimiento y enlace a sus resultados/transparencia. Es un envío distinto al anuncio inicial. |
+
+Cada registro muestra su estado y una **Vista previa de Facebook** dentro del panel correspondiente. El servidor decide si es publicable, incluso si alguien intenta solicitar el envío manualmente. Las consultas y reintentos de aportes respetan los permisos financieros: los supervisores pueden consultar y los moderadores quedan fuera; los envíos manuales financieros corresponden al administrador/superadmin.
+
+### Ejemplo de un aporte de S/50
+
+1. Registrar el aporte: permanece pendiente, sin anuncio.
+2. Comprobarlo y aprobarlo/conciliarlo: se registra un único envío.
+3. Facebook recibirá un mensaje similar a «Confirmamos un aporte de S/50.00 para ChocoFest. Gracias a una persona solidaria por sumarse», junto con el enlace a la transparencia. La imagen será la portada pública de la campaña.
+4. Si la donación no es anónima y existe una autorización explícita vigente de `public_name`, el agradecimiento puede incluir su nombre. Sin una autorización positiva, se mantiene anónimo aunque el registro antiguo no tenga marcada la casilla de anonimato.
+5. El estado pasa de pendiente a enviado/publicado o muestra el motivo de rechazo y permite reintentar según las reglas de abajo.
+
+El anuncio del aporte no incluye comprobantes, correos, teléfonos, notas internas ni mensajes privados. Antes de cada intento se relee la última decisión de consentimiento; una revocación anterior al envío vuelve anónimo el anuncio. En productos se publican cantidades recibidas, no las prometidas. Rechazos, anulaciones y entregas sin verificar no se anuncian.
+
+La migración 038 es aditiva y no envía el historial en bloque. Los cambios de notas/contactos internos no desencadenan publicaciones de los nuevos módulos. Los registros anteriores pueden enviarse individualmente si siguen cumpliendo los requisitos. Los trabajos nuevos utilizan una cola compatible con despliegues graduales para que una instancia antigua no interprete un aporte como una campaña.
+
+La configuración, los mensajes de contacto, los usuarios y las solicitudes de voluntariado permanecen como operaciones internas. El flujo social corresponde al contenido aprobado y público de la tabla anterior.
+
+Si se revoca un consentimiento, se anula un aporte o se retira contenido **después** de haberse publicado en Facebook, la copia externa debe revisarse/retirarse allí. El panel advierte cuando el registro enviado deja de cumplir los requisitos. Las ediciones posteriores no modifican automáticamente una publicación ya enviada.
+
 ## Uso
 
 - **Noticias:** al guardar una noticia en el panel, queda pública en la web y se registra su envío a Facebook en la misma transacción de base de datos.
@@ -26,7 +57,7 @@ Mantener el Build Command y Start Command ya configurados. La migración **037_f
 
 ## Entrega y duplicados
 
-La cola tiene una clave única por tipo e ID de contenido. Los disparadores de PostgreSQL garantizan que una operación revertida no envíe nada. Los procesos reclaman trabajos con `FOR UPDATE SKIP LOCKED`, por lo que dos instancias no envían el mismo trabajo a la vez.
+La cola tiene una clave única por tipo e ID de contenido. Los disparadores de PostgreSQL garantizan que una operación revertida no envíe nada. Los procesos reclaman trabajos con `FOR UPDATE SKIP LOCKED` y solo sus tipos compatibles, por lo que dos instancias no envían el mismo trabajo a la vez.
 
 El resultado de Meta se guarda antes de considerar el envío publicado. Un error de permisos o token queda como fallo con reintento manual. Los rechazos explícitos por límite de uso pueden reintentarse automáticamente hasta cinco intentos acumulados, con espera creciente. Los intentos se cuentan de forma monotónica incluso al reintentar manualmente.
 
