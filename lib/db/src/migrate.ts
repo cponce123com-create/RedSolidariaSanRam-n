@@ -1,4 +1,5 @@
 import { notificationMigrationSql } from "./notification-migration";
+import { facebookMigrationSql } from "./facebook-migration";
 import { pool } from "./pool";
 
 /**
@@ -1034,6 +1035,7 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
     `,
   },
   { name: "036_public_notifications.sql", sql: notificationMigrationSql },
+  { name: "037_facebook_publications.sql", sql: facebookMigrationSql },
 ];
 
 /**
