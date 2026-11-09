@@ -271,7 +271,7 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
-          phone: data.phone ?? null,
+          phone,
           amount: moneyAmount,
           // Una donación en especie no tiene método de pago; "other" es la
           // convención ya usada por las donaciones históricas en especie
