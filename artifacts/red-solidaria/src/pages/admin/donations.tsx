@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { ManualDonationForm } from "@/components/admin/ManualDonationForm";
 import { FacebookPublicationStatus } from "@/components/admin/FacebookPublicationStatus";
 import { 
   useGetDonations, 
@@ -40,17 +41,10 @@ export default function AdminDonations() {
   const [proofUploadId, setProofUploadId] = useState<number | null>(null);
   const [proofUploading, setProofUploading] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualSaving, setManualSaving] = useState(false);
-  const [manualError, setManualError] = useState("");
+  const [manualBusy, setManualBusy] = useState(false);
   const [manualCampaigns, setManualCampaigns] = useState<{ id: number; title: string; status: string }[]>([]);
-  const [manualForm, setManualForm] = useState({
-    firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash",
-    collaborationType: "dinero", product: "panetones", productOther: "", quantity: "1",
-    unit: "unidad", estimatedValue: "", campaignId: "", message: "",
-  });
+  const [manualCampaignError, setManualCampaignError] = useState("");
   const proofFileRef = useRef<HTMLInputElement>(null);
-  const manualDedupeToken = useRef<string | null>(null);
-  const manualSyntheticEmail = useRef<string | null>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -61,11 +55,11 @@ export default function AdminDonations() {
   useEffect(() => {
     let active = true;
     fetch("/api/campaigns?limit=100")
-      .then((res) => (res.ok ? res.json() : []))
+      .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
       .then((rows: { id: number; title: string; status: string }[]) => {
         if (active && Array.isArray(rows)) setManualCampaigns(rows.filter((row) => row.status === "active"));
       })
-      .catch(() => {});
+      .catch(() => { if (active) setManualCampaignError("No se pudieron cargar las campañas. Recarga la página antes de asignar el aporte a una campaña."); });
     return () => { active = false; };
   }, []);
 
@@ -82,7 +76,7 @@ export default function AdminDonations() {
   const query = search.trim().toLowerCase();
   const filteredDonations = (donations ?? []).filter((d) => {
     if (!query) return true;
-    const donor = d.anonymous ? "" : `${d.firstName} ${d.lastName}`.toLowerCase();
+    const donor = `${d.firstName} ${d.lastName}`.toLowerCase();
     return (
       donor.includes(query) ||
       (d.email ?? "").toLowerCase().includes(query) ||
@@ -207,66 +201,6 @@ export default function AdminDonations() {
     }
   };
 
-  const handleManualSubmit = async () => {
-    setManualError("");
-    setManualSaving(true);
-    try {
-      manualDedupeToken.current ??= globalThis.crypto?.randomUUID?.() ??
-        `manual-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      if (!manualForm.email.trim()) {
-        manualSyntheticEmail.current ??= `registro-${Date.now()}-${Math.random().toString(36).slice(2)}@sin-correo.redsolidaria.invalid`;
-      }
-      const email = manualForm.email.trim() || manualSyntheticEmail.current!;
-      const isMoney = manualForm.collaborationType === "dinero";
-      const payload = {
-        firstName: manualForm.firstName.trim(),
-        lastName: manualForm.lastName.trim(),
-        email,
-        phone: manualForm.phone.trim() || undefined,
-        amount: isMoney ? Number(manualForm.amount) : 0,
-        paymentMethod: isMoney ? manualForm.paymentMethod : undefined,
-        collaborationType: manualForm.collaborationType,
-        items: isMoney ? undefined : [{
-          product: manualForm.product,
-          productOther: manualForm.product === "otros" ? manualForm.productOther.trim() : undefined,
-          quantity: Number(manualForm.quantity),
-          unit: manualForm.unit,
-          description: manualForm.message.trim() || undefined,
-          estimatedValue: Number(manualForm.estimatedValue || 0),
-        }],
-        campaignId: manualForm.campaignId ? Number(manualForm.campaignId) : null,
-        message: isMoney ? undefined : `${manualForm.quantity} ${manualForm.unit} ${manualForm.product === "otros" ? manualForm.productOther.trim() : manualForm.product}`,
-        adminNote: manualForm.message.trim() || undefined,
-        receiptNote: isMoney ? "Registro administrativo de aporte coordinado por WhatsApp" : undefined,
-        anonymous: true,
-        publicProof: false,
-        contactConsent: false,
-        dedupeToken: manualDedupeToken.current,
-      };
-      const response = await fetch("/api/donations", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json().catch(() => null) as { message?: string } | null;
-      if (!response.ok) throw new Error(result?.message || "No se pudo registrar el aporte.");
-      toast({
-        title: "Aporte registrado",
-        description: "Quedó pendiente de revisión. Adjunta el comprobante si corresponde y apruébalo para que aparezca en transparencia.",
-      });
-      setManualOpen(false);
-      manualDedupeToken.current = null;
-      manualSyntheticEmail.current = null;
-      setManualForm({ firstName: "", lastName: "", email: "", phone: "", amount: "", paymentMethod: "cash", collaborationType: "dinero", product: "panetones", productOther: "", quantity: "1", unit: "unidad", estimatedValue: "", campaignId: "", message: "" });
-      invalidateDonationQueries(queryClient);
-    } catch (error) {
-      setManualError(error instanceof Error ? error.message : "No se pudo registrar el aporte.");
-    } finally {
-      setManualSaving(false);
-    }
-  };
-
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-500 hover:bg-yellow-600 text-white",
     approved: "bg-accent hover:bg-accent text-white",
@@ -352,8 +286,8 @@ export default function AdminDonations() {
         </div>
       </div>
 
-      <Dialog open={manualOpen} onOpenChange={(open) => { setManualOpen(open); if (!open) { setManualError(""); manualDedupeToken.current = null; manualSyntheticEmail.current = null; } }}>
-        <DialogContent className="rounded-2xl sm:max-w-xl">
+      <Dialog open={manualOpen} onOpenChange={(open) => { if (!manualBusy) setManualOpen(open); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto rounded-2xl sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Registrar aporte coordinado</DialogTitle>
             <DialogDescription>
@@ -361,95 +295,12 @@ export default function AdminDonations() {
               Se guardará como pendiente hasta que el equipo lo revise.
             </DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void handleManualSubmit(); }}>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm font-medium">Nombres
-                <Input required minLength={2} value={manualForm.firstName} onChange={(e) => setManualForm({ ...manualForm, firstName: e.target.value })} />
-              </label>
-              <label className="space-y-1 text-sm font-medium">Apellidos
-                <Input required minLength={2} value={manualForm.lastName} onChange={(e) => setManualForm({ ...manualForm, lastName: e.target.value })} />
-              </label>
-              <label className="space-y-1 text-sm font-medium">Correo (opcional)
-                <Input type="email" value={manualForm.email} onChange={(e) => setManualForm({ ...manualForm, email: e.target.value })} placeholder="correo@ejemplo.com" />
-              </label>
-              <label className="space-y-1 text-sm font-medium">WhatsApp (opcional)
-                <Input value={manualForm.phone} onChange={(e) => setManualForm({ ...manualForm, phone: e.target.value })} placeholder="9 dígitos" />
-              </label>
-              <label className="space-y-1 text-sm font-medium">Tipo de aporte
-                <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.collaborationType} onChange={(e) => setManualForm({ ...manualForm, collaborationType: e.target.value })}>
-                  <option value="dinero">Dinero</option>
-                  <option value="productos">Productos</option>
-                </select>
-              </label>
-              {manualForm.collaborationType === "dinero" ? (
-                <label className="space-y-1 text-sm font-medium">Monto recibido (S/)
-                  <Input type="number" min="5" step="0.01" required value={manualForm.amount} onChange={(e) => setManualForm({ ...manualForm, amount: e.target.value })} />
-                </label>
-              ) : (
-                <>
-                  <label className="space-y-1 text-sm font-medium">Producto
-                    <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.product} onChange={(e) => setManualForm({ ...manualForm, product: e.target.value })}>
-                      <option value="panetones">Panetones</option><option value="leche">Leche</option>
-                      <option value="chocolate">Chocolate</option><option value="arroz">Arroz</option>
-                      <option value="azucar">Azúcar</option><option value="aceite">Aceite</option>
-                      <option value="juguetes">Juguetes</option><option value="ropa">Ropa</option>
-                      <option value="otros">Otros</option>
-                    </select>
-                  </label>
-                  <label className="space-y-1 text-sm font-medium">Cantidad y unidad
-                    <div className="flex gap-2">
-                      <Input type="number" min="0.001" step="0.001" required value={manualForm.quantity} onChange={(e) => setManualForm({ ...manualForm, quantity: e.target.value })} />
-                      <select className="h-10 rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.unit} onChange={(e) => setManualForm({ ...manualForm, unit: e.target.value })}>
-                        <option value="unidad">Unidad</option><option value="caja">Caja</option>
-                        <option value="paquete">Paquete</option><option value="saco">Saco</option>
-                        <option value="kilogramo">Kilogramo</option><option value="litro">Litro</option>
-                      </select>
-                    </div>
-                  </label>
-                  {manualForm.product === "otros" && (
-                    <label className="space-y-1 text-sm font-medium">Describe el producto
-                      <Input required minLength={2} maxLength={60} value={manualForm.productOther} onChange={(e) => setManualForm({ ...manualForm, productOther: e.target.value })} />
-                    </label>
-                  )}
-                  <label className="space-y-1 text-sm font-medium">Valor estimado (S/, opcional)
-                    <Input type="number" min="0" step="0.01" value={manualForm.estimatedValue} onChange={(e) => setManualForm({ ...manualForm, estimatedValue: e.target.value })} />
-                  </label>
-                </>
-              )}
-              {manualForm.collaborationType === "dinero" && (
-              <label className="space-y-1 text-sm font-medium">Medio de recepción
-                <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.paymentMethod} onChange={(e) => setManualForm({ ...manualForm, paymentMethod: e.target.value })}>
-                  <option value="cash">Efectivo</option>
-                  <option value="other">Otro / coordinado</option>
-                  <option value="yape">Yape</option>
-                  <option value="plin">Plin</option>
-                  <option value="transfer">Transferencia</option>
-                </select>
-              </label>
-              )}
-              <label className="space-y-1 text-sm font-medium sm:col-span-2">Campaña (opcional)
-                <select className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm" value={manualForm.campaignId} onChange={(e) => setManualForm({ ...manualForm, campaignId: e.target.value })}>
-                  <option value="">Fondo general</option>
-                  {manualCampaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.title}</option>)}
-                </select>
-              </label>
-              <label className="space-y-1 text-sm font-medium sm:col-span-2">Nota interna (opcional)
-                <Textarea rows={2} value={manualForm.message} onChange={(e) => setManualForm({ ...manualForm, message: e.target.value })} placeholder="Detalle útil para el equipo" />
-              </label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Los aportes digitales quedarán pendientes hasta que adjuntes el comprobante y los apruebes.
-              Sin correo se guarda un identificador interno, no se publica en la página.
-            </p>
-            {manualError && <p role="alert" className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">{manualError}</p>}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setManualOpen(false)} className="rounded-xl">Cancelar</Button>
-              <Button type="submit" disabled={manualSaving} className="rounded-xl">
-                {manualSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar como pendiente
-              </Button>
-            </DialogFooter>
-          </form>
+          {manualCampaignError && <p role="alert" className="text-sm text-destructive">{manualCampaignError}</p>}
+          <ManualDonationForm onLockChange={setManualBusy} campaigns={manualCampaigns} onCancel={() => setManualOpen(false)} onSaved={(id) => {
+            setManualOpen(false);
+            invalidateDonationQueries(queryClient);
+            toast({ title: `Aporte #${id} registrado`, description: "Quedó pendiente de revisión. Aprueba el dinero o verifica la entrega en especie para activar su publicación en Facebook." });
+          }} />
         </DialogContent>
       </Dialog>
 
@@ -549,16 +400,13 @@ export default function AdminDonations() {
                     {formatDate(d.createdAt)}
                   </TableCell>
                   <TableCell>
-                    {d.anonymous ? (
-                      <span className="font-medium italic text-muted-foreground">Donante Anónimo</span>
-                    ) : (
-                      <div>
-                        <div className="font-medium text-foreground">{d.firstName} {d.lastName}</div>
-                        <div className="text-xs text-muted-foreground">{d.email}</div>
-                        {d.phone && <div className="text-xs text-muted-foreground">{d.phone}</div>}
-                        {d.message && <div className="mt-1 max-w-[240px] text-xs text-muted-foreground">{d.message}</div>}
-                      </div>
-                    )}
+                    <div>
+                      <div className="font-medium text-foreground">{d.firstName} {d.lastName}</div>
+                      {d.anonymous && <Badge variant="outline" className="text-[10px]">Nombre privado en público</Badge>}
+                      <div className="text-xs text-muted-foreground">{d.email?.endsWith("@sin-correo.redsolidaria.invalid") ? "Sin correo registrado" : d.email}</div>
+                      {d.phone && <div className="text-xs text-muted-foreground">{d.phone}</div>}
+                      {d.message && <div className="mt-1 max-w-[240px] text-xs text-muted-foreground">{d.message}</div>}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {typeof d.id === "number" && <FacebookPublicationStatus kind="donation" sourceId={d.id}
@@ -610,13 +458,10 @@ export default function AdminDonations() {
                             </Badge>
                           )}
                         </>
-                      ) : d.receiptNote ? (
-                        <div className="text-xs bg-secondary/50 p-1.5 rounded text-muted-foreground max-w-[150px] truncate" title={d.receiptNote}>
-                          📝 {d.receiptNote}
-                        </div>
                       ) : (
                         <div className="flex flex-col gap-1 items-start">
                           <span className="text-xs text-muted-foreground italic">Sin adjunto</span>
+                          {d.receiptNote && <span className="max-w-[160px] text-xs text-muted-foreground" title={d.receiptNote}>{d.receiptNote}</span>}
                           <Button
                             variant="outline"
                             size="sm"
@@ -642,7 +487,7 @@ export default function AdminDonations() {
                         size="icon" 
                         variant="outline" 
                         className="h-10 w-10 text-accent border-accent/20 hover:bg-accent/10 hover:text-accent rounded-lg"
-                        disabled={d.status === 'approved' || updateStatus.isPending}
+                        disabled={d.status !== "pending" || updateStatus.isPending}
                         onClick={() => handleApprove(d.id)}
                         title="Aprobar"
                         data-testid="btn-approve-donation"
@@ -653,7 +498,7 @@ export default function AdminDonations() {
                         size="icon" 
                         variant="outline" 
                         className="h-10 w-10 text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive rounded-lg"
-                        disabled={d.status === 'rejected' || updateStatus.isPending}
+                        disabled={d.status !== "pending" || updateStatus.isPending}
                         onClick={() => setRejectDialogId(d.id)}
                         title="Rechazar"
                         data-testid="btn-reject-donation"
