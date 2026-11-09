@@ -32,7 +32,7 @@ export function FacebookConnectionCard() {
           <p>{check.data.message}</p>
           <p>ID de página: {check.data.pageIdConfigured ? "Configurado" : "Falta configurar"}. Token: {check.data.tokenConfigured ? "Configurado" : "Falta configurar"}.</p>
           {check.data.page && <p>Página verificada: <strong>{check.data.page.name}</strong> · {check.data.page.id}</p>}
-          <p>{check.data.autoPublishEnabled ? "Publicación automática activada para noticias y campañas al publicarlas." : "Publicación automática desactivada o configuración incompleta. Revisa las variables de Facebook y SITE_URL en Render."}</p>
+          <p>{check.data.autoPublishEnabled ? "Publicación automática activada: noticias, campañas, aportes confirmados, mascotas y casos aprobados, novedades y cierres de campaña." : "Publicación automática desactivada o configuración incompleta. Revisa las variables de Facebook y SITE_URL en Render."}</p>
           {!check.data.siteUrlConfigured && <p>Configura SITE_URL con la dirección HTTPS pública de tu web, sin rutas adicionales.</p>}
           <p className="text-muted-foreground">El primer envío confirmará los permisos de publicación. Consulta su resultado en Noticias o Campañas. El token puede caducar o ser revocado.</p>
         </div>
