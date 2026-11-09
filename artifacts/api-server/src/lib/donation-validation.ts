@@ -94,8 +94,20 @@ export const donationInputSchema = z
     // Mismos valores que DONOR_TYPES de lib/donor-identity.ts.
     donorType: z.enum(DONOR_TYPES).nullish(),
     receiptNote: z.string().trim().max(200).nullish(),
+    publicationTemplate: z.enum(["agradecimiento", "impacto", "comunidad"]).default("agradecimiento"),
+    publicationImageUrl: z.string().max(2000).nullish(),
+    publicationImagePublicId: z.string().trim().min(1).max(300).nullish(),
+    publicPhotoConsent: z.boolean().default(false),
   })
   .superRefine((data, ctx) => {
+    if (data.publicationImageUrl) {
+      if (!isValidProofUrl(data.publicationImageUrl, { requireCloudinary: true })) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publicationImageUrl"], message: "Vuelve a subir la foto pública: debe ser una imagen de Cloudinary." });
+      }
+      if (!data.publicPhotoConsent || !data.publicationImagePublicId) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publicPhotoConsent"], message: "La foto pública requiere autorización y una subida válida." });
+      }
+    }
     // Solo el dinero exige monto (≥ S/5) y método de pago; una donación en
     // especie (productos, servicios, apoyo logístico) no tiene pago que exigir.
     if (!collaborationRequiresAmount(data.collaborationType)) return;
