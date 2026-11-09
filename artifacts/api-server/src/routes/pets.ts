@@ -177,7 +177,7 @@ router.delete("/admin/pets/:id", async (req, res) => {
     if (requests.length > 0) {
       return res.status(409).json({
         error: "conflict",
-        message: `Esta mascota tiene ${requests.length} solicitud(es) de adopción. Resuélvelas antes de eliminarla.`,
+        message: `Esta mascota tiene ${requests.length} solicitud(es) de adopción vinculada(s). Despublícala para retirarla de la web y conservar su historial.`,
       });
     }
     // V14-3.1: se COMPRUEBA que el borrado afectó a una fila. Antes se devolvía 204

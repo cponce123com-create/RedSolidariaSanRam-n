@@ -1,3 +1,4 @@
+import { invalidateEntities } from "@/lib/query-invalidation";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -262,8 +263,7 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       toast({ title: "Configuración guardada", description: "Los cambios se aplicaron correctamente." });
-      queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      invalidateEntities(queryClient, ["settings"]);
       setDirty(false);
     },
     onError: () => {

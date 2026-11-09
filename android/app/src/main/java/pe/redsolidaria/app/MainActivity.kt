@@ -55,6 +55,7 @@ fun RedSolidariaApp(campaigns: CampaignViewModel = viewModel(), community: Commu
     var route by rememberSaveable { mutableStateOf(if (initialNotice != null && initialCampaign == 0) "notices" else "home") }
     var more by remember { mutableStateOf(false) }
     var donation by remember { mutableStateOf(false) }
+    var contactError by remember { mutableStateOf<String?>(null) }
     val campaignState by campaigns.state.collectAsStateWithLifecycle()
     val identity by community.identity.collectAsStateWithLifecycle()
     val settings by community.settings.collectAsStateWithLifecycle()
@@ -64,10 +65,16 @@ fun RedSolidariaApp(campaigns: CampaignViewModel = viewModel(), community: Commu
     fun navigate(next: String) { campaigns.closeDetail(); route = next; more = false }
     fun whatsapp(title: String? = null) {
         val number = settings.text("org_whatsapp").filter(Char::isDigit)
-        if (number.length < 8) { donation = false; navigate("contact"); return }
+        if (number.length < 8) {
+            donation = false
+            community.loadMetadata()
+            contactError = "No se pudo obtener el número de WhatsApp. Puedes reintentar o enviar un mensaje desde Contacto."
+            return
+        }
         val text = if (title != null) "Hola, quiero apoyar la campaña “$title”. ¿Me indican cómo coordinar mi aporte?"
             else settings.text("whatsapp_message_general").ifBlank { "Hola, quisiera más información sobre cómo ayudar a Red Solidaria San Ramón." }
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number?text=${Uri.encode(text)}")))
+        try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number?text=${Uri.encode(text)}"))) }
+        catch (_: android.content.ActivityNotFoundException) { contactError = "No se encontró una aplicación para abrir WhatsApp. Puedes enviar un mensaje desde Contacto." }
     }
     LaunchedEffect(Unit) {
         initialNotice?.let { NoticeStore.markRead(context, it) }
@@ -143,12 +150,16 @@ fun RedSolidariaApp(campaigns: CampaignViewModel = viewModel(), community: Commu
             route == "pets" -> PetsScreen(padding, community, ::navigate)
             route.startsWith("pet/") -> PetDetailScreen(padding, route.substringAfter('/').toInt(), community, ::navigate)
             route.startsWith("article/") -> ArticleScreen(padding, route.substringAfter('/').toInt(), community)
-            route == "transparency" -> TransparencyScreen(padding, community, campaignState, { campaigns.open(it) })
+            route == "transparency" -> TransparencyScreen(padding, community, { campaigns.open(it) })
             route == "urgent" -> UrgentScreen(padding, community, ::navigate, { campaigns.open(it) })
             route in setOf("report", "volunteer", "contact") -> PublicFormScreen(route, padding, community, ::navigate, { whatsapp() })
             else -> InformationScreen(route, padding, community, ::navigate, { donation = true })
         }
     }
+    contactError?.let { message -> AlertDialog(onDismissRequest = { contactError = null },
+        title = { Text("Contacto por WhatsApp") }, text = { Text(message) },
+        confirmButton = { TextButton(onClick = { contactError = null; whatsapp() }) { Text("Reintentar") } },
+        dismissButton = { TextButton(onClick = { contactError = null; navigate("contact") }) { Text("Abrir Contacto") } }) }
     if (donation) AlertDialog(onDismissRequest = { donation = false }, icon = { Icon(Icons.Outlined.Handshake, null) },
         title = { Text("Coordina tu aporte por WhatsApp") },
         text = { Text("Escríbenos y te ayudaremos a colaborar. El equipo registra el aporte como pendiente; solo después de confirmarlo se suma a la recaudación pública.") },

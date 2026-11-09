@@ -39,7 +39,7 @@ jobs:
       - name: Upload installable test APK
         uses: actions/upload-artifact@v4
         with:
-          name: RedSolidaria-Android-0.3.0-debug
+          name: RedSolidaria-Android-0.3.1-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
       - name: Upload verification reports
@@ -84,7 +84,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: RedSolidaria-Android-0.3.0-screenshots
+          name: RedSolidaria-Android-0.3.1-screenshots
           path: |
             android/screenshots/
             android/app/build/reports/androidTests/

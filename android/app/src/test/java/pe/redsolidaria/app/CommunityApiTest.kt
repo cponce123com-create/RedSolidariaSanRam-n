@@ -9,6 +9,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class CommunityApiTest {
+    @Test fun `HTML fallback cannot count as a successful API response`() = runBlocking {
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setBody("<!doctype html><html></html>"))
+            try { CommunityApi(server.url("/").toString()).request("notifications"); fail("HTML is not API data") }
+            catch (error: IOException) { assertTrue(error.message!!.contains("módulo")) }
+        }
+    }
     @Test fun `public native screens consume JSON from the shared server`() = runBlocking {
         MockWebServer().use { server ->
             server.enqueue(MockResponse().setBody("""[{"id":39,"name":"Rex","species":"perro"}]"""))

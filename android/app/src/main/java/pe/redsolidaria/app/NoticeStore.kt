@@ -102,7 +102,9 @@ object NoticeStore {
             val incoming = client.newCall(request).execute().use { response ->
                 if (response.code == 404) throw IOException("El servidor aún no tiene publicado el módulo de avisos.")
                 if (!response.isSuccessful) throw IOException("El servidor no pudo cargar los avisos (${response.code}).")
-                parseNotices(response.body?.string() ?: throw IOException("Respuesta vacía"))
+                val body = response.body?.string() ?: throw IOException("Respuesta vacía")
+                if (body.trimStart().startsWith("<")) throw IOException("El servidor aún no tiene publicado el módulo de avisos.")
+                parseNotices(body)
             }
             val settings = prefs(context)
             val initialized = settings.getBoolean("initialized", false)

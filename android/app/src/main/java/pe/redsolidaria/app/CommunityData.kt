@@ -35,6 +35,7 @@ class CommunityApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                 val message = runCatching { JSONObject(text).optString("message").ifBlank { JSONObject(text).optString("error") } }.getOrDefault("")
                 throw IOException(message.ifBlank { "No se pudo completar la solicitud (${response.code})." })
             }
+            if (text.trimStart().startsWith("<")) throw IOException("El servidor no entregó los datos esperados. Es posible que falte publicar este módulo.")
             text
         }
     }
@@ -57,6 +58,8 @@ class CommunityViewModel : ViewModel() {
     val stats = mutableStats.asStateFlow()
     private val mutableCms = MutableStateFlow<Map<String, JSONObject?>>(emptyMap())
     val cms = mutableCms.asStateFlow()
+    private val mutableMetadataErrors = MutableStateFlow<Map<String, String>>(emptyMap())
+    val metadataErrors = mutableMetadataErrors.asStateFlow()
 
     init {
         loadMetadata()
@@ -66,9 +69,14 @@ class CommunityViewModel : ViewModel() {
     }
 
     fun loadMetadata() {
-        viewModelScope.launch { try { mutableIdentity.value = api.obj("institutional-identity") } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {} }
-        viewModelScope.launch { try { mutableSettings.value = api.obj("settings") ?: JSONObject() } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {} }
-        viewModelScope.launch { try { mutableStats.value = api.obj("donations/stats") } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) {} }
+        fun load(key: String, assign: (JSONObject?) -> Unit) = viewModelScope.launch {
+            try { assign(api.obj(key)); mutableMetadataErrors.value = mutableMetadataErrors.value - key }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { mutableMetadataErrors.value = mutableMetadataErrors.value + (key to (failure.message ?: "No se pudo actualizar la información.")) }
+        }
+        load("institutional-identity") { mutableIdentity.value = it }
+        load("settings") { mutableSettings.value = it ?: JSONObject() }
+        load("donations/stats") { mutableStats.value = it }
         loadCms("inicio")
     }
 

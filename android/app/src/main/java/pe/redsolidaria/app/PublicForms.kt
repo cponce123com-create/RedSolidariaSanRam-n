@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -18,6 +20,10 @@ import org.json.JSONObject
 @Composable
 fun PublicFormScreen(route: String, padding: PaddingValues, community: CommunityViewModel,
     navigate: (String) -> Unit, whatsapp: () -> Unit) {
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("volunteer_tracking", android.content.Context.MODE_PRIVATE) }
+    var trackingToken by remember { mutableStateOf(preferences.getString("publicToken", "").orEmpty()) }
+    val metadataErrors by community.metadataErrors.collectAsStateWithLifecycle()
     var name by rememberSaveable(route) { mutableStateOf("") }
     var email by rememberSaveable(route) { mutableStateOf("") }
     var phone by rememberSaveable(route) { mutableStateOf("") }
@@ -62,7 +68,14 @@ fun PublicFormScreen(route: String, padding: PaddingValues, community: Community
         val path = when (route) { "report" -> "reports"; "volunteer" -> "volunteers"; else -> "contact" }
         scope.launch {
             submitting = true
-            try { community.api.request(path, body); submitted = true }
+            try {
+                val response = JSONObject(community.api.request(path, body))
+                if (route == "volunteer") {
+                    trackingToken = response.text("publicToken")
+                    if (trackingToken.isNotBlank()) preferences.edit().putString("publicToken", trackingToken).apply()
+                }
+                submitted = true
+            }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { error = failure.message ?: "No se pudo confirmar el envío. Revisa tu conexión." }
             finally { submitting = false }
@@ -71,6 +84,14 @@ fun PublicFormScreen(route: String, padding: PaddingValues, community: Community
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         item { Icon(if (route == "volunteer") Icons.Outlined.Groups else if (route == "report") Icons.Outlined.Support else Icons.Outlined.MailOutline,
             null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp)); Spacer(Modifier.height(14.dp)); SectionTitle(heading, subtitle) }
+        if (route == "volunteer" && trackingToken.isNotBlank()) item {
+            OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp)) {
+                Text("Seguimiento de tu postulación", style = MaterialTheme.typography.titleMedium)
+                Text("El enlace queda guardado en este teléfono.")
+                TextButton(onClick = { openWeb(context, "/voluntariado/estado/${android.net.Uri.encode(trackingToken)}") }) { Text("Consultar estado en la web") }
+            } }
+        }
+        if (route == "contact") metadataErrors["settings"]?.let { message -> item { ErrorBlock(message) { community.loadMetadata() } } }
         if (submitted) {
             item { OutlinedCard { Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Icon(Icons.Outlined.CheckCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(44.dp))

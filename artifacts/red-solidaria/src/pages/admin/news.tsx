@@ -1,4 +1,4 @@
-import { NEWS_KEY } from "../../lib/query-keys";
+import { invalidateNewsQueries } from "@/lib/query-invalidation";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -118,17 +118,17 @@ export default function AdminNews() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [NEWS_KEY] });
+      invalidateNewsQueries(queryClient);
       toast({ title: "Noticia eliminada" });
     },
     // Antes no había onError: un fallo no decía nada y la noticia seguía en la lista.
     onError: (error: Error) => {
-      queryClient.invalidateQueries({ queryKey: [NEWS_KEY] });
+      invalidateNewsQueries(queryClient);
       toast({ title: "No se pudo eliminar", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleSave = () => { queryClient.invalidateQueries({ queryKey: ["/api/news"] }); setShowForm(false); setEditing(null); };
+  const handleSave = () => { invalidateNewsQueries(queryClient); setShowForm(false); setEditing(null); };
 
   return (
     <div className="p-6 sm:p-8 max-w-4xl">

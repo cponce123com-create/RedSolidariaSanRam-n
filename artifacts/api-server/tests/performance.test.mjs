@@ -102,15 +102,15 @@ test("publicApiCache: GETs públicos reciben Cache-Control", async () => {
   await withServer(app, async (base) => {
     assert.equal(
       await cacheHeader(base, "/api/campaigns"),
-      "public, max-age=60",
+      "public, no-cache",
     );
     assert.equal(
       await cacheHeader(base, "/api/campaigns/5/donors"),
-      "public, max-age=60",
+      "public, no-cache",
     );
     assert.equal(
       await cacheHeader(base, "/api/donations/stats"),
-      "public, max-age=60",
+      "public, no-cache",
     );
   });
 });
@@ -146,7 +146,7 @@ test("publicApiCache: la variante anónima se marca Vary: Cookie", async () => {
   const app = buildCacheApp();
   await withServer(app, async (base) => {
     const res = await fetch(`${base}/api/campaigns`);
-    assert.equal(res.headers.get("cache-control"), "public, max-age=60");
+    assert.equal(res.headers.get("cache-control"), "public, no-cache");
     assert.equal(res.headers.get("vary"), "Cookie");
   });
 });

@@ -142,7 +142,7 @@ export default function AdminFaq() {
       toast({ title: "No se pudo cambiar la visibilidad", description: errorMessage(error), variant: "destructive" }),
   });
 
-  const handleSave = () => { queryClient.invalidateQueries({ queryKey: ["/api/admin/faq"] }); setShowForm(false); setEditing(null); };
+  const handleSave = () => { invalidateFaqQueries(queryClient); setShowForm(false); setEditing(null); };
 
   const filtered = faqs.filter(f => categoryFilter === "all" || f.category === categoryFilter);
   const CATEGORY_COLOR: Record<string, string> = {

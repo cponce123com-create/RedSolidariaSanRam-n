@@ -133,3 +133,16 @@ El workflow Android incluye pruebas de navegación en un emulador y publica
 capturas de las pantallas reales. La revisión final en el teléfono del usuario
 continúa siendo necesaria. El archivo de esta versión es
 `RedSolidaria-Android-0.3.0-debug`.
+
+
+## Versión 0.3.1 — correcciones de conexiones
+
+- Lee `proofUrl` del DTO público y respeta comprobantes no autorizados; PDFs y videos se abren como adjuntos.
+- Aportes paginados de 20 en 20 con Cargar más.
+- Transparencia tiene su propio listado de campañas y paginación independiente del filtro principal.
+- Adopciones y fichas se revalidan al volver a la pantalla y cada 30 segundos mientras están visibles. Los errores de detalle dejan de mostrar la ficha anterior.
+- WhatsApp explica la falta de configuración y permite reintentar o abrir Contacto.
+- La postulación conserva localmente el enlace público de seguimiento y permite consultarlo en la web.
+- Reconoce el HTML de un servidor sin el módulo de avisos y muestra un mensaje claro.
+
+Los cambios de servidor/web siguen requiriendo despliegue. Este APK no publica el servidor ni convierte las consultas periódicas en push inmediato.

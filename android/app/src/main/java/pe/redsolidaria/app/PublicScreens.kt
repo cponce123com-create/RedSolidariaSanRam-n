@@ -26,7 +26,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import org.json.JSONObject
 
 @Composable
@@ -54,7 +59,13 @@ fun NativeCampaignDetail(state: CampaignState, padding: PaddingValues, campaigns
     var tab by rememberSaveable(state.selectedId) { mutableStateOf("summary") }
     val feeds by community.feeds.collectAsStateWithLifecycle()
     val id = state.selectedId ?: return
-    LaunchedEffect(id, tab) { if (tab != "summary") community.load("campaign-$id-$tab", "campaigns/$id/$tab") }
+    fun loadTab(append: Boolean = false) {
+        val key = "campaign-$id-$tab"
+        val offset = if (append) feeds[key]?.rows?.size ?: 0 else 0
+        val query = if (tab == "donors") "?limit=20&offset=$offset" else ""
+        community.load(key, "campaigns/$id/$tab$query", append)
+    }
+    LaunchedEffect(id, tab) { if (tab != "summary") loadTab() }
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         if (state.detailLoading) item { LoadingBlock("Abriendo la campaña…") }
         state.detailError?.let { error -> item { ErrorBlock(error) { campaigns.open(id) } } }
@@ -89,20 +100,23 @@ fun NativeCampaignDetail(state: CampaignState, padding: PaddingValues, campaigns
             } else {
                 val feed = feeds["campaign-$id-$tab"] ?: CommunityFeed(loading = true)
                 if (feed.loading) item { LoadingBlock() }
-                feed.error?.let { error -> item { ErrorBlock(error) { community.load("campaign-$id-$tab", "campaigns/$id/$tab") } } }
+                feed.error?.let { error -> item { ErrorBlock(error) { loadTab(append = feed.rows.isNotEmpty()) } } }
                 items(feed.rows) { row -> OutlinedCard(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val image = row.text("imageUrl").ifBlank { row.text("receiptUrl") }
+                        val image = publicImage(row)
                         if (image.isNotBlank()) BrandPhoto(image, "Evidencia pública", Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(14.dp)))
                         Text(row.text("title").ifBlank { row.text("name").ifBlank { row.text("donorName").ifBlank { if (tab == "donors") "Aporte confirmado" else "Registro público" } } }, fontWeight = FontWeight.Bold)
                         val description = row.text("description").ifBlank { row.text("content") }
                         if (description.isNotBlank()) Text(plainText(description))
                         if (row.has("amount")) Text(money(row.optDouble("amount", 0.0)), fontFamily = Outfit, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                        val attachment = row.text("receiptUrl").ifBlank { row.text("mediaUrl") }
+                        val attachment = publicAttachment(row)
                         if (attachment.startsWith("https://")) TextButton(onClick = { openWeb(context, attachment) }) { Text("Abrir comprobante público") }
                     }
                 } }
                 if (!feed.loading && feed.error == null && feed.rows.isEmpty()) item { EmptyBlock("Sin registros publicados", "El equipo publicará aquí la información disponible.") }
+                if (tab == "donors" && feed.hasMore && !feed.loading && feed.error == null) item {
+                    OutlinedButton(onClick = { loadTab(true) }, modifier = Modifier.fillMaxWidth()) { Text("Cargar más aportes") }
+                }
             }
         }
     }
@@ -152,6 +166,7 @@ fun ArticleScreen(padding: PaddingValues, id: Int, community: CommunityViewModel
 
 @Composable
 fun PetsScreen(padding: PaddingValues, community: CommunityViewModel, navigate: (String) -> Unit) {
+    RefreshWhileVisible("pets") { community.load("pets", "pets") }
     val feeds by community.feeds.collectAsStateWithLifecycle()
     val feed = feeds["pets"] ?: CommunityFeed(loading = true)
     var species by rememberSaveable { mutableStateOf("all") }
@@ -160,6 +175,7 @@ fun PetsScreen(padding: PaddingValues, community: CommunityViewModel, navigate: 
         (search.isBlank() || (it.text("name") + it.text("description") + it.text("location")).contains(search, true)) }
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { SectionTitle("Ellos esperan una familia", "Adopta con responsabilidad. Conoce a los animales que buscan un hogar.") }
+        item { TextButton(onClick = { community.load("pets", "pets") }, enabled = !feed.loading) { Text("Actualizar adopciones") } }
         item { OutlinedTextField(value = search, onValueChange = { search = it }, label = { Text("Buscar por nombre o ubicación") }, leadingIcon = { Icon(Icons.Outlined.Search, null) }, modifier = Modifier.fillMaxWidth(), singleLine = true) }
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf("all" to "Todos", "perro" to "Perros", "gato" to "Gatos").forEach { (key, label) ->
             FilterChip(selected = species == key, onClick = { species = key }, label = { Text(label) })
@@ -251,11 +267,14 @@ fun UrgentScreen(padding: PaddingValues, community: CommunityViewModel, navigate
 }
 
 @Composable
-fun TransparencyScreen(padding: PaddingValues, community: CommunityViewModel, state: CampaignState, openCampaign: (Int) -> Unit) {
+fun TransparencyScreen(padding: PaddingValues, community: CommunityViewModel, openCampaign: (Int) -> Unit) {
+    val model: CampaignViewModel = viewModel(key = "transparency-campaigns")
+    val state by model.state.collectAsStateWithLifecycle()
     val stats by community.stats.collectAsStateWithLifecycle()
+    val metadataErrors by community.metadataErrors.collectAsStateWithLifecycle()
     val feeds by community.feeds.collectAsStateWithLifecycle()
     val feed = feeds["ledger"] ?: CommunityFeed(loading = true)
-    LaunchedEffect(Unit) { community.loadLedger(); community.loadMetadata() }
+    LaunchedEffect(Unit) { model.load("all"); community.loadLedger(); community.loadMetadata() }
     LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { Icon(Icons.Outlined.VerifiedUser, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(44.dp)); SectionTitle("Transparencia", "Cada aporte tiene un destino. Consulta los ingresos confirmados y los gastos publicados.") }
         item { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -269,10 +288,16 @@ fun TransparencyScreen(padding: PaddingValues, community: CommunityViewModel, st
             }
         } }
         item { SectionTitle("Por campaña") }
+        metadataErrors["donations/stats"]?.let { item { ErrorBlock(it) { community.loadMetadata() } } }
         items(state.campaigns.filter { it.status in setOf("active", "completed") }, key = { "campaign-${it.id}" }) { campaign ->
             OutlinedCard(onClick = { openCampaign(campaign.id) }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(campaign.title, style = MaterialTheme.typography.titleMedium); CampaignFunding(campaign)
             } }
+        }
+        if (state.loading) item { LoadingBlock() }
+        state.error?.let { item { ErrorBlock(it) { model.load("all", append = state.campaigns.isNotEmpty()) } } }
+        if (state.hasMore && !state.loading && state.error == null) item {
+            OutlinedButton(onClick = { model.load("all", append = true) }, modifier = Modifier.fillMaxWidth()) { Text("Cargar más campañas") }
         }
         item { SectionTitle("Movimientos públicos") }
         items(feed.rows) { row -> OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -296,7 +321,20 @@ fun DetailLoader(path: String, community: CommunityViewModel, content: @Composab
         error = null
         try { data = community.api.obj(path) }
         catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { error = failure.message ?: "No se pudo consultar la información." }
+        catch (failure: Exception) { data = null; error = failure.message ?: "No se pudo consultar la información." }
     }
+    RefreshWhileVisible(path) { revision++ }
     content(data, error) { revision++ }
+}
+
+@Composable
+fun RefreshWhileVisible(key: String, refresh: () -> Unit) {
+    val owner = LocalLifecycleOwner.current
+    val currentRefresh by rememberUpdatedState(refresh)
+    LaunchedEffect(owner, key) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            currentRefresh()
+            while (true) { delay(30_000); currentRefresh() }
+        }
+    }
 }

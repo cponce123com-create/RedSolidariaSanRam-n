@@ -205,10 +205,15 @@ app.use(
 // Va DESPUÉS de la sesión para poder detectar adminUser.
 app.use("/api", publicApiLimiter);
 
-// Caché pública (max-age 60s) para GETs anónimos de endpoints públicos.
+// Revalidación HTTP para GETs públicos; las sesiones no se cachean.
 app.use("/api", publicApiCache);
 
 app.use("/api", router);
+// Unknown API endpoints are JSON 404s, never a successful SPA document.
+app.use("/api", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(404).json({ error: "not_found", message: "Ruta de API no encontrada." });
+});
 
 // Servir archivos estáticos del frontend en producción con caching optimizado
 if (process.env.NODE_ENV === "production") {

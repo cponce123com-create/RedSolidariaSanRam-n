@@ -1,3 +1,4 @@
+import { invalidateCampaignQueries } from "@/lib/query-invalidation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { readErrorMessage } from "@/lib/api-error";
 
@@ -179,8 +180,7 @@ export function useCreateExpense(campaignId: number) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -198,8 +198,7 @@ export function useUpdateExpense(campaignId: number) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -214,8 +213,7 @@ export function useDeleteExpense(campaignId: number) {
       if (!res.ok) throw new Error("Failed to delete expense");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "expenses"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -233,8 +231,7 @@ export function useCreateEvidence(campaignId: number) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "evidence"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -252,8 +249,7 @@ export function useUpdateEvidence(campaignId: number) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "evidence"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -268,8 +264,7 @@ export function useDeleteEvidence(campaignId: number) {
       if (!res.ok) throw new Error("Failed to delete evidence");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "evidence"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -302,8 +297,7 @@ export function useCreateLeftover(campaignId: number) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "leftovers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -321,8 +315,7 @@ export function useUpdateLeftover(campaignId: number) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "leftovers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -337,8 +330,7 @@ export function useDeleteLeftover(campaignId: number) {
       if (!res.ok) throw new Error("Failed to delete leftover");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "leftovers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+      invalidateCampaignQueries(queryClient);
     },
   });
 }
@@ -431,9 +423,7 @@ export function usePublicCampaignBudgets(id: number) {
 }
 
 function invalidateBudgetQueries(queryClient: ReturnType<typeof useQueryClient>, campaignId: number) {
-  queryClient.invalidateQueries({ queryKey: ["/api/admin/campaigns", campaignId, "budgets"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "budgets"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/campaigns", campaignId, "transparency"] });
+  invalidateCampaignQueries(queryClient);
 }
 
 export function useCreateBudget(campaignId: number) {
