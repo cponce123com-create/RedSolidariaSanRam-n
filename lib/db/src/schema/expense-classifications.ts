@@ -26,7 +26,8 @@ import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
  */
 export const expenseClassificationsTable = pgTable("expense_classifications", {
   id: serial("id").primaryKey(),
-  expenseId: integer("expense_id").notNull().unique(),
+  // Match migration 029 so schema diffing does not propose a second constraint.
+  expenseId: integer("expense_id").notNull().unique("expense_classifications_expense_unique"),
   /** `demo` | `real` | `pending` (validado además por un CHECK en la base). */
   classification: text("classification").notNull(),
   /** Motivo obligatorio: sin él no se acepta la clasificación. */
