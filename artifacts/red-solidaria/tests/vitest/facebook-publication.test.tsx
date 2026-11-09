@@ -105,3 +105,15 @@ it("a 429 is shown clearly and never causes automatic retries", async () => {
   try { await vi.advanceTimersByTimeAsync(180_000); expect(request).toHaveBeenCalledTimes(1); }
   finally { vi.useRealTimers(); }
 });
+
+it("diagnoses an expired token without making a publication POST", async () => {
+  const request = vi.fn(async (url: RequestInfo | URL) => new Response(JSON.stringify(String(url).endsWith('/diagnosis')
+    ? { status: 'invalid_token', message: 'El token caducó o fue revocado.' }
+    : { publication: { status: 'failed', attempts: 1, lastError: 'Token no válido', postUrl: null }, autoPublishEnabled: true, publishable: true }), { status: 200 }));
+  vi.stubGlobal('fetch', request);
+  renderWithProviders(<FacebookPublicationStatus kind="donation" sourceId={73} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Ver estado de Facebook' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Diagnosticar sin publicar' }));
+  expect(await screen.findByRole('status')).toHaveTextContent('El token caducó o fue revocado.');
+  expect(request.mock.calls.every(call => call.length === 1 || (call[1] as RequestInit | undefined)?.method !== 'POST')).toBe(true);
+});
