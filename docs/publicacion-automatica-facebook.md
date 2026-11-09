@@ -94,3 +94,12 @@ Al guardar, el aporte queda pendiente. La publicación se activa con la aprobaci
 Ante un resultado de registro incierto por fallo de red, el formulario conserva la misma solicitud y clave de idempotencia: «Reintentar el mismo registro» recupera el aporte sin crear otro. Durante la subida o el guardado se bloquea el cierre del diálogo. Una validación rechazada permite corregir los campos.
 
 La migración 039 añade columnas; no borra datos ni publica aportes anteriores. No se requieren nuevas variables de Facebook. Las subidas usan la configuración Cloudinary existente del servidor (`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`).
+
+
+### Consultas del panel y subidas de imágenes
+
+Cada fila ofrece **Ver estado de Facebook**: las filas cerradas no hacen consultas. Solo los envíos pendientes o en curso, con el panel abierto y la publicación automática activa, se actualizan una vez por minuto. Los registros sin envío, publicados o con errores no se consultan indefinidamente; un error 429 requiere reintento manual y no produce una tormenta de reintentos. Abrir una vista previa ya cargada no genera otra consulta.
+
+Las lecturas autenticadas de `/admin` tienen un presupuesto independiente (180 por minuto por cuenta). Las escrituras y las firmas de subida conservan su límite anterior. Consultar estados de Facebook ya no consume la autorización para subir imágenes. La firma, la autorización por rol y las restricciones de formato de Cloudinary se mantienen.
+
+Si la subida recibe 429, se informa del límite de solicitudes. Si falta la configuración de Cloudinary, se conserva el mensaje concreto del servidor en lugar de ocultarlo bajo un 503 genérico. No se requieren variables nuevas.
