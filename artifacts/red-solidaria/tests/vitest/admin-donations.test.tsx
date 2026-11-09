@@ -86,6 +86,20 @@ describe("AdminDonations", () => {
     }];
   });
 
+  it("una nota administrativa no oculta Adjuntar ni la identidad interna de un donante anónimo", async () => {
+    const original = donationsMock.donations;
+    donationsMock.donations = [{ ...original[0], anonymous: true, receiptUrl: null, receiptNote: "Registro administrativo por WhatsApp" }];
+    try {
+      renderWithProviders(<AdminDonations />);
+      expect(screen.getByTestId("btn-attach-proof")).toBeInTheDocument();
+      expect(screen.getByText("María Quispe")).toBeInTheDocument();
+      expect(screen.getByText("Nombre privado en público")).toBeInTheDocument();
+      const user = userEvent.setup();
+      await user.type(screen.getByLabelText("Buscar donaciones"), "María");
+      expect(screen.getByText("María Quispe")).toBeInTheDocument();
+    } finally { donationsMock.donations = original; }
+  });
+
   it("fila sin id numérico (datos stale de un redeploy) no dispara PUT /undefined", async () => {
     // Simula la sesión con datos de antes del redeploy: la fila no trae id.
     donationsMock.donations = [{

@@ -1,3 +1,4 @@
+import { donationPublicationMigrationSql } from "./donation-publication-migration";
 import { notificationMigrationSql } from "./notification-migration";
 import { facebookMigrationSql } from "./facebook-migration";
 import { facebookContentMigrationSql } from "./facebook-content-migration";
@@ -1038,6 +1039,7 @@ const MIGRATIONS: Array<{ name: string; sql: string }> = [
   { name: "036_public_notifications.sql", sql: notificationMigrationSql },
   { name: "037_facebook_publications.sql", sql: facebookMigrationSql },
   { name: "038_facebook_public_content.sql", sql: facebookContentMigrationSql },
+  { name: "039_donation_publication_assets.sql", sql: donationPublicationMigrationSql },
 ];
 
 /**

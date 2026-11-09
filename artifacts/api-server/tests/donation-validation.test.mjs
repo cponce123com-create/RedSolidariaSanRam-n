@@ -174,3 +174,15 @@ test("approvalRequiresProof: en especie nunca exige comprobante", () => {
   assert.equal(approvalRequiresProof("cash", "dinero"), false);
   assert.equal(approvalRequiresProof("other", "productos"), false);
 });
+
+
+test("public photo requires explicit authorization, Cloudinary URL, public ID and a known template", () => {
+  const image = { publicationImageUrl: "https://res.cloudinary.com/test/image/upload/public.jpg", publicationImagePublicId: "public", publicPhotoConsent: true, publicationTemplate: "impacto" };
+  assert.equal(donationInputSchema.safeParse({ ...VALID, ...image }).success, true);
+  for (const invalid of [{ publicPhotoConsent: false }, { publicationImagePublicId: null }, { publicationImageUrl: "https://evil.example/photo.jpg" }, { publicationImageUrl: "http://res.cloudinary.com/photo.jpg" }, { publicationTemplate: "arbitrary" }]) {
+    assert.equal(donationInputSchema.safeParse({ ...VALID, ...image, ...invalid }).success, false);
+  }
+  const plain = donationInputSchema.parse(VALID);
+  assert.equal(plain.publicationTemplate, "agradecimiento");
+  assert.equal(plain.publicPhotoConsent, false);
+});

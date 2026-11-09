@@ -123,7 +123,7 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
   // inesperados, que responden 500 en lugar de disfrazarse de validación.
   const parsed = donationInputSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: "validation_error", message: "Invalid donation data" });
+    return res.status(400).json({ error: "validation_error", message: parsed.error.issues[0]?.message || "Revisa los datos del aporte." });
   }
 
   let dedupeToken: string | null = null;
@@ -271,8 +271,8 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
-          phone: data.phone ?? null,
-          amount: data.amount,
+          phone,
+          amount: moneyAmount,
           // Una donación en especie no tiene método de pago; "other" es la
           // convención ya usada por las donaciones históricas en especie
           // (ver src/lib/chocofest-2025-data.ts).
@@ -283,6 +283,11 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
           // predeterminada; el nombre solo se publica con consentimiento.
           anonymous: data.anonymous ?? true,
           adminNote: data.adminNote ?? null,
+          contactConsent: data.contactConsent ?? false,
+          orgName: data.orgName ?? null,
+          publicationTemplate: data.publicationTemplate,
+          publicationImageUrl: data.publicationImageUrl || null,
+          publicationImagePublicId: data.publicationImageUrl ? data.publicationImagePublicId : null,
           publicProof: data.publicProof ?? false,
           receiptNote: data.receiptNote ?? null,
           status: "pending",
@@ -298,6 +303,14 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
           granted: true,
           version: CONSENT_VERSION,
           reason: null,
+          recordedBy: req.session?.adminUser?.username ?? null,
+        });
+      }
+
+      if (data.publicationImageUrl && data.publicPhotoConsent) {
+        await tx.insert(donationConsentsTable).values({
+          donationId: row.id, donorId, scope: "public_photo", granted: true,
+          version: CONSENT_VERSION, reason: null,
           recordedBy: req.session?.adminUser?.username ?? null,
         });
       }
@@ -330,6 +343,7 @@ router.post("/donations", ...adminOnly, donationLimiter, async (req, res) => {
           .update(donationsTable)
           .set({ receiptUrl: proofUrl })
           .where(eq(donationsTable.id, row.id));
+        row.receiptUrl = proofUrl;
       }
 
       return row;

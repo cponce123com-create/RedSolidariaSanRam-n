@@ -22,6 +22,10 @@ export const donationsTable = pgTable("donations", {
   publicProof: boolean("public_proof").notNull().default(false),
   receiptUrl: text("receipt_url"),
   receiptNote: text("receipt_note"),
+  // Public recognition photo is independent of the private payment proof.
+  publicationImageUrl: text("publication_image_url"),
+  publicationImagePublicId: text("publication_image_public_id"),
+  publicationTemplate: text("publication_template").notNull().default("agradecimiento"),
   status: text("status").notNull().default("pending"),
   adminNote: text("admin_note"),
   // Fase 3: perfil de donante (persona/familia/empresa/anónimo) al que

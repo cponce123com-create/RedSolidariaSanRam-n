@@ -5,7 +5,28 @@ import { checkFacebookConnection } from "../lib/facebook";
 import { facebookPublishConfiguration, facebookMessage, isFacebookSource } from "../lib/facebook-publisher";
 import { readFacebookContent, readFacebookPublication, requestFacebookPublication } from "../lib/facebook-outbox";
 
+import { z } from "zod";
+import { donationFacebookContent } from "../lib/facebook-public-content";
+
 const router = Router();
+const draftSchema = z.object({
+  amount: z.number().finite().nonnegative(),
+  collaborationType: z.enum(["dinero", "productos", "servicios", "logistica"]),
+  campaignId: z.number().int().positive().nullable(),
+  campaignTitle: z.string().max(300).nullable(),
+  recognitionName: z.string().max(210).nullable(),
+  publicationTemplate: z.enum(["agradecimiento", "impacto", "comunidad"]),
+  publicationImageUrl: z.string().url().max(2000).nullable(),
+});
+router.post("/admin/integrations/facebook/donation-preview", requireAdmin, requireRole(ROLES.ADMIN), (req, res) => {
+  res.setHeader("Cache-Control", "private, no-store");
+  const parsed = draftSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Completa el tipo y un monto válido para ver la plantilla." });
+  const content = donationFacebookContent({ ...parsed.data, id: 0, campaignImage: null });
+  const config = facebookPublishConfiguration();
+  const formatted = config.siteUrl ? facebookMessage(content, config.siteUrl) : null;
+  return res.json({ title: content.title, summary: content.summary, imageUrl: content.imageUrl, message: formatted?.message ?? `${content.title}\n\n${content.summary}`, link: formatted?.link ?? null });
+});
 
 router.get("/admin/integrations/facebook/status", requireAdmin, requireRole(ROLES.SUPERADMIN), async (_req, res) => {
   res.setHeader("Cache-Control", "private, no-store");
