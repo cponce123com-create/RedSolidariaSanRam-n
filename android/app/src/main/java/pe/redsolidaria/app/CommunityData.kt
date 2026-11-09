@@ -61,6 +61,9 @@ class CommunityViewModel : ViewModel() {
     private val mutableMetadataErrors = MutableStateFlow<Map<String, String>>(emptyMap())
     val metadataErrors = mutableMetadataErrors.asStateFlow()
 
+    // loadMetadata() reads this cache synchronously during construction.
+    private val cmsLoadedAt = mutableMapOf<String, Long>()
+
     init {
         loadMetadata()
         load("urgent", "reports/urgent")
@@ -79,8 +82,6 @@ class CommunityViewModel : ViewModel() {
         load("donations/stats") { mutableStats.value = it }
         loadCms("inicio")
     }
-
-    private val cmsLoadedAt = mutableMapOf<String, Long>()
 
     fun loadCms(slug: String) {
         if (System.nanoTime() - (cmsLoadedAt[slug] ?: 0L) < 60_000_000_000L && mutableCms.value.containsKey(slug)) return
