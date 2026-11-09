@@ -52,3 +52,21 @@ it("does not offer to publish a draft campaign", async () => {
   await screen.findByText("Se enviará al activar la campaña.");
   expect(screen.queryByRole("button")).not.toBeInTheDocument();
 });
+
+it("shows the server-approved donation preview while preventing a read-only user from sending", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ publication: null, autoPublishEnabled: true,
+    publishable: true, canRequest: false, preview: { title: "Nuevo aporte", summary: "Anónimo", imageUrl: null, link: "https://example.org/transparencia",
+      message: "Confirmamos un aporte de S/ 50.00. Gracias a una persona solidaria." } }), { status: 200 })));
+  renderWithProviders(<FacebookPublicationStatus kind="donation" sourceId={5} />);
+  await screen.findByText("Vista previa de Facebook");
+  expect(screen.getByText(/Confirmamos un aporte de S\/ 50.00/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Enviar a Facebook" })).not.toBeInTheDocument();
+});
+
+it("the server eligibility check cannot be bypassed by the parent UI flag", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ publication: null, autoPublishEnabled: true,
+    publishable: false, preview: null }), { status: 200 })));
+  renderWithProviders(<FacebookPublicationStatus kind="donation" sourceId={5} publishable waitingText="Confirma el aporte antes de publicarlo." />);
+  await screen.findByText("Confirma el aporte antes de publicarlo.");
+  expect(screen.queryByRole("button", { name: "Enviar a Facebook" })).not.toBeInTheDocument();
+});
