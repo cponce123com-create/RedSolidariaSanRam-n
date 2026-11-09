@@ -12,6 +12,7 @@
  */
 
 export type UploadFailureKind =
+  | "rate_limit"
   | "network"
   | "signature"
   | "format"
@@ -56,6 +57,11 @@ export function describeUploadFailure(input: UploadFailureInput): UploadFailure 
     };
   }
 
+  if (input.status === 429) return {
+    kind: "rate_limit",
+    message: "Se alcanzó temporalmente el límite de solicitudes para subir imágenes. Espera el tiempo indicado por el servidor y vuelve a intentar. " + server,
+  };
+
   if (cloud && FORMAT_RE.test(cloud)) {
     return {
       kind: "format",
@@ -92,8 +98,7 @@ export function describeUploadFailure(input: UploadFailureInput): UploadFailure 
   if (status !== null && status >= 500) {
     return {
       kind: "server",
-      message:
-        "El servicio de imágenes no está disponible en este momento. Inténtalo de nuevo en unos minutos.",
+      message: server || "El servicio de imágenes no está disponible en este momento. Inténtalo de nuevo en unos minutos.",
     };
   }
 
