@@ -103,3 +103,14 @@ Cada fila ofrece **Ver estado de Facebook**: las filas cerradas no hacen consult
 Las lecturas autenticadas de `/admin` tienen un presupuesto independiente (180 por minuto por cuenta). Las escrituras y las firmas de subida conservan su límite anterior. Consultar estados de Facebook ya no consume la autorización para subir imágenes. La firma, la autorización por rol y las restricciones de formato de Cloudinary se mantienen.
 
 Si la subida recibe 429, se informa del límite de solicitudes. Si falta la configuración de Cloudinary, se conserva el mensaje concreto del servidor en lugar de ocultarlo bajo un 503 genérico. No se requieren variables nuevas.
+
+
+### Token rechazado y aportes de prueba
+
+«Token caducado o revocado» requiere sustituir **FACEBOOK_PAGE_ACCESS_TOKEN en Render** por un token de página vigente y desplegar el cambio. La aplicación no puede renovar por sí sola una credencial revocada. Antes de volver a enviar contenido real, comprobar la identidad de la página y revisar el vencimiento en el depurador de Meta. No reintentar publicaciones de prueba que deben retirarse de contabilidad.
+
+**Diagnosticar sin publicar** es una consulta de lectura, por solicitud del operador: distingue configuración incompleta, contenido no elegible y token rechazado. Una identidad correcta no demuestra el permiso de escritura; este se confirma en un envío real autorizado. Los rechazos nuevos guardan código y subcódigo numéricos de Meta, sin mensajes brutos que puedan contener credenciales.
+
+Un aporte pendiente se puede rechazar. Si ya está aprobado o conciliado, usar **Anular contablemente** con un motivo de al menos 10 caracteres, contraseña y 2FA cuando corresponda. «Usar motivo: aporte de prueba» rellena una explicación válida, pero la confirmación sigue siendo explícita. El aporte deja de contar en las cifras y conserva la corrección en el libro; no se borra el historial.
+
+La migración 040 cancela trabajos seguros no enviados (pendientes o fallidos) de aportes anulados/rechazados/retirados, incluidos los retirados antes del despliegue. No cambia importes ni asientos. Las publicaciones aceptadas, los envíos en curso y los resultados inciertos conservan su estado para revisión; no se afirma que se haya borrado un post de Facebook.
