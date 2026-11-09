@@ -11,7 +11,7 @@ describe("Footer", () => {
     const facebook = screen.getByRole("link", { name: "Facebook de Red Solidaria San Ramón" });
     const instagram = screen.getByRole("link", { name: "Instagram de Red Solidaria San Ramón" });
 
-    expect(facebook).toHaveAttribute("href", "https://facebook.com/redsolidariasanramon");
+    expect(facebook).toHaveAttribute("href", "https://www.facebook.com/redsolidariasr");
     expect(facebook).toHaveAttribute("target", "_blank");
     expect(instagram).toHaveAttribute("href", "https://instagram.com/redsolidariasanramon");
     expect(instagram).toHaveAttribute("target", "_blank");
