@@ -23,7 +23,12 @@ export function facebookPublishConfiguration(env: FacebookPublishEnv = process.e
     if (url.protocol === "https:" && !url.username && !url.password && url.pathname === "/" && !url.search && !url.hash
       && !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) siteUrl = url.origin;
   } catch { /* Show a configuration error without leaking values. */ }
-  return { pageId, token, siteUrl, enabled: !["false", "0"].includes(env.FACEBOOK_AUTO_PUBLISH_ENABLED?.trim().toLowerCase() ?? "")
+  const issues: string[] = [];
+  if (!/^\d+$/.test(pageId)) issues.push("Configura FACEBOOK_PAGE_ID con el ID numérico de tu página.");
+  if (!token) issues.push("Falta FACEBOOK_PAGE_ACCESS_TOKEN en Render.");
+  if (!siteUrl) issues.push("Configura SITE_URL con la dirección HTTPS pública de tu web, sin rutas adicionales.");
+  if (["false", "0"].includes(env.FACEBOOK_AUTO_PUBLISH_ENABLED?.trim().toLowerCase() ?? "")) issues.push("La publicación está pausada por FACEBOOK_AUTO_PUBLISH_ENABLED.");
+  return { pageId, token, siteUrl, issues, enabled: !["false", "0"].includes(env.FACEBOOK_AUTO_PUBLISH_ENABLED?.trim().toLowerCase() ?? "")
     && /^\d+$/.test(pageId) && Boolean(token) && Boolean(siteUrl) };
 }
 
@@ -63,11 +68,14 @@ export async function sendFacebookPublication(content: FacebookContent, env: Fac
       return { kind: "uncertain", message: "Meta respondió sin un identificador verificable. Revisa la página antes de reintentar." };
     }
     const error = data.error && typeof data.error === "object" ? data.error as Record<string, unknown> : {};
+    const code = Number.isSafeInteger(error.code) ? Number(error.code) : null;
+    const subcode = Number.isSafeInteger(error.error_subcode) ? Number(error.error_subcode) : null;
+    const detail = code !== null ? ` (Meta: ${code}${subcode !== null ? `, subcódigo: ${subcode}` : ""})` : "";
     if (response.status >= 500) return { kind: "uncertain", message: "Meta devolvió un error de servidor. Revisa si publicó antes de reintentar." };
     if (response.status === 429 || [4, 17, 32, 613].includes(Number(error.code))) return { kind: "retry", message: "Meta limitó temporalmente los envíos. Se reintentará automáticamente." };
-    if (error.code === 190) return { kind: "failed", message: "El token caducó o fue revocado. Actualízalo en Render y reintenta." };
-    if ([10, 200].includes(Number(error.code))) return { kind: "failed", message: "Meta no autorizó publicar. Revisa pages_manage_posts y el acceso a la página." };
-    return { kind: "failed", message: "Meta rechazó la publicación. Revisa permisos, enlace e imagen y reintenta." };
+    if (error.code === 190) return { kind: "failed", message: `El token caducó o fue revocado. Actualiza FACEBOOK_PAGE_ACCESS_TOKEN en Render con un token de página vigente y reintenta.${detail}` };
+    if ([10, 200].includes(Number(error.code))) return { kind: "failed", message: `Meta no autorizó publicar. Revisa pages_manage_posts y el acceso a la página; si cambias permisos debes generar un nuevo token de página.${detail}` };
+    return { kind: "failed", message: `Meta rechazó la publicación. Revisa permisos, enlace e imagen y reintenta.${detail}` };
   } catch {
     return { kind: "uncertain", message: "Se perdió la respuesta de Meta. Comprueba si la publicación existe antes de reintentar." };
   }
