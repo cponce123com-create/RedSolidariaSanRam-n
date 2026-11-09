@@ -175,3 +175,37 @@ test("reauthLimiter: los aciertos y los rechazos NO son intentos fallidos de con
     await new Promise((resolve) => server.close(resolve));
   }
 });
+
+
+test("admin reads and image-signature actions have separate budgets, while both remain bounded", async () => {
+  const express = (await import("express")).default;
+  const mod = await import("./dist/middleware/rate-limit.mjs?split=" + Date.now());
+  const app = express();
+  app.use((req, _res, next) => { req.session = { adminUser: { id: 9191, username: 'rate-test', role: 'administrador' } }; next(); });
+  app.use('/api/admin', mod.adminRouteLimiter);
+  app.get('/api/admin/status', (_req, res) => res.json({ ok: true }));
+  app.post('/api/uploads/admin-signature', mod.adminActionLimiter, (_req, res) => res.json({ authorized: true }));
+  const server = app.listen(0); await new Promise(r => server.once('listening', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (let i = 0; i < 180; i++) assert.equal((await fetch(base + '/api/admin/status')).status, 200);
+    assert.equal((await fetch(base + '/api/admin/status')).status, 429);
+    for (let i = 0; i < 30; i++) assert.equal((await fetch(base + '/api/uploads/admin-signature', { method: 'POST' })).status, 200);
+    assert.equal((await fetch(base + '/api/uploads/admin-signature', { method: 'POST' })).status, 429);
+  } finally { await new Promise(r => server.close(r)); }
+});
+
+test("real router: checking many Facebook states does not block image authorization", async () => {
+  const express = (await import('express')).default;
+  const { default: router } = await import('./dist/routes/index.mjs?read-upload=' + Date.now());
+  const app = express(); app.use(express.json());
+  app.use((req, _res, next) => { req.session = { adminUser: { id: 717171, username: 'read-upload-test', role: 'administrador' } }; next(); });
+  app.use('/api', router);
+  const server = app.listen(0); await new Promise(r => server.once('listening', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    for (let i = 0; i < 120; i++) assert.equal((await fetch(base + '/api/admin/integrations/facebook/publications/donation/0')).status, 400, 'authorized read reaches validation');
+    const upload = await fetch(base + '/api/uploads/admin-signature', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    assert.ok([200,503].includes(upload.status), 'upload reaches configuration/signature handler instead of 429');
+  } finally { await new Promise(r => server.close(r)); }
+});

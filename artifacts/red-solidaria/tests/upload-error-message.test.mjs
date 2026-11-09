@@ -76,3 +76,14 @@ test("V18.1: 'Invalid credentials' también se propaga", () => {
   const f = describeUploadFailure({ status: 401, cloudinaryMessage: "Invalid credentials" });
   assert.match(f.message, /Invalid credentials/);
 });
+
+
+test("429 explains the upload request limit instead of a signature error", () => {
+  const f = describeUploadFailure({ status: 429, serverMessage: "Espera un minuto." });
+  assert.equal(f.kind, "rate_limit");
+  assert.match(f.message, /límite de solicitudes/);
+});
+test("missing Cloudinary configuration is preserved on 503", () => {
+  const f = describeUploadFailure({ status: 503, serverMessage: "Cloudinary no está configurado." });
+  assert.match(f.message, /Cloudinary no está configurado/);
+});

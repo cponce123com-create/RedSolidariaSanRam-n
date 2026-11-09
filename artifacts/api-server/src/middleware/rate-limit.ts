@@ -87,6 +87,26 @@ export const adminActionLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
+// Reads must not spend the mutation/upload budget. Authentication remains in the
+// global gate; this separate bounded budget is per account, never client headers.
+export const adminReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 180,
+  keyGenerator: req => {
+    const admin = req.session?.adminUser;
+    return admin ? `admin-read:${admin.id}:${admin.username}` : `admin-read-ip:${ipKeyGenerator(req.ip ?? "unknown")}`;
+  },
+  message: { error: "too_many_reads", message: "Hay demasiadas consultas del panel. Espera un minuto antes de volver a consultar." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export function adminRouteLimiter(req: Request, res: Response, next: NextFunction) {
+  return ["GET", "HEAD"].includes(req.method)
+    ? adminReadLimiter(req, res, next)
+    : adminActionLimiter(req, res, next);
+}
+
 // Reautenticación de operaciones IRREVERSIBLES (purga de campañas DEMO).
 // Presupuesto estrecho por usuario admin: una sesión robada no puede usar el
 // endpoint como oráculo para adivinar la contraseña del superadmin. Es

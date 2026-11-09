@@ -92,10 +92,10 @@ export async function uploadImageToCloudinary(
       body: JSON.stringify(signatureBody),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { message?: string } | null;
+      const body = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
       const failure = describeUploadFailure({
         status: res.status,
-        serverMessage: body?.message ?? null,
+        serverMessage: body?.message ?? body?.error ?? null,
       });
       throw new UploadError(failure.message, "init", failure.kind);
     }
