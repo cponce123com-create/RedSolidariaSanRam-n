@@ -115,7 +115,7 @@ export function Footer() {
             </p>
             <div className="flex gap-3">
               <a
-                href="https://facebook.com/redsolidariasanramon"
+                href="https://www.facebook.com/redsolidariasr"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={t("footer.facebookAria")}
