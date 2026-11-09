@@ -1,11 +1,8 @@
 package pe.redsolidaria.app
 
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
 import org.junit.Rule
 import org.junit.Test
 
@@ -14,9 +11,10 @@ class NativeNavigationTest {
 
     private fun screenshot(name: String) {
         compose.waitForIdle()
-        val directory = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "screenshots")
-        directory.mkdirs()
-        File(directory, name).outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        listOf("mkdir -p /sdcard/Download/redsolidaria-screenshots", "screencap -p /sdcard/Download/redsolidaria-screenshots/$name").forEach { command ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+        }
     }
 
     @Test fun referenceIdentityAndMainNavigationArePresent() {

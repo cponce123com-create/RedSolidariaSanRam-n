@@ -79,7 +79,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
             gradle -p android connectedDebugAndroidTest --stacktrace
-            adb pull /sdcard/Android/data/pe.redsolidaria.sanramon/files/screenshots/ android/screenshots/
+            adb pull /sdcard/Download/redsolidaria-screenshots/ android/screenshots/
       - name: Upload actual Android screenshots
         if: always()
         uses: actions/upload-artifact@v4

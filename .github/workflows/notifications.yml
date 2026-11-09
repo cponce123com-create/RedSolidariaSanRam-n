@@ -36,5 +36,8 @@ jobs:
           NOTIFICATIONS_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/notifications_test
       - name: Test web and API
         run: pnpm -r --if-present test
+        env:
+          # These unit/auth tests intentionally do not use the PostgreSQL service.
+          DATABASE_URL: postgres://localhost:1/nonexistent
       - name: Build web and API
         run: pnpm run build
