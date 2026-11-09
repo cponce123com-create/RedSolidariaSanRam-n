@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect, type ReactNode } from "react";
-import { publicRefreshInterval, subscribeToEntityChanges } from "@/lib/query-sync";
+import { subscribeToEntityChanges } from "@/lib/query-sync";
+import { createAppQueryClient } from "@/lib/query-client";
 import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { DynamicFavicon } from "@/components/shared/DynamicFavicon";
 import { MotionConfig } from "framer-motion";
 import { Toaster } from "@/components/ui/toaster";
@@ -74,16 +75,7 @@ const AdminPageEditor = lazy(() => import("./pages/admin/page-editor"));
 
 // Revalidate on navigation/focus and while visible. Entity invalidation also
 // crosses tabs; the server revalidates HTTP caches after publication changes.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 60_000,
-      refetchOnWindowFocus: "always",
-      refetchOnMount: "always",
-      refetchInterval: query => query.state.error ? false : publicRefreshInterval(query.queryKey),
-    },
-  },
-});
+const queryClient = createAppQueryClient();
 
 function MainLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
