@@ -97,7 +97,9 @@ export default defineConfig(({ mode }) => ({
       react: path.resolve(import.meta.dirname, "node_modules", "react"),
       "react-dom": path.resolve(import.meta.dirname, "node_modules", "react-dom"),
     },
-    dedupe: ["react", "react-dom"],
+    // The Zod resolver imports zod/v4/core without declaring Zod as a peer.
+    // Resolve it from this app, including when pnpm has no hoisted Zod link.
+    dedupe: ["react", "react-dom", "zod"],
   },
   root: path.resolve(import.meta.dirname),
   build: {
