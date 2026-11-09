@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { FacebookPublicationStatus } from "@/components/admin/FacebookPublicationStatus";
 import { 
   useGetDonations, 
   useUpdateDonationStatus, 
@@ -560,6 +561,9 @@ export default function AdminDonations() {
                     )}
                   </TableCell>
                   <TableCell>
+                    {typeof d.id === "number" && <FacebookPublicationStatus kind="donation" sourceId={d.id}
+                      publishable={["approved", "reconciled"].includes(d.status)}
+                      waitingText="Se enviará al confirmar el dinero o verificar el aporte en especie. El nombre requiere autorización explícita vigente." />}
                     {d.campaignId ? (
                       <span className="text-sm font-medium">{d.campaignTitle || `Campaña #${d.campaignId}`}</span>
                     ) : (
