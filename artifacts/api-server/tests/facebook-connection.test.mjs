@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 import { checkFacebookConnection } from "./dist/lib/facebook.mjs";
-import facebookRouter from "./dist/routes/facebook.mjs";
+process.env.DATABASE_URL ??= "postgres://localhost:5432/nonexistent";
+const { default: facebookRouter } = await import("./dist/routes/facebook.mjs");
 
 const token = "fake-token-for-tests-only";
 const env = { FACEBOOK_PAGE_ID: "914513275073067", FACEBOOK_PAGE_ACCESS_TOKEN: token };
