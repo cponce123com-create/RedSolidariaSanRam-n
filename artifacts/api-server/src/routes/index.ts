@@ -40,7 +40,7 @@ import maintenanceRouter from "./maintenance";
 import maintenanceExpensesRouter from "./maintenance-expenses";
 import campaignClosureRouter from "./campaign-closure";
 import { requireAdmin } from "../middleware/require-admin";
-import { adminActionLimiter } from "../middleware/rate-limit";
+import { adminRouteLimiter } from "../middleware/rate-limit";
 
 const router: IRouter = Router();
 
@@ -52,9 +52,9 @@ router.use(adminTwoFactorRouter);
 
 // ─── Gate global de autorización ──────────────────────────────────────────────
 // UN solo punto de control para toda ruta /admin/* que no sea de autenticación:
-// exige sesión de administrador + rate limit. Evita chequeos manuales dispersos
+// exige sesión de administrador + presupuestos separados de lectura y acción. Evita chequeos manuales dispersos
 // y que un router montado antes intercepte rutas públicas del prefijo /admin.
-router.use("/admin", requireAdmin, adminActionLimiter);
+router.use("/admin", requireAdmin, adminRouteLimiter);
 
 router.use(healthRouter);
 router.use(facebookRouter);
