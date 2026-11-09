@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useCampaignAnnulmentPreview,
   useDonationAnnulment,
@@ -93,10 +94,16 @@ export function DonationVoidDialog({
     !isBulk || (campaignId !== null && campaignIdentifierMatches(identifier, campaignId));
   const canConfirm = isBulk ? Boolean(plan?.allowed) : true;
 
-  const close = () => onOpenChange(false);
+  const missing = !reasonOk ? `El motivo requiere mínimo ${MIN_ANNUL_REASON} caracteres; has escrito ${reason.trim().length}.`
+    : password.length === 0 ? "Introduce tu contraseña para confirmar la anulación."
+    : !identifierOk ? `Escribe ${campaignId} para confirmar la campaña.`
+    : !acknowledged ? "Marca la casilla de confirmación para continuar." : null;
+  const close = () => { if (!busy) onOpenChange(false); };
 
   const submit = () => {
     setFormError(null);
+    if (busy || !canConfirm) return;
+    if (missing) { setFormError(missing); return; }
     const payload = { reason: reason.trim(), password, totpCode: totpCode || undefined };
     if (isBulk) {
       if (!campaignId) return;
@@ -120,7 +127,7 @@ export function DonationVoidDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(value) => { if (!busy) onOpenChange(value); }}>
       <DialogContent className="sm:max-w-[620px] rounded-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-display flex items-center gap-2">
@@ -246,13 +253,21 @@ export function DonationVoidDialog({
 
               <div className="space-y-1.5">
                 <Label htmlFor="annul-reason">Motivo (obligatorio)</Label>
-                <Input
+                <Textarea
                   id="annul-reason"
+                  name="donation_void_reason"
+                  autoComplete="off"
+                  disabled={busy}
+                  minLength={MIN_ANNUL_REASON}
+                  aria-describedby="annul-reason-help"
+                  aria-invalid={reason.length > 0 && !reasonOk}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder={`Explica por qué se anula (mínimo ${MIN_ANNUL_REASON} caracteres)`}
                   className="rounded-xl"
                 />
+                <p id="annul-reason-help" className="text-xs text-muted-foreground">{reason.trim().length}/{MIN_ANNUL_REASON} caracteres mínimos. El motivo queda registrado en la auditoría.</p>
+                <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => setReason("Aporte de prueba registrado por error; no corresponde a un ingreso real.")}>Usar motivo: aporte de prueba</Button>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -261,6 +276,8 @@ export function DonationVoidDialog({
                   <Input
                     id="annul-password"
                     type="password"
+                    disabled={busy}
+                    name="donation_void_password"
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -272,6 +289,9 @@ export function DonationVoidDialog({
                   <Input
                     id="annul-totp"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
+                    disabled={busy}
+                    maxLength={6}
                     value={totpCode}
                     onChange={(e) => setTotpCode(e.target.value)}
                     placeholder="123456"
@@ -287,6 +307,7 @@ export function DonationVoidDialog({
                   </Label>
                   <Input
                     id="annul-identifier"
+                    disabled={busy}
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder={String(campaignId ?? "")}
@@ -298,6 +319,7 @@ export function DonationVoidDialog({
               <div className="flex items-start gap-2">
                 <Checkbox
                   id="annul-ack"
+                  disabled={busy}
                   checked={acknowledged}
                   onCheckedChange={(value) => setAcknowledged(value === true)}
                 />
@@ -320,6 +342,7 @@ export function DonationVoidDialog({
           </div>
         )}
 
+        {canConfirm && missing && <p role="status" className="text-sm text-amber-800">{missing}</p>}
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" className="rounded-xl" onClick={close} disabled={busy}>
             Cancelar
